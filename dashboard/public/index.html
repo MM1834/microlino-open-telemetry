@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>MOT Dashboard</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Microlino Open Telemetry</p>
+        <h1>MOT Dashboard</h1>
+      </div>
+      <div class="status-pill" id="connectionStatus">offline</div>
+    </header>
+
+    <section class="grid">
+      <article class="card soc-card">
+        <span class="label">State of Charge</span>
+        <div class="big"><span id="soc">--</span><small>%</small></div>
+        <div class="bar"><div id="socBar"></div></div>
+      </article>
+
+      <article class="card">
+        <span class="label">Range</span>
+        <div class="value"><span id="range">--</span><small>km</small></div>
+      </article>
+
+      <article class="card">
+        <span class="label">Speed</span>
+        <div class="value"><span id="speed">--</span><small>km/h</small></div>
+      </article>
+
+      <article class="card">
+        <span class="label">Odometer</span>
+        <div class="value"><span id="odo">--</span><small>km</small></div>
+      </article>
+
+      <article class="card">
+        <span class="label">Charging</span>
+        <div class="value" id="charging">--</div>
+      </article>
+
+      <article class="card">
+        <span class="label">Last update</span>
+        <div class="value" id="lastUpdate">--</div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>MQTT Connection</h2>
+      <div class="form-grid">
+        <label>WebSocket URL<input id="mqttUrl" placeholder="wss://mqtt.example.net"></label>
+        <label>Base topic<input id="baseTopic" value="mot/microlino"></label>
+        <label>Username<input id="mqttUser"></label>
+        <label>Password<input id="mqttPass" type="password"></label>
+      </div>
+      <div class="actions">
+        <button id="connectBtn">Connect</button>
+        <button id="saveBtn" class="secondary">Save settings</button>
+      </div>
+      <p class="hint">The dashboard connects directly from your browser to MQTT over WebSocket.</p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
