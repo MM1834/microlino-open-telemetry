@@ -1,50 +1,34 @@
 # Firmware Structure
 
-MOT firmware is split into reusable common modules and board-specific targets.
+MOT separates platform-independent logic from board-specific hardware integration.
 
-```text
-firmware/
-  common/
-    app/
-    config/
-    network/
-    mqtt/
-    telemetry/
-    can/
-    decoders/
-    api/
-    web/
-    abrp/
-    ota/
-    system/
+## Common
 
-  esp32-wroom/
-    platformio.ini
-    include/board_config.h
-    src/main.cpp
-
-  lilygo-t-a7670/
-```
-
-## Principle
-
-Board-specific code defines pins, hardware capabilities and startup wiring.
-
-Common code implements the platform logic:
+`firmware/common/` contains:
 
 - telemetry model
-- CAN frame dispatching
-- decoders
-- MQTT publishing
-- JSON API
-- web configuration
-- ABRP upload
-- OTA
+- CAN frame types
+- decoder engine
+- display CAN decoder
+- JSON serialization
+- MQTT topic helpers
+- version/device ID helpers
 
-## Rule
+Common code must not depend on WiFi, WebServer, TWAI setup, LTE, GPS, board pins, or storage backends.
 
-Decoders must not publish MQTT, call ABRP, or render web pages.
+## ESP32-WROOM
 
-Decoders only write to the telemetry model.
+`firmware/esp32-wroom/` contains:
 
-Outputs only read from the telemetry model.
+- PlatformIO project
+- board pin configuration
+- WiFi/AP fallback
+- MQTT client
+- Web UI
+- TWAI CAN input
+- board-specific `main.cpp`
+
+## Design Rule
+
+Common decoders only write into `MotTelemetry`.
+Outputs such as MQTT, JSON API, Dashboard and ABRP read from `MotTelemetry`.

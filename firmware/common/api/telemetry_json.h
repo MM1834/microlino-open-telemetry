@@ -3,4 +3,4 @@
 #include <Arduino.h>
 #include "../telemetry/telemetry.h"
 
-String telemetryToJson(const TelemetryState &state);
+String telemetryToJson(const MotTelemetry &state);
