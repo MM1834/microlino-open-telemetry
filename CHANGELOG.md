@@ -1,36 +1,39 @@
 # Changelog
 
-All notable changes to Microlino Open Telemetry (MOT) will be documented in this file.
+## v1.0.0 - First usable MOT release
 
-The project follows semantic versioning once the first stable release is reached.
+### Added
 
-## v0.9.0 - Foundation
+- ESP32-WROOM firmware baseline for Microlino Open Telemetry.
+- CAN Display decoder baseline.
+- MQTT telemetry publishing.
+- Configurable MQTT prefix, vehicle ID and vehicle name.
+- Embedded firmware Web UI configuration.
+- JSON status endpoint.
+- Fallback WiFi AP.
+- MOT Dashboard v1.0 cockpit layout.
+- Microlino-style SVG illustration.
+- MQTT over WebSocket dashboard support.
+- WSS-ready dashboard configuration.
+- Location panel placeholder for GPS/location support.
 
-Initial project foundation.
+### Changed
 
-- Repository structure
-- Project philosophy
-- Architecture documentation
-- MQTT specification draft
-- HTTP JSON API specification draft
-- Hardware documentation draft
-- Getting started guide draft
-- Dashboard prototype structure
+- MQTT topic structure aligned to:
 
-## Planned
+```text
+mot/<vehicleId>/<domain>/<field>
+```
 
-### v0.9.1
+Example:
 
-- Dashboard prototype with MQTT-over-WebSocket
+```text
+mot/pioneer/display/soc
+mot/pioneer/charging/is_charging
+```
 
-### v0.9.2
+### Notes
 
-- ABRP integration draft
-
-### v0.9.3
-
-- OTA update support draft
-
-### v1.0.0
-
-- First stable ESP32-WROOM firmware release
+- The dashboard requires a browser MQTT.js build at `dashboard/libs/mqtt.min.js`.
+- For HTTPS-hosted dashboard pages, MQTT WebSocket access must use WSS, not plain WS.
+- ESP32 can continue using plain MQTT inside the local network.

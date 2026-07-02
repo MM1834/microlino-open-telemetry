@@ -1,60 +1,73 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101624">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>MOT Dashboard</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/style.css">
+  <meta name="theme-color" content="#06101b">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <script src="config.js"></script>
+  <script src="libs/mqtt.min.js"></script>
 </head>
 <body>
-  <header class="app-header">
-    <div>
-      <p class="eyebrow">Microlino Open Telemetry</p>
-      <h1>MOT Dashboard</h1>
-    </div>
-    <div id="mqtt-status" class="status-pill offline">MQTT offline</div>
-  </header>
-
-  <main class="dashboard">
-    <section class="hero card">
-      <div class="hero-top">
-        <div>
-          <p class="label">State of Charge</p>
-          <div class="soc-value"><span id="soc">--</span><span>%</span></div>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon"><img src="img/microlino.svg" alt=""></div>
+        <div><strong>MICROLINO</strong><span>Telemetrie Dashboard</span></div>
+      </div>
+      <nav>
+        <a class="active" href="#overview">⌂ Übersicht</a>
+        <a href="#battery">▣ Batterie</a>
+        <a href="#vehicle">▱ Fahrzeug</a>
+        <a href="#charging">⌁ Laden</a>
+        <a href="#temps">♨ Temperaturen</a>
+        <a href="#cells">▦ Zellen</a>
+        <a href="#map">⌖ Standort</a>
+      </nav>
+      <div class="side-status glass">
+        <div class="live"><span id="mqtt-dot" class="dot"></span><span id="mqtt-text">Connecting…</span></div>
+        <small>Verbunden mit MQTT</small>
+        <hr>
+        <small>FAHRZEUG</small><b id="side-vehicle">--</b>
+        <small>LETZTE AKTUALISIERUNG</small><b id="side-updated" class="green">--</b>
+        <small>MQTT</small><b id="side-mqtt" class="green">--</b>
+        <small>TOPIC PRÄFIX</small><b id="side-topic">--</b>
+        <em>mot-dashboard v1.0</em>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar glass">
+        <div class="pill"><span class="dot"></span><span id="top-status">Connecting…</span></div>
+        <span>Verbunden mit MQTT</span>
+        <div class="top-spacer"></div>
+        <span id="date">--</span><span id="clock">--</span><button id="theme">☾</button>
+      </header>
+      <section class="hero glass" id="overview">
+        <div class="hero-art"><img src="img/microlino.svg" alt="Microlino illustration"></div>
+        <div class="hero-info">
+          <h1 id="vehicle-title">Microlino Pioneer</h1>
+          <p>Dein Microlino. Immer im Blick.</p>
+          <div class="hero-kpis">
+            <div class="kpi ring-card"><div class="ring" id="soc-ring" style="--p:0"><span id="hero-soc">--</span><small>SoC</small></div><small>Reichweite</small><b id="hero-range">-- km</b></div>
+            <div class="kpi"><div class="kpi-icon">◷</div><b id="hero-speed">--</b><small>km/h</small><small>Geschwindigkeit</small></div>
+            <div class="kpi"><div class="kpi-icon plug">⌁</div><b id="hero-charge">--</b><small>Ladestatus</small></div>
+            <div class="kpi"><div class="kpi-icon">╱</div><b id="hero-odo">-- km</b><small>Laufleistung</small><small id="hero-mode">Modus --</small></div>
+          </div>
         </div>
-        <div id="charging-badge" class="charge-badge">Not charging</div>
-      </div>
-      <div class="bar"><div id="soc-bar" class="bar-fill" style="width:0%"></div></div>
-      <div class="hero-grid">
-        <div><span class="label">Range</span><strong><span id="range">--</span> km</strong></div>
-        <div><span class="label">Speed</span><strong><span id="speed">--</span> km/h</strong></div>
-        <div><span class="label">ODO</span><strong><span id="odo">--</span> km</strong></div>
-      </div>
-    </section>
-
-    <section class="cards">
-      <article class="card metric"><span class="label">Charging</span><strong id="is-charging">--</strong><small>power display: <span id="power-display">--</span></small></article>
-      <article class="card metric"><span class="label">Vehicle</span><strong id="vehicle-id">--</strong><small>topic prefix: <span id="topic-base">--</span></small></article>
-      <article class="card metric"><span class="label">Firmware</span><strong id="firmware">--</strong><small>device: <span id="device-id">--</span></small></article>
-      <article class="card metric"><span class="label">Network</span><strong id="ip-address">--</strong><small>RSSI: <span id="rssi">--</span> dBm</small></article>
-      <article class="card metric"><span class="label">Last update</span><strong id="last-update">--</strong><small id="stale-state">waiting for data</small></article>
-      <article class="card metric"><span class="label">Uptime</span><strong><span id="uptime">--</span> s</strong><small>from firmware</small></article>
-    </section>
-
-    <section class="card debug-panel">
-      <div class="section-title"><h2>Developer</h2><button id="toggle-debug">Show topics</button></div>
-      <pre id="topic-log" class="hidden"></pre>
-    </section>
-  </main>
-
-  <footer>
-    <span>One telemetry model. Multiple vehicles. Open platform.</span>
-  </footer>
-
-  <script src="config.js"></script>
-  <script src="js/mqtt.min.js"></script>
+      </section>
+      <section class="grid">
+        <article class="card glass" id="battery"><h2>▣ Batterie</h2><div class="battery-card"><div><small>Spannung</small><b id="voltage">-- V</b><small>Strom</small><b id="current">-- A</b><small id="current-mode">--</small></div><div class="ring big" id="soc-ring-2" style="--p:0"><span id="soc-main">--</span><small>SoC</small></div></div></article>
+        <article class="card glass" id="vehicle"><h2>▱ Fahrzeug</h2><div class="speedo"><div class="needle" id="needle"></div><b id="speed-main">--</b><small>km/h</small></div><div class="mini-grid"><div><small>Trip</small><b id="trip">-- km</b></div><div><small>Ø Verbrauch</small><b id="consumption">--</b></div><div><small>Fahrzeit</small><b id="drive-time">--</b></div></div></article>
+        <article class="card glass" id="charging"><h2>⌁ Laden</h2><div class="charge-state"><span>⌁</span><b id="charge-state">--</b></div><div class="mini-grid"><div><small>Ladestrom</small><b id="charge-current">--</b></div><div><small>Ladespannung</small><b id="charge-voltage">--</b></div><div><small>Leistung</small><b id="charge-power">--</b></div></div></article>
+        <article class="card glass" id="temps"><h2>♨ Temperaturen</h2><ul class="kv"><li>Batterie Min <b id="temp-min">-- °C</b></li><li>Batterie Max <b id="temp-max">-- °C</b></li><li>Batterie Ø <b id="temp-avg">-- °C</b></li><li>Umgebung <b id="temp-amb">-- °C</b></li></ul></article>
+        <article class="card glass" id="cells"><h2>▦ Zellspannungen</h2><div class="cell-meta">Min: <span id="cell-min">--</span> V &nbsp; Max: <span id="cell-max">--</span> V &nbsp; Δ: <span id="cell-delta">--</span> V</div><div class="bars" id="cell-bars"></div></article>
+        <article class="card glass history"><h2>Verlauf (SoC)</h2><div class="tabs"><button class="active">24 h</button><button>7 Tage</button><button>30 Tage</button></div><canvas id="soc-chart" width="600" height="210"></canvas></article>
+        <article class="card glass map-card" id="map"><h2>⌖ Standort</h2><div class="map-wrap"><div class="map" id="map-canvas"></div><div><b id="address">Standort nicht verfügbar</b><p id="coords">--</p><small>Letzte Aktualisierung</small><b class="green" id="map-updated">--</b></div></div></article>
+        <article class="card glass"><h2>⌁ Status</h2><ul class="kv"><li>Charging <b id="status-charging">--</b></li><li>BMS Status <b>--</b></li><li>Fehler <b>Keine</b></li><li>12V Batterie <b id="v12">-- V</b></li><li>Firmware <b id="firmware">--</b></li><li>Device <b id="device-id">--</b></li></ul></article>
+      </section>
+    </main>
+  </div>
   <script src="js/app.js"></script>
 </body>
 </html>

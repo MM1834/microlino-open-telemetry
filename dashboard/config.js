@@ -1,14 +1,17 @@
-// MOT Dashboard configuration
-// Copy this folder to any static web host and adjust these values.
 window.MOT_CONFIG = {
-  host: "your-mqtt-host.example.com",
-  port: 22026,
-  useTls: false,
+  host: "mmds.muehlberg.ch",
+  port: 20226,
+  useTls: true,
+  path: "/",
   username: "",
   password: "",
   topicPrefix: "mot",
   vehicleId: "pioneer",
-  reconnectPeriodMs: 3000,
-  connectTimeoutMs: 8000,
-  staleAfterMs: 15000
+  vehicleName: "Microlino Pioneer",
+  rangeFullKm: 140,
+  map: {
+    defaultLat: 47.3125,
+    defaultLng: 7.8864,
+    zoom: 14
+  }
 };
