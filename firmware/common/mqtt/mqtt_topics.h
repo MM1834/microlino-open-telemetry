@@ -2,5 +2,4 @@
 
 #include <Arduino.h>
 
-String motTopic(const String &prefix, const char *suffix);
-String motDefaultPrefix(const String &vehicleId);
+String motTopic(const String &vehicleId, const String &suffix);

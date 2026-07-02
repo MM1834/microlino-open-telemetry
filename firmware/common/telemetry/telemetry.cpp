@@ -1,13 +1,13 @@
 #include "telemetry.h"
 
-TelemetryState telemetry;
+MotTelemetry telemetry;
 
-void telemetryReset()
+void telemetryInit()
 {
-    telemetry = TelemetryState();
+    telemetry = MotTelemetry();
 }
 
-bool telemetryHasVehicleData()
+void telemetryUpdateSystemRuntime()
 {
-    return telemetry.display.valid || telemetry.charging.valid || telemetry.bms.valid;
+    telemetry.system.uptimeSec = millis() / 1000;
 }
