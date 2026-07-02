@@ -1,64 +1,111 @@
-const state = { values: {}, client: null, connected: false };
-const $ = (id) => document.getElementById(id);
-const cfgKey = "mot-dashboard-config";
+(() => {
+  const cfg = window.MOT_CONFIG || {};
+  const state = { values: {}, topics: {}, lastMessageAt: 0 };
+  const $ = (id) => document.getElementById(id);
 
-function loadConfig(){
-  const saved = JSON.parse(localStorage.getItem(cfgKey) || "{}");
-  return { ...window.MOT_DEFAULT_CONFIG, ...saved };
-}
-function saveConfig(){
-  const cfg = { mqttUrl: $("mqttUrl").value.trim(), topicPrefix: $("topicPrefix").value.trim().replace(/\/$/, ""), username: $("mqttUser").value, password: $("mqttPass").value };
-  localStorage.setItem(cfgKey, JSON.stringify(cfg));
-  return cfg;
-}
-function applyConfig(cfg){
-  $("mqttUrl").value = cfg.mqttUrl || "";
-  $("topicPrefix").value = cfg.topicPrefix || "";
-  $("mqttUser").value = cfg.username || "";
-  $("mqttPass").value = cfg.password || "";
-}
-function setBadge(online){
-  const b=$("connectionBadge"); b.textContent = online ? "MQTT Online" : "Offline"; b.className = online ? "badge badge-online" : "badge badge-offline";
-}
-function setText(id, value, decimals=1){
-  if(value === undefined || value === null || value === "") { $(id).textContent="--"; return; }
-  const n = Number(value); $(id).textContent = Number.isFinite(n) ? n.toFixed(decimals) : String(value);
-}
-function updateUi(){
-  setText("socValue", state.values["display/soc"], 1);
-  const soc = Number(state.values["display/soc"] || 0); $("socBar").style.width = `${Math.max(0, Math.min(100, soc))}%`;
-  setText("rangeValue", state.values["display/range"], 0);
-  setText("speedValue", state.values["display/speed"], 1);
-  setText("odoValue", state.values["display/odo"], 1);
-  const charging = String(state.values["charging/is_charging"] || "0") === "1" || String(state.values["charging/is_charging"]).toLowerCase() === "true";
-  const c=$("chargingValue"); c.textContent = charging ? "⚡ Charging" : "Idle"; c.className = charging ? "status-pill status-charging" : "status-pill status-idle";
-  $("lastUpdateValue").textContent = state.values.__lastUpdate || "--";
-  $("rawValues").textContent = JSON.stringify(state.values, null, 2);
-}
-function connect(){
-  const cfg = saveConfig();
-  if(state.client){ state.client.end(true); state.client = null; }
-  const options = { clientId: `mot-dashboard-${Math.random().toString(16).slice(2)}`, username: cfg.username || undefined, password: cfg.password || undefined, reconnectPeriod: 3000, connectTimeout: 10000 };
-  state.client = mqtt.connect(cfg.mqttUrl, options);
-  state.client.on("connect", () => { state.connected=true; setBadge(true); state.client.subscribe(`${cfg.topicPrefix}/#`); });
-  state.client.on("close", () => { state.connected=false; setBadge(false); });
-  state.client.on("error", () => setBadge(false));
-  state.client.on("message", (topic, payload) => {
-    const prefix = cfg.topicPrefix + "/";
-    if(!topic.startsWith(prefix)) return;
-    const key = topic.slice(prefix.length);
-    state.values[key] = payload.toString();
-    state.values.__lastUpdate = new Date().toLocaleTimeString();
-    updateUi();
+  const topicBase = `${cfg.topicPrefix || 'mot'}/${cfg.vehicleId || 'pioneer'}`;
+  $('vehicle-id').textContent = cfg.vehicleId || 'pioneer';
+  $('topic-base').textContent = topicBase;
+
+  function setText(id, value, fallback = '--') {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = (value === undefined || value === null || Number.isNaN(value)) ? fallback : value;
+  }
+
+  function parseBool(v) {
+    return v === true || v === 'true' || v === '1' || v === 1 || v === 'yes';
+  }
+
+  function updateUi() {
+    const v = state.values;
+    const soc = parseFloat(v['display/soc']);
+    if (!Number.isNaN(soc)) {
+      setText('soc', soc.toFixed(1));
+      $('soc-bar').style.width = `${Math.max(0, Math.min(100, soc))}%`;
+    }
+    setText('speed', fmt(v['display/speed'], 1));
+    setText('range', fmt(v['display/range'], 0));
+    setText('odo', fmt(v['display/odo'], 1));
+    setText('power-display', v['charging/power_display']);
+    setText('firmware', v['system/firmware'] || v['system/firmware_version']);
+    setText('device-id', v['system/device_id']);
+    setText('ip-address', v['system/ip'] || v['system/ip_address']);
+    setText('rssi', v['system/rssi'] || v['system/wifi_rssi']);
+    setText('uptime', v['system/uptime'] || v['system/uptime_sec']);
+
+    const charging = parseBool(v['charging/is_charging']);
+    setText('is-charging', charging ? 'Charging' : 'Not charging');
+    const badge = $('charging-badge');
+    badge.textContent = charging ? '⚡ Charging' : 'Not charging';
+    badge.classList.toggle('charging', charging);
+
+    if (state.lastMessageAt) {
+      setText('last-update', new Date(state.lastMessageAt).toLocaleTimeString());
+      const stale = Date.now() - state.lastMessageAt > (cfg.staleAfterMs || 15000);
+      $('stale-state').textContent = stale ? 'stale data' : 'live';
+      $('stale-state').classList.toggle('stale', stale);
+    }
+  }
+
+  function fmt(v, decimals) {
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? undefined : n.toFixed(decimals);
+  }
+
+  function setMqttStatus(online, text) {
+    const el = $('mqtt-status');
+    el.textContent = text || (online ? 'MQTT online' : 'MQTT offline');
+    el.classList.toggle('online', online);
+    el.classList.toggle('offline', !online);
+  }
+
+  function logTopic(topic, payload) {
+    state.topics[topic] = payload;
+    const lines = Object.entries(state.topics)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([t, p]) => `${t}\n  ${p}`);
+    $('topic-log').textContent = lines.join('\n\n');
+  }
+
+  function connect() {
+    if (!window.mqtt) {
+      setMqttStatus(false, 'mqtt.js missing');
+      return;
+    }
+    const protocol = cfg.useTls ? 'wss' : 'ws';
+    const url = `${protocol}://${cfg.host}:${cfg.port}`;
+    const clientId = `mot-dashboard-${Math.random().toString(16).slice(2)}`;
+    setMqttStatus(false, 'Connecting...');
+    const client = mqtt.connect(url, {
+      clientId,
+      username: cfg.username || undefined,
+      password: cfg.password || undefined,
+      reconnectPeriod: cfg.reconnectPeriodMs || 3000,
+      connectTimeout: cfg.connectTimeoutMs || 8000,
+      clean: true
+    });
+    client.on('connect', () => {
+      setMqttStatus(true, 'MQTT online');
+      client.subscribe(`${topicBase}/#`);
+    });
+    client.on('reconnect', () => setMqttStatus(false, 'Reconnecting...'));
+    client.on('close', () => setMqttStatus(false, 'MQTT offline'));
+    client.on('error', (err) => setMqttStatus(false, err.message || 'MQTT error'));
+    client.on('message', (topic, payloadBuf) => {
+      const payload = payloadBuf.toString();
+      const suffix = topic.replace(`${topicBase}/`, '');
+      state.values[suffix] = payload;
+      state.lastMessageAt = Date.now();
+      logTopic(topic, payload);
+      updateUi();
+    });
+  }
+
+  $('toggle-debug').addEventListener('click', () => {
+    $('topic-log').classList.toggle('hidden');
   });
-}
-function disconnect(){ if(state.client){ state.client.end(true); state.client = null; } setBadge(false); }
 
-window.addEventListener("load", () => {
-  applyConfig(loadConfig());
-  $("saveBtn").addEventListener("click", saveConfig);
-  $("connectBtn").addEventListener("click", connect);
-  $("disconnectBtn").addEventListener("click", disconnect);
-  setBadge(false); updateUi();
-  if("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js").catch(()=>{});
-});
+  setInterval(updateUi, 1000);
+  connect();
+})();

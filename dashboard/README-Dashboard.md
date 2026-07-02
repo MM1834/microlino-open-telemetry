@@ -1,14 +1,16 @@
-# MOT Dashboard v0.1
+# MOT Dashboard v0.2
 
-Static browser dashboard for Microlino Open Telemetry.
+Static dashboard for Microlino Open Telemetry.
 
 ## Setup
 
-Edit `dashboard/config.js` before uploading to your web host:
+1. Replace `js/mqtt.min.js` with the browser bundle from MQTT.js:
+   `https://unpkg.com/mqtt/dist/mqtt.min.js`
+2. Edit `config.js`:
 
 ```js
 window.MOT_CONFIG = {
-  host: "your-mqtt-host.example.com",
+  host: "your-domain.example",
   port: 22026,
   useTls: false,
   username: "",
@@ -18,23 +20,17 @@ window.MOT_CONFIG = {
 };
 ```
 
-For the current test setup use `useTls: false` and your public WebSocket MQTT port.
-Later, with TLS/Let's Encrypt, switch to `useTls: true` and usually `port: 443`.
-
-## Upload
-
-Upload the contents of the `dashboard/` folder to your web host.
-Open `index.html` in a browser.
+3. Upload the folder contents to your webhost.
 
 ## MQTT topics
 
 The dashboard subscribes to:
 
 ```text
-<topicPrefix>/<vehicleId>/#
+mot/<vehicleId>/#
 ```
 
-It expects values such as:
+Expected example topics:
 
 ```text
 mot/pioneer/display/soc
@@ -43,10 +39,9 @@ mot/pioneer/display/odo
 mot/pioneer/display/range
 mot/pioneer/charging/is_charging
 mot/pioneer/charging/power_display
+mot/pioneer/system/device_id
+mot/pioneer/system/firmware
 mot/pioneer/system/ip
 mot/pioneer/system/rssi
-mot/pioneer/system/firmware
-mot/pioneer/system/device_id
+mot/pioneer/system/uptime
 ```
-
-It also has fallback handling for older flat topics such as `microlino/display/soc` if configured accordingly.
