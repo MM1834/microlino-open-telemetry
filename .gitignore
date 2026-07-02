@@ -5,9 +5,10 @@
 # macOS
 .DS_Store
 
-# Build
+# Build artifacts
 *.bin
 *.elf
+map
 
 # Logs
 *.log
