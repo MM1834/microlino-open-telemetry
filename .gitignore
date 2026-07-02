@@ -1,0 +1,13 @@
+# PlatformIO
+.pio/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Build
+*.bin
+*.elf
+
+# Logs
+*.log
