@@ -7,8 +7,24 @@ static Preferences prefs;
 void loadConfig()
 {
     prefs.begin("mot", true);
-    config.vehicleName = prefs.getString("vehicle", "microlino");
-    config.mqttPrefix = prefs.getString("prefix", "mot/" + config.vehicleName);
+    config.vehicleName = prefs.getString("vehicle", "Microlino Pioneer");
+    config.vehicleId = prefs.getString("vehicleId", "");
+    config.mqttPrefix = prefs.getString("prefix", "mot");
+
+    // Migration from older builds where mqttPrefix contained the full base topic,
+    // for example "mot/microlino". New format is prefix="mot" + vehicleId.
+    config.mqttPrefix.trim();
+    config.vehicleId.trim();
+    if (config.vehicleId.isEmpty()) {
+        if (config.mqttPrefix.startsWith("mot/") && config.mqttPrefix.length() > 4) {
+            config.vehicleId = config.mqttPrefix.substring(4);
+            config.mqttPrefix = "mot";
+        } else {
+            config.vehicleId = "pioneer";
+        }
+    }
+    if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
+    if (config.vehicleId.isEmpty()) config.vehicleId = "pioneer";
     config.wifiSsid = prefs.getString("ssid", "");
     config.wifiPass = prefs.getString("pass", "");
     config.mqttHost = prefs.getString("mqttHost", "");
@@ -29,6 +45,7 @@ void saveConfig()
 {
     prefs.begin("mot", false);
     prefs.putString("vehicle", config.vehicleName);
+    prefs.putString("vehicleId", config.vehicleId);
     prefs.putString("prefix", config.mqttPrefix);
     prefs.putString("ssid", config.wifiSsid);
     prefs.putString("pass", config.wifiPass);

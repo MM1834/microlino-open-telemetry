@@ -52,7 +52,9 @@ static void handleStatus()
     s += "<div class='card'><h2>System</h2>";
     s += "Network: " + networkModeName() + "<br>";
     s += "IP: " + networkIp() + "<br>";
-    s += "MQTT prefix: " + config.mqttPrefix + "<br>";
+    s += "Vehicle name: " + config.vehicleName + "<br>";
+    s += "Vehicle ID: " + config.vehicleId + "<br>";
+    s += "MQTT base topic: " + config.mqttPrefix + "/" + config.vehicleId + "<br>";
     s += "Uptime: " + String(millis() / 1000) + " s</div>";
 
     s += "<p><a href='/config'>Config</a> · <a href='/api/status'>JSON API</a></p></body></html>";
@@ -70,7 +72,10 @@ static void handleConfig()
     s += "<h1>Config</h1><form method='POST' action='/save'>";
     s += "<div class='card'><h2>Vehicle</h2>";
     s += "Vehicle name<input name='vehicleName' value='" + config.vehicleName + "'>";
-    s += "MQTT prefix<input name='mqttPrefix' value='" + config.mqttPrefix + "'></div>";
+    s += "Vehicle ID<input name='vehicleId' value='" + config.vehicleId + "'>";
+    s += "<p class='muted'>Used in MQTT topics, e.g. mot/pioneer/display/soc. Use lowercase letters, numbers, dash or underscore.</p>";
+    s += "MQTT prefix<input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
+    s += "<p class='muted'>Usually just mot. The firmware publishes to &lt;prefix&gt;/&lt;vehicleId&gt;/...</p></div>";
 
     s += "<div class='card'><h2>Network</h2>";
     s += "WiFi SSID<input name='wifiSsid' value='" + config.wifiSsid + "'>";
@@ -109,9 +114,21 @@ static void handleConfig()
 static void handleSave()
 {
     config.vehicleName = server.arg("vehicleName");
-    if (config.vehicleName.isEmpty()) config.vehicleName = "microlino";
+    if (config.vehicleName.isEmpty()) config.vehicleName = "Microlino Pioneer";
+
+    config.vehicleId = server.arg("vehicleId");
+    config.vehicleId.trim();
+    config.vehicleId.toLowerCase();
+    config.vehicleId.replace(" ", "-");
+    config.vehicleId.replace("/", "-");
+    if (config.vehicleId.isEmpty()) config.vehicleId = "pioneer";
+
     config.mqttPrefix = server.arg("mqttPrefix");
-    if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot/" + config.vehicleName;
+    config.mqttPrefix.trim();
+    while (config.mqttPrefix.endsWith("/")) {
+        config.mqttPrefix.remove(config.mqttPrefix.length() - 1);
+    }
+    if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
     config.wifiSsid = server.arg("wifiSsid");
     config.wifiPass = server.arg("wifiPass");
     config.mqttHost = server.arg("mqttHost");

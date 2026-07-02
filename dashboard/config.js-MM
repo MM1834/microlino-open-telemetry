@@ -1,0 +1,14 @@
+// MOT Dashboard configuration
+// Copy this folder to any static web host and adjust these values.
+window.MOT_CONFIG = {
+  host: "mmds.muehlberg.ch",
+  port: 22026,
+  useTls: false,
+  username: "MMTeam11",
+  password: "11TeamMM",
+  topicPrefix: "mot",
+  vehicleId: "microlino",
+  reconnectPeriodMs: 3000,
+  connectTimeoutMs: 8000,
+  staleAfterMs: 15000
+};

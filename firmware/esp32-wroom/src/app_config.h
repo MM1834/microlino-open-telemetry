@@ -9,8 +9,9 @@ enum DecoderProfile {
 };
 
 struct AppConfig {
-    String vehicleName = "microlino";
-    String mqttPrefix = "mot/microlino";
+    String vehicleName = "Microlino Pioneer";   // Display name only
+    String vehicleId = "pioneer";               // Stable MQTT topic id
+    String mqttPrefix = "mot";                  // MQTT namespace/prefix
 
     String wifiSsid;
     String wifiPass;

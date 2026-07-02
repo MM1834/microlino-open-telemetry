@@ -1,4 +1,4 @@
-# MOT Dashboard v0.2
+# MOT Dashboard v0.3
 
 Static dashboard for Microlino Open Telemetry.
 
@@ -34,14 +34,14 @@ Expected example topics:
 
 ```text
 mot/pioneer/display/soc
-mot/pioneer/display/speed
-mot/pioneer/display/odo
-mot/pioneer/display/range
+mot/pioneer/display/speed_kmh
+mot/pioneer/display/odometer_km
+mot/pioneer/display/estimated_range_km
 mot/pioneer/charging/is_charging
 mot/pioneer/charging/power_display
 mot/pioneer/system/device_id
-mot/pioneer/system/firmware
-mot/pioneer/system/ip
-mot/pioneer/system/rssi
-mot/pioneer/system/uptime
+mot/pioneer/system/firmware_version
+mot/pioneer/system/ip_address
+mot/pioneer/system/wifi_rssi
+mot/pioneer/system/uptime_sec
 ```

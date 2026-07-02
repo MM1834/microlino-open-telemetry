@@ -14,8 +14,18 @@ static PubSubClient mqtt(wifiClient);
 static String topic(const char *suffix)
 {
     String prefix = config.mqttPrefix;
-    if (prefix.endsWith("/")) return prefix + suffix;
-    return prefix + "/" + suffix;
+    prefix.trim();
+    while (prefix.endsWith("/")) {
+        prefix.remove(prefix.length() - 1);
+    }
+    if (prefix.isEmpty()) prefix = "mot";
+
+    String vehicle = config.vehicleId;
+    vehicle.trim();
+    vehicle.replace("/", "-");
+    if (vehicle.isEmpty()) vehicle = "pioneer";
+
+    return prefix + "/" + vehicle + "/" + suffix;
 }
 
 static void reconnectMqtt()

@@ -24,9 +24,9 @@
       setText('soc', soc.toFixed(1));
       $('soc-bar').style.width = `${Math.max(0, Math.min(100, soc))}%`;
     }
-    setText('speed', fmt(v['display/speed'], 1));
-    setText('range', fmt(v['display/range'], 0));
-    setText('odo', fmt(v['display/odo'], 1));
+    setText('speed', fmt(v['display/speed_kmh'] ?? v['display/speed'], 1));
+    setText('range', fmt(v['display/estimated_range_km'] ?? v['display/range'], 0));
+    setText('odo', fmt(v['display/odometer_km'] ?? v['display/odo'], 1));
     setText('power-display', v['charging/power_display']);
     setText('firmware', v['system/firmware'] || v['system/firmware_version']);
     setText('device-id', v['system/device_id']);
@@ -69,15 +69,17 @@
   }
 
   function connect() {
-    if (!window.mqtt) {
+    const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
+    if (!mqttLib || typeof mqttLib.connect !== 'function') {
       setMqttStatus(false, 'mqtt.js missing');
+      console.error('MQTT.js not available. window.mqtt =', window.mqtt);
       return;
     }
     const protocol = cfg.useTls ? 'wss' : 'ws';
     const url = `${protocol}://${cfg.host}:${cfg.port}`;
     const clientId = `mot-dashboard-${Math.random().toString(16).slice(2)}`;
     setMqttStatus(false, 'Connecting...');
-    const client = mqtt.connect(url, {
+    const client = mqttLib.connect(url, {
       clientId,
       username: cfg.username || undefined,
       password: cfg.password || undefined,
