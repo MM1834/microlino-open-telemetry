@@ -1,118 +1,86 @@
-const els = {
-  status: document.getElementById('connectionStatus'),
-  soc: document.getElementById('soc'),
-  socBar: document.getElementById('socBar'),
-  range: document.getElementById('range'),
-  speed: document.getElementById('speed'),
-  odo: document.getElementById('odo'),
-  charging: document.getElementById('charging'),
-  lastUpdate: document.getElementById('lastUpdate'),
-  mqttUrl: document.getElementById('mqttUrl'),
-  baseTopic: document.getElementById('baseTopic'),
-  mqttUser: document.getElementById('mqttUser'),
-  mqttPass: document.getElementById('mqttPass'),
-  connectBtn: document.getElementById('connectBtn'),
-  saveBtn: document.getElementById('saveBtn'),
-};
-
 let client = null;
+let lastUpdate = null;
 
-function loadSettings() {
-  els.mqttUrl.value = localStorage.getItem('mot.mqttUrl') || '';
-  els.baseTopic.value = localStorage.getItem('mot.baseTopic') || 'mot/microlino';
-  els.mqttUser.value = localStorage.getItem('mot.mqttUser') || '';
-  els.mqttPass.value = localStorage.getItem('mot.mqttPass') || '';
+const $ = (id) => document.getElementById(id);
+
+function setConnection(online) {
+  const el = $('connection');
+  el.textContent = online ? 'online' : 'offline';
+  el.className = 'pill ' + (online ? 'online' : 'offline');
 }
 
-function saveSettings() {
-  localStorage.setItem('mot.mqttUrl', els.mqttUrl.value.trim());
-  localStorage.setItem('mot.baseTopic', els.baseTopic.value.trim().replace(/\/$/, ''));
-  localStorage.setItem('mot.mqttUser', els.mqttUser.value);
-  localStorage.setItem('mot.mqttPass', els.mqttPass.value);
+function setText(id, value, fallback = '--') {
+  $(id).textContent = value === undefined || value === null || value === '' ? fallback : value;
 }
 
-function setStatus(online) {
-  els.status.textContent = online ? 'online' : 'offline';
-  els.status.classList.toggle('online', online);
-  els.status.classList.toggle('offline', !online);
-}
-
-function setLastUpdate() {
-  els.lastUpdate.textContent = new Date().toLocaleTimeString();
-}
-
-function setNumber(el, value, decimals = 1) {
-  const n = Number(value);
-  el.textContent = Number.isFinite(n) ? n.toFixed(decimals) : '--';
-}
-
-function handleTopic(topic, payload) {
-  const base = els.baseTopic.value.trim().replace(/\/$/, '');
-  const suffix = topic.startsWith(base + '/') ? topic.slice(base.length + 1) : topic;
+function updateFromTopic(prefix, topic, payload) {
+  const suffix = topic.startsWith(prefix + '/') ? topic.substring(prefix.length + 1) : topic;
   const value = payload.toString();
 
   switch (suffix) {
     case 'display/soc': {
-      const soc = Number(value);
-      setNumber(els.soc, soc, 1);
-      els.socBar.style.width = `${Math.max(0, Math.min(100, soc || 0))}%`;
+      const soc = parseFloat(value);
+      setText('soc', Number.isFinite(soc) ? soc.toFixed(1) : '--');
+      $('socBar').style.width = Number.isFinite(soc) ? Math.max(0, Math.min(100, soc)) + '%' : '0%';
       break;
     }
-    case 'display/range':
-      setNumber(els.range, value, 0);
-      break;
-    case 'display/speed':
-      setNumber(els.speed, value, 1);
-      break;
-    case 'display/odo':
-      setNumber(els.odo, value, 1);
-      break;
-    case 'charging/is_charging':
-      els.charging.textContent = value === '1' || value === 'true' ? '⚡ Yes' : 'No';
-      break;
+    case 'display/speed': setText('speed', parseFloat(value).toFixed(1)); break;
+    case 'display/odo': setText('odo', parseFloat(value).toFixed(1)); break;
+    case 'display/range': setText('range', value); break;
+    case 'charging/is_charging': setText('charging', value === '1' || value === 'true' ? 'Yes' : 'No'); break;
+    case 'charging/power_display': setText('power', 'power ' + value); break;
+    case 'vehicle/name': setText('vehicle', value); break;
+    case 'system/device_id': setText('device', value); break;
+    case 'system/firmware': setText('firmware', value); break;
   }
 
-  setLastUpdate();
+  lastUpdate = new Date();
+  $('lastUpdate').textContent = lastUpdate.toLocaleTimeString();
 }
 
 function connectMqtt() {
-  saveSettings();
+  const url = $('mqttUrl').value.trim();
+  const username = $('mqttUser').value.trim();
+  const password = $('mqttPass').value;
+  const prefix = $('mqttPrefix').value.trim().replace(/\/$/, '');
 
-  if (client) {
-    client.end(true);
-    client = null;
-  }
+  localStorage.setItem('mot.mqttUrl', url);
+  localStorage.setItem('mot.mqttUser', username);
+  localStorage.setItem('mot.mqttPrefix', prefix);
 
-  const url = els.mqttUrl.value.trim();
-  const base = els.baseTopic.value.trim().replace(/\/$/, '');
-
-  if (!url) {
-    alert('Please enter a MQTT WebSocket URL.');
+  if (!url || !prefix) {
+    alert('Please enter MQTT WebSocket URL and topic prefix.');
     return;
   }
 
+  if (client) {
+    client.end(true);
+  }
+
   client = mqtt.connect(url, {
-    username: els.mqttUser.value || undefined,
-    password: els.mqttPass.value || undefined,
+    username: username || undefined,
+    password: password || undefined,
     reconnectPeriod: 3000,
-    connectTimeout: 10000,
+    clean: true,
+    clientId: 'mot-dashboard-' + Math.random().toString(16).slice(2)
   });
 
   client.on('connect', () => {
-    setStatus(true);
-    client.subscribe(`${base}/#`);
+    setConnection(true);
+    client.subscribe(prefix + '/#');
   });
 
-  client.on('reconnect', () => setStatus(false));
-  client.on('offline', () => setStatus(false));
-  client.on('close', () => setStatus(false));
-  client.on('error', () => setStatus(false));
-
-  client.on('message', handleTopic);
+  client.on('close', () => setConnection(false));
+  client.on('offline', () => setConnection(false));
+  client.on('error', (err) => console.warn('MQTT error', err));
+  client.on('message', (topic, payload) => updateFromTopic(prefix, topic, payload));
 }
 
-els.connectBtn.addEventListener('click', connectMqtt);
-els.saveBtn.addEventListener('click', saveSettings);
+function init() {
+  $('mqttUrl').value = localStorage.getItem('mot.mqttUrl') || '';
+  $('mqttUser').value = localStorage.getItem('mot.mqttUser') || '';
+  $('mqttPrefix').value = localStorage.getItem('mot.mqttPrefix') || 'mot/pioneer';
+  $('connectBtn').addEventListener('click', connectMqtt);
+}
 
-loadSettings();
-setStatus(false);
+init();
