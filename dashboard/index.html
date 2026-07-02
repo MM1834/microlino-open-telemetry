@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>MOT Dashboard</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Microlino Open Telemetry</p>
+        <h1>MOT Dashboard</h1>
+      </div>
+      <div id="connectionBadge" class="badge badge-offline">Offline</div>
+    </header>
+
+    <section class="grid primary">
+      <article class="card soc-card">
+        <div class="card-label">State of Charge</div>
+        <div class="soc-row"><span id="socValue">--</span><span class="unit">%</span></div>
+        <div class="bar"><div id="socBar" class="bar-fill" style="width:0%"></div></div>
+      </article>
+
+      <article class="card">
+        <div class="card-label">Range</div>
+        <div class="value"><span id="rangeValue">--</span><span class="unit">km</span></div>
+      </article>
+
+      <article class="card">
+        <div class="card-label">Speed</div>
+        <div class="value"><span id="speedValue">--</span><span class="unit">km/h</span></div>
+      </article>
+
+      <article class="card">
+        <div class="card-label">Charging</div>
+        <div id="chargingValue" class="status-pill">Unknown</div>
+      </article>
+
+      <article class="card">
+        <div class="card-label">Odometer</div>
+        <div class="value"><span id="odoValue">--</span><span class="unit">km</span></div>
+      </article>
+
+      <article class="card">
+        <div class="card-label">Last Update</div>
+        <div id="lastUpdateValue" class="value small">--</div>
+      </article>
+    </section>
+
+    <section class="card settings-card">
+      <h2>Connection</h2>
+      <div class="form-grid">
+        <label>WebSocket URL<input id="mqttUrl" placeholder="wss://mqtt.example.ch"></label>
+        <label>Vehicle topic prefix<input id="topicPrefix" placeholder="mot/pioneer"></label>
+        <label>Username<input id="mqttUser" autocomplete="username"></label>
+        <label>Password<input id="mqttPass" type="password" autocomplete="current-password"></label>
+      </div>
+      <div class="actions">
+        <button id="saveBtn">Save</button>
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" class="secondary">Disconnect</button>
+      </div>
+      <p class="hint">Use MQTT over WebSocket. Example topic: <code>mot/pioneer/display/soc</code></p>
+    </section>
+
+    <section class="card developer-card">
+      <details>
+        <summary>Developer / MQTT values</summary>
+        <pre id="rawValues">{}</pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="js/mqtt.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
