@@ -1,45 +1,21 @@
 # Changelog
 
-## v1.0.0-rc1
-
-First release candidate for Microlino Open Telemetry.
+## v1.0.0
 
 ### Added
-
-- ESP32-WROOM firmware for Microlino Display CAN telemetry
-- SOC decoding
-- Speed decoding
-- Odometer decoding
-- Charging-state detection
-- MQTT publisher
-- MQTT topic structure `mot/<vehicleId>/...`
-- Configurable MQTT prefix
-- Configurable vehicle ID
-- Configurable vehicle display name
-- ESP32 Web configuration UI
-- JSON status API
-- WiFi fallback AP
-- OTA firmware update via Web UI
-- OTA password protection
-- Cockpit-style dashboard
+- ESP32-WROOM firmware baseline
+- CAN telemetry decoder foundation
+- MQTT publishing under `mot/<vehicle>/...`
+- Responsive MOT Dashboard
 - MQTT over WebSocket/WSS dashboard support
-- Caddy reverse-proxy documentation for secure WSS
-- Release documentation
+- OTA firmware update with password protection
+- Configurable vehicle ID, vehicle name and MQTT prefix
+- Default dashboard map location
+- Documentation and screenshot structure
 
 ### Changed
+- MQTT topic model aligned between firmware and dashboard
 
-- MQTT topics moved from legacy flat/prefix topics to structured topics:
-
-```text
-microlino/display/soc
-```
-
-to:
-
-```text
-mot/<vehicleId>/display/soc
-```
-
-### Notes
-
-This is a release candidate intended for beta testing before the final v1.0.0 release.
+### Known limitations
+- No onboard GPS in v1.0.0
+- Cellular/LTE support planned for future hardware

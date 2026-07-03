@@ -1,40 +1,15 @@
 # Microlino Open Telemetry v1.0.0
 
-First usable release of Microlino Open Telemetry (MOT).
-
-> One telemetry model. Multiple vehicles. Open platform.
-
 ## Highlights
+- Stable ESP32-WROOM firmware
+- MQTT telemetry under `mot/<vehicle>/...`
+- Responsive MOT Dashboard
+- OTA firmware updates
+- Secure dashboard connection via WSS
+- Documentation and screenshots
 
-- ESP32-WROOM firmware baseline
-- Microlino Display-CAN telemetry
-- MQTT publishing
-- Configurable vehicle ID and MQTT prefix
-- Web configuration UI
-- JSON status endpoint
-- MOT Dashboard v1.0 cockpit UI
-- WSS-ready dashboard connection
-- Microlino SVG illustration
+## Upgrade notes
+If upgrading from early prototype builds, update the MQTT prefix to `mot` and set a vehicle ID such as `pioneer` or `microlino`.
 
-## Default MQTT structure
-
-```text
-mot/pioneer/display/soc
-mot/pioneer/display/speed_kmh
-mot/pioneer/display/odometer_km
-mot/pioneer/charging/is_charging
-```
-
-## Recommended dashboard setup
-
-```js
-host: "mmds.muehlberg.ch",
-port: 20226,
-useTls: true,
-topicPrefix: "mot",
-vehicleId: "pioneer"
-```
-
-## Notes
-
-Replace `dashboard/libs/mqtt.min.js` with the working MQTT.js browser build before uploading the dashboard.
+## Known limitations
+GPS and LTE are not part of v1.0.0 and are planned for future releases.

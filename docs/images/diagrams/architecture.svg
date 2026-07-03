@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+<rect width="1200" height="520" rx="30" fill="#0b1220"/>
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#38bdf8"/></marker></defs>
+<g font-family="Arial, sans-serif" font-size="26" fill="#f8fafc" text-anchor="middle">
+<rect x="60" y="190" width="180" height="100" rx="18" fill="#111827" stroke="#22c55e"/><text x="150" y="250">Microlino</text>
+<rect x="310" y="190" width="180" height="100" rx="18" fill="#111827" stroke="#38bdf8"/><text x="400" y="234">ESP32</text><text x="400" y="266" font-size="18" fill="#94a3b8">CAN Decoder</text>
+<rect x="560" y="190" width="180" height="100" rx="18" fill="#111827" stroke="#38bdf8"/><text x="650" y="234">MQTT</text><text x="650" y="266" font-size="18" fill="#94a3b8">Broker</text>
+<rect x="810" y="110" width="250" height="90" rx="18" fill="#111827" stroke="#22c55e"/><text x="935" y="164">Dashboard</text>
+<rect x="810" y="240" width="250" height="90" rx="18" fill="#111827" stroke="#22c55e"/><text x="935" y="294">ioBroker / HA</text>
+<rect x="810" y="370" width="250" height="90" rx="18" fill="#111827" stroke="#22c55e"/><text x="935" y="424">OTA / Config</text>
+</g>
+<g stroke="#38bdf8" stroke-width="5" marker-end="url(#a)">
+<line x1="240" y1="240" x2="310" y2="240"/>
+<line x1="490" y1="240" x2="560" y2="240"/>
+<line x1="740" y1="240" x2="810" y2="155"/>
+<line x1="740" y1="240" x2="810" y2="285"/>
+<line x1="400" y1="290" x2="810" y2="415"/>
+</g>
+<text x="600" y="60" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#f8fafc" text-anchor="middle">MOT Architecture</text>
+</svg>

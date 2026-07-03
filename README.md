@@ -1,206 +1,86 @@
-# Microlino Open Telemetry (MOT)
+# MOT – Microlino Open Telemetry
 
-> **One telemetry model. Multiple vehicles. Open platform.**
+![MOT Poster](docs/images/branding/poster-v1.0.0.jpg)
 
-Microlino Open Telemetry (MOT) is an open-source telemetry platform for the Microlino EV.
+**MOT** is an open-source telemetry platform for the Microlino and other lightweight electric vehicles. It combines an ESP32 firmware, CAN decoding, MQTT telemetry, OTA firmware updates and a responsive web dashboard.
 
-MOT reads vehicle data from the Microlino Display CAN bus, decodes it on an ESP32, publishes live telemetry through MQTT, and displays it in a browser-based dashboard.
+![License](https://img.shields.io/badge/license-MIT-green)
+![PlatformIO](https://img.shields.io/badge/build-PlatformIO-blue)
+![ESP32](https://img.shields.io/badge/platform-ESP32-orange)
+![MQTT](https://img.shields.io/badge/telemetry-MQTT-38bdf8)
+![OTA](https://img.shields.io/badge/update-OTA-22c55e)
 
-The project is designed around one common telemetry model so that firmware, MQTT, dashboards, OTA updates, ABRP integration and future LilyGO/LTE hardware can evolve without changing the data structure.
+## Highlights
 
----
-
-## Current status
-
-**Release candidate:** `v1.0.0-rc1`
-
-Current tested setup:
-
-- ESP32-WROOM DevKit
-- SN65HVD230 / VP230 CAN transceiver
-- Microlino Display CAN via OBD2
-- WiFi + MQTT
-- MQTT over WebSocket/WSS for the dashboard
-- ESP32 Web configuration
-- OTA firmware upload via Web UI
-- Cockpit-style web dashboard
-
----
-
-## Features
-
-### Firmware
-
-- ESP32-WROOM support
-- Microlino Display CAN decoder
-- SOC, speed, odometer and charging-state telemetry
-- Configurable MQTT broker
-- Configurable MQTT prefix and vehicle ID
-- Fallback WiFi access point
-- Web configuration interface
-- JSON status API
+- ESP32-WROOM firmware for CAN telemetry
+- MQTT topic structure: `mot/<vehicle>/...`
+- Responsive dashboard for desktop, tablet and iPhone
+- Secure dashboard access through MQTT over WebSocket / WSS
 - OTA firmware update with password protection
+- Configurable vehicle name, vehicle ID and MQTT prefix
+- Default map location with future GPS support
+- Designed as a foundation for future LilyGO LTE/GNSS support
 
-### Dashboard
+## Dashboard
 
-- Browser-based dashboard
-- Dark cockpit UI
-- Microlino illustration
-- MQTT over WebSocket / WSS
-- SOC, range, speed, odometer and charging status
-- Online/offline status
-- Prepared location panel
-- Responsive layout for desktop and mobile
+| Home | Battery |
+|---|---|
+| ![Home](docs/images/screenshots/desktop-home.png) | ![Battery](docs/images/screenshots/desktop-battery.png) |
 
----
-
-## MQTT topic structure
-
-MOT uses the following topic pattern:
-
-```text
-mot/<vehicleId>/<category>/<value>
-```
-
-Example:
-
-```text
-mot/pioneer/display/soc
-mot/pioneer/display/speed_kmh
-mot/pioneer/display/odometer_km
-mot/pioneer/charging/is_charging
-mot/pioneer/system/device_id
-```
-
-See [docs/MQTT.md](docs/MQTT.md).
-
----
+| Vehicle | Location |
+|---|---|
+| ![Vehicle](docs/images/screenshots/desktop-vehicle.png) | ![Location](docs/images/screenshots/desktop-location.png) |
 
 ## Architecture
 
-```text
-                 Microlino
-                     │
-                Display CAN
-                     │
-                     ▼
-              ESP32-WROOM
-                     │
-              CAN Decoder
-                     │
-                     ▼
-              Telemetry Model
-                     │
-      ┌──────────────┼──────────────┐
-      │              │              │
-    MQTT         JSON API          OTA
-      │
-      ▼
-  Dashboard / ioBroker / Home Assistant / Node-RED
-```
-
----
-
-## Quick start
-
-### 1. Flash firmware
-
-```bash
-cd firmware/esp32-wroom
-pio run -t upload
-pio device monitor
-```
-
-### 2. Configure ESP32
-
-Open the ESP32 Web UI and configure:
+![Architecture](docs/images/diagrams/architecture.svg)
 
 ```text
-WiFi SSID
-WiFi password
-MQTT host
-MQTT port
-MQTT username/password
-MQTT prefix: mot
-Vehicle ID: pioneer
-Vehicle name: Microlino Pioneer
-OTA password
+Microlino CAN Bus
+        ↓
+ESP32-WROOM Firmware
+        ↓
+MQTT Broker
+        ↓
+Dashboard / ioBroker / Home Assistant
 ```
 
-### 3. Configure dashboard
+## Quick Start
 
-Copy and adapt the dashboard configuration:
+1. Build and flash the ESP32 firmware with PlatformIO.
+2. Connect to the MOT setup access point.
+3. Configure WiFi, MQTT and OTA password.
+4. Upload the dashboard to a web server.
+5. Configure `dashboard/config.js`.
+6. Open the dashboard and verify live telemetry.
 
-```bash
-cp dashboard/config.example.js dashboard/config.js
+See [Installation](docs/getting-started/installation.md).
+
+## Documentation
+
+- [Documentation overview](docs/README.md)
+- [Installation](docs/getting-started/installation.md)
+- [Configuration](docs/getting-started/configuration.md)
+- [Dashboard](docs/dashboard/overview.md)
+- [MQTT Topics](docs/firmware/mqtt-topics.md)
+- [OTA](docs/firmware/ota.md)
+- [Hardware](docs/hardware/esp32.md)
+- [FAQ](docs/faq.md)
+
+## MQTT Topic Model
+
+```text
+mot/<vehicle>/display/soc
+mot/<vehicle>/display/speed_kmh
+mot/<vehicle>/display/odometer_km
+mot/<vehicle>/charging/is_charging
+mot/<vehicle>/system/device_id
 ```
 
-Example:
+## v1.0.0 Scope
 
-```js
-window.MOT_CONFIG = {
-  mqtt: {
-    host: "mqtt.example.com",
-    port: 443,
-    useTls: true,
-    path: "/",
-    username: "",
-    password: "",
-    topicPrefix: "mot",
-    vehicleId: "pioneer"
-  }
-};
-```
-
-### 4. Deploy dashboard
-
-Upload the `dashboard/` folder to any static web host.
-
-For HTTPS-hosted dashboards, MQTT WebSocket must be available as `wss://`, not plain `ws://`.
-
-See [docs/DASHBOARD.md](docs/DASHBOARD.md) and [docs/SECURE_WEBSOCKET_CADDY.md](docs/SECURE_WEBSOCKET_CADDY.md).
-
----
-
-## Roadmap
-
-### v1.0.0
-
-- Stable ESP32-WROOM release
-- Display CAN telemetry
-- MQTT dashboard
-- OTA updates
-- Documentation
-
-### v1.1
-
-- Dashboard refinements
-- Historical charts
-- More system telemetry
-- Config backup/restore
-- ABRP integration
-
-### v2.0
-
-- LilyGO LTE/GPS support
-- Cellular connectivity
-- GPS location
-- Optional second CAN / BMS data
-
----
-
-## Contributing
-
-Contributions, testing results and CAN decoding notes are welcome.
-
-Please see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
+Version 1.0 focuses on a stable ESP32-WROOM release with WiFi, MQTT, OTA and the responsive dashboard. LTE/GNSS and LilyGO support are planned for later releases.
 
 ## License
 
-Released under the MIT License.
-
-Microlino® is a registered trademark of Micro Mobility Systems AG.
-
-Microlino Open Telemetry is an independent open-source community project and is not affiliated with or endorsed by Micro Mobility Systems AG.
+MIT License.
