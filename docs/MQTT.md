@@ -1,138 +1,63 @@
 # MQTT Specification
 
-This document defines the MQTT topic structure for Microlino Open Telemetry (MOT).
-
-MQTT mirrors the MOT telemetry model.
-
-## Base Topic
-
-Recommended base topic:
+MOT publishes telemetry using this structure:
 
 ```text
-mot/<vehicle-id>/
+<prefix>/<vehicleId>/<category>/<value>
 ```
 
-Examples:
+Default:
 
 ```text
-mot/pioneer/display/soc
-mot/blue/display/odo
-mot/MOT-A34F12/system/uptime
+mot/pioneer/...
 ```
 
-The `<vehicle-id>` should be configurable.
+## Configuration
 
-For simple installations it may be:
+| Setting | Default | Description |
+|---|---|---|
+| MQTT Prefix | `mot` | Root topic for all MOT devices |
+| Vehicle ID | `pioneer` | Stable technical ID used in topics |
+| Vehicle Name | `Microlino Pioneer` | Human-readable name for UI only |
 
-```text
-microlino
-```
+## Display topics
 
-For multi-vehicle setups it should be unique.
+| Topic | Type | Unit | Description |
+|---|---:|---|---|
+| `mot/<vehicleId>/display/soc` | float | % | State of charge |
+| `mot/<vehicleId>/display/speed_kmh` | float | km/h | Vehicle speed |
+| `mot/<vehicleId>/display/odometer_km` | float | km | Odometer |
+| `mot/<vehicleId>/display/estimated_range_km` | integer | km | Estimated range |
 
-## Retained Messages
+## Charging topics
 
-Telemetry values should be published as retained messages unless they are high-frequency debug data.
+| Topic | Type | Unit | Description |
+|---|---:|---|---|
+| `mot/<vehicleId>/charging/is_charging` | boolean | - | Charging active candidate |
+| `mot/<vehicleId>/charging/plugged` | boolean | - | Plugged-in state, if available |
+| `mot/<vehicleId>/charging/power_display` | integer | raw | Display CAN power value |
+| `mot/<vehicleId>/charging/power_signed` | integer | raw | Signed power candidate |
 
-This allows dashboards and integrations to show the latest known state immediately after connecting.
+## System topics
 
-## Payload Format
+| Topic | Type | Unit | Description |
+|---|---:|---|---|
+| `mot/<vehicleId>/system/device_id` | string | - | ESP32 device ID |
+| `mot/<vehicleId>/system/firmware_version` | string | - | Firmware version |
+| `mot/<vehicleId>/system/ip_address` | string | - | Current IP address |
+| `mot/<vehicleId>/system/network_mode` | string | - | WiFi STA or fallback AP |
+| `mot/<vehicleId>/system/wifi_rssi` | integer | dBm | WiFi signal strength |
+| `mot/<vehicleId>/system/uptime_sec` | integer | s | Runtime since boot |
 
-Payloads are plain text values unless otherwise specified.
+## Retained messages
 
-Examples:
+Recommended:
 
-```text
-74.5
-```
+- Retain slowly changing state such as SOC, odometer and system information.
+- Do not retain high-frequency debug data.
 
-```text
-1
-```
+## Security
 
-```text
-192.168.11.124
-```
+For dashboards served over HTTPS, MQTT over WebSocket must use WSS.
 
-Boolean values are published as:
-
-```text
-1
-0
-```
-
-## Display Topics
-
-| Topic | Type | Unit | Retained | Description |
-|---|---:|---:|---:|---|
-| `mot/<vehicle-id>/display/soc` | float | % | yes | State of charge from Display CAN |
-| `mot/<vehicle-id>/display/speed` | float | km/h | yes | Vehicle speed from Display CAN |
-| `mot/<vehicle-id>/display/odo` | float | km | yes | Odometer from Display CAN |
-| `mot/<vehicle-id>/display/range` | int | km | yes | Estimated range calculated from SOC |
-
-## Charging Topics
-
-| Topic | Type | Unit | Retained | Description |
-|---|---:|---:|---:|---|
-| `mot/<vehicle-id>/charging/is_charging` | bool | - | yes | Charging active |
-| `mot/<vehicle-id>/charging/power_display` | int | raw | yes | Raw power display value from Display CAN |
-| `mot/<vehicle-id>/charging/plugged_unconfirmed` | bool | - | yes | Candidate plug state, not yet fully confirmed |
-
-## Vehicle Topics
-
-| Topic | Type | Unit | Retained | Description |
-|---|---:|---:|---:|---|
-| `mot/<vehicle-id>/vehicle/name` | string | - | yes | Configured vehicle name |
-| `mot/<vehicle-id>/vehicle/model` | string | - | yes | Optional model description |
-
-## System Topics
-
-| Topic | Type | Unit | Retained | Description |
-|---|---:|---:|---:|---|
-| `mot/<vehicle-id>/system/device_id` | string | - | yes | MOT device ID |
-| `mot/<vehicle-id>/system/firmware` | string | - | yes | Firmware version |
-| `mot/<vehicle-id>/system/ip` | string | - | yes | Current IP address |
-| `mot/<vehicle-id>/system/mac` | string | - | yes | WiFi MAC address |
-| `mot/<vehicle-id>/system/rssi` | int | dBm | yes | WiFi signal strength |
-| `mot/<vehicle-id>/system/uptime` | int | s | yes | Device uptime |
-| `mot/<vehicle-id>/system/network_mode` | string | - | yes | Current network state |
-
-## BMS Topics - Planned
-
-| Topic | Type | Unit | Retained | Description |
-|---|---:|---:|---:|---|
-| `mot/<vehicle-id>/bms/voltage` | float | V | yes | Battery voltage |
-| `mot/<vehicle-id>/bms/current` | float | A | yes | Battery current |
-| `mot/<vehicle-id>/bms/power` | float | kW | yes | Battery power |
-| `mot/<vehicle-id>/bms/temperature_min` | float | °C | yes | Minimum battery temperature |
-| `mot/<vehicle-id>/bms/temperature_max` | float | °C | yes | Maximum battery temperature |
-| `mot/<vehicle-id>/bms/cell_voltage_min` | float | V | yes | Minimum cell voltage |
-| `mot/<vehicle-id>/bms/cell_voltage_max` | float | V | yes | Maximum cell voltage |
-
-## GPS Topics - Planned
-
-| Topic | Type | Unit | Retained | Description |
-|---|---:|---:|---:|---|
-| `mot/<vehicle-id>/gps/latitude` | float | degrees | yes | GPS latitude |
-| `mot/<vehicle-id>/gps/longitude` | float | degrees | yes | GPS longitude |
-| `mot/<vehicle-id>/gps/altitude` | float | m | yes | GPS altitude |
-| `mot/<vehicle-id>/gps/speed` | float | km/h | yes | GPS speed |
-| `mot/<vehicle-id>/gps/valid` | bool | - | yes | GPS fix valid |
-
-## Debug Topics - Optional
-
-Debug topics should not be required by normal users.
-
-Examples:
-
-```text
-mot/<vehicle-id>/debug/can/last_id
-mot/<vehicle-id>/debug/can/frame_count
-mot/<vehicle-id>/debug/heap/free
-```
-
-## Compatibility Rule
-
-Once a stable topic is released, it should not be renamed without a migration period.
-
-New values should be added under the existing hierarchy whenever possible.
+Never expose unauthenticated MQTT directly to the internet.

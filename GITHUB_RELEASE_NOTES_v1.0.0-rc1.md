@@ -5,16 +5,50 @@ First release candidate for MOT v1.0.
 ## Highlights
 
 - ESP32-WROOM firmware for Microlino Display CAN telemetry
-- MQTT publishing with topic structure `mot/<vehicleId>/...`
-- Configurable MQTT prefix, vehicle ID and vehicle name
-- Web configuration UI on the ESP32
-- Public dashboard with MQTT over WebSocket/WSS support
-- Cockpit-style dashboard with Microlino illustration
-- SOC, range, speed, odometer, charging and system status
-- Prepared project documentation and release workflow
+- MQTT topic structure `mot/<vehicleId>/...`
+- Web configuration UI
+- OTA firmware update via browser upload
+- OTA password protection
+- Cockpit-style dashboard
+- MQTT over WebSocket/WSS dashboard support
+- Tested with real Microlino OBD2 Display CAN data
 
-## Notes
+## Tested core telemetry
 
-This is a release candidate. Use it for testing and feedback before the final v1.0.0 release.
+- SOC
+- Speed
+- Odometer
+- Charging indicator candidate
+- MQTT publishing
+- Dashboard connection over WSS
+- OTA update flow
 
-Private MQTT hosts, credentials and API keys are intentionally not included. Copy `dashboard/config.example.js` to `dashboard/config.js` and adapt it for your own deployment.
+## Important notes
+
+This is a **release candidate**.
+
+Use it for beta testing before the final v1.0.0 release.
+
+Do not expose plain MQTT or plain WebSocket directly to the internet. For browser dashboards served over HTTPS, use WSS through a reverse proxy such as Caddy.
+
+## Default topic structure
+
+```text
+mot/pioneer/display/soc
+mot/pioneer/display/speed_kmh
+mot/pioneer/display/odometer_km
+mot/pioneer/charging/is_charging
+mot/pioneer/system/device_id
+```
+
+## Configuration
+
+Private MQTT hosts, credentials and API keys are intentionally not included.
+
+Copy:
+
+```bash
+cp dashboard/config.example.js dashboard/config.js
+```
+
+Then adapt `dashboard/config.js` for your broker.

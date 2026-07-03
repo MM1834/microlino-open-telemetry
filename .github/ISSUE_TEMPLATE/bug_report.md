@@ -1,27 +1,24 @@
 ---
 name: Bug report
 about: Report a problem with MOT
-labels: bug
 ---
 
 ## Description
 
-Describe the problem.
+What happened?
 
 ## Hardware
 
 - Board:
 - CAN transceiver:
-- Vehicle model/generation:
-- Firmware version:
+- Vehicle model:
 
-## Steps to reproduce
+## Firmware
 
-1.
-2.
-3.
+- Version:
+- MQTT prefix:
+- Vehicle ID:
 
-## Expected behavior
+## Logs
 
-## Logs / screenshots
-
+Paste relevant serial logs, MQTT logs or browser console errors.

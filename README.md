@@ -4,176 +4,200 @@
 
 Microlino Open Telemetry (MOT) is an open-source telemetry platform for the Microlino EV.
 
-MOT reads vehicle data from one or more CAN buses, decodes it into a unified telemetry model, and makes this information available through MQTT, JSON APIs, dashboards, and future cloud services.
+MOT reads vehicle data from the Microlino Display CAN bus, decodes it on an ESP32, publishes live telemetry through MQTT, and displays it in a browser-based dashboard.
 
-The project is designed to support multiple Microlino generations while remaining hardware independent and easy to extend.
+The project is designed around one common telemetry model so that firmware, MQTT, dashboards, OTA updates, ABRP integration and future LilyGO/LTE hardware can evolve without changing the data structure.
+
+---
+
+## Current status
+
+**Release candidate:** `v1.0.0-rc1`
+
+Current tested setup:
+
+- ESP32-WROOM DevKit
+- SN65HVD230 / VP230 CAN transceiver
+- Microlino Display CAN via OBD2
+- WiFi + MQTT
+- MQTT over WebSocket/WSS for the dashboard
+- ESP32 Web configuration
+- OTA firmware upload via Web UI
+- Cockpit-style web dashboard
 
 ---
 
 ## Features
 
-### Current
+### Firmware
 
-- ✅ ESP32-WROOM support
-- ✅ Microlino Display CAN decoder
-- ✅ MQTT telemetry
-- ✅ Embedded web configuration
-- ✅ JSON status API
-- ✅ WiFi fallback access point
-- ✅ Configuration stored in NVS
+- ESP32-WROOM support
+- Microlino Display CAN decoder
+- SOC, speed, odometer and charging-state telemetry
+- Configurable MQTT broker
+- Configurable MQTT prefix and vehicle ID
+- Fallback WiFi access point
+- Web configuration interface
+- JSON status API
+- OTA firmware update with password protection
 
-### Planned
+### Dashboard
 
-- 🚧 Progressive Web Dashboard (PWA)
-- 🚧 ABRP integration
-- 🚧 OTA firmware updates
-- 🚧 LilyGO LTE/GPS support
-- 🚧 Dual CAN support
-- 🚧 Pioneer BMS decoder
-- 🚧 Standard BMS decoder
-
----
-
-## Supported Hardware
-
-### Current
-
-- ESP32-WROOM DevKit
-- SN65HVD230 / VP230 CAN transceiver
-- OBD-II connection
-
-### Planned
-
-- LilyGO T-A7670
-- Dual CAN modules
-- LTE
-- GPS
+- Browser-based dashboard
+- Dark cockpit UI
+- Microlino illustration
+- MQTT over WebSocket / WSS
+- SOC, range, speed, odometer and charging status
+- Online/offline status
+- Prepared location panel
+- Responsive layout for desktop and mobile
 
 ---
 
-# System Architecture
+## MQTT topic structure
+
+MOT uses the following topic pattern:
+
+```text
+mot/<vehicleId>/<category>/<value>
+```
+
+Example:
+
+```text
+mot/pioneer/display/soc
+mot/pioneer/display/speed_kmh
+mot/pioneer/display/odometer_km
+mot/pioneer/charging/is_charging
+mot/pioneer/system/device_id
+```
+
+See [docs/MQTT.md](docs/MQTT.md).
+
+---
+
+## Architecture
 
 ```text
                  Microlino
-
-        ┌────────────┴────────────┐
-        │                         │
-   Display CAN               BMS CAN
-        │                         │
-        └────────────┬────────────┘
                      │
-              Decoder Engine
+                Display CAN
+                     │
+                     ▼
+              ESP32-WROOM
+                     │
+              CAN Decoder
                      │
                      ▼
               Telemetry Model
                      │
       ┌──────────────┼──────────────┐
       │              │              │
-    MQTT         JSON API        ABRP
-      │              │
- Dashboard      Third-party Apps
+    MQTT         JSON API          OTA
+      │
+      ▼
+  Dashboard / ioBroker / Home Assistant / Node-RED
 ```
-
-The decoder layer is completely independent from all outputs.
-
-Every decoder writes only into the shared telemetry model.
-
-MQTT, JSON APIs, dashboards and cloud integrations simply consume the telemetry model.
-
-This architecture allows support for multiple Microlino generations while keeping all integrations identical.
 
 ---
 
-# Repository Structure
+## Quick start
+
+### 1. Flash firmware
+
+```bash
+cd firmware/esp32-wroom
+pio run -t upload
+pio device monitor
+```
+
+### 2. Configure ESP32
+
+Open the ESP32 Web UI and configure:
 
 ```text
-microlino-open-telemetry/
-
-firmware/
-    common/
-    esp32-wroom/
-    lilygo-t-a7670/
-
-dashboard/
-    public/
-        css/
-        js/
-        icons/
-
-docs/
-    can/
-
-hardware/
-    esp32-wroom/
-    lilygo/
-    sn65hvd230/
-    obd2/
-
-tools/
+WiFi SSID
+WiFi password
+MQTT host
+MQTT port
+MQTT username/password
+MQTT prefix: mot
+Vehicle ID: pioneer
+Vehicle name: Microlino Pioneer
+OTA password
 ```
 
----
+### 3. Configure dashboard
 
-# Roadmap
+Copy and adapt the dashboard configuration:
 
-| Version | Description |
-|----------|-------------|
-| **v0.9.0** | Project foundation |
-| **v0.9.1** | Dashboard prototype |
-| **v0.9.2** | ABRP integration |
-| **v0.9.3** | OTA support |
-| **v1.0.0** | First stable ESP32-WROOM release |
-| **v2.0.0** | LilyGO LTE/GPS support |
-| **v2.1.0** | Dual CAN support |
+```bash
+cp dashboard/config.example.js dashboard/config.js
+```
 
----
+Example:
 
-# Project Philosophy
+```js
+window.MOT_CONFIG = {
+  mqtt: {
+    host: "mqtt.example.com",
+    port: 443,
+    useTls: true,
+    path: "/",
+    username: "",
+    password: "",
+    topicPrefix: "mot",
+    vehicleId: "pioneer"
+  }
+};
+```
 
-Microlino Open Telemetry is built around one simple principle:
+### 4. Deploy dashboard
 
-> **One telemetry model. Multiple vehicles. Open platform.**
+Upload the `dashboard/` folder to any static web host.
 
-Rather than creating separate firmware versions for different Microlino generations, MOT provides a single telemetry model shared by all supported vehicles.
+For HTTPS-hosted dashboards, MQTT WebSocket must be available as `wss://`, not plain `ws://`.
 
-Vehicle-specific CAN decoders translate raw CAN frames into the common telemetry model.
-
-This allows MQTT, JSON APIs, dashboards, ABRP and future integrations to work without knowing which Microlino model produced the data.
-
----
-
-# Why MOT?
-
-The goal of this project is not only to build another ESP32 CAN interface.
-
-The goal is to provide an open, documented and extensible telemetry platform for the Microlino community.
-
-Future versions will support:
-
-- Multiple Microlino generations
-- Multiple CAN buses
-- Cloud connectivity
-- Local dashboards
-- Home Assistant
-- Node-RED
-- ABRP
-- Mobile applications
-
-while keeping one common telemetry model.
+See [docs/DASHBOARD.md](docs/DASHBOARD.md) and [docs/SECURE_WEBSOCKET_CADDY.md](docs/SECURE_WEBSOCKET_CADDY.md).
 
 ---
 
-# Contributing
+## Roadmap
 
-Contributions are very welcome.
+### v1.0.0
 
-Whether you are improving CAN decoders, testing new hardware, documenting reverse engineering results or improving the dashboard, every contribution helps the project.
+- Stable ESP32-WROOM release
+- Display CAN telemetry
+- MQTT dashboard
+- OTA updates
+- Documentation
 
-Contribution guidelines will be published in `CONTRIBUTING.md`.
+### v1.1
+
+- Dashboard refinements
+- Historical charts
+- More system telemetry
+- Config backup/restore
+- ABRP integration
+
+### v2.0
+
+- LilyGO LTE/GPS support
+- Cellular connectivity
+- GPS location
+- Optional second CAN / BMS data
 
 ---
 
-# License
+## Contributing
+
+Contributions, testing results and CAN decoding notes are welcome.
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## License
 
 Released under the MIT License.
 

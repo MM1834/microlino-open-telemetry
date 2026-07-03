@@ -1,29 +1,68 @@
-# MOT Dashboard
+# Dashboard
 
-The MOT Dashboard is a static Progressive Web App. It can be hosted on any web server and connects to telemetry data via MQTT over WebSocket.
+The MOT dashboard is a static web dashboard using MQTT over WebSocket/WSS.
 
-## Requirements
+It can be hosted on any web server.
 
-- MQTT broker with WebSocket support
-- MQTT topics following `docs/MQTT.md`
-- Browser-accessible `ws://` or `wss://` endpoint
+## Configuration
 
-## Quick Start
+Copy:
 
-1. Copy the `dashboard/` directory to a web server.
-2. Replace `dashboard/js/mqtt.min.js` with the MQTT.js browser bundle.
-3. Open `index.html`.
-4. Configure WebSocket URL, topic prefix, username and password.
-5. Press **Connect**.
-
-Example topic prefix:
-
-```text
-mot/pioneer
+```bash
+cp dashboard/config.example.js dashboard/config.js
 ```
 
-Example full topic:
+Then edit:
+
+```js
+window.MOT_CONFIG = {
+  mqtt: {
+    host: "mqtt.example.com",
+    port: 443,
+    useTls: true,
+    path: "/",
+    username: "",
+    password: "",
+    topicPrefix: "mot",
+    vehicleId: "pioneer"
+  }
+};
+```
+
+## HTTPS and WSS
+
+If the dashboard is served using HTTPS, browsers block plain `ws://` WebSocket connections.
+
+Use:
 
 ```text
-mot/pioneer/display/soc
+wss://mqtt.example.com
 ```
+
+not:
+
+```text
+ws://mqtt.example.com
+```
+
+## MQTT.js
+
+The dashboard requires the browser build of MQTT.js.
+
+Download it and place it here:
+
+```text
+dashboard/libs/mqtt.min.js
+```
+
+Example source:
+
+```text
+https://unpkg.com/mqtt/dist/mqtt.min.js
+```
+
+## Deployment
+
+Upload the content of `dashboard/` to your web host.
+
+Do not commit personal `config.js` files containing private broker names or credentials.

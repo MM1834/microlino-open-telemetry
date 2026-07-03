@@ -1,31 +1,34 @@
-// Microlino Open Telemetry Dashboard configuration example
-// Copy this file to config.js and adapt it for your MQTT WebSocket endpoint.
+// Copy this file to config.js and adapt it for your own deployment.
+// Do not commit private hosts, usernames, passwords or tokens.
+
 window.MOT_CONFIG = {
-  // MQTT over WebSocket endpoint.
-  // Use WSS when the dashboard is served over HTTPS.
-  host: "mqtt.example.com",
-  port: 443,
-  useTls: true,
-  path: "/",
+  app: {
+    title: "Microlino Open Telemetry",
+    vehicleName: "Microlino Pioneer",
+    locale: "de-CH",
+    units: "metric"
+  },
 
-  // Optional MQTT credentials.
-  username: "",
-  password: "",
+  mqtt: {
+    host: "mqtt.example.com",
+    port: 443,
+    useTls: true,
+    path: "/",
 
-  // MQTT topic base: <topicPrefix>/<vehicleId>/...
-  topicPrefix: "mot",
-  vehicleId: "microlino",
+    username: "",
+    password: "",
 
-  // UI only.
-  vehicleName: "Microlino",
+    topicPrefix: "mot",
+    vehicleId: "pioneer",
 
-  // Range estimate fallback used when no range topic is available.
-  rangeFullKm: 140,
+    reconnectPeriodMs: 3000,
+    connectTimeoutMs: 10000
+  },
 
-  // Default map position shown until location topics are received.
   map: {
-    defaultLat: 47.3769,
-    defaultLng: 8.5417,
-    zoom: 13
+    enabled: true,
+    defaultLat: 47.478,
+    defaultLon: 8.212,
+    defaultZoom: 13
   }
 };

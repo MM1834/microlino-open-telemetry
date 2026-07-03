@@ -1,6 +1,7 @@
 #include "web_ui.h"
 #include "../app_config.h"
 #include "../network/wifi_manager.h"
+#include "../ota/ota_web.h"
 
 #include <Arduino.h>
 #include <WebServer.h>
@@ -57,7 +58,7 @@ static void handleStatus()
     s += "MQTT base topic: " + config.mqttPrefix + "/" + config.vehicleId + "<br>";
     s += "Uptime: " + String(millis() / 1000) + " s</div>";
 
-    s += "<p><a href='/config'>Config</a> · <a href='/api/status'>JSON API</a></p></body></html>";
+    s += "<p><a href='/config'>Config</a> · <a href='/update'>OTA Update</a> · <a href='/api/status'>JSON API</a></p></body></html>";
     server.send(200, "text/html", s);
 }
 
@@ -166,6 +167,7 @@ void setupWebUi()
     server.on("/save", HTTP_POST, handleSave);
     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
     server.on("/favicon.ico", []() { server.send(204); });
+    setupOtaRoutes(server);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
     server.begin();
     Serial.println("Web UI started");
@@ -174,6 +176,7 @@ void setupWebUi()
 void webUiLoop()
 {
     server.handleClient();
+    otaWebLoop();
     if (rebootPending && millis() > rebootAtMs) {
         Serial.println("Rebooting now...");
         delay(100);
