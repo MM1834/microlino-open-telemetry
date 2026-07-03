@@ -7,6 +7,12 @@
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
+  function fmtCoord(v, positiveSuffix, negativeSuffix) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '--';
+    const suffix = n >= 0 ? positiveSuffix : negativeSuffix;
+    return `${Math.abs(n).toFixed(5)}° ${suffix}`;
+  }
   function baseTopic() {
     const prefix = (mqttCfg.topicPrefix || 'mot').replace(/\/$/, '');
     const vehicle = mqttCfg.vehicleId || 'pioneer';
@@ -69,14 +75,31 @@
       case 'system/device_id': setText('device-id', val); break;
       case 'system/rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
-      case 'location/lat': case 'gps/lat': updateCoords(); break;
-      case 'location/lon': case 'gps/lon': updateCoords(); break;
+      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
+      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
     }
   }
-  function updateCoords() {
-    const lat = state.values['location/lat'] ?? state.values['gps/lat'];
-    const lon = state.values['location/lon'] ?? state.values['gps/lon'];
-    if (lat !== undefined && lon !== undefined) { setText('location-title', 'Letzter Standort'); setText('location-coords', `${fmtNum(lat,5)}° N · ${fmtNum(lon,5)}° E`); }
+  function updateCoords(source = 'mqtt') {
+    const lat = state.values['location/latitude'] ?? state.values['location/lat'] ?? state.values['gps/latitude'] ?? state.values['gps/lat'];
+    const lon = state.values['location/longitude'] ?? state.values['location/lon'] ?? state.values['gps/longitude'] ?? state.values['gps/lon'];
+
+    if (lat !== undefined && lon !== undefined) {
+      setText('location-title', source === 'default' ? (vehicleCfg.defaultLocation?.label || 'Default Standort') : 'Letzter Standort');
+      setText('location-coords', `${fmtCoord(lat, 'N', 'S')} · ${fmtCoord(lon, 'E', 'W')}`);
+    }
+  }
+
+  function applyDefaultLocation() {
+    const loc = vehicleCfg.defaultLocation || {};
+    if (loc.enabled === false) return;
+    const lat = Number(loc.latitude);
+    const lon = Number(loc.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    state.values['location/latitude'] = lat;
+    state.values['location/longitude'] = lon;
+    updateCoords('default');
+    setText('location-updated', 'Default Standort aus config.js');
   }
   function initBars() {
     const wrap = $('cell-bars'); if (!wrap) return;
@@ -86,7 +109,7 @@
     const img = vehicleCfg.image || 'img/microlino.jpeg';
     $('hero-image')?.setAttribute('src', img); $('brand-image')?.setAttribute('src', img);
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
-    initBars(); setSoc(NaN);
+    initBars(); setSoc(NaN); applyDefaultLocation();
   }
   function connect() {
     const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
