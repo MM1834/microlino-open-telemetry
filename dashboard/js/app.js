@@ -78,6 +78,10 @@
       case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
       case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
     }
+
+    window.MOTHistoryRecorder?.update(state.values, {
+      vehicleId: mqttCfg.vehicleId || 'pioneer'
+    });
   }
   function updateCoords(source = 'mqtt') {
     const lat = state.values['location/latitude'] ?? state.values['location/lat'] ?? state.values['gps/latitude'] ?? state.values['gps/lat'];
@@ -128,3 +132,9 @@
   }
   initStatic(); connect();
 })();
+
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.MOTHistoryChart?.init();
+});
+

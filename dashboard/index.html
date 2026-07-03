@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
   <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/history.css">
+  <link rel="stylesheet" href="css/history-controls.css">
+  <link rel="stylesheet" href="css/history-soc-speed.css">
 </head>
 <body>
   <div class="app-shell">
@@ -91,10 +94,61 @@
           <ul class="data-list"><li><span>Firmware</span><strong id="fw-version">--</strong></li><li><span>Device</span><strong id="device-id">--</strong></li><li><span>RSSI</span><strong id="rssi">-- dBm</strong></li><li><span>Uptime</span><strong id="uptime">--</strong></li></ul>
         </article>
       </section>
-    </main>
+    
+<section class="card history-card" id="history">
+  <div class="card-header">
+    <h2>History</h2>
+    <span class="muted">local browser storage</span>
+  </div>
+  <div class="history-toolbar">
+    <button class="active" data-history-range="24">24h</button>
+    <button data-history-range="168">7d</button>
+    <button data-history-range="720">30d</button>
+  </div>
+  <div class="history-split">
+    <div class="history-mini">
+      <h3>SoC Verlauf</h3>
+      <div class="history-chart-wrap">
+        <div id="soc-history-empty" class="history-empty">Noch keine SOC-History vorhanden.</div>
+        <canvas id="soc-history-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="history-mini">
+      <h3>Speed Verlauf</h3>
+      <div class="history-chart-wrap">
+        <div id="speed-history-empty" class="history-empty">Noch keine Speed-History vorhanden.</div>
+        <canvas id="speed-history-chart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div id="soc-history-meta" class="history-meta"></div>
+
+  <div class="history-actions">
+    <button id="history-demo" type="button">Demo-Daten</button>
+    <button id="history-export-csv" type="button">CSV Export</button>
+    <button id="history-export-json" type="button">JSON Export</button>
+    <button id="history-clear" type="button">History löschen</button>
+  </div>
+
+  <div class="history-debug">
+    <div><strong id="history-debug-count">--</strong>Samples</div>
+    <div><strong id="history-debug-oldest">--</strong>Ältester Punkt</div>
+    <div><strong id="history-debug-newest">--</strong>Neuster Punkt</div>
+    <div><strong id="history-debug-latest-soc">--</strong>Letzter SoC</div>
+  </div>
+
+</section>
+
+</main>
   </div>
   <script src="config.js"></script>
   <script src="libs/mqtt.min.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/history/history-db.js"></script>
+  <script src="js/history/history-recorder.js"></script>
+  <script src="js/history/history-chart.js"></script>
+  <script src="js/history/history-export.js"></script>
+  <script src="js/history/history-debug.js"></script>
 </body>
 </html>

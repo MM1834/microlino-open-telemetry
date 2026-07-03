@@ -1,0 +1,5 @@
+.history-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+.history-actions button{border:1px solid rgba(148,163,184,.35);background:rgba(15,23,42,.72);color:var(--text,#e5eefb);border-radius:12px;padding:.55rem .8rem;cursor:pointer}
+.history-actions button:hover{border-color:rgba(56,189,248,.75)}
+.history-debug{margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;color:var(--muted,#94a3b8);font-size:.9rem}
+.history-debug strong{display:block;color:var(--text,#e5eefb);font-size:1rem}
