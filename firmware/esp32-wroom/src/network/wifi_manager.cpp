@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <time.h>
 #include "system/device_id.h"
 #include "telemetry/telemetry.h"
 
@@ -59,6 +60,11 @@ void setupNetwork()
         telemetry.system.wifiRssi = WiFi.RSSI();
 
         Serial.printf("\nWiFi connected: %s\n", WiFi.localIP().toString().c_str());
+
+       	configTime(0, 0, "pool.ntp.org", "time.google.com", "time.cloudflare.com");
+        Serial.println("NTP: time sync requested");
+
+
         if (MDNS.begin(motHostname().c_str())) {
             Serial.printf("mDNS: http://%s.local/\n", motHostname().c_str());
         }
