@@ -159,7 +159,7 @@ static void handleConfig()
     s += "<textarea name='configJson' rows='8' style='width:100%;box-sizing:border-box' placeholder='Paste config JSON here'></textarea>";
     s += "<button type='submit'>Import config & reboot</button></form>";
     s += "<p class='muted'>Export contains local secrets such as WiFi and MQTT passwords. Keep it private.</p></div>";
-    s += "<div class='card'><h2>Factory Reset</h2><form method='POST' action='/factory-reset'><button type='submit'>Clear config & reboot</button></form></div>";
+    s += "<div class='card'><h2>Factory Reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Factory Reset wirklich ausführen? Alle Einstellungen werden gelöscht.');\"><button type='submit'>Clear config & reboot</button></form></div>";
     s += "<p><a href='/status'>Status</a></p></body></html>";
     server.send(200, "text/html", s);
 }
