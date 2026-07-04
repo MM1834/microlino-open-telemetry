@@ -3,6 +3,8 @@
 #include "../network/wifi_manager.h"
 #include "../ota/ota_web.h"
 
+#include "common/abrp/abrp_client.h"
+
 #include <Arduino.h>
 #include <WebServer.h>
 #include "telemetry/telemetry.h"
@@ -140,6 +142,17 @@ static void handleConfig()
     s += "OTA Password<input name='otaPass' type='password' value='" + config.otaPassword + "'></div>";
 
     s += "<button type='submit'>Save & Reboot</button></form>";
+
+    s += "<div class='card'><h2>ABRP Status</h2>";
+    s += "<p class='muted'>ABRP sends telemetry only when API key and user token are configured.</p>";
+    s += "<button type='button' onclick='testAbrp()'>Test ABRP Send</button>";
+    s += "<pre id='abrp-status' style='white-space:pre-wrap;margin-top:1rem'>Loading...</pre>";
+    s += "<script>";
+    s += "async function loadAbrp(){try{const r=await fetch('/api/abrp/status');const d=await r.json();document.getElementById('abrp-status').textContent=`Enabled: ${d.enabled}\\nTime valid: ${d.timeValid}\\nUTC: ${d.utc}\\nLast success: ${d.lastSuccess}\\nHTTP: ${d.lastHttpCode}\\nMessage: ${d.lastMessage}\\nPayload: ${d.lastPayload}`;}catch(e){document.getElementById('abrp-status').textContent=e.message;}}";
+    s += "async function testAbrp(){document.getElementById('abrp-status').textContent='Sending test telemetry...';try{const r=await fetch('/api/abrp/test',{method:'POST'});const d=await r.json();document.getElementById('abrp-status').textContent=`Enabled: ${d.enabled}\\nTime valid: ${d.timeValid}\\nUTC: ${d.utc}\\nLast success: ${d.lastSuccess}\\nHTTP: ${d.lastHttpCode}\\nMessage: ${d.lastMessage}\\nPayload: ${d.lastPayload}`;}catch(e){document.getElementById('abrp-status').textContent=e.message;}}";
+    s += "loadAbrp();";
+    s += "</script></div>";
+
     s += "<div class='card'><h2>Configuration Management</h2>";
     s += "<p><a href='/api/config/export'>Download config JSON</a></p>";
     s += "<form method='POST' action='/config/import'>";
@@ -196,6 +209,18 @@ static void handleSave()
     rebootAtMs = millis() + 5000;
 }
 
+
+
+static void handleAbrpStatus()
+{
+    server.send(200, "application/json", abrpStatusJson());
+}
+
+static void handleAbrpTest()
+{
+    bool ok = sendAbrpTelemetryNow();
+    server.send(ok ? 200 : 503, "application/json", abrpStatusJson());
+}
 
 static void handleConfigExport()
 {
@@ -278,6 +303,8 @@ void setupWebUi()
     server.on("/save", HTTP_POST, handleSave);
     server.on("/api/config/export", HTTP_GET, handleConfigExport);
     server.on("/config/import", HTTP_POST, handleConfigImport);
+    server.on("/api/abrp/status", HTTP_GET, handleAbrpStatus);
+    server.on("/api/abrp/test", HTTP_POST, handleAbrpTest);
     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
     server.on("/favicon.ico", []() { server.send(204); });
     setupOtaRoutes(server);
