@@ -68,7 +68,7 @@
       case 'display/odometer_km': case 'display/odo': setText('odo-main', `${fmtNum(val,1)} km`); break;
       case 'display/estimated_range_km': case 'display/range': state.values.range = val; setText('range-main', `${fmtNum(val,0)} km`); break;
       case 'charging/is_charging': { const charging = !!Number(val) || val === true; const t = charging ? 'Lädt' : 'Nicht am Laden'; setText('charging-main', t); setText('charging-card', t); break; }
-      case 'charging/power_signed': case 'charging/power_display': setText('power', `${fmtNum(Number(val)/10,1)} kW`); break;
+      case 'charging/power_signed': case 'charging/power_display': { const p=Number(val)/10; setText('power', `${fmtNum(p,1)} kW`); if(p < -0.1) setText('charging-card','Rekuperation'); break; }
       case 'bms/pack_voltage': setText('voltage', `${fmtNum(val,1)} V`); setText('charge-voltage', `${fmtNum(val,1)} V`); break;
       case 'bms/pack_current': setText('current', `${fmtNum(val,1)} A`); setText('charge-current', `${fmtNum(val,1)} A`); break;
       case 'system/firmware': case 'system/version': setText('fw-version', val); break;
@@ -83,6 +83,31 @@
       vehicleId: mqttCfg.vehicleId || 'pioneer'
     });
   }
+
+  function updateLocationMap(lat, lon) {
+    const nLat = Number(lat);
+    const nLon = Number(lon);
+    if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) return;
+
+    const delta = 0.0032;
+    const bbox = [
+      (nLon - delta).toFixed(6),
+      (nLat - delta).toFixed(6),
+      (nLon + delta).toFixed(6),
+      (nLat + delta).toFixed(6)
+    ].join(',');
+
+    const marker = `${nLat.toFixed(6)},${nLon.toFixed(6)}`;
+    const iframe = $('location-map-frame');
+    const link = $('location-map-link');
+
+    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(marker)}`;
+    const href = `https://www.openstreetmap.org/?mlat=${nLat.toFixed(6)}&mlon=${nLon.toFixed(6)}#map=17/${nLat.toFixed(6)}/${nLon.toFixed(6)}`;
+
+    if (iframe && iframe.src !== src) iframe.src = src;
+    if (link) link.href = href;
+  }
+
   function updateCoords(source = 'mqtt') {
     const lat = state.values['location/latitude'] ?? state.values['location/lat'] ?? state.values['gps/latitude'] ?? state.values['gps/lat'];
     const lon = state.values['location/longitude'] ?? state.values['location/lon'] ?? state.values['gps/longitude'] ?? state.values['gps/lon'];
@@ -90,6 +115,7 @@
     if (lat !== undefined && lon !== undefined) {
       setText('location-title', source === 'default' ? (vehicleCfg.defaultLocation?.label || 'Default Standort') : 'Letzter Standort');
       setText('location-coords', `${fmtCoord(lat, 'N', 'S')} · ${fmtCoord(lon, 'E', 'W')}`);
+      updateLocationMap(lat, lon);
     }
   }
 

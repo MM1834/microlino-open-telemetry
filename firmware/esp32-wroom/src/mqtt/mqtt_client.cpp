@@ -30,10 +30,10 @@ static String topic(const char *suffix)
 
 static void reconnectMqtt()
 {
-    if (!networkOnline() || config.mqttHost.isEmpty() || mqtt.connected()) return;
+    if (!networkOnline() || !config.mqttEnabled() || mqtt.connected()) return;
 
     Serial.print("Connecting MQTT... ");
-    String clientId = motDeviceId();
+    String clientId = config.mqttClientId();
     if (mqtt.connect(clientId.c_str(), config.mqttUser.c_str(), config.mqttPass.c_str())) {
         Serial.println("connected");
     } else {
@@ -63,20 +63,24 @@ static void publishBool(const char *suffix, bool value)
 
 void setupMqtt()
 {
-    if (!config.mqttHost.isEmpty()) {
+    if (config.mqttEnabled()) {
         mqtt.setServer(config.mqttHost.c_str(), config.mqttPort);
+        Serial.printf("MQTT: enabled host=%s port=%u clientId=%s\n", config.mqttHost.c_str(), config.mqttPort, config.mqttClientId().c_str());
+    } else {
+        Serial.println("MQTT: disabled (no host configured)");
     }
 }
 
 void mqttLoop()
 {
+    if (!config.mqttEnabled()) return;
     if (!mqtt.connected()) reconnectMqtt();
     mqtt.loop();
 }
 
 void publishTelemetry()
 {
-    if (!mqtt.connected()) return;
+    if (!config.mqttEnabled() || !mqtt.connected()) return;
 
     publishFloat("display/soc", telemetry.display.soc);
     publishFloat("display/speed_kmh", telemetry.display.speedKmh);
@@ -89,6 +93,8 @@ void publishTelemetry()
     publishInt("charging/power_signed", telemetry.charging.powerSigned);
 
     mqtt.publish(topic("system/device_id").c_str(), motDeviceId().c_str(), true);
+    mqtt.publish(topic("system/device_name").c_str(), config.deviceName.c_str(), true);
+    mqtt.publish(topic("system/mqtt_client_id").c_str(), config.mqttClientId().c_str(), true);
     mqtt.publish(topic("system/firmware_version").c_str(), telemetry.system.firmwareVersion.c_str(), true);
     mqtt.publish(topic("system/ip_address").c_str(), telemetry.system.ipAddress.c_str(), true);
     mqtt.publish(topic("system/network_mode").c_str(), telemetry.system.networkMode.c_str(), true);

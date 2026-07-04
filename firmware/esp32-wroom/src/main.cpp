@@ -9,6 +9,7 @@
 #include "telemetry/telemetry.h"
 #include "system/version.h"
 #include "system/device_id.h"
+#include "common/abrp/abrp_client.h"
 
 static unsigned long lastMqttPublishMs = 0;
 static unsigned long lastSystemUpdateMs = 0;
@@ -33,6 +34,7 @@ void setup()
 
     setupNetwork();
     setupMqtt();
+    setupAbrp();
     setupWebUi();
     setupCanInput();
 
@@ -44,6 +46,7 @@ void loop()
     processCanInput();
     mqttLoop();
     webUiLoop();
+    abrpLoop();
 
     if (millis() - lastSystemUpdateMs > 1000) {
         lastSystemUpdateMs = millis();

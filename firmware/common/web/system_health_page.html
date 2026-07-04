@@ -1,0 +1,43 @@
+<div class="card">
+  <h3>System Health</h3>
+  <p>Prüft WiFi, DNS, TCP, MQTT und Basisdaten des Geräts.</p>
+
+  <button type="button" onclick="loadSystemHealth()">System Health prüfen</button>
+
+  <pre id="system-health-result" style="white-space:pre-wrap;margin-top:1rem;"></pre>
+</div>
+
+<script>
+async function loadSystemHealth() {
+  const out = document.getElementById('system-health-result');
+  out.textContent = 'Prüfe System Health…';
+
+  try {
+    const res = await fetch('/api/system-health');
+    const data = await res.json();
+
+    out.textContent =
+`Device    : ${data.deviceId || '--'}
+Firmware  : ${data.firmwareVersion || '--'}
+Build     : ${data.buildDate || '--'}
+IP        : ${data.ip || '--'}
+RSSI      : ${data.rssi} dBm
+Uptime    : ${data.uptimeText}
+
+WiFi      : ${data.wifiOk ? 'OK' : 'FAIL'}
+DNS       : ${data.dnsOk ? 'OK' : 'FAIL'}
+TCP       : ${data.tcpOk ? 'OK' : 'FAIL'}
+MQTT      : ${data.mqttOk ? 'OK' : 'FAIL'}
+CAN       : ${data.canOk ? 'OK' : 'UNKNOWN'}
+
+MQTT Host : ${data.mqtt.host}
+MQTT Port : ${data.mqtt.port}
+MQTT IP   : ${data.mqtt.resolvedIp || '--'}
+MQTT RC   : ${data.mqtt.mqttState}
+Message   : ${data.mqtt.message}
+Duration  : ${data.mqtt.durationMs} ms`;
+  } catch (err) {
+    out.textContent = 'Fehler beim System-Health-Test: ' + err.message;
+  }
+}
+</script>
