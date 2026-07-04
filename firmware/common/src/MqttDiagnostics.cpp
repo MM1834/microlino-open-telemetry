@@ -13,6 +13,13 @@ MqttDiagResult MqttDiagnostics::test(
   r.port = port;
   r.wifiConnected = WiFi.status() == WL_CONNECTED;
   const uint32_t started = millis();
+  String cleanHost = host;
+  cleanHost.trim();
+  if (cleanHost.isEmpty()) {
+    r.message = "MQTT disabled: no host configured";
+    r.durationMs = millis() - started;
+    return r;
+  }
 
   if (!r.wifiConnected) {
     r.message = "WiFi not connected";
@@ -21,7 +28,7 @@ MqttDiagResult MqttDiagnostics::test(
   }
 
   IPAddress ip;
-  r.dnsOk = WiFi.hostByName(host.c_str(), ip);
+  r.dnsOk = WiFi.hostByName(cleanHost.c_str(), ip);
   if (r.dnsOk) {
     r.resolvedIp = ip.toString();
   } else {
@@ -32,7 +39,7 @@ MqttDiagResult MqttDiagnostics::test(
 
   WiFiClient tcpClient;
   tcpClient.setTimeout(tcpTimeoutMs / 1000);
-  r.tcpOk = tcpClient.connect(host.c_str(), port);
+  r.tcpOk = tcpClient.connect(cleanHost.c_str(), port);
   if (!r.tcpOk) {
     r.message = "TCP connection failed";
     r.durationMs = millis() - started;
@@ -42,7 +49,7 @@ MqttDiagResult MqttDiagnostics::test(
 
   WiFiClient mqttNet;
   PubSubClient mqtt(mqttNet);
-  mqtt.setServer(host.c_str(), port);
+  mqtt.setServer(cleanHost.c_str(), port);
 
   const String clientId = clientIdPrefix + "-" + String((uint32_t)ESP.getEfuseMac(), HEX);
   bool ok = false;
