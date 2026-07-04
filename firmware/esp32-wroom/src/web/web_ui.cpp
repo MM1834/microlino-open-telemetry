@@ -9,6 +9,9 @@
 #include "api/telemetry_json.h"
 #include "system/device_id.h"
 #include "system/version.h"
+#include "MqttDiagnostics.h"
+#include "SystemHealth.h"
+#include <WiFi.h>
 
 static WebServer server(80);
 static bool rebootPending = false;
@@ -23,7 +26,7 @@ static String htmlHeader(const char *title)
     s += "<style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;margin:24px;max-width:760px}";
     s += "input,select{width:100%;padding:9px;margin:4px 0 12px;box-sizing:border-box}";
     s += "button{padding:10px 16px;border-radius:8px;border:1px solid #999;background:#f5f5f5}";
-    s += ".card{border:1px solid #ddd;border-radius:12px;padding:16px;margin:12px 0}.muted{color:#666}</style></head><body>";
+    s += ".card{border:1px solid #ddd;border-radius:12px;padding:16px;margin:12px 0}.muted{color:#666}pre{background:#111;color:#eee;border-radius:8px;padding:12px;overflow:auto}.ok{color:#087f23}.fail{color:#b00020}</style></head><body>";
     return s;
 }
 
@@ -58,6 +61,19 @@ static void handleStatus()
     s += "MQTT base topic: " + config.mqttPrefix + "/" + config.vehicleId + "<br>";
     s += "Uptime: " + String(millis() / 1000) + " s</div>";
 
+
+    s += "<div class='card'><h2>System Health</h2>";
+    s += "<p class='muted'>Prüft WiFi, DNS, TCP, MQTT und CAN-Status.</p>";
+    s += "<button type='button' onclick='loadSystemHealth()'>System Health prüfen</button>";
+    s += "<pre id='system-health-result'>Noch nicht geprüft.</pre></div>";
+    s += "<script>";
+    s += "async function loadSystemHealth(){";
+    s += "const out=document.getElementById('system-health-result');out.textContent='Prüfe System Health…';";
+    s += "try{const r=await fetch('/api/system-health');const d=await r.json();";
+    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`;}";
+    s += "catch(e){out.textContent='Fehler beim System-Health-Test: '+e.message;}}";
+    s += "</script>";
+
     s += "<p><a href='/config'>Config</a> · <a href='/update'>OTA Update</a> · <a href='/api/status'>JSON API</a></p></body></html>";
     server.send(200, "text/html", s);
 }
@@ -88,6 +104,19 @@ static void handleConfig()
     s += "MQTT User<input name='mqttUser' value='" + config.mqttUser + "'>";
     s += "MQTT Password<input name='mqttPass' type='password' value='" + config.mqttPass + "'>";
     s += "Publish interval ms<input name='pubMs' value='" + String(config.publishIntervalMs) + "'></div>";
+
+    s += "<div class='card'><h2>MQTT Diagnose</h2>";
+    s += "<p class='muted'>Testet die gespeicherte MQTT-Konfiguration: WiFi, DNS, TCP-Port und Login.</p>";
+    s += "<button type='button' onclick='testMqtt()'>Test Connection</button>";
+    s += "<pre id='mqtt-test-result'>Noch nicht geprüft.</pre></div>";
+    s += "<script>";
+    s += "async function testMqtt(){";
+    s += "const out=document.getElementById('mqtt-test-result');out.textContent='Teste MQTT-Verbindung…';";
+    s += "try{const r=await fetch('/api/mqtt-test');const d=await r.json();";
+    s += "out.textContent=`Host      : ${d.host}\\nPort      : ${d.port}\\nIP        : ${d.resolvedIp||'--'}\\n\\nWiFi      : ${d.wifiConnected?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\n\\nRC        : ${d.mqttState}\\nMessage   : ${d.message}\\nDuration  : ${d.durationMs} ms`;}";
+    s += "catch(e){out.textContent='Fehler beim MQTT-Test: '+e.message;}}";
+    s += "</script>";
+
 
     s += "<div class='card'><h2>CAN</h2>";
     s += "CAN 1 profile<select name='can1Profile'>";
@@ -158,11 +187,53 @@ static void handleFactoryReset()
     rebootAtMs = millis() + 5000;
 }
 
+
+static MqttDiagResult runMqttDiagnostics(const char *clientIdPrefix)
+{
+    return MqttDiagnostics::test(
+        config.mqttHost,
+        config.mqttPort,
+        config.mqttUser,
+        config.mqttPass,
+        clientIdPrefix
+    );
+}
+
+static void handleApiMqttTest()
+{
+    MqttDiagResult result = runMqttDiagnostics("mot-diag");
+    server.send(200, "application/json", MqttDiagnostics::toJson(result));
+}
+
+static void handleApiSystemHealth()
+{
+    MqttDiagResult mqtt = runMqttDiagnostics("mot-health");
+
+    SystemHealthResult health;
+    health.deviceId = motDeviceId();
+    health.firmwareVersion = MOT_VERSION;
+    health.buildDate = String(__DATE__) + " " + String(__TIME__);
+    health.ip = WiFi.localIP().toString();
+    health.rssi = WiFi.RSSI();
+    health.uptimeSec = millis() / 1000UL;
+
+    health.wifiOk = WiFi.status() == WL_CONNECTED;
+    health.dnsOk = mqtt.dnsOk;
+    health.tcpOk = mqtt.tcpOk;
+    health.mqttOk = mqtt.mqttOk;
+    health.canOk = telemetry.display.valid;
+    health.mqtt = mqtt;
+
+    server.send(200, "application/json", SystemHealth::toJson(health));
+}
+
 void setupWebUi()
 {
     server.on("/", handleStatus);
     server.on("/status", handleStatus);
     server.on("/api/status", handleApiStatus);
+    server.on("/api/mqtt-test", handleApiMqttTest);
+    server.on("/api/system-health", handleApiSystemHealth);
     server.on("/config", handleConfig);
     server.on("/save", HTTP_POST, handleSave);
     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
