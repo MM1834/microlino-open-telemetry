@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="css/history.css">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
+  <link rel="stylesheet" href="css/location-map.css">
+  <link rel="stylesheet" href="css/location-map-cleanup.css">
 </head>
 <body>
   <div class="app-shell">
@@ -25,6 +27,7 @@
         <a href="#temps">♨ Temperaturen</a>
         <a href="#cells">▦ Zellen</a>
         <a href="#location">⌖ Standort</a>
+        <a href="#history">↗ History</a>
       </nav>
       <div class="side-status card compact">
         <div class="status-line"><span id="side-dot" class="dot"></span><strong id="side-online">Offline</strong></div>
@@ -80,13 +83,10 @@
           <div class="cell-meta"><span>Min: <b id="cell-min">--</b></span><span>Max: <b id="cell-max">--</b></span><span>Δ: <b id="cell-delta">--</b></span></div>
           <div id="cell-bars" class="cell-bars"></div>
         </article>
-        <article class="card panel chart-panel">
-          <h2>Verlauf (SoC)</h2>
-          <div class="chart-line" id="soc-chart"></div>
-        </article>
-        <article id="location" class="card panel location-panel">
+<article id="location" class="card panel location-panel">
           <h2>⌖ Standort</h2>
-          <div class="map-card"><div class="map-grid"></div><div class="map-pin">⌖</div></div>
+          <iframe id="location-map-frame" class="location-map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <a id="location-map-link" class="location-map-link" href="#" target="_blank" rel="noopener">OpenStreetMap öffnen</a>
           <div class="location-text"><strong id="location-title">Standort nicht verfügbar</strong><span id="location-coords">--</span><small id="location-updated">--</small></div>
         </article>
         <article class="card panel status-panel">

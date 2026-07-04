@@ -10,6 +10,7 @@ enum DecoderProfile {
 
 struct AppConfig {
     String vehicleName = "Microlino Pioneer";   // Display name only
+    String deviceName;                          // Stable hostname / MQTT client id
     String vehicleId = "pioneer";               // Stable MQTT topic id
     String mqttPrefix = "mot";                  // MQTT namespace/prefix
 
@@ -31,6 +32,10 @@ struct AppConfig {
     String otaPassword;
 
     uint32_t publishIntervalMs = 5000;
+
+    bool mqttEnabled() const;
+    bool abrpEnabled() const;
+    String mqttClientId() const;
 };
 
 extern AppConfig config;
@@ -38,4 +43,6 @@ extern AppConfig config;
 void loadConfig();
 void saveConfig();
 void clearConfig();
+String configToJson(bool includeSecrets = true);
+bool importConfigJson(const String& json, String& error);
 const char *decoderProfileName(DecoderProfile profile);

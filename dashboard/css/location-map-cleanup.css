@@ -1,0 +1,39 @@
+/* v1.0.2: replace old synthetic/static location graphic with real OSM iframe */
+
+.location-panel{
+  overflow:hidden;
+}
+
+/* The old dashboard used a synthetic map/background in the location card.
+   Keep this defensive so the real iframe is the only visible map. */
+.location-panel::before,
+.location-panel::after,
+.location-panel .location-static,
+.location-panel .location-visual,
+.location-panel .location-map-static,
+.location-panel .map-static,
+.location-panel .map-grid,
+.location-panel .map-bg,
+.location-panel .map-lines,
+.location-panel .crosshair{
+  display:none!important;
+  content:none!important;
+}
+
+.location-map-frame{
+  display:block!important;
+  width:100%!important;
+  min-height:300px;
+  border:0;
+  border-radius:18px;
+  margin:1rem 0;
+  background:rgba(15,23,42,.55);
+  position:relative;
+  z-index:2;
+}
+
+.location-map-link,
+.location-text{
+  position:relative;
+  z-index:3;
+}

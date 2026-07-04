@@ -89,6 +89,8 @@ static void handleConfig()
     s += "<h1>Config</h1><form method='POST' action='/save'>";
     s += "<div class='card'><h2>Vehicle</h2>";
     s += "Vehicle name<input name='vehicleName' value='" + config.vehicleName + "'>";
+    s += "Device name<input name='deviceName' value='" + config.deviceName + "'>";
+    s += "<p class='muted'>Stable device hostname / MQTT client ID. If empty, a stable MAC-based ID is used.</p>";
     s += "Vehicle ID<input name='vehicleId' value='" + config.vehicleId + "'>";
     s += "<p class='muted'>Used in MQTT topics, e.g. mot/pioneer/display/soc. Use lowercase letters, numbers, dash or underscore.</p>";
     s += "MQTT prefix<input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
@@ -99,6 +101,7 @@ static void handleConfig()
     s += "WiFi Password<input name='wifiPass' type='password' value='" + config.wifiPass + "'></div>";
 
     s += "<div class='card'><h2>MQTT</h2>";
+    s += "<p class='muted'>MQTT is optional. Leave host empty to disable MQTT without connection errors.</p>";
     s += "MQTT Host<input name='mqttHost' value='" + config.mqttHost + "'>";
     s += "MQTT Port<input name='mqttPort' value='" + String(config.mqttPort) + "'>";
     s += "MQTT User<input name='mqttUser' value='" + config.mqttUser + "'>";
@@ -131,11 +134,18 @@ static void handleConfig()
     s += "</select><p class='muted'>v0.9.x WROOM uses CAN 1 only.</p></div>";
 
     s += "<div class='card'><h2>OTA / ABRP</h2>";
+    s += "<p class='muted'>ABRP is optional. It is only active when API key and user token are both configured.</p>";
     s += "ABRP API Key<input name='abrpApiKey' value='" + config.abrpApiKey + "'>";
     s += "ABRP User Token<input name='abrpToken' value='" + config.abrpUserToken + "'>";
     s += "OTA Password<input name='otaPass' type='password' value='" + config.otaPassword + "'></div>";
 
     s += "<button type='submit'>Save & Reboot</button></form>";
+    s += "<div class='card'><h2>Configuration Management</h2>";
+    s += "<p><a href='/api/config/export'>Download config JSON</a></p>";
+    s += "<form method='POST' action='/config/import'>";
+    s += "<textarea name='configJson' rows='8' style='width:100%;box-sizing:border-box' placeholder='Paste config JSON here'></textarea>";
+    s += "<button type='submit'>Import config & reboot</button></form>";
+    s += "<p class='muted'>Export contains local secrets such as WiFi and MQTT passwords. Keep it private.</p></div>";
     s += "<div class='card'><h2>Factory Reset</h2><form method='POST' action='/factory-reset'><button type='submit'>Clear config & reboot</button></form></div>";
     s += "<p><a href='/status'>Status</a></p></body></html>";
     server.send(200, "text/html", s);
@@ -145,6 +155,13 @@ static void handleSave()
 {
     config.vehicleName = server.arg("vehicleName");
     if (config.vehicleName.isEmpty()) config.vehicleName = "Microlino Pioneer";
+
+    config.deviceName = server.arg("deviceName");
+    config.deviceName.trim();
+    config.deviceName.toLowerCase();
+    config.deviceName.replace(" ", "-");
+    config.deviceName.replace("/", "-");
+    if (config.deviceName.isEmpty()) config.deviceName = motHostname();
 
     config.vehicleId = server.arg("vehicleId");
     config.vehicleId.trim();
@@ -175,6 +192,29 @@ static void handleSave()
     config.otaPassword = server.arg("otaPass");
     saveConfig();
     server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p></body></html>");
+    rebootPending = true;
+    rebootAtMs = millis() + 5000;
+}
+
+
+static void handleConfigExport()
+{
+    server.sendHeader("Content-Disposition", "attachment; filename=mot-config.json");
+    server.send(200, "application/json", configToJson(true));
+}
+
+static void handleConfigImport()
+{
+    String json = server.arg("configJson");
+    if (json.isEmpty()) json = server.arg("plain");
+
+    String error;
+    if (!importConfigJson(json, error)) {
+        server.send(400, "text/plain", "Config import failed: " + error);
+        return;
+    }
+
+    server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration imported.</h2><p>Device will reboot in 5 seconds...</p></body></html>");
     rebootPending = true;
     rebootAtMs = millis() + 5000;
 }
@@ -236,6 +276,8 @@ void setupWebUi()
     server.on("/api/system-health", handleApiSystemHealth);
     server.on("/config", handleConfig);
     server.on("/save", HTTP_POST, handleSave);
+    server.on("/api/config/export", HTTP_GET, handleConfigExport);
+    server.on("/config/import", HTTP_POST, handleConfigImport);
     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
     server.on("/favicon.ico", []() { server.send(204); });
     setupOtaRoutes(server);
