@@ -6,6 +6,8 @@ static HardwareSerial SerialAT(1);
 static bool modemReadyFlag=false, simReadyFlag=false, networkRegisteredFlag=false, gprsAttachedFlag=false, pdpConfiguredFlag=false;
 static String modemInfo="", revision="", imei="", operatorName="", registration="", gprs="", signalInfo="", lastAt="", lastMessage="", ipInfo="";
 static unsigned long lastPollMs=0;
+static bool lteTcpOpenFlag=false;
+static size_t lteTcpBufferedAvailable=0;
 static unsigned long lastGprsAttemptMs=0;
 
 static String esc(String s){s.replace("\\","\\\\");s.replace("\"","\\\"");s.replace("\r","\\r");s.replace("\n","\\n");return s;}
@@ -212,3 +214,173 @@ String lilygoLteIp()
 
     return ip;
 }
+
+
+#ifndef MOT_LILYGO_LTE_TCP_FUNCTIONS_APPENDED
+#define MOT_LILYGO_LTE_TCP_FUNCTIONS_APPENDED
+
+static String atCommandPrompt(const String& cmd, const uint8_t* data, size_t len, uint32_t timeoutMs)
+{
+    while (SerialAT.available()) SerialAT.read();
+
+    SerialAT.print(cmd);
+    SerialAT.print("\r\n");
+
+    uint32_t start = millis();
+    String response;
+    bool prompted = false;
+
+    while (millis() - start < timeoutMs) {
+        while (SerialAT.available()) {
+            char c = (char)SerialAT.read();
+            response += c;
+            if (c == '>') {
+                prompted = true;
+                break;
+            }
+        }
+
+        if (prompted) break;
+        delay(10);
+    }
+
+    if (!prompted) {
+        response.trim();
+        lastAt = response;
+        return response;
+    }
+
+    SerialAT.write(data, len);
+    SerialAT.flush();
+
+    start = millis();
+    while (millis() - start < timeoutMs) {
+        while (SerialAT.available()) {
+            response += (char)SerialAT.read();
+        }
+
+        if (response.indexOf("SEND OK") >= 0 ||
+            response.indexOf("ERROR") >= 0 ||
+            response.indexOf("FAIL") >= 0) {
+            break;
+        }
+
+        delay(10);
+    }
+
+    response.trim();
+    lastAt = response;
+    return response;
+}
+
+bool lilygoLteTcpOpen(const String& host, uint16_t port)
+{
+    if (!modemReadyFlag) return false;
+    if (!lilygoEnsureGprsConnected()) return false;
+
+    atCommand("AT+CIPCLOSE=0", 3000);
+    atCommand("AT+NETOPEN", 8000);
+
+    String cmd = "AT+CIPOPEN=0,\"TCP\",\"" + host + "\"," + String(port);
+    String r = atCommand(cmd, 20000);
+
+    bool opened =
+        r.indexOf("OK") >= 0 ||
+        r.indexOf("+CIPOPEN: 0,0") >= 0 ||
+        r.indexOf("ALREADY") >= 0;
+
+    lteTcpOpenFlag = opened;
+
+    if (opened) {
+        lastMessage = "LTE TCP open " + host + ":" + String(port);
+    } else {
+        lastMessage = "LTE TCP open failed: " + r;
+    }
+
+    return lteTcpOpenFlag;
+}
+
+int lilygoLteTcpWrite(const uint8_t* data, size_t len)
+{
+    if (!lteTcpOpenFlag || len == 0) return 0;
+
+    String cmd = "AT+CIPSEND=0," + String(len);
+    String r = atCommandPrompt(cmd, data, len, 15000);
+
+    if (r.indexOf("SEND OK") >= 0 || r.indexOf("OK") >= 0) {
+        return (int)len;
+    }
+
+    if (r.indexOf("ERROR") >= 0 || r.indexOf("FAIL") >= 0) {
+        lteTcpOpenFlag = false;
+    }
+
+    return 0;
+}
+
+static size_t parseCipRxGetAvailable(const String& r)
+{
+    int pos = r.indexOf("+CIPRXGET:");
+    if (pos < 0) return 0;
+
+    int comma1 = r.indexOf(',', pos);
+    if (comma1 < 0) return 0;
+
+    int comma2 = r.indexOf(',', comma1 + 1);
+    if (comma2 < 0) return 0;
+
+    String n = r.substring(comma2 + 1);
+    n.trim();
+    return (size_t)n.toInt();
+}
+
+int lilygoLteTcpAvailable()
+{
+    if (!lteTcpOpenFlag) return 0;
+
+    String r = atCommand("AT+CIPRXGET=4,0", 2000);
+    lteTcpBufferedAvailable = parseCipRxGetAvailable(r);
+    return (int)lteTcpBufferedAvailable;
+}
+
+int lilygoLteTcpRead(uint8_t* out, size_t len)
+{
+    if (!lteTcpOpenFlag || len == 0) return 0;
+
+    String cmd = "AT+CIPRXGET=2,0," + String(len);
+    String r = atCommand(cmd, 5000);
+
+    int header = r.indexOf("+CIPRXGET:");
+    if (header < 0) return 0;
+
+    int lineEnd = r.indexOf('\n', header);
+    if (lineEnd < 0) return 0;
+    lineEnd++;
+
+    int okPos = r.indexOf("\r\nOK", lineEnd);
+    if (okPos < 0) okPos = r.indexOf("\nOK", lineEnd);
+    if (okPos < 0) okPos = r.length();
+
+    String payload = r.substring(lineEnd, okPos);
+    payload.trim();
+
+    size_t n = payload.length();
+    if (n > len) n = len;
+
+    memcpy(out, payload.c_str(), n);
+    return (int)n;
+}
+
+void lilygoLteTcpClose()
+{
+    atCommand("AT+CIPCLOSE=0", 3000);
+    lteTcpOpenFlag = false;
+}
+
+bool lilygoLteTcpConnected()
+{
+    return lteTcpOpenFlag && lilygoGprsConnected();
+}
+
+#endif
+

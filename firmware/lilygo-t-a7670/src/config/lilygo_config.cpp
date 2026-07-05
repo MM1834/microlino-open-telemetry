@@ -47,6 +47,9 @@ void loadLilygoConfig()
     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
     config.otaEnabled = prefs.isKey("otaEnabled") ? prefs.getBool("otaEnabled", true) : true;
     config.otaPassword = getStringOrDefault("otaPassword", "");
+    config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
+    config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
+    config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
 
     prefs.end();
 
@@ -73,6 +76,9 @@ void saveLilygoConfig()
     prefs.putString("mqttPrefix", config.mqttPrefix);
     prefs.putBool("otaEnabled", config.otaEnabled);
     prefs.putString("otaPassword", config.otaPassword);
+    prefs.putBool("abrpEnabled", config.abrpEnabled);
+    prefs.putString("abrpApiKey", config.abrpApiKey);
+    prefs.putString("abrpUserToken", config.abrpUserToken);
     prefs.end();
 }
 
