@@ -56,6 +56,21 @@ double l76kSpeedKmph()
     return gps.speed.isValid() ? gps.speed.kmph() : NAN;
 }
 
+uint32_t l76kSatellites()
+{
+    return gps.satellites.isValid() ? gps.satellites.value() : 0;
+}
+
+double l76kHdop()
+{
+    return gps.hdop.isValid() ? gps.hdop.hdop() : NAN;
+}
+
+uint32_t l76kLocationAgeMs()
+{
+    return gps.location.isValid() ? gps.location.age() : 0;
+}
+
 String l76kGpsStatusJson()
 {
     String json = "{";
@@ -64,7 +79,7 @@ String l76kGpsStatusJson()
     json += "\"ageMs\":" + String(gps.location.isValid() ? gps.location.age() : 0) + ",";
     json += "\"chars\":" + String(charsTotal) + ",";
     json += "\"lastCharMs\":" + String(lastCharMs) + ",";
-    json += "\"satellites\":" + String(gps.satellites.isValid() ? gps.satellites.value() : 0) + ",";
+    json += "\"satellites\":" + String(l76kSatellites()) + ",";
     json += "\"hdop\":" + String(gps.hdop.isValid() ? gps.hdop.hdop() : 0, 1) + ",";
 
     if (gps.location.isValid()) {

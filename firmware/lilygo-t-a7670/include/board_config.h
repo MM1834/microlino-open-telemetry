@@ -39,7 +39,7 @@
 // NOTE: GPIO33 is MODEM_RI_PIN on this board, so CAN TX=33 is not enabled yet.
 // CAN remains intentionally disabled in LilyGO Sprint 2.
 #define CAN_RX_PIN 32
-#define CAN_TX_PIN 33
+#define CAN_TX_PIN 13
 
 #define SETUP_AP_SSID "MOT-LilyGO"
 #define SETUP_AP_PASS "microlino"
