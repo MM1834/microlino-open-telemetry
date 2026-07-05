@@ -6,6 +6,7 @@ static HardwareSerial SerialAT(1);
 static bool modemReadyFlag=false, simReadyFlag=false, networkRegisteredFlag=false, gprsAttachedFlag=false, pdpConfiguredFlag=false;
 static String modemInfo="", revision="", imei="", operatorName="", registration="", gprs="", signalInfo="", lastAt="", lastMessage="", ipInfo="";
 static unsigned long lastPollMs=0;
+static unsigned long lastGprsAttemptMs=0;
 
 static String esc(String s){s.replace("\\","\\\\");s.replace("\"","\\\"");s.replace("\r","\\r");s.replace("\n","\\n");return s;}
 
@@ -42,8 +43,6 @@ static void modemPowerOn()
 #endif
 #ifdef MODEM_PWR_PIN
     pinMode(MODEM_PWR_PIN,OUTPUT);
-    // Confirmed working sequence from debug sprint:
-    // UART RX27/TX26 first, then PWR HIGH->LOW, then long AT retry.
     digitalWrite(MODEM_PWR_PIN,HIGH);
     delay(1200);
     digitalWrite(MODEM_PWR_PIN,LOW);
@@ -97,15 +96,40 @@ static void readIdentity()
     simReadyFlag=sim.indexOf("READY")>=0;
 }
 
+bool lilygoEnsureGprsConnected()
+{
+    if (!modemReadyFlag) return false;
+
+    updateStatus();
+    if (gprsAttachedFlag) return true;
+
+    if (millis() - lastGprsAttemptMs < 10000) return false;
+    lastGprsAttemptMs = millis();
+
+    if (!pdpConfiguredFlag) configurePdp();
+
+    Serial.println("LTE: GPRS attach/reconnect attempt");
+    String att = atCommand("AT+CGATT=1", 10000);
+    if(!ok(att)) {
+        lastMessage = "CGATT failed or pending: " + att;
+    }
+
+    updateStatus();
+
+    if (gprsAttachedFlag) {
+        lastMessage = "LTE GPRS attached";
+    }
+
+    return gprsAttachedFlag;
+}
+
 static void bringup()
 {
     modemReadyFlag=ok(atCommand("AT",1500));
     if(!modemReadyFlag){lastMessage="AT failed";return;}
     readIdentity();
     configurePdp();
-    String att=atCommand("AT+CGATT=1",10000);
-    if(!ok(att)) lastMessage="CGATT failed or pending: "+att;
-    updateStatus();
+    lilygoEnsureGprsConnected();
     if(networkRegisteredFlag && gprsAttachedFlag) lastMessage="LTE registered and GPRS attached";
     else if(simReadyFlag) lastMessage="SIM ready, waiting for network/GPRS";
 }
@@ -118,8 +142,6 @@ void setupLilygoModem()
     SerialAT.begin(MODEM_BAUD,SERIAL_8N1,MODEM_RX_PIN,MODEM_TX_PIN);
     delay(300);
 
-    // Use the confirmed debug sequence deterministically:
-    // power pulse once, then wait long enough for A7670G AT to become ready.
     Serial.print("Powering modem, waiting for AT ");
     modemPowerOn();
     modemReadyFlag = waitForAt(45000);
@@ -135,8 +157,7 @@ void lilygoModemLoop()
         lastPollMs=millis();
         updateStatus();
         if(modemReadyFlag && !gprsAttachedFlag){
-            atCommand("AT+CGATT=1",10000);
-            updateStatus();
+            lilygoEnsureGprsConnected();
         }
     }
 }
@@ -165,4 +186,29 @@ String lilygoModemStatusJson()
     json+="\"lastAt\":\""+esc(lastAt)+"\",";
     json+="\"message\":\""+esc(lastMessage)+"\"";
     json+="}"; return json;
+}
+
+String lilygoLteIp()
+{
+    // Expected:
+    // AT+CGPADDR=1
+    // +CGPADDR: 1,10.244.254.19
+    // OK
+
+    int pos = ipInfo.indexOf("+CGPADDR:");
+    if (pos < 0) return "";
+
+    pos = ipInfo.indexOf(',', pos);
+    if (pos < 0) return "";
+
+    pos++;
+
+    int end = ipInfo.indexOf('\r', pos);
+    if (end < 0) end = ipInfo.indexOf('\n', pos);
+    if (end < 0) end = ipInfo.length();
+
+    String ip = ipInfo.substring(pos, end);
+    ip.trim();
+
+    return ip;
 }
