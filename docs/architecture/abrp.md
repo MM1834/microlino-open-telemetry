@@ -2,6 +2,27 @@
 
 ABRP receives telemetry from the firmware through the ABRP telemetry endpoint.
 
+## ABRP data flow
+
+```mermaid
+flowchart LR
+    CAN["Microlino Display CAN"] --> Decoder["CAN decoder"]
+    Decoder --> Telemetry["Shared telemetry model"]
+
+    GPS["GPS source"] -. optional .-> Telemetry
+
+    Telemetry --> Payload["ABRP payload builder"]
+    Payload --> Sender["ABRP telemetry sender"]
+
+    Sender --> WiFi["WiFi transport"]
+    Sender -. planned .-> LTE["LTE transport"]
+
+    WiFi --> ABRP["ABRP telemetry API"]
+    LTE -. planned .-> ABRP
+
+    ABRP --> App["ABRP Web / Mobile App"]
+```
+
 ## Data source
 
 ```text
@@ -10,7 +31,19 @@ CAN decoder
   -> ABRP payload
 ```
 
-## Location handling
+## Payload
+
+Typical payload fields:
+
+```text
+soc
+utc
+speed
+power
+is_charging
+lat
+lon
+```
 
 Latitude and longitude are only sent when a valid GPS source exists.
 
@@ -41,3 +74,15 @@ Current status:
 GET  /api/lilygo/abrp
 POST /api/lilygo/abrp/test
 ```
+
+The status includes:
+
+- enabled
+- configured
+- transport
+- transportAvailable
+- timeValid
+- lastSuccess
+- HTTP code
+- ABRP response message
+- last payload
