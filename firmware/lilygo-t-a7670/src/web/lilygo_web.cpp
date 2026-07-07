@@ -16,6 +16,7 @@
 #include "mqtt/lilygo_mqtt.h"
 #include "network/lilygo_network.h"
 #include "telemetry/telemetry.h"
+#include "lte/lilygo_lte_client.h"
 
 static WebServer server(80);
 static bool rebootPending = false;
@@ -302,6 +303,18 @@ static void handleLteDebug()
 }
 
 
+
+static void handleLteMqttTrace()
+{
+    server.send(200, "application/json", lilygoLteClientTraceJson());
+}
+
+static void handleLteMqttTraceClear()
+{
+    lilygoLteClientTraceClear();
+    server.send(200, "application/json", lilygoLteClientTraceJson());
+}
+
 static void handleMqtt()
 {
     server.send(200, "application/json", lilygoMqttStatusJson());
@@ -417,6 +430,8 @@ void setupLilygoWeb()
     server.on("/api/lilygo/abrp", HTTP_GET, handleAbrp);
     server.on("/api/lilygo/abrp/test", HTTP_POST, handleAbrpTest);
     server.on("/api/lilygo/mqtt", HTTP_GET, handleMqtt);
+    server.on("/api/lilygo/lte/mqtt-trace", HTTP_GET, handleLteMqttTrace);
+    server.on("/api/lilygo/lte/mqtt-trace/clear", HTTP_POST, handleLteMqttTraceClear);
     server.on("/api/lilygo/mqtt/debug", HTTP_GET, handleMqttDebug);
     server.on("/api/telemetry", HTTP_GET, handleTelemetry);
     server.on("/api/lilygo/modem", HTTP_GET, handleModem);

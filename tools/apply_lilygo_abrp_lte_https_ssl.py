@@ -1,0 +1,48 @@
+from pathlib import Path
+
+root = Path.cwd()
+fw = root / "firmware/lilygo-t-a7670"
+if not fw.exists():
+    raise SystemExit("Run from repository root.")
+
+def read(p): return p.read_text(encoding="utf-8")
+def write(p, s): p.write_text(s, encoding="utf-8")
+
+modem_cpp = fw / "src/modem/lilygo_modem.cpp"
+s = read(modem_cpp)
+
+if "TinyGsmClientSecure" not in s:
+    if "static TinyGsmClient lteClient(modem);" not in s:
+        raise SystemExit("Could not find lteClient declaration in lilygo_modem.cpp")
+    s = s.replace(
+        "static TinyGsmClient lteClient(modem);",
+        "static TinyGsmClient lteClient(modem);\nstatic TinyGsmClientSecure lteSecureClient(modem);"
+    )
+
+if "lilygoTinyGsmSecureClient()" not in s:
+    marker = "Client* lilygoTinyGsmClient()"
+    if marker not in s:
+        raise SystemExit("Could not find lilygoTinyGsmClient()")
+    secure = """Client* lilygoTinyGsmSecureClient()
+{
+    return &lteSecureClient;
+}
+
+"""
+    s = s.replace(marker, secure + marker, 1)
+
+write(modem_cpp, s)
+
+modem_h = fw / "src/modem/lilygo_modem.h"
+h = read(modem_h)
+if "lilygoTinyGsmSecureClient" not in h:
+    if "Client* lilygoTinyGsmClient();" not in h:
+        raise SystemExit("Could not find lilygoTinyGsmClient declaration")
+    h = h.replace(
+        "Client* lilygoTinyGsmClient();",
+        "Client* lilygoTinyGsmClient();\nClient* lilygoTinyGsmSecureClient();"
+    )
+write(modem_h, h)
+
+write(fw / "src/abrp/lilygo_abrp.cpp", '#include "lilygo_abrp.h"\n\n#include <Arduino.h>\n#include <Client.h>\n#include <HTTPClient.h>\n#include <WiFi.h>\n#include <time.h>\n\n#include "config/lilygo_config.h"\n#include "gps/l76k_gps.h"\n#include "modem/lilygo_modem.h"\n#include "network/lilygo_network.h"\n#include "telemetry/telemetry.h"\n\nstatic bool lastSuccess = false;\nstatic int lastHttpCode = 0;\nstatic String lastMessage = "";\nstatic String lastPayload = "";\nstatic String lastTransport = "";\nstatic unsigned long lastSendMs = 0;\nstatic unsigned long lastAttemptMs = 0;\nstatic uint32_t successCount = 0;\nstatic uint32_t failCount = 0;\n\nstatic const unsigned long ABRP_INTERVAL_MS = 30000;\nstatic const char* ABRP_HOST = "api.iternio.com";\nstatic const char* ABRP_PATH = "/1/tlm/send";\nstatic const char* ABRP_WIFI_URL = "https://api.iternio.com/1/tlm/send";\n\nstruct AbrpHttpResult\n{\n    int code = 0;\n    String body;\n    String error;\n};\n\nstatic String esc(String s)\n{\n    s.replace("\\\\", "\\\\\\\\");\n    s.replace("\\"", "\\\\\\"");\n    s.replace("\\r", "\\\\r");\n    s.replace("\\n", "\\\\n");\n    return s;\n}\n\nstatic bool abrpEnabled()\n{\n    return config.abrpEnabled && config.abrpApiKey.length() && config.abrpUserToken.length();\n}\n\nstatic bool timeValid()\n{\n    time_t now = time(nullptr);\n    return now > 1700000000;\n}\n\nstatic bool lteAvailable()\n{\n    return lilygoGprsConnected() || lilygoEnsureGprsConnected();\n}\n\nstatic String currentTransport()\n{\n    if (WiFi.status() == WL_CONNECTED) return "WiFi";\n    if (lilygoGprsConnected()) return "LTE";\n    return "";\n}\n\nstatic String urlEncode(const String& s)\n{\n    String out;\n    const char *hex = "0123456789ABCDEF";\n    for (size_t i = 0; i < s.length(); i++) {\n        uint8_t c = (uint8_t)s[i];\n        if (isalnum(c) || c == \'-\' || c == \'_\' || c == \'.\' || c == \'~\') out += (char)c;\n        else {\n            out += \'%\';\n            out += hex[(c >> 4) & 0x0F];\n            out += hex[c & 0x0F];\n        }\n    }\n    return out;\n}\n\nstatic AbrpHttpResult httpsGetViaLte(const String& path)\n{\n    AbrpHttpResult result;\n\n    if (!lteAvailable()) {\n        result.error = "LTE/GPRS unavailable";\n        return result;\n    }\n\n    Client* client = lilygoTinyGsmSecureClient();\n    if (!client) {\n        result.error = "No LTE SSL client";\n        return result;\n    }\n\n    client->stop();\n    if (!client->connect(ABRP_HOST, 443)) {\n        result.error = "LTE SSL TCP connect failed";\n        client->stop();\n        return result;\n    }\n\n    client->print(String("GET ") + path + " HTTP/1.1\\r\\n");\n    client->print(String("Host: ") + ABRP_HOST + "\\r\\n");\n    client->print("User-Agent: MOT-LilyGO\\r\\n");\n    client->print("Accept: application/json,*/*\\r\\n");\n    client->print("Connection: close\\r\\n\\r\\n");\n\n    String raw;\n    bool sawData = false;\n    uint32_t start = millis();\n\n    while (millis() - start < 30000) {\n        while (client->available()) {\n            sawData = true;\n            raw += (char)client->read();\n            if (raw.length() > 4096) raw.remove(0, raw.length() - 4096);\n        }\n        if (sawData && !client->connected()) break;\n        delay(10);\n    }\n\n    client->stop();\n\n    if (raw.startsWith("HTTP/")) {\n        int p = raw.indexOf(\' \');\n        if (p >= 0) result.code = raw.substring(p + 1, p + 4).toInt();\n    }\n\n    int bodyStart = raw.indexOf("\\r\\n\\r\\n");\n    result.body = bodyStart >= 0 ? raw.substring(bodyStart + 4) : raw;\n    if (result.code == 0) result.error = raw.length() ? ("HTTPS parse failed: " + raw) : "No HTTPS response";\n    return result;\n}\n\nstatic String buildPayload()\n{\n    String json = "{";\n    bool first = true;\n    auto addComma = [&]() { if (!first) json += ","; first = false; };\n\n    if (!isnan(telemetry.display.soc)) { addComma(); json += "\\"soc\\":" + String(telemetry.display.soc, 1); }\n    if (timeValid()) { addComma(); json += "\\"utc\\":" + String((uint32_t)time(nullptr)); }\n    if (!isnan(telemetry.display.speedKmh)) { addComma(); json += "\\"speed\\":" + String(telemetry.display.speedKmh, 1); }\n\n    addComma(); json += "\\"power\\":" + String(telemetry.charging.powerSigned);\n    addComma(); json += "\\"is_charging\\":" + String(telemetry.charging.isCharging ? "true" : "false");\n\n    if (l76kGpsValid()) {\n        addComma(); json += "\\"lat\\":" + String(l76kLatitude(), 6);\n        addComma(); json += "\\"lon\\":" + String(l76kLongitude(), 6);\n    }\n\n    json += "}";\n    return json;\n}\n\nvoid setupLilygoAbrp()\n{\n    if (abrpEnabled()) {\n        Serial.println("ABRP: enabled");\n        lastMessage = "ABRP enabled";\n    } else {\n        Serial.println("ABRP: disabled (missing api key/token or disabled)");\n        lastMessage = "ABRP disabled";\n    }\n}\n\nbool sendLilygoAbrpTelemetryNow()\n{\n    lastAttemptMs = millis();\n    lastTransport = currentTransport();\n\n    if (!abrpEnabled()) {\n        lastSuccess = false; lastHttpCode = 0; lastMessage = "ABRP disabled";\n        return false;\n    }\n\n    bool wifi = WiFi.status() == WL_CONNECTED;\n    bool lte = !wifi && lteAvailable();\n\n    if (!wifi && !lte) {\n        lastSuccess = false; lastHttpCode = 0; lastTransport = "";\n        lastMessage = "ABRP transport unavailable: no WiFi/LTE route";\n        failCount++;\n        return false;\n    }\n\n    if (wifi && !timeValid()) configTime(0, 0, "pool.ntp.org", "time.nist.gov");\n\n    lastPayload = buildPayload();\n    if (lastPayload == "{}") {\n        lastSuccess = false; lastHttpCode = 0; lastMessage = "ABRP no telemetry payload yet";\n        failCount++;\n        return false;\n    }\n\n    String query = "?api_key=" + config.abrpApiKey + "&token=" + config.abrpUserToken + "&tlm=" + urlEncode(lastPayload);\n    String response;\n\n    if (wifi) {\n        lastTransport = "WiFi";\n        HTTPClient http;\n        http.begin(String(ABRP_WIFI_URL) + query);\n        lastHttpCode = http.GET();\n        response = http.getString();\n        http.end();\n    } else {\n        lastTransport = "LTE-SSL";\n        AbrpHttpResult r = httpsGetViaLte(String(ABRP_PATH) + query);\n        lastHttpCode = r.code;\n        response = r.body.length() ? r.body : r.error;\n    }\n\n    lastSuccess = lastHttpCode >= 200 && lastHttpCode < 300;\n    lastMessage = response.length() ? response : (lastSuccess ? "OK" : "HTTP failed");\n\n    if (lastSuccess) {\n        successCount++; lastSendMs = millis();\n        Serial.printf("ABRP %s: HTTP %d OK\\n", lastTransport.c_str(), lastHttpCode);\n    } else {\n        failCount++;\n        Serial.printf("ABRP %s: HTTP %d failed: %s\\n", lastTransport.c_str(), lastHttpCode, lastMessage.c_str());\n    }\n    return lastSuccess;\n}\n\nvoid lilygoAbrpLoop()\n{\n    if (!abrpEnabled()) return;\n    if (millis() - lastAttemptMs >= ABRP_INTERVAL_MS) sendLilygoAbrpTelemetryNow();\n}\n\nString lilygoAbrpStatusJson()\n{\n    String transport = currentTransport();\n    bool transportAvailable = transport.length() > 0;\n\n    String json = "{";\n    json += "\\"enabled\\":" + String(abrpEnabled() ? "true" : "false") + ",";\n    json += "\\"configured\\":" + String(config.abrpApiKey.length() && config.abrpUserToken.length() ? "true" : "false") + ",";\n    json += "\\"transport\\":\\"" + transport + "\\",";\n    json += "\\"lastTransport\\":\\"" + lastTransport + "\\",";\n    json += "\\"transportAvailable\\":" + String(transportAvailable ? "true" : "false") + ",";\n    json += "\\"timeValid\\":" + String(timeValid() ? "true" : "false") + ",";\n    json += "\\"lastSuccess\\":" + String(lastSuccess ? "true" : "false") + ",";\n    json += "\\"http\\":" + String(lastHttpCode) + ",";\n    json += "\\"successCount\\":" + String(successCount) + ",";\n    json += "\\"failCount\\":" + String(failCount) + ",";\n    json += "\\"lastAttemptMs\\":" + String(lastAttemptMs) + ",";\n    json += "\\"lastSendMs\\":" + String(lastSendMs) + ",";\n    json += "\\"message\\":\\"" + esc(lastMessage) + "\\",";\n    json += "\\"payload\\":\\"" + esc(lastPayload) + "\\"";\n    json += "}";\n    return json;\n}\n')
+print("Applied ABRP LTE HTTPS/SSL support.")

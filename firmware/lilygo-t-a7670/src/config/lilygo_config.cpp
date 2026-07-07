@@ -118,6 +118,9 @@ String lilygoConfigJson(bool includeSecrets)
         json += ",\"mqttPass\":\"" + esc(config.mqttPass) + "\"";
         json += ",\"otaPassword\":\"" + esc(config.otaPassword) + "\"";
     }
+    json += ",\"abrpEnabled\":" + String(config.abrpEnabled ? "true" : "false");
+    json += ",\"abrpApiKey\":\"" + esc(config.abrpApiKey) + "\"";
+    json += ",\"abrpUserToken\":\"" + esc(config.abrpUserToken) + "\"";
     json += "}";
     return json;
 }
