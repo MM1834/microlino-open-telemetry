@@ -53,5 +53,13 @@ int LilygoLteClient::read(uint8_t *buf, size_t size)
 int LilygoLteClient::peek() { return -1; }
 void LilygoLteClient::flush() {}
 void LilygoLteClient::stop() { lilygoLteTcpClose(); connectedFlag = false; }
-uint8_t LilygoLteClient::connected() { connectedFlag = lilygoLteTcpConnected(); return connectedFlag ? 1 : 0; }
+
+
+uint8_t LilygoLteClient::connected()
+{
+    connectedFlag = lilygoLteTcpConnected();
+    return connectedFlag ? 1 : 0;
+}
+
+
 LilygoLteClient::operator bool() { return connected(); }

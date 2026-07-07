@@ -60,13 +60,12 @@ static void handleRoot()
     s += "<p><a href='/config'>Config</a> · <a href='/ota'>OTA</a> · <a href='/api/status'>Status JSON</a></p>";
 
     s += "<div class='card'><h2>Network</h2><button onclick='loadNetwork()'>Refresh</button><pre id='network'>Loading...</pre></div>";
-    s += "<div class='card'><h2>LTE Modem</h2><button onclick='loadModem()'>Refresh</button><pre id='modem'>Loading...</pre></div>";
+    s += "<div class='card'><h2>LTE Modem</h2><p><a href='/api/lilygo/lte/debug'>LTE Debug</a> · <a href='/api/lilygo/lte/rx-debug'>LTE RX Debug</a> · <a href='/api/lilygo/lte/tcp-test'>LTE TCP Test</a></p><button onclick='loadModem()'>Refresh</button><pre id='modem'>Loading...</pre></div>";
     s += "<div class='card'><h2>L76K GPS</h2><button onclick='loadGps()'>Refresh</button><pre id='gps'>Loading...</pre></div>";
     s += "<div class='card'><h2>CAN Input</h2><button onclick='loadCan()'>Refresh</button><pre id='can'>Loading...</pre><p><a href='/api/lilygo/can/frames'>Latest frames JSON</a></p></div>";
     s += "<div class='card'><h2>Decoded Telemetry</h2><button onclick='loadTelemetry()'>Refresh</button><pre id='telemetry'>Loading...</pre></div>";
 
     s += "<div class='card'><h2>MQTT WiFi</h2>";
-    s += "<p><a href='/api/lilygo/mqtt/debug'>MQTT Debug</a></p>";
     s += "<button onclick='loadMqtt()'>Refresh</button>";
     s += "<pre id='mqtt'>Loading...</pre></div>";
 
@@ -274,6 +273,35 @@ static void handleAbrpTest()
     server.send(sendLilygoAbrpTelemetryNow() ? 200 : 503, "application/json", lilygoAbrpStatusJson());
 }
 
+
+
+static void handleLteTcpTest()
+{
+    String host = server.hasArg("host") ? server.arg("host") : config.mqttHost;
+    uint16_t port = server.hasArg("port") ? (uint16_t)server.arg("port").toInt() : config.mqttPort;
+
+    host.trim();
+
+    if (host.isEmpty() || port == 0) {
+        server.send(400, "application/json", "{\"error\":\"missing host or port\"}");
+        return;
+    }
+
+    server.send(200, "application/json", lilygoLteTcpTestJson(host, port));
+}
+
+
+static void handleLteRxDebug()
+{
+    server.send(200, "application/json", lilygoLteRxDebugJson());
+}
+
+static void handleLteDebug()
+{
+    server.send(200, "application/json", lilygoLteDebugJson());
+}
+
+
 static void handleMqtt()
 {
     server.send(200, "application/json", lilygoMqttStatusJson());
@@ -382,6 +410,10 @@ void setupLilygoWeb()
     server.on("/api/status", HTTP_GET, handleStatusJson);
 
     server.on("/api/lilygo/network", HTTP_GET, handleNetwork);
+    server.on("/api/lilygo/lte/debug", HTTP_GET, handleLteDebug);
+    server.on("/api/lilygo/lte/rx-debug", HTTP_GET, handleLteRxDebug);
+    server.on("/api/lilygo/lte/tcp-test", HTTP_GET, handleLteTcpTest);
+    server.on("/api/lilygo/lte/tcp-test", HTTP_POST, handleLteTcpTest);
     server.on("/api/lilygo/abrp", HTTP_GET, handleAbrp);
     server.on("/api/lilygo/abrp/test", HTTP_POST, handleAbrpTest);
     server.on("/api/lilygo/mqtt", HTTP_GET, handleMqtt);

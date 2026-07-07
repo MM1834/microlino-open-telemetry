@@ -23,6 +23,7 @@ static int lastConnectState = 0;
 static String lastMessage = "";
 
 static const unsigned long MQTT_RECONNECT_INTERVAL_MS = 10000;
+static const unsigned long MQTT_LTE_RECONNECT_INTERVAL_MS = 60000;
 static const unsigned long MQTT_PUBLISH_INTERVAL_MS = 5000;
 
 static String esc(String s){ s.replace("\\","\\\\"); s.replace("\"","\\\""); s.replace("\r","\\r"); s.replace("\n","\\n"); return s; }
@@ -66,6 +67,7 @@ static String wantedTransport()
     return "";
 }
 
+
 static bool transportAvailable(){ return wantedTransport().length() > 0; }
 
 static void selectTransport()
@@ -86,7 +88,8 @@ static void reconnectMqtt()
     selectTransport();
     if(!transportAvailable()){ if(mqtt.connected()) mqtt.disconnect(); lastMessage="MQTT transport unavailable: no WiFi/LTE route"; return; }
     if(mqtt.connected()) return;
-    if(lastReconnectAttemptMs && millis()-lastReconnectAttemptMs<MQTT_RECONNECT_INTERVAL_MS) return;
+    unsigned long reconnectIntervalMs = activeTransport == "LTE" ? MQTT_LTE_RECONNECT_INTERVAL_MS : MQTT_RECONNECT_INTERVAL_MS;
+    if(lastReconnectAttemptMs && millis()-lastReconnectAttemptMs<reconnectIntervalMs) return;
     lastReconnectAttemptMs=millis(); connectAttempts++;
 
     mqtt.setServer(config.mqttHost.c_str(), config.mqttPort);

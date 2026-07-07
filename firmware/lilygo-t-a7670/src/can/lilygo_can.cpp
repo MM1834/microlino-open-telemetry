@@ -66,7 +66,7 @@ static void logFrame(const twai_message_t& msg)
 void setupLilygoCan()
 {
     Serial.printf("CAN input setup: RX=%d TX=%d bitrate=500k\n", CAN_RX_PIN, CAN_TX_PIN);
-    Serial.println("CAN mode: TWAI receive. No application CAN frames are sent in this sprint.");
+    Serial.println("CAN mode: TWAI receive with decoder diagnostics. No application CAN frames are sent.");
 
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(
         (gpio_num_t)CAN_TX_PIN,

@@ -19,3 +19,9 @@ int lilygoLteTcpRead(uint8_t* out, size_t len);
 void lilygoLteTcpClose();
 bool lilygoLteTcpConnected();
 
+
+String lilygoLteDebugJson();
+
+String lilygoLteTcpTestJson(const String& host, uint16_t port);
+
+String lilygoLteRxDebugJson();
