@@ -12,14 +12,14 @@
 
 ## Highlights
 
-- ESP32-WROOM firmware for CAN telemetry
+- ESP32-WROOM / CAN485 / LilyGo LTE/GNSS firmware for CAN telemetry
 - MQTT topic structure: `mot/<vehicle>/...`
 - Responsive dashboard for desktop, tablet and iPhone
 - Secure dashboard access through MQTT over WebSocket / WSS
 - OTA firmware update with password protection
 - Configurable vehicle name, vehicle ID and MQTT prefix
-- Default map location with future GPS support
-- Designed as a foundation for future LilyGO LTE/GNSS support
+- Default map location or GPS support
+- Designed for LilyGO LTE/GNSS support
 
 ## Dashboard
 
@@ -38,7 +38,7 @@
 ```text
 Microlino CAN Bus
         ↓
-ESP32-WROOM Firmware
+ESP32-WROOM / CAN 485 / LilyGo LTE/GNSSFirmware
         ↓
 MQTT Broker
         ↓
@@ -49,7 +49,7 @@ Dashboard / ioBroker / Home Assistant
 
 1. Build and flash the ESP32 firmware with PlatformIO.
 2. Connect to the MOT setup access point.
-3. Configure WiFi, MQTT and OTA password.
+3. Configure WiFi, MQTT ABRP, and OTA password.
 4. Upload the dashboard to a web server.
 5. Configure `dashboard/config.js`.
 6. Open the dashboard and verify live telemetry.
@@ -77,9 +77,9 @@ mot/<vehicle>/charging/is_charging
 mot/<vehicle>/system/device_id
 ```
 
-## v1.0.0 Scope
+## v1.0.x Scope
 
-Version 1.0 focuses on a stable ESP32-WROOM release with WiFi, MQTT, OTA and the responsive dashboard. LTE/GNSS and LilyGO support are planned for later releases.
+Version 1.0 focuses on a stable ESP32-WROOM release with WiFi, MQTT, ABRP, OTA and the responsive dashboard. LTE/GNSS and LilyGO are supported (with the exception for ABRP over LTE)
 
 ## License
 
