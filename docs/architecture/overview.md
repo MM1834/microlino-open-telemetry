@@ -3,6 +3,7 @@
 Microlino Open Telemetry supports two firmware targets:
 
 - ESP32-WROOM
+- CAN485
 - LilyGO T-A7670G R2
 
 Both targets share the same core telemetry concepts:
@@ -84,7 +85,7 @@ flowchart LR
 
 ## Platform differences
 
-| Area | ESP32-WROOM | LilyGO T-A7670G R2 |
+| Area | ESP32-WROOM | CAN484 | LilyGO T-A7670G R2 |
 |---|---|---|
 | Network | WiFi | WiFi + LTE |
 | GPS | none | external L76K GPS |
