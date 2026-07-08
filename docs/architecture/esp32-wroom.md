@@ -1,6 +1,6 @@
-# ESP32-WROOM Architecture
+# ESP32-WROOM and CAN485 Architecture
 
-The ESP32-WROOM target is the original Microlino Open Telemetry firmware.
+The ESP32-WROOM / CAN485 target is the original Microlino Open Telemetry firmware.
 
 ## Responsibilities
 
