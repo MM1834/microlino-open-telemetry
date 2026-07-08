@@ -1,37 +1,15 @@
-# ABRP Integration
+# ABRP
 
-MOT v1.0.3 adds optional ABRP telemetry.
+ABRP integration builds telemetry payloads for A Better Routeplanner.
 
-The firmware follows the working Node-RED payload:
+## Current status
 
-```json
-{
-  "soc": 88,
-  "utc": 1750000000,
-  "speed": 53,
-  "power": 0.0,
-  "is_charging": false
-}
-```
+- ABRP over WiFi is retained.
+- ABRP over LTE HTTPS is deferred.
 
-Endpoint:
+## Planned work
 
-```text
-https://api.iternio.com/1/tlm/send
-```
-
-## Optional service
-
-ABRP is disabled unless both values are configured:
-
-- ABRP API Key
-- ABRP User Token
-
-Secrets are not logged and not published over MQTT.
-
-## Firmware Web API
-
-```text
-GET  /api/abrp/status
-POST /api/abrp/test
-```
+- Isolated `TinyGsmClientSecure` test
+- HTTPS request to `api.iternio.com`
+- Timeout/backoff logic
+- Non-blocking behavior so WebUI is not impacted

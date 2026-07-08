@@ -1,28 +1,28 @@
 # Installation
 
-## Requirements
-- ESP32-WROOM development board
-- CAN transceiver
-- PlatformIO
-- MQTT broker
-- Web server for the dashboard
+## Build firmware
 
-## Firmware
 ```bash
-cd firmware/esp32-wroom
+cd firmware/lilygo-t-a7670
 pio run
+```
+
+## Upload firmware
+
+```bash
 pio run -t upload
 ```
 
-## First configuration
-After the first boot, connect to the MOT setup access point and configure WiFi, MQTT and OTA.
+## Upload filesystem
 
-## Dashboard
-Upload the `dashboard/` folder to your web server and edit `dashboard/config.js`.
+```bash
+pio run -t uploadfs
+```
 
-## Validation
-Check:
-- MQTT connected
-- CAN values are published
-- Dashboard shows live data
-- OTA upload works
+If `uploadfs` reports `can't read source directory`, skip it unless the environment contains WebUI assets in `data/`.
+
+## Restore configuration
+
+Use the WebUI Backup/Restore page.
+
+> TODO screenshot: `docs/images/screenshots/backup-restore.png`

@@ -1,15 +1,27 @@
-# Firmware Architecture
+# Firmware architecture
 
-The firmware is structured around a central telemetry model.
-
-```text
-CAN input → Decoder → Telemetry → MQTT / Web UI / Dashboard
+```mermaid
+flowchart LR
+    Microlino[Microlino CAN] --> CAN[CAN decoder]
+    CAN --> Telemetry[Telemetry model]
+    GPS[L76K GPS] --> Telemetry
+    Telemetry --> MQTT[MQTT publisher]
+    Telemetry --> WebUI[Local WebUI]
+    Telemetry --> ABRP[ABRP integration]
+    Config[Backup/Restore] --> WebUI
+    OTA[OTA updater] --> WebUI
 ```
 
-Main responsibilities:
-- WiFi setup and fallback AP
-- CAN reception
-- Microlino display CAN decoding
-- MQTT publishing
-- Web configuration
-- OTA update
+## Modules
+
+| Module | Responsibility |
+|---|---|
+| CAN | Receive CAN frames and diagnostics |
+| GPS | Read L76K NMEA data |
+| Telemetry | Normalize vehicle state |
+| Network | WiFi/LTE selection |
+| Modem | LilyGO A7670G modem stack |
+| MQTT | Publish telemetry |
+| WebUI | Local status/config/OTA |
+| Config | Persistent settings and Backup/Restore |
+| ABRP | Send telemetry to ABRP over WiFi currently |

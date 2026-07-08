@@ -1,86 +1,40 @@
-# MOT – Microlino Open Telemetry
+# Microlino Open Telemetry
 
-![MOT Poster](docs/images/branding/poster-v1.0.0.jpg)
+Microlino Open Telemetry (MOT) is an ESP32-based telemetry platform for the Microlino. It reads vehicle data via CAN, enriches it with GPS and system status, and publishes telemetry through MQTT over WiFi or LTE.
 
-**MOT** is an open-source telemetry platform for the Microlino and other lightweight electric vehicles. It combines an ESP32 firmware, CAN decoding, MQTT telemetry, OTA firmware updates and a responsive web dashboard.
+> TODO: Add project hero image: `docs/images/hardware/mot-installed.jpg`
 
-![License](https://img.shields.io/badge/license-MIT-green)
-![PlatformIO](https://img.shields.io/badge/build-PlatformIO-blue)
-![ESP32](https://img.shields.io/badge/platform-ESP32-orange)
-![MQTT](https://img.shields.io/badge/telemetry-MQTT-38bdf8)
-![OTA](https://img.shields.io/badge/update-OTA-22c55e)
+## Current release status
 
-## Highlights
+Stable firmware baseline: `v1.1.0-lilygo-stability`
 
-- ESP32-WROOM firmware for CAN telemetry
-- MQTT topic structure: `mot/<vehicle>/...`
-- Responsive dashboard for desktop, tablet and iPhone
-- Secure dashboard access through MQTT over WebSocket / WSS
-- OTA firmware update with password protection
-- Configurable vehicle name, vehicle ID and MQTT prefix
-- Default map location with future GPS support
-- Designed as a foundation for future LilyGO LTE/GNSS support
+## Features
 
-## Dashboard
+- CAN receive via ESP32 TWAI and SN65HVD230
+- MQTT telemetry over WiFi or LTE
+- LilyGO T-A7670G LTE support
+- External L76K GPS support
+- Local WebUI and REST status API
+- OTA firmware update
+- JSON Backup/Restore
+- Factory Reset
+- CAN diagnostics
+- Modem recovery for the A7670G
 
-| Home | Battery |
-|---|---|
-| ![Home](docs/images/screenshots/desktop-home.png) | ![Battery](docs/images/screenshots/desktop-battery.png) |
+## Supported hardware
 
-| Vehicle | Location |
-|---|---|
-| ![Vehicle](docs/images/screenshots/desktop-vehicle.png) | ![Location](docs/images/screenshots/desktop-location.png) |
+| Hardware | Status | Notes |
+|---|---:|---|
+| ESP32-WROOM + SN65HVD230 | Supported | Classic MOT ESP32 setup |
+| WeAct Studio ESP32 CAN485 | Supported | Compatible CAN pins with SN65HVD230 |
+| LilyGO T-A7670G | Supported | LTE, GPS shield, MQTT over LTE |
 
-## Architecture
+## Quick start
 
-![Architecture](docs/images/diagrams/architecture.svg)
-
-```text
-Microlino CAN Bus
-        ↓
-ESP32-WROOM Firmware
-        ↓
-MQTT Broker
-        ↓
-Dashboard / ioBroker / Home Assistant
+```bash
+cd firmware/lilygo-t-a7670
+pio run
+pio run -t upload
 ```
 
-## Quick Start
-
-1. Build and flash the ESP32 firmware with PlatformIO.
-2. Connect to the MOT setup access point.
-3. Configure WiFi, MQTT and OTA password.
-4. Upload the dashboard to a web server.
-5. Configure `dashboard/config.js`.
-6. Open the dashboard and verify live telemetry.
-
-See [Installation](docs/getting-started/installation.md).
-
-## Documentation
-
-- [Documentation overview](docs/README.md)
-- [Installation](docs/getting-started/installation.md)
-- [Configuration](docs/getting-started/configuration.md)
-- [Dashboard](docs/dashboard/overview.md)
-- [MQTT Topics](docs/firmware/mqtt-topics.md)
-- [OTA](docs/firmware/ota.md)
-- [Hardware](docs/hardware/esp32.md)
-- [FAQ](docs/faq.md)
-
-## MQTT Topic Model
-
-```text
-mot/<vehicle>/display/soc
-mot/<vehicle>/display/speed_kmh
-mot/<vehicle>/display/odometer_km
-mot/<vehicle>/charging/is_charging
-mot/<vehicle>/system/device_id
-```
-
-## v1.0.0 Scope
-
-Version 1.0 focuses on a stable ESP32-WROOM release with WiFi, MQTT, OTA and the responsive dashboard. LTE/GNSS and LilyGO support are planned for later releases.
-
-## License
-
-MIT License.
+See `docs/index.md` for the full documentation.

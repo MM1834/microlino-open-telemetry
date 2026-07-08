@@ -1,33 +1,18 @@
 # Changelog
 
-## v1.0.1
+## v1.1.0-lilygo-stability
 
 ### Added
-- Dashboard History Engine using browser IndexedDB.
-- SoC history chart.
-- Speed history chart.
-- 24h / 7d / 30d history range selector.
-- Demo data generator.
-- CSV and JSON export for local history.
-- Clear local history action.
-- Debug summary for history samples.
+- LilyGO T-A7670G firmware path.
+- LewisXhe TinyGSM A76XXSSL transport for A7670G-LLSE.
+- LTE modem initialization and GPRS/PDP connection.
+- MQTT over LTE.
+- External L76K GPS support.
+- CAN receive diagnostics.
+- Backup/Restore for JSON configuration.
+- Factory Reset.
+- Modem recovery after OTA/reset.
 
-### Changed
-- Dashboard now records telemetry samples locally after MQTT updates.
-- Demo data generation includes both SoC and speed profiles.
-
-### Fixed
-- History recorder now supports the dashboard's flat MQTT topic value map.
-
-### Notes
-- No firmware changes are required.
-- History is stored locally in the browser and is not synchronized across devices.
-
-## v1.0.0
-
-### Added
-- Initial stable ESP32-WROOM firmware.
-- MQTT telemetry.
-- Responsive dashboard.
-- OTA update support.
-- Documentation and screenshots.
+### Known issues
+- ABRP over LTE HTTPS is disabled/deferred.
+- Device online heartbeat is planned but not yet implemented.

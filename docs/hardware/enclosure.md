@@ -1,3 +1,11 @@
 # Enclosure
 
-The final installation should use a protected enclosure with strain relief and automotive-safe wiring.
+Recommendations:
+
+- Strain relief for OBD/CAN cable
+- Access to USB for emergency flashing
+- Ventilation for LTE modem heat
+- LTE and GPS antenna placement
+- Optional reset access
+
+> TODO photos: `docs/images/hardware/enclosure-open.jpg`, `docs/images/hardware/enclosure-closed.jpg`

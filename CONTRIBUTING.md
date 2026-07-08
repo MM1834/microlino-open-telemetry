@@ -1,15 +1,26 @@
 # Contributing
 
-Contributions are welcome.
+## Development workflow
 
-## Guidelines
-- Keep firmware, MQTT topics and dashboard aligned.
-- Document every new MQTT topic.
-- Keep dashboard responsive.
-- Do not commit personal credentials, hostnames or API keys.
-- Use feature branches for larger changes.
+1. Create a feature branch from `develop`.
+2. Keep hardware-specific changes isolated.
+3. Build before committing.
+4. Update documentation for user-visible changes.
+5. Merge back into `develop`.
 
-## Branches
-- `main`: stable releases
-- `develop`: integration branch
-- `feature/*`: new features
+## Build check
+
+```bash
+cd firmware/lilygo-t-a7670
+pio run -t clean
+pio run
+```
+
+## Commit examples
+
+```text
+feat(lilygo): add LTE MQTT transport
+fix(config): include ABRP fields in backup JSON
+docs(hardware): add WeAct CAN485 board
+release: stabilize LilyGO LTE MQTT integration
+```
