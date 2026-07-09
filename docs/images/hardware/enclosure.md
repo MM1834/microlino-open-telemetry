@@ -1,0 +1,3 @@
+# Gehäuse
+
+USB zugänglich halten.

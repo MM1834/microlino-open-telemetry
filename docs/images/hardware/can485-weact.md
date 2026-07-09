@@ -1,0 +1,3 @@
+# WeAct CAN485
+
+SN65HVD230, GPIO32/13 kompatibel.
