@@ -1,11 +1,17 @@
-# Enclosure
+# Enclosure and installation
 
-Recommendations:
+The final hardware should be installed in an enclosure that protects the electronics while keeping USB, antennas and wiring serviceable.
 
-- Strain relief for OBD/CAN cable
-- Access to USB for emergency flashing
-- Ventilation for LTE modem heat
-- LTE and GPS antenna placement
-- Optional reset access
+![LilyGO case open](../assets/images/hardware/lilygo-t-a7670-case-open.png)
 
-> TODO photos: `docs/images/hardware/enclosure-open.jpg`, `docs/images/hardware/enclosure-closed.jpg`
+![LilyGO case with GPS](../assets/images/hardware/lilygo-t-a7670-case-with-gps.png)
+
+![Installed ESP32 system](../assets/images/hardware/system-esp32-installed.png)
+
+## Recommendations
+
+- Provide strain relief for OBD/CAN wiring.
+- Keep USB accessible for recovery flashing.
+- Keep LTE and GPS antennas away from shielding.
+- Allow ventilation around the LTE modem.
+- Label board type and firmware variant.

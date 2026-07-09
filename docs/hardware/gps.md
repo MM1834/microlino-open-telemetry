@@ -1,17 +1,21 @@
 # GPS
 
-The LilyGO setup uses an external L76K GPS module.
+The LilyGO platform uses an external L76K GPS module.
 
-Typical status:
+![LilyGO with L76K GPS](../assets/images/hardware/lilygo-t-a7670-board-top-incl-l76k-gps-module.png)
 
-```json
-{
-  "seen": true,
-  "valid": true,
-  "satellites": 7,
-  "lat": 47.0,
-  "lon": 8.0
-}
-```
+## Pins
 
-> TODO photo: `docs/images/hardware/gps-l76k.jpg`
+| Function | GPIO |
+|---|---:|
+| GPS RX | 22 |
+| GPS TX | 21 |
+| PPS | 23 |
+| WAKEUP | 19 |
+
+## Installation tips
+
+- Place the GPS antenna with sky visibility.
+- Keep GPS and LTE antennas separated.
+- Wait for a valid fix before relying on location.
+- First fix after power loss can take longer.

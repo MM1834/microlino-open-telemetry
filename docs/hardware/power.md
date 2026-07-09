@@ -1,5 +1,23 @@
-# Power Supply
+# Power
 
-For permanent installation, use a stable automotive-rated step-down converter from 12 V to 5 V.
+Reliable power is especially important for the LilyGO LTE hardware.
 
-Avoid powering additional cellular modules from the ESP32 3.3 V rail.
+## ESP32-WROOM and WeAct CAN485
+
+WiFi-only ESP32 setups are usually stable from USB or a regulated 5 V source. Avoid weak USB hubs and poor cables.
+
+## LilyGO T-A7670G
+
+LTE modems can draw short current peaks during registration and transmission. Use:
+
+- stable 5 V supply,
+- short good-quality USB cable,
+- charged battery if installed,
+- connected LTE antenna.
+
+## Possible power symptoms
+
+- Power LED does not light reliably.
+- Modem initialization occasionally fails.
+- LTE registration is unstable.
+- Device behaves differently from laptop USB vs wall adapter.
