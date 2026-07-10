@@ -1,6 +1,6 @@
 # Dashboard Overview
 
-![Desktop Home](../images/screenshots/desktop-home.png)
+![Desktop Home](../assets/images/dashboard/desktop-home.png)
 
 The dashboard provides live telemetry over MQTT/WebSocket.
 
