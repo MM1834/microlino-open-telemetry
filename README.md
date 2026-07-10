@@ -45,5 +45,10 @@ Open Source telemetry platform for Microlino vehicles based on ESP32 hardware.
 - TLS / AWS IoT evaluation
 
 ## License
+See  the repository license.
 
-See the repository license.
+## 👥 Contributors
+
+Thanks to Wolfgang for his support in decoding OBD2 registers on standard bis and the hint to use Display-CAN in the initial version for noth, the Microlino Pioneer series and the newer models.
+
+* [Wolfgang] (https://github.com/wolfijenne) –
