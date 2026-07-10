@@ -68,7 +68,52 @@
     }
 
     setText('mqtt-detail', detail);
+
+    const mobileDetail = $('mobile-device-detail');
+    if (mobileDetail) {
+      mobileDetail.textContent =
+        `Netzwerk: ${mode} · WebUI: ${hasIp ? ip : '--'}`;
+
+      mobileDetail.classList.toggle('available', localWebUiReachable);
+
+      if (localWebUiReachable) {
+        mobileDetail.setAttribute('role', 'link');
+        mobileDetail.setAttribute('tabindex', '0');
+        mobileDetail.title = 'Lokale Geräte-WebUI öffnen';
+      } else {
+        mobileDetail.removeAttribute('role');
+        mobileDetail.removeAttribute('tabindex');
+        mobileDetail.title = hasIp
+          ? 'Diese IP ist nur im gleichen lokalen WLAN erreichbar'
+          : 'Noch keine Geräte-IP über MQTT empfangen';
+      }
+    }
   }
+
+  function openLocalWebUi() {
+    const mode = String(state.networkMode || '').trim().toLowerCase();
+    const ip = String(state.deviceIp || '').trim();
+
+    if (mode === 'wifi' && isUsableIp(ip)) {
+      window.open(`http://${ip}/`, '_blank', 'noopener');
+    }
+  }
+
+  document.addEventListener('click', event => {
+    if (event.target?.id === 'mobile-device-detail' &&
+        event.target.classList.contains('available')) {
+      openLocalWebUi();
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.target?.id === 'mobile-device-detail' &&
+        event.target.classList.contains('available') &&
+        (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      openLocalWebUi();
+    }
+  });
 
   function setOnline(ok, detail) {
     state.mqttConnected = ok;

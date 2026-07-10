@@ -5,3 +5,27 @@
 .device-network a{color:var(--muted);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default}
 .device-network a.available{color:var(--blue);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .device-network a.available:hover{color:var(--text)}
+
+.mobile-device-detail{display:none}
+@media (max-width:900px){
+  .topbar{flex-wrap:wrap}
+  .mobile-device-detail{
+    display:block;
+    flex:0 0 100%;
+    order:10;
+    padding:8px 4px 2px;
+    color:var(--muted);
+    font-size:.88rem;
+    line-height:1.35;
+    border-top:1px solid rgba(158,176,199,.14);
+  }
+  .mobile-device-detail.available{
+    color:var(--blue);
+    text-decoration:underline;
+    text-underline-offset:3px;
+    cursor:pointer;
+  }
+}
+@media (max-width:520px){
+  .topbar .mobile-device-detail{display:block}
+}
