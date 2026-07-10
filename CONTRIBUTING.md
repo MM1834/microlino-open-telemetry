@@ -1,26 +1,15 @@
 # Contributing
 
-## Development workflow
+Thank you for contributing!
 
-1. Create a feature branch from `develop`.
-2. Keep hardware-specific changes isolated.
-3. Build before committing.
-4. Update documentation for user-visible changes.
-5. Merge back into `develop`.
+## Workflow
 
-## Build check
+- Create a feature branch from `develop`.
+- Keep commits focused.
+- Update documentation when functionality changes.
+- Test on the target hardware before opening a pull request.
 
-```bash
-cd firmware/lilygo-t-a7670
-pio run -t clean
-pio run
-```
+## Documentation
 
-## Commit examples
-
-```text
-feat(lilygo): add LTE MQTT transport
-fix(config): include ABRP fields in backup JSON
-docs(hardware): add WeAct CAN485 board
-release: stabilize LilyGO LTE MQTT integration
-```
+Store permanent documentation in `docs/`.
+Historic investigations belong under `docs/developer/`.

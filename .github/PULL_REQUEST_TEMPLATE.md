@@ -1,23 +1,18 @@
 ## Summary
 
-Describe the change.
+-
 
-## Type
+## Tested on
 
-- [ ] Firmware
-- [ ] Dashboard
-- [ ] Documentation
-- [ ] Hardware
-- [ ] CAN decoding
+- [ ] ESP32-WROOM
+- [ ] LilyGO T-A7670G
 
-## Test status
+## Documentation
 
-- [ ] Builds locally
-- [ ] Tested on ESP32-WROOM
-- [ ] Tested with MQTT
-- [ ] Tested dashboard
-- [ ] Documentation updated
+- [ ] Documentation updated if required
 
-## Notes
+## Checklist
 
-Add any important notes for reviewers.
+- [ ] Builds successfully
+- [ ] No secrets committed
+- [ ] Relevant guides updated

@@ -1,40 +1,49 @@
-# Microlino Open Telemetry
+# Microlino Open Telemetry (MOT)
 
-Microlino Open Telemetry (MOT) is an ESP32-based telemetry platform for the Microlino. It reads vehicle data via CAN, enriches it with GPS and system status, and publishes telemetry through MQTT over WiFi or LTE.
+Open Source telemetry platform for Microlino vehicles based on ESP32 hardware.
 
-> TODO: Add project hero image: `docs/images/hardware/mot-installed.jpg`
+## Highlights
 
-## Current release status
-
-Stable firmware baseline: `v1.1.0-lilygo-stability`
-
-## Features
-
-- CAN receive via ESP32 TWAI and SN65HVD230
-- MQTT telemetry over WiFi or LTE
-- LilyGO T-A7670G LTE support
-- External L76K GPS support
-- Local WebUI and REST status API
-- OTA firmware update
-- JSON Backup/Restore
-- Factory Reset
-- CAN diagnostics
-- Modem recovery for the A7670G
+- CAN bus decoding
+- MQTT telemetry
+- Local WebUI
+- Browser dashboard (desktop & mobile)
+- OTA firmware updates
+- Backup & Restore
+- GPS support (LilyGO)
+- Experimental LTE transport
 
 ## Supported hardware
 
-| Hardware | Status | Notes |
-|---|---:|---|
-| ESP32-WROOM + SN65HVD230 | Supported | Classic MOT ESP32 setup |
-| WeAct Studio ESP32 CAN485 | Supported | Compatible CAN pins with SN65HVD230 |
-| LilyGO T-A7670G | Supported | LTE, GPS shield, MQTT over LTE |
+| Platform | Status |
+|---|---|
+| ESP32-WROOM + WeAct CAN485 | Stable |
+| LilyGO T-A7670G | Working |
+| LTE MQTT | Experimental |
 
 ## Quick start
 
-```bash
-cd firmware/lilygo-t-a7670
-pio run
-pio run -t upload
-```
+1. Flash the firmware for your board.
+2. Connect to the setup Access Point.
+3. Configure WiFi and MQTT.
+4. Verify telemetry in the dashboard.
+5. Export a backup.
 
-See `docs/index.md` for the full documentation.
+## Documentation
+
+- `docs/index.md` – documentation landing page
+- Hardware Guide
+- WebUI Guide
+- Firmware Guide
+- Developer Guide
+
+## Current priorities
+
+- LTE MQTT stability
+- Security hardening
+- MQTT heartbeat / Last Will
+- TLS / AWS IoT evaluation
+
+## License
+
+See the repository license.
