@@ -3,7 +3,14 @@
   const mqttCfg = cfg.mqtt || {};
   const vehicleCfg = cfg.vehicle || {};
   const $ = (id) => document.getElementById(id);
-  const state = { lastMessage: 0, values: {} };
+  const state = {
+    lastMessage: 0,
+    values: {},
+    mqttConnected: false,
+    mqttDetail: '',
+    networkMode: '--',
+    deviceIp: '--'
+  };
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
@@ -18,12 +25,61 @@
     const vehicle = mqttCfg.vehicleId || 'pioneer';
     return `${prefix}/${vehicle}`;
   }
+  function isUsableIp(value) {
+    const ip = String(value || '').trim();
+    return ip !== '' && ip !== '--' && ip !== '0.0.0.0';
+  }
+
+  function updateDeviceInfo() {
+    const mode = String(state.networkMode || '--').trim() || '--';
+    const ip = String(state.deviceIp || '--').trim() || '--';
+    const hasIp = isUsableIp(ip);
+    const localWebUiReachable = hasIp && mode.toLowerCase() === 'wifi';
+
+    setText('device-network-mode', mode);
+
+    const ipEl = $('device-ip');
+    if (ipEl) {
+      ipEl.textContent = hasIp ? ip : '--';
+
+      if (localWebUiReachable) {
+        ipEl.href = `http://${ip}/`;
+        ipEl.classList.add('available');
+        ipEl.setAttribute('aria-disabled', 'false');
+        ipEl.title = 'Lokale Geräte-WebUI öffnen';
+      } else {
+        ipEl.removeAttribute('href');
+        ipEl.classList.remove('available');
+        ipEl.setAttribute('aria-disabled', 'true');
+        ipEl.title = hasIp
+          ? 'Diese IP ist nur im gleichen lokalen Netzwerk erreichbar'
+          : 'Noch keine Geräte-IP über MQTT empfangen';
+      }
+    }
+
+    let detail = state.mqttDetail ||
+      (state.mqttConnected ? 'Verbunden mit MQTT' : 'MQTT getrennt');
+
+    if (state.mqttConnected) {
+      const parts = ['Verbunden mit MQTT'];
+      if (mode !== '--') parts.push(mode);
+      if (hasIp) parts.push(ip);
+      detail = parts.join(' · ');
+    }
+
+    setText('mqtt-detail', detail);
+  }
+
   function setOnline(ok, detail) {
+    state.mqttConnected = ok;
+    state.mqttDetail = detail || (ok ? 'Verbunden mit MQTT' : 'MQTT getrennt');
+
     setText('mqtt-status', ok ? 'Online' : 'Offline');
     setText('side-online', ok ? 'Online' : 'Offline');
-    setText('mqtt-detail', detail || (ok ? 'Verbunden mit MQTT' : 'MQTT getrennt'));
     $('mqtt-dot')?.classList.toggle('online', ok);
     $('side-dot')?.classList.toggle('online', ok);
+
+    updateDeviceInfo();
   }
   function updateClock() {
     const d = new Date();
@@ -74,6 +130,14 @@
       case 'system/firmware': case 'system/version': setText('fw-version', val); break;
       case 'system/device_id': setText('device-id', val); break;
       case 'system/rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
+      case 'system/ip_address':
+        state.deviceIp = String(val || '--');
+        updateDeviceInfo();
+        break;
+      case 'system/network_mode':
+        state.networkMode = String(val || '--');
+        updateDeviceInfo();
+        break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
       case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
       case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
@@ -139,7 +203,7 @@
     const img = vehicleCfg.image || 'img/microlino.jpeg';
     $('hero-image')?.setAttribute('src', img); $('brand-image')?.setAttribute('src', img);
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
-    initBars(); setSoc(NaN); applyDefaultLocation();
+    initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo();
   }
   function connect() {
     const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
