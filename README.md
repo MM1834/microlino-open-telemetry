@@ -49,6 +49,6 @@ See  the repository license.
 
 ## 👥 Contributors
 
-Thanks to Wolfgang for his support in decoding OBD2 registers on standard bis and the hint to use Display-CAN in the initial version for noth, the Microlino Pioneer series and the newer models.
+Thanks to Wolfgang for his support in decoding OBD2 registers on standard bus and the hint to use Display-CAN in the initial version for noth, the Microlino Pioneer series and the newer models.
 
 * [Wolfgang] (https://github.com/wolfijenne) –
