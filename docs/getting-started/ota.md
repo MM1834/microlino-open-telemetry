@@ -2,7 +2,7 @@
 
 OTA allows firmware updates without physical USB access.
 
-![OTA Upload](../images/screenshots/ota-update.png)
+![OTA Upload](../assets/images/dashboard/ota-update.png)
 
 ## Recommended process
 1. Build firmware.

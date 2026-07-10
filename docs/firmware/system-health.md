@@ -1,41 +1,39 @@
-# System Health & MQTT Diagnostics
+# System health and diagnostics
 
-MOT v1.0.2 adds two firmware-side diagnostic endpoints:
+The firmware exposes status information for runtime and connectivity diagnostics.
+
+## Core health data
+
+- device ID and firmware version,
+- uptime,
+- IP address and network mode,
+- WiFi RSSI,
+- MQTT state,
+- CAN validity and counters,
+- GPS freshness,
+- LilyGO modem/GPRS state.
+
+## Layered diagnosis
+
+Diagnose communications in this order:
 
 ```text
-GET /api/mqtt-test
-GET /api/system-health
+network interface
+-> DNS
+-> TCP
+-> MQTT authentication/session
+-> publish/receive
 ```
 
-## `/api/mqtt-test`
+A successful TCP connection does not prove a complete MQTT session. MQTT additionally requires a valid broker `CONNACK`.
 
-Checks the configured MQTT connection in layers:
+## Useful evidence for bug reports
 
-- WiFi connected
-- DNS resolution
-- TCP port reachable
-- MQTT login successful
+Include:
 
-## `/api/system-health`
-
-Returns device, firmware and connectivity information:
-
-- device id
-- firmware version
-- build date
-- IP address
-- RSSI
-- uptime
-- WiFi/DNS/TCP/MQTT state
-- CAN validity state
-
-## Web UI
-
-The local ESP32 web UI now shows:
-
-- **System Health prüfen** on the status page
-- **Test Connection** in the MQTT section of the config page
-
-## Notes
-
-The ESP32 firmware uses plain MQTT over TCP. Do not use the dashboard WebSocket/WSS port for firmware MQTT.
+- serial boot/runtime log,
+- `/api/status` JSON,
+- MQTT status/debug JSON,
+- broker log timestamps,
+- active transport,
+- firmware version and board.

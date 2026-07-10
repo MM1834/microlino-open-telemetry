@@ -1,15 +1,27 @@
-# ABRP
+# ABRP integration
 
-ABRP integration builds telemetry payloads for A Better Routeplanner.
+ABRP support is optional and builds telemetry for A Better Routeplanner.
 
-## Current status
+## Payload fields
 
-- ABRP over WiFi is retained.
-- ABRP over LTE HTTPS is deferred.
+Depending on available valid telemetry, the payload may include:
 
-## Planned work
+- state of charge,
+- Unix UTC timestamp,
+- speed,
+- power,
+- charging state,
+- latitude/longitude.
 
-- Isolated `TinyGsmClientSecure` test
-- HTTPS request to `api.iternio.com`
-- Timeout/backoff logic
-- Non-blocking behavior so WebUI is not impacted
+## Time requirements
+
+ABRP requires a valid Unix timestamp. Earlier firmware logic considered timestamps above `1700000000` valid and did not send ABRP telemetry until time was valid.
+
+## Transport status
+
+| Transport | Status |
+|---|---:|
+| WiFi HTTP/HTTPS path | Implemented during earlier releases |
+| LilyGO LTE HTTPS | Deferred |
+
+The LTE implementation must be non-blocking enough that it does not degrade the AP/WebUI and must use a validated secure client path.

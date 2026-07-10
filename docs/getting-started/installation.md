@@ -25,4 +25,4 @@ If `uploadfs` reports `can't read source directory`, skip it unless the environm
 
 Use the WebUI Backup/Restore page.
 
-> TODO screenshot: `docs/images/screenshots/backup-restore.png`
+> TODO screenshot: `docs/assets/images/dashboard/backup-restore.png`
