@@ -104,8 +104,7 @@
       dotEl.classList.add('offline');
     }
 
-    const tm=new Date(state.vehicleLastSeenMs).toLocaleTimeString(cfg.dashboard?.locale||'de-CH');
-    detailEl.textContent = `${statusEl.textContent} (Last Seen: ${tm})`;
+    detailEl.textContent = `Letztes Update ${relative}`;
     setText('side-updated', relative);
   }
 
@@ -344,6 +343,70 @@
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
     initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
   }
+  function sanitizeClientIdPart(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+  }
+
+  function createClientIdSuffix() {
+    try {
+      if (window.crypto?.randomUUID) {
+        return window.crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+      }
+
+      if (window.crypto?.getRandomValues) {
+        const bytes = new Uint8Array(6);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, byte =>
+          byte.toString(16).padStart(2, '0')
+        ).join('');
+      }
+    } catch (error) {
+      console.warn('Could not use crypto for MQTT client ID:', error);
+    }
+
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+      .slice(0, 12);
+  }
+
+  function getPersistentMqttClientId() {
+    const configuredId = sanitizeClientIdPart(mqttCfg.clientId);
+    if (configuredId) return configuredId;
+
+    const prefix =
+      sanitizeClientIdPart(mqttCfg.clientIdPrefix) || 'mot-dashboard';
+    const vehicle =
+      sanitizeClientIdPart(mqttCfg.vehicleId || vehicleCfg.id || 'vehicle');
+    const broker =
+      sanitizeClientIdPart(mqttCfg.host || 'broker');
+
+    // Each browser profile keeps one stable ID for this broker/vehicle.
+    const storageKey =
+      mqttCfg.clientIdStorageKey ||
+      `mot.mqttClientId.${broker}.${vehicle}`;
+
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (stored) return stored;
+
+      const generated = `${prefix}-${createClientIdSuffix()}`;
+      window.localStorage.setItem(storageKey, generated);
+      return generated;
+    } catch (error) {
+      // Private browsing or restricted storage: stable during this page session.
+      console.warn('localStorage unavailable for MQTT client ID:', error);
+
+      if (!state.sessionMqttClientId) {
+        state.sessionMqttClientId = `${prefix}-${createClientIdSuffix()}`;
+      }
+      return state.sessionMqttClientId;
+    }
+  }
+
   function connect() {
     const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
     if (!mqttLib || typeof mqttLib.connect !== 'function') { setOnline(false, 'mqtt.min.js fehlt oder ist ungültig'); return; }
@@ -351,7 +414,9 @@
     const path = mqttCfg.path || '/';
     const url = `${protocol}://${mqttCfg.host}:${mqttCfg.port}${path}`;
     setOnline(false, 'Connecting…');
-    const client = mqttLib.connect(url, { username: mqttCfg.username || undefined, password: mqttCfg.password || undefined, clientId: `${mqttCfg.clientIdPrefix || 'mot-dashboard'}-${Math.random().toString(16).slice(2)}`, reconnectPeriod: 2500, connectTimeout: 15000 });
+    const mqttClientId = getPersistentMqttClientId();
+    console.info('MQTT client ID:', mqttClientId);
+    const client = mqttLib.connect(url, { username: mqttCfg.username || undefined, password: mqttCfg.password || undefined, clientId: mqttClientId, reconnectPeriod: 2500, connectTimeout: 15000 });
     client.on('connect', () => { setOnline(true, 'Verbunden mit MQTT'); client.subscribe(`${baseTopic()}/#`); });
     client.on('reconnect', () => setOnline(false, 'Reconnect…'));
     client.on('offline', () => setOnline(false, 'Offline'));
