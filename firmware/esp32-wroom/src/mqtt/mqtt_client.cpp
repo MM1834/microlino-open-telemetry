@@ -5,11 +5,38 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <time.h>
 #include "telemetry/telemetry.h"
 #include "system/device_id.h"
 
 static WiFiClient wifiClient;
 static PubSubClient mqtt(wifiClient);
+
+static String topic(const char *suffix);
+
+static bool ntpSyncRequested = false;
+static const time_t MIN_VALID_UTC = 1700000000;
+
+static void requestUtcSyncIfPossible()
+{
+    if (ntpSyncRequested || WiFi.status() != WL_CONNECTED) return;
+
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    ntpSyncRequested = true;
+    Serial.println("UTC: NTP synchronization requested");
+}
+
+static bool publishLastSeenUtc()
+{
+    requestUtcSyncIfPossible();
+
+    const time_t nowUtc = time(nullptr);
+    if (nowUtc < MIN_VALID_UTC) return false;
+
+    char value[24];
+    snprintf(value, sizeof(value), "%lld", static_cast<long long>(nowUtc));
+    return mqtt.publish(topic("system/last_seen_utc").c_str(), value, true);
+}
 
 static String topic(const char *suffix)
 {
@@ -73,6 +100,7 @@ void setupMqtt()
 
 void mqttLoop()
 {
+    requestUtcSyncIfPossible();
     if (!config.mqttEnabled()) return;
     if (!mqtt.connected()) reconnectMqtt();
     mqtt.loop();
@@ -100,4 +128,5 @@ void publishTelemetry()
     mqtt.publish(topic("system/network_mode").c_str(), telemetry.system.networkMode.c_str(), true);
     publishInt("system/wifi_rssi", telemetry.system.wifiRssi);
     publishInt("system/uptime_sec", telemetry.system.uptimeSec);
+    publishLastSeenUtc();
 }
