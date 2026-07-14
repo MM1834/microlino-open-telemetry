@@ -2,6 +2,7 @@
   const cfg = window.MOT_CONFIG || {};
   const mqttCfg = cfg.mqtt || {};
   const vehicleCfg = cfg.vehicle || {};
+  const dashboardCfg = cfg.dashboard || {};
   const $ = (id) => document.getElementById(id);
   const state = {
     lastMessage: 0,
@@ -14,10 +15,18 @@
     vehicleLastSeenSource: ''
   };
 
+  function configuredSeconds(value, fallback) {
+    const seconds = Number(value ?? fallback);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : fallback;
+  }
+
   const VEHICLE_ONLINE_MS =
-    Number(cfg.dashboard?.vehicleOnlineSeconds || 120) * 1000;
+    configuredSeconds(dashboardCfg.vehicleOnlineSeconds, 120) * 1000;
   const VEHICLE_STALE_MS =
-    Number(cfg.dashboard?.vehicleStaleSeconds || 600) * 1000;
+    Math.max(
+      configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
+      VEHICLE_ONLINE_MS
+    );
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }

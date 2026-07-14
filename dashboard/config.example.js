@@ -26,6 +26,13 @@ window.MOT_CONFIG = {
   },
   dashboard: {
     title: "MOT Dashboard",
-    locale: "de-CH"
+    locale: "de-CH",
+
+    // Microlino / OBD2 presence thresholds.
+    // 0–120 seconds: Online
+    // 121–600 seconds: Data stale
+    // More than 600 seconds: Offline
+    vehicleOnlineSeconds: 120,
+    vehicleStaleSeconds: 600
   }
 };
