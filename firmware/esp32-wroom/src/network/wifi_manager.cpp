@@ -33,7 +33,16 @@ void setupNetwork()
         return;
     }
 
-    Serial.printf("Connecting WiFi '%s'\n", config.wifiSsid.c_str());
+    Serial.printf(
+        "WiFi STA: SSID='%s' length=%u\n",
+        config.wifiSsid.c_str(),
+        static_cast<unsigned>(config.wifiSsid.length())
+    );
+
+    Serial.printf(
+        "WiFi STA: password length=%u\n",
+        static_cast<unsigned>(config.wifiPass.length())
+    );
 
     WiFi.disconnect(true, true);
     WiFi.mode(WIFI_OFF);

@@ -297,6 +297,13 @@ Client* lilygoTinyGsmClient()
     return &lteClient;
 }
 
+void lilygoTinyGsmMaintain()
+{
+    if (!modemReadyFlag) return;
+    modem.maintain();
+}
+
+
 bool lilygoLteTcpOpen(const String& host, uint16_t port)
 {
     if (!lilygoEnsureGprsConnected()) {

@@ -15,9 +15,9 @@
   };
 
   const VEHICLE_ONLINE_MS =
-    Number(cfg.dashboard?.vehicleOnlineSeconds || 30) * 1000;
+    Number(cfg.dashboard?.vehicleOnlineSeconds || 120) * 1000;
   const VEHICLE_STALE_MS =
-    Number(cfg.dashboard?.vehicleStaleSeconds || 120) * 1000;
+    Number(cfg.dashboard?.vehicleStaleSeconds || 600) * 1000;
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
@@ -104,7 +104,8 @@
       dotEl.classList.add('offline');
     }
 
-    detailEl.textContent = `Letztes Update ${relative}`;
+    const tm=new Date(state.vehicleLastSeenMs).toLocaleTimeString(cfg.dashboard?.locale||'de-CH');
+    detailEl.textContent = `${statusEl.textContent} (Last Seen: ${tm})`;
     setText('side-updated', relative);
   }
 
