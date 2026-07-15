@@ -23,6 +23,7 @@ String lilygoLteTcpTestJson(const String& host, uint16_t port);
 String lilygoLteRxDebugJson();
 
 Client* lilygoTinyGsmClient();
+void lilygoTinyGsmMaintain();
 Client* lilygoTinyGsmSecureClient();
 String lilygoTinyGsmTraceJson();
 void lilygoTinyGsmTraceClear();

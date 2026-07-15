@@ -29,3 +29,67 @@
 @media (max-width:520px){
   .topbar .mobile-device-detail{display:block}
 }
+
+
+/* Separate browser-to-broker MQTT state from vehicle/OBD2 freshness. */
+.connection-status{
+  display:flex;
+  align-items:center;
+  gap:24px;
+  min-width:0;
+}
+.connection-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+.connection-copy{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+.connection-label{
+  color:var(--muted);
+  font-size:.7rem;
+  line-height:1.1;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+.connection-detail{
+  color:var(--muted);
+  font-size:.78rem;
+  line-height:1.25;
+  white-space:nowrap;
+}
+.vehicle-dot.stale{
+  background:var(--amber);
+}
+.vehicle-dot.offline{
+  background:var(--red);
+}
+
+@media (max-width:900px){
+  .connection-status{
+    flex:0 0 100%;
+    align-items:stretch;
+    justify-content:space-between;
+    gap:14px;
+  }
+  .connection-item{
+    flex:1 1 0;
+  }
+}
+
+@media (max-width:600px){
+  .connection-status{
+    flex-direction:column;
+    gap:10px;
+  }
+  .connection-item{
+    width:100%;
+  }
+  .connection-detail{
+    white-space:normal;
+  }
+}

@@ -2,6 +2,7 @@
   const cfg = window.MOT_CONFIG || {};
   const mqttCfg = cfg.mqtt || {};
   const vehicleCfg = cfg.vehicle || {};
+  const dashboardCfg = cfg.dashboard || {};
   const $ = (id) => document.getElementById(id);
   const state = {
     lastMessage: 0,
@@ -9,8 +10,23 @@
     mqttConnected: false,
     mqttDetail: '',
     networkMode: '--',
-    deviceIp: '--'
+    deviceIp: '--',
+    vehicleLastSeenMs: 0,
+    vehicleLastSeenSource: ''
   };
+
+  function configuredSeconds(value, fallback) {
+    const seconds = Number(value ?? fallback);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : fallback;
+  }
+
+  const VEHICLE_ONLINE_MS =
+    configuredSeconds(dashboardCfg.vehicleOnlineSeconds, 120) * 1000;
+  const VEHICLE_STALE_MS =
+    Math.max(
+      configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
+      VEHICLE_ONLINE_MS
+    );
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
@@ -28,6 +44,86 @@
   function isUsableIp(value) {
     const ip = String(value || '').trim();
     return ip !== '' && ip !== '--' && ip !== '0.0.0.0';
+  }
+
+  function parseTimestampMs(value) {
+    if (value === null || value === undefined) return 0;
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value >= 1e12) return value;
+      if (value >= 1e9) return value * 1000;
+      return 0;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return 0;
+
+    if (/^\d{13}$/.test(raw)) return Number(raw);
+    if (/^\d{10}$/.test(raw)) return Number(raw) * 1000;
+
+    const parsed = Date.parse(raw);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function relativeTime(timestampMs) {
+    if (!timestampMs) return 'Noch kein Update empfangen';
+
+    const seconds = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
+    if (seconds < 5) return 'gerade eben';
+    if (seconds < 60) return `vor ${seconds} s`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `vor ${minutes} min`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 48) return `vor ${hours} h`;
+
+    const days = Math.floor(hours / 24);
+    return `vor ${days} Tagen`;
+  }
+
+  function updateVehicleStatus() {
+    const statusEl = $('vehicle-status');
+    const detailEl = $('vehicle-last-update');
+    const dotEl = $('vehicle-dot');
+
+    if (!statusEl || !detailEl || !dotEl) return;
+
+    dotEl.classList.remove('online', 'stale', 'offline');
+
+    if (!state.vehicleLastSeenMs) {
+      statusEl.textContent = 'Keine Daten';
+      detailEl.textContent = 'Noch kein Update empfangen';
+      setText('side-updated', '--');
+      dotEl.classList.add('offline');
+      return;
+    }
+
+    const ageMs = Math.max(0, Date.now() - state.vehicleLastSeenMs);
+    const relative = relativeTime(state.vehicleLastSeenMs);
+
+    if (ageMs <= VEHICLE_ONLINE_MS) {
+      statusEl.textContent = 'Online';
+      dotEl.classList.add('online');
+    } else if (ageMs <= VEHICLE_STALE_MS) {
+      statusEl.textContent = 'Daten veraltet';
+      dotEl.classList.add('stale');
+    } else {
+      statusEl.textContent = 'Offline';
+      dotEl.classList.add('offline');
+    }
+
+    detailEl.textContent = `Letztes Update ${relative}`;
+    setText('side-updated', relative);
+  }
+
+  function setVehicleLastSeen(value, source) {
+    const timestampMs = parseTimestampMs(value);
+    if (!timestampMs) return;
+
+    state.vehicleLastSeenMs = timestampMs;
+    state.vehicleLastSeenSource = source || '';
+    updateVehicleStatus();
   }
 
   function updateDeviceInfo() {
@@ -130,6 +226,7 @@
     const d = new Date();
     setText('date-now', d.toLocaleDateString(cfg.dashboard?.locale || 'de-CH'));
     setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
+    updateVehicleStatus();
   }
   setInterval(updateClock, 1000); updateClock();
 
@@ -162,7 +259,8 @@
     const base = baseTopic() + '/';
     const key = topic.startsWith(base) ? topic.slice(base.length) : topic;
     const val = parsePayload(payload);
-    state.values[key] = val; state.lastMessage = Date.now(); setUpdated();
+    state.values[key] = val;
+    state.lastMessage = Date.now();
     switch (key) {
       case 'display/soc': setSoc(val); break;
       case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); break;
@@ -183,9 +281,13 @@
         state.networkMode = String(val || '--');
         updateDeviceInfo();
         break;
+      case 'system/last_seen_utc':
+      case 'time/utc':
+        setVehicleLastSeen(val, key);
+        break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
-      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
-      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
+      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); setUpdated(); break;
+      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); setUpdated(); break;
     }
 
     window.MOTHistoryRecorder?.update(state.values, {
@@ -248,8 +350,72 @@
     const img = vehicleCfg.image || 'img/microlino.jpeg';
     $('hero-image')?.setAttribute('src', img); $('brand-image')?.setAttribute('src', img);
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
-    initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo();
+    initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
   }
+  function sanitizeClientIdPart(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+  }
+
+  function createClientIdSuffix() {
+    try {
+      if (window.crypto?.randomUUID) {
+        return window.crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+      }
+
+      if (window.crypto?.getRandomValues) {
+        const bytes = new Uint8Array(6);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, byte =>
+          byte.toString(16).padStart(2, '0')
+        ).join('');
+      }
+    } catch (error) {
+      console.warn('Could not use crypto for MQTT client ID:', error);
+    }
+
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+      .slice(0, 12);
+  }
+
+  function getPersistentMqttClientId() {
+    const configuredId = sanitizeClientIdPart(mqttCfg.clientId);
+    if (configuredId) return configuredId;
+
+    const prefix =
+      sanitizeClientIdPart(mqttCfg.clientIdPrefix) || 'mot-dashboard';
+    const vehicle =
+      sanitizeClientIdPart(mqttCfg.vehicleId || vehicleCfg.id || 'vehicle');
+    const broker =
+      sanitizeClientIdPart(mqttCfg.host || 'broker');
+
+    // Each browser profile keeps one stable ID for this broker/vehicle.
+    const storageKey =
+      mqttCfg.clientIdStorageKey ||
+      `mot.mqttClientId.${broker}.${vehicle}`;
+
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (stored) return stored;
+
+      const generated = `${prefix}-${createClientIdSuffix()}`;
+      window.localStorage.setItem(storageKey, generated);
+      return generated;
+    } catch (error) {
+      // Private browsing or restricted storage: stable during this page session.
+      console.warn('localStorage unavailable for MQTT client ID:', error);
+
+      if (!state.sessionMqttClientId) {
+        state.sessionMqttClientId = `${prefix}-${createClientIdSuffix()}`;
+      }
+      return state.sessionMqttClientId;
+    }
+  }
+
   function connect() {
     const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
     if (!mqttLib || typeof mqttLib.connect !== 'function') { setOnline(false, 'mqtt.min.js fehlt oder ist ungültig'); return; }
@@ -257,7 +423,9 @@
     const path = mqttCfg.path || '/';
     const url = `${protocol}://${mqttCfg.host}:${mqttCfg.port}${path}`;
     setOnline(false, 'Connecting…');
-    const client = mqttLib.connect(url, { username: mqttCfg.username || undefined, password: mqttCfg.password || undefined, clientId: `${mqttCfg.clientIdPrefix || 'mot-dashboard'}-${Math.random().toString(16).slice(2)}`, reconnectPeriod: 2500, connectTimeout: 15000 });
+    const mqttClientId = getPersistentMqttClientId();
+    console.info('MQTT client ID:', mqttClientId);
+    const client = mqttLib.connect(url, { username: mqttCfg.username || undefined, password: mqttCfg.password || undefined, clientId: mqttClientId, reconnectPeriod: 2500, connectTimeout: 15000 });
     client.on('connect', () => { setOnline(true, 'Verbunden mit MQTT'); client.subscribe(`${baseTopic()}/#`); });
     client.on('reconnect', () => setOnline(false, 'Reconnect…'));
     client.on('offline', () => setOnline(false, 'Offline'));

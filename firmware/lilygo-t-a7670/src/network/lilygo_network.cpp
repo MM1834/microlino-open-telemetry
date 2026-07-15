@@ -40,7 +40,8 @@ static void startAp()
     apSsid = String(SETUP_AP_SSID) + "-" + chipId();
 
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(apSsid.c_str(), SETUP_AP_PASS);
+    WiFi.softAP(apSsid.c_str());
+    // WiFi.softAP(apSsid.c_str(), SETUP_AP_PASS);
 
     Serial.printf("Setup AP: %s\n", apSsid.c_str());
     Serial.printf("Setup AP IP: %s\n", WiFi.softAPIP().toString().c_str());
@@ -52,6 +53,18 @@ static bool tryWifi(uint32_t timeoutMs)
         lastMessage = "WiFi not configured";
         return false;
     }
+
+    Serial.printf(
+        "WiFi STA: SSID='%s' length=%u\n",
+        config.wifiSsid.c_str(),
+        static_cast<unsigned>(config.wifiSsid.length())
+    );
+
+    Serial.printf(
+        "WiFi STA: password length=%u\n",
+        static_cast<unsigned>(config.wifiPass.length())
+    );
+
 
     Serial.printf("WiFi STA: connecting to '%s'\n", config.wifiSsid.c_str());
     lastMessage = "WiFi connect attempt";

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <time.h>
 
 #include "config/lilygo_config.h"
 #include "network/lilygo_network.h"
@@ -25,6 +26,40 @@ static String lastMessage = "";
 static const unsigned long MQTT_RECONNECT_INTERVAL_MS = 10000;
 static const unsigned long MQTT_LTE_RECONNECT_INTERVAL_MS = 60000;
 static const unsigned long MQTT_PUBLISH_INTERVAL_MS = 5000;
+
+static String topic(const char* suffix);
+
+static bool ntpSyncRequested = false;
+static const time_t MIN_VALID_UTC = 1700000000;
+
+static void requestUtcSyncIfPossible()
+{
+    // ESP32 SNTP uses the WiFi/lwIP route. For LTE-only operation, a future
+    // modem/GPS time provider can set the ESP32 system clock; the publish
+    // function below will then automatically use that valid UTC.
+    if (ntpSyncRequested || WiFi.status() != WL_CONNECTED) return;
+
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    ntpSyncRequested = true;
+    Serial.println("UTC: NTP synchronization requested via WiFi");
+}
+
+static bool utcTimeValid()
+{
+    return time(nullptr) >= MIN_VALID_UTC;
+}
+
+static bool publishLastSeenUtc()
+{
+    requestUtcSyncIfPossible();
+
+    const time_t nowUtc = time(nullptr);
+    if (nowUtc < MIN_VALID_UTC || !mqtt.connected()) return false;
+
+    char value[24];
+    snprintf(value, sizeof(value), "%lld", static_cast<long long>(nowUtc));
+    return mqtt.publish(topic("system/last_seen_utc").c_str(), value, true);
+}
 
 static String esc(String s){ s.replace("\\","\\\\"); s.replace("\"","\\\""); s.replace("\r","\\r"); s.replace("\n","\\n"); return s; }
 
@@ -116,6 +151,7 @@ void setupLilygoMqtt()
 
 void lilygoMqttLoop()
 {
+    requestUtcSyncIfPossible();
     if(!mqttEnabled()) return;
     selectTransport();
     if(!transportAvailable()){ if(mqtt.connected()) mqtt.disconnect(); lastMessage="MQTT transport unavailable: no WiFi/LTE route"; return; }
@@ -154,6 +190,7 @@ void publishLilygoTelemetry()
     mqtt.publish(topic("system/mqtt_transport").c_str(), activeTransport.c_str(), true);
     publishInt("system/wifi_rssi", telemetry.system.wifiRssi);
     publishInt("system/uptime_sec", telemetry.system.uptimeSec);
+    publishLastSeenUtc();
     publishCount++; lastMessage="Telemetry published via "+activeTransport;
 }
 
@@ -173,7 +210,9 @@ String lilygoMqttStatusJson()
     json+="\"lastConnectState\":"+String(lastConnectState)+",";
     json+="\"lastConnectStateText\":\""+String(mqttStateText(lastConnectState))+"\",";
     json+="\"connectAttempts\":"+String(connectAttempts)+",";
+    json+="\"timeValid\":"+String(utcTimeValid()?"true":"false")+",";
     json+="\"publishCount\":"+String(publishCount)+",";
+    json+="\"timeValid\":"+String(utcTimeValid()?"true":"false")+",";
     json+="\"wifiIp\":\""+esc(WiFi.localIP().toString())+"\",";
     json+="\"lteIp\":\""+esc(lilygoLteIp())+"\",";
     json+="\"message\":\""+esc(lastMessage)+"\"}";
