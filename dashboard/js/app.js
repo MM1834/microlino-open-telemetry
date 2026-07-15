@@ -3,6 +3,7 @@
   const mqttCfg = cfg.mqtt || {};
   const vehicleCfg = cfg.vehicle || {};
   const dashboardCfg = cfg.dashboard || {};
+  const dataSourceCfg = cfg.dataSource || { type: 'legacy-mqtt' };
   const $ = (id) => document.getElementById(id);
   const state = {
     lastMessage: 0,
@@ -352,88 +353,48 @@
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
     initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
   }
-  function sanitizeClientIdPart(value) {
-    return String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 32);
+
+function startDataProvider() {
+  const registry = window.MOTDataProviders;
+  if (!registry) {
+    setOnline(false, 'Data Provider Registry fehlt');
+    return;
   }
 
-  function createClientIdSuffix() {
-    try {
-      if (window.crypto?.randomUUID) {
-        return window.crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-      }
+  const type = dataSourceCfg.type || 'legacy-mqtt';
+  let providerConfig;
 
-      if (window.crypto?.getRandomValues) {
-        const bytes = new Uint8Array(6);
-        window.crypto.getRandomValues(bytes);
-        return Array.from(bytes, byte =>
-          byte.toString(16).padStart(2, '0')
-        ).join('');
-      }
-    } catch (error) {
-      console.warn('Could not use crypto for MQTT client ID:', error);
-    }
-
-    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-      .slice(0, 12);
+  if (type === 'legacy-mqtt') {
+    providerConfig = mqttCfg;
+  } else if (type === 'aws-backend') {
+    providerConfig = {
+      ...(cfg.awsBackend || {}),
+      vehicleId: mqttCfg.vehicleId || 'pioneer',
+      topicPrefix: mqttCfg.topicPrefix || 'mot'
+    };
+  } else {
+    setOnline(false, `Unbekannte Datenquelle: ${type}`);
+    return;
   }
 
-  function getPersistentMqttClientId() {
-    const configuredId = sanitizeClientIdPart(mqttCfg.clientId);
-    if (configuredId) return configuredId;
+  try {
+    const provider = registry.create(type, { config: providerConfig });
+    state.dataProvider = provider;
 
-    const prefix =
-      sanitizeClientIdPart(mqttCfg.clientIdPrefix) || 'mot-dashboard';
-    const vehicle =
-      sanitizeClientIdPart(mqttCfg.vehicleId || vehicleCfg.id || 'vehicle');
-    const broker =
-      sanitizeClientIdPart(mqttCfg.host || 'broker');
+    provider.start({
+      onConnection: (ok, detail) => setOnline(ok, detail),
+      onMessage: (topic, payload) => applyTopic(topic, payload),
+      onError: error => console.error('MOT data provider error:', error)
+    });
 
-    // Each browser profile keeps one stable ID for this broker/vehicle.
-    const storageKey =
-      mqttCfg.clientIdStorageKey ||
-      `mot.mqttClientId.${broker}.${vehicle}`;
-
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) return stored;
-
-      const generated = `${prefix}-${createClientIdSuffix()}`;
-      window.localStorage.setItem(storageKey, generated);
-      return generated;
-    } catch (error) {
-      // Private browsing or restricted storage: stable during this page session.
-      console.warn('localStorage unavailable for MQTT client ID:', error);
-
-      if (!state.sessionMqttClientId) {
-        state.sessionMqttClientId = `${prefix}-${createClientIdSuffix()}`;
-      }
-      return state.sessionMqttClientId;
-    }
+    console.info('MOT provider details:', provider.describe?.());
+  } catch (error) {
+    console.error(error);
+    setOnline(false, error?.message || 'Datenquelle konnte nicht gestartet werden');
   }
+}
 
-  function connect() {
-    const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
-    if (!mqttLib || typeof mqttLib.connect !== 'function') { setOnline(false, 'mqtt.min.js fehlt oder ist ungültig'); return; }
-    const protocol = mqttCfg.useTls ? 'wss' : 'ws';
-    const path = mqttCfg.path || '/';
-    const url = `${protocol}://${mqttCfg.host}:${mqttCfg.port}${path}`;
-    setOnline(false, 'Connecting…');
-    const mqttClientId = getPersistentMqttClientId();
-    console.info('MQTT client ID:', mqttClientId);
-    const client = mqttLib.connect(url, { username: mqttCfg.username || undefined, password: mqttCfg.password || undefined, clientId: mqttClientId, reconnectPeriod: 2500, connectTimeout: 15000 });
-    client.on('connect', () => { setOnline(true, 'Verbunden mit MQTT'); client.subscribe(`${baseTopic()}/#`); });
-    client.on('reconnect', () => setOnline(false, 'Reconnect…'));
-    client.on('offline', () => setOnline(false, 'Offline'));
-    client.on('close', () => setOnline(false, 'Verbindung geschlossen'));
-    client.on('error', (err) => setOnline(false, err?.message || 'MQTT Fehler'));
-    client.on('message', applyTopic);
-  }
-  initStatic(); connect();
+  initStatic(); startDataProvider();
 })();
 
 

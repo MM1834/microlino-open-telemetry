@@ -28,3 +28,6 @@ firmware/esp32-wroom/.pio/
 *.secret
 *.secrets
 .env
+# AWS IoT device credentials
+secrets/aws-iot/*
+!secrets/aws-iot/.gitkeep

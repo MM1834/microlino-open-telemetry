@@ -1,5 +1,11 @@
 // Copy this file from config.example.js and adjust it for your installation.
 window.MOT_CONFIG = {
+  // Current production target will become "aws-backend".
+  // Keep "legacy-mqtt" while the authenticated backend is not deployed.
+  dataSource: {
+    type: "legacy-mqtt"
+  },
+
   mqtt: {
     host: "mqtt.example.com",
     port: 443,
@@ -11,6 +17,19 @@ window.MOT_CONFIG = {
     vehicleId: "pioneer",
     clientIdPrefix: "mot-dashboard"
   },
+  // Target provider for the production WebApp.
+  // The browser talks to an authenticated application backend, not directly
+  // to AWS IoT Core with device credentials.
+  awsBackend: {
+    apiBaseUrl: "",
+    websocketUrl: "",
+    reconnectPeriodMs: 5000
+
+    // Authentication will be added with the user-management sprint.
+    // getAccessToken: async () => "...",
+    // tokenQueryParameter: "access_token"
+  },
+
   vehicle: {
     name: "Microlino Pioneer",
     image: "img/microlino.jpeg",
