@@ -1,147 +1,120 @@
 (function () {
   window.MOTDataProviders.register('aws-backend', function (options) {
     const config = options.config || {};
-    let socket = null;
     let stopped = false;
-    let reconnectTimer = null;
+    let timer = null;
+    let callbacksRef = null;
+    let activeVehicleId = config.vehicleId || 'pioneer';
 
-    function vehicleId() {
-      return config.vehicleId || 'pioneer';
-    }
+    const baseUrl = () => String(config.apiBaseUrl || '').replace(/\/$/, '');
+    const interval = () => {
+      const value = Number(config.pollingIntervalMs ?? 5000);
+      return Number.isFinite(value) && value >= 1000 ? value : 5000;
+    };
 
-    function topicFor(key) {
-      const prefix = (config.topicPrefix || 'mot').replace(/\/$/, '');
-      return `${prefix}/${vehicleId()}/${key}`;
-    }
-
-    function emitSnapshot(snapshot, callbacks) {
-      const values = snapshot?.values || snapshot?.telemetry || snapshot;
-      if (!values || typeof values !== 'object') return;
-
-      Object.entries(values).forEach(([key, value]) => {
-        callbacks.onMessage(topicFor(key), JSON.stringify(value));
-      });
-    }
-
-    async function loadSnapshot(callbacks) {
-      if (!config.apiBaseUrl) return;
-
-      const url =
-        `${config.apiBaseUrl.replace(/\/$/, '')}` +
-        `/api/vehicles/${encodeURIComponent(vehicleId())}/snapshot`;
-
-      const headers = { Accept: 'application/json' };
+    async function headers() {
+      const result = { Accept: 'application/json' };
       if (typeof config.getAccessToken === 'function') {
         const token = await config.getAccessToken();
-        if (token) headers.Authorization = `Bearer ${token}`;
+        if (token) result.Authorization = `Bearer ${token}`;
       }
-
-      const response = await fetch(url, { headers });
-      if (!response.ok) {
-        throw new Error(`Snapshot request failed: HTTP ${response.status}`);
-      }
-
-      emitSnapshot(await response.json(), callbacks);
+      return result;
     }
 
-    async function connectSocket(callbacks) {
-      if (!config.websocketUrl || stopped) {
-        callbacks.onConnection(
-          false,
-          'AWS Backend Provider ist noch nicht konfiguriert'
+    async function get(path) {
+      const response = await fetch(`${baseUrl()}${path}`, {
+        headers: await headers(),
+        cache: 'no-store'
+      });
+      if (!response.ok) throw new Error(`AWS API HTTP ${response.status}`);
+      return response.json();
+    }
+
+    function emit(snapshot, callbacks) {
+      const vehicleId = snapshot.vehicleId || activeVehicleId;
+      const prefix = String(config.topicPrefix || 'mot').replace(/\/$/, '');
+      Object.entries(snapshot.values || {}).forEach(([key, value]) => {
+        const payload = typeof value === 'string'
+          ? value
+          : JSON.stringify(value);
+        callbacks.onMessage(`${prefix}/${vehicleId}/${key}`, payload);
+      });
+      callbacks.onSnapshot?.(snapshot);
+    }
+
+    async function poll(callbacks) {
+      if (stopped) return;
+
+      const requestedVehicleId = activeVehicleId;
+
+      try {
+        const snapshot = await get(
+          `/api/vehicles/${encodeURIComponent(requestedVehicleId)}/snapshot`
         );
-        return;
+
+        if (stopped || requestedVehicleId !== activeVehicleId) return;
+
+        callbacks.onConnection(true, 'Verbunden mit AWS Vehicle API');
+        emit(snapshot, callbacks);
+      } catch (error) {
+        if (requestedVehicleId !== activeVehicleId) return;
+        callbacks.onConnection(false, error.message || 'AWS API Fehler');
+        callbacks.onError(error);
       }
-
-      let url = config.websocketUrl
-        .replace('{vehicleId}', encodeURIComponent(vehicleId()));
-
-      if (typeof config.getAccessToken === 'function') {
-        const token = await config.getAccessToken();
-        if (token && config.tokenQueryParameter) {
-          const separator = url.includes('?') ? '&' : '?';
-          url += `${separator}${encodeURIComponent(config.tokenQueryParameter)}` +
-            `=${encodeURIComponent(token)}`;
-        }
-      }
-
-      callbacks.onConnection(false, 'AWS Backend wird verbunden…');
-      socket = new WebSocket(url);
-
-      socket.addEventListener('open', async () => {
-        callbacks.onConnection(true, 'Verbunden mit AWS Backend');
-        try {
-          await loadSnapshot(callbacks);
-        } catch (error) {
-          callbacks.onError(error);
-        }
-      });
-
-      socket.addEventListener('message', event => {
-        try {
-          const message = JSON.parse(event.data);
-
-          // Preferred backend contract:
-          // { "topic": "mot/pioneer/system/...", "payload": ... }
-          if (message.topic) {
-            const payload = typeof message.payload === 'string'
-              ? message.payload
-              : JSON.stringify(message.payload);
-            callbacks.onMessage(message.topic, payload);
-            return;
-          }
-
-          // Snapshot/update contract:
-          // { "key": "system/last_seen_utc", "value": ... }
-          if (message.key) {
-            callbacks.onMessage(
-              topicFor(message.key),
-              JSON.stringify(message.value)
-            );
-          }
-        } catch (error) {
-          callbacks.onError(error);
-        }
-      });
-
-      socket.addEventListener('close', () => {
-        callbacks.onConnection(false, 'AWS Backend getrennt');
-        if (!stopped) {
-          reconnectTimer = window.setTimeout(
-            () => connectSocket(callbacks),
-            Number(config.reconnectPeriodMs ?? 5000)
-          );
-        }
-      });
-
-      socket.addEventListener('error', () => {
-        callbacks.onConnection(false, 'AWS Backend Fehler');
-      });
     }
 
     return {
       name: 'aws-backend',
 
-      start(callbacks) {
+      async start(callbacks) {
+        callbacksRef = callbacks;
         stopped = false;
-        console.info('MOT data provider: aws-backend');
-        connectSocket(callbacks).catch(callbacks.onError);
+
+        if (!baseUrl()) {
+          callbacks.onConnection(false, 'AWS API URL fehlt');
+          return;
+        }
+
+        try {
+          const result = await get('/api/vehicles');
+          const vehicles = Array.isArray(result)
+            ? result
+            : (result.vehicles || []);
+
+          const exists = vehicles.some(v => v.vehicleId === activeVehicleId);
+          if (!exists && vehicles.length) activeVehicleId = vehicles[0].vehicleId;
+
+          callbacks.onVehicles?.(vehicles);
+          await poll(callbacks);
+          timer = window.setInterval(() => poll(callbacks), interval());
+        } catch (error) {
+          callbacks.onConnection(false, error.message || 'AWS API Fehler');
+          callbacks.onError(error);
+        }
+      },
+
+      async selectVehicle(vehicleId) {
+        activeVehicleId = vehicleId;
+        if (callbacksRef) await poll(callbacksRef);
+      },
+
+      getSelectedVehicleId() {
+        return activeVehicleId;
       },
 
       stop() {
         stopped = true;
-        if (reconnectTimer) window.clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-        if (socket) socket.close();
-        socket = null;
+        callbacksRef = null;
+        if (timer) window.clearInterval(timer);
+        timer = null;
       },
 
       describe() {
         return {
           type: 'aws-backend',
-          apiBaseUrl: config.apiBaseUrl,
-          websocketUrl: config.websocketUrl,
-          vehicleId: vehicleId()
+          apiBaseUrl: baseUrl(),
+          vehicleId: activeVehicleId,
+          pollingIntervalMs: interval()
         };
       }
     };

@@ -31,3 +31,9 @@ firmware/esp32-wroom/.pio/
 # AWS IoT device credentials
 secrets/aws-iot/*
 !secrets/aws-iot/.gitkeep
+
+# Per-device AWS IoT credentials and temporary LittleFS staging
+/private/aws/**
+!/private/aws/.gitkeep
+/firmware/lilygo-t-a7670/data/aws/**
+!/firmware/lilygo-t-a7670/data/aws/.gitkeep

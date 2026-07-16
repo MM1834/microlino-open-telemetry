@@ -1,0 +1,13 @@
+Changed:
+- firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp
+- tools/bootstrap_aws_iot_thing.sh
+- tools/update_aws_iot_presence_policy.sh
+- README-AWS-2-2.md
+
+No changes:
+- LTE/TinyGSM transport
+- CAN
+- GPS
+- ABRP
+- WebUI
+- AWS credentials

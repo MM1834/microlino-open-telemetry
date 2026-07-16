@@ -93,3 +93,9 @@
     white-space:normal;
   }
 }
+
+
+.vehicle-selector-wrap{display:flex;flex-direction:column;gap:3px;min-width:160px}
+.vehicle-selector-label{color:var(--muted);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase}
+.vehicle-selector{min-height:34px;border:1px solid var(--line);border-radius:8px;padding:5px 9px;color:var(--text);background:var(--panel)}
+@media (max-width:900px){.vehicle-selector-wrap{flex:1 1 100%;min-width:0}}

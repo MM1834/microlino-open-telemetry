@@ -13,7 +13,9 @@
     networkMode: '--',
     deviceIp: '--',
     vehicleLastSeenMs: 0,
-    vehicleLastSeenSource: ''
+    vehicleLastSeenSource: '',
+    availableVehicles: [],
+    selectedVehicleId: mqttCfg.vehicleId || 'pioneer'
   };
 
   function configuredSeconds(value, fallback) {
@@ -37,9 +39,9 @@
     const suffix = n >= 0 ? positiveSuffix : negativeSuffix;
     return `${Math.abs(n).toFixed(5)}° ${suffix}`;
   }
-  function baseTopic() {
+  function baseTopic(vehicleId = state.selectedVehicleId) {
     const prefix = (mqttCfg.topicPrefix || 'mot').replace(/\/$/, '');
-    const vehicle = mqttCfg.vehicleId || 'pioneer';
+    const vehicle = vehicleId || mqttCfg.vehicleId || 'pioneer';
     return `${prefix}/${vehicle}`;
   }
   function isUsableIp(value) {
@@ -155,7 +157,7 @@
     }
 
     let detail = state.mqttDetail ||
-      (state.mqttConnected ? 'Verbunden mit MQTT' : 'MQTT getrennt');
+      (state.mqttConnected ? 'Verbunden' : 'MQTT getrennt');
 
     if (state.mqttConnected) {
       const parts = ['Verbunden mit MQTT'];
@@ -271,9 +273,9 @@
       case 'charging/power_signed': case 'charging/power_display': { const p=Number(val)/10; setText('power', `${fmtNum(p,1)} kW`); if(p < -0.1) setText('charging-card','Rekuperation'); break; }
       case 'bms/pack_voltage': setText('voltage', `${fmtNum(val,1)} V`); setText('charge-voltage', `${fmtNum(val,1)} V`); break;
       case 'bms/pack_current': setText('current', `${fmtNum(val,1)} A`); setText('charge-current', `${fmtNum(val,1)} A`); break;
-      case 'system/firmware': case 'system/version': setText('fw-version', val); break;
+      case 'system/firmware': case 'system/version': case 'system/firmware_version': setText('fw-version', val); break;
       case 'system/device_id': setText('device-id', val); break;
-      case 'system/rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
+      case 'system/rssi': case 'system/wifi_rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
       case 'system/ip_address':
         state.deviceIp = String(val || '--');
         updateDeviceInfo();
@@ -292,7 +294,7 @@
     }
 
     window.MOTHistoryRecorder?.update(state.values, {
-      vehicleId: mqttCfg.vehicleId || 'pioneer'
+      vehicleId: state.selectedVehicleId || mqttCfg.vehicleId || 'pioneer'
     });
   }
 
@@ -354,6 +356,95 @@
     initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
   }
 
+
+
+function resetDashboardForVehicle(vehicleId) {
+  state.values = {};
+  state.lastMessage = 0;
+  state.networkMode = '--';
+  state.deviceIp = '--';
+  state.vehicleLastSeenMs = 0;
+  state.vehicleLastSeenSource = '';
+
+  setText('side-vehicle', vehicleId || '--');
+  setText('side-topic', vehicleId ? `${baseTopic(vehicleId)}/#` : '--');
+
+  setText('soc-main', '--');
+  setText('soc-battery', '--');
+  $('soc-ring')?.style.setProperty('--p', 0);
+  $('soc-ring-2')?.style.setProperty('--p', 0);
+  setText('speed-main', '--');
+  setText('speed-card', '--');
+  setText('odo-main', '-- km');
+  setText('range-main', '-- km');
+
+  setText('charging-main', 'Keine Daten');
+  setText('charging-card', 'Keine Daten');
+  setText('power', '-- kW');
+  setText('voltage', '-- V');
+  setText('charge-voltage', '-- V');
+  setText('current', '-- A');
+  setText('charge-current', '-- A');
+
+  setText('fw-version', '--');
+  setText('device-id', '--');
+  setText('rssi', '-- dBm');
+  setText('uptime', '--');
+
+  setText('location-title', 'Kein Standort');
+  setText('location-coords', '--');
+  setText('location-updated', 'Noch keine Standortdaten');
+
+  const mapFrame = $('location-map-frame');
+  if (mapFrame) mapFrame.removeAttribute('src');
+  const mapLink = $('location-map-link');
+  if (mapLink) mapLink.removeAttribute('href');
+
+  updateDeviceInfo();
+  updateVehicleStatus();
+}
+
+
+function updateVehicleSelector(vehicles) {
+  state.availableVehicles = Array.isArray(vehicles) ? vehicles : [];
+  const wrap = $('vehicle-selector-wrap');
+  const select = $('vehicle-selector');
+  if (!wrap || !select) return;
+
+  select.innerHTML = '';
+  state.availableVehicles.forEach(vehicle => {
+    const option = document.createElement('option');
+    option.value = vehicle.vehicleId;
+    const status = vehicle.online === true
+      ? 'online'
+      : (vehicle.online === false ? 'offline' : '');
+    option.textContent = status
+      ? `${vehicle.vehicleId} · ${status}`
+      : vehicle.vehicleId;
+    select.appendChild(option);
+  });
+
+  if (!state.availableVehicles.some(v => v.vehicleId === state.selectedVehicleId)
+      && state.availableVehicles.length) {
+    state.selectedVehicleId = state.availableVehicles[0].vehicleId;
+  }
+
+  select.value = state.selectedVehicleId;
+  wrap.hidden = state.availableVehicles.length <= 1;
+}
+
+async function selectVehicle(vehicleId) {
+  if (!vehicleId || vehicleId === state.selectedVehicleId) return;
+
+  state.selectedVehicleId = vehicleId;
+  resetDashboardForVehicle(vehicleId);
+  updateVehicleSelector(state.availableVehicles);
+
+  if (state.dataProvider?.selectVehicle) {
+    await state.dataProvider.selectVehicle(vehicleId);
+  }
+}
+
 function startDataProvider() {
   const registry = window.MOTDataProviders;
   if (!registry) {
@@ -384,6 +475,23 @@ function startDataProvider() {
     provider.start({
       onConnection: (ok, detail) => setOnline(ok, detail),
       onMessage: (topic, payload) => applyTopic(topic, payload),
+      onVehicles: vehicles => {
+        const previous = state.selectedVehicleId;
+        updateVehicleSelector(vehicles);
+        const selected = provider.getSelectedVehicleId?.();
+
+        if (selected) {
+          state.selectedVehicleId = selected;
+          updateVehicleSelector(vehicles);
+
+          if (selected !== previous) {
+            resetDashboardForVehicle(selected);
+          }
+        }
+      },
+      onSnapshot: snapshot => {
+        if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
+      },
       onError: error => console.error('MOT data provider error:', error)
     });
 
@@ -394,7 +502,13 @@ function startDataProvider() {
   }
 }
 
-  initStatic(); startDataProvider();
+  $('vehicle-selector')?.addEventListener('change', event => {
+    selectVehicle(event.target.value);
+  });
+  initStatic();
+  resetDashboardForVehicle(state.selectedVehicleId);
+  updateVehicleSelector([]);
+  startDataProvider();
 })();
 
 
