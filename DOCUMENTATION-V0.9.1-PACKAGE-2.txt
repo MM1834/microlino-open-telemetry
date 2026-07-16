@@ -1,0 +1,16 @@
+MOT Documentation Sprint v0.9.1 — Package 2
+
+Added:
+- ADR-001 AWS IoT Core
+- ADR-002 shared MotAwsIot library
+- ADR-003 Dashboard REST API
+- system overview Draw.io + SVG
+- firmware architecture Draw.io + SVG
+- AWS cloud architecture Draw.io + SVG
+- Dashboard data flow Draw.io + SVG
+
+Updated:
+- docs/README.md
+- docs/architecture/README.md
+
+This package assumes package 1 is already present.

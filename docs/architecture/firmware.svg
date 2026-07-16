@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1460" height="430" viewBox="0 0 1460 430" role="img" aria-labelledby="title desc">
+<title id="title">Firmware architecture</title>
+<desc id="desc">Firmware architecture for Microlino Open Telemetry</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+<style><![CDATA[
+.box{fill:#ffffff;stroke:#334155;stroke-width:2;rx:12;ry:12}
+.group{fill:#f8fafc;stroke:#94a3b8;stroke-width:2;stroke-dasharray:7 5;rx:16;ry:16}
+.title{font:700 24px Arial,sans-serif;fill:#0f172a}
+.label{font:700 16px Arial,sans-serif;fill:#0f172a}
+.small{font:14px Arial,sans-serif;fill:#334155}
+.tiny{font:12px Arial,sans-serif;fill:#475569}
+.arrow{stroke:#475569;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+.subarrow{stroke:#64748b;stroke-width:2;fill:none;marker-end:url(#arrow)}
+]]></style>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text class="title" x="30" y="38">Firmware architecture</text>
+<rect class="group" x="40" y="80" width="420" height="300"/><text class="label" x="56" y="108">ESP32-WROOM firmware</text>
+<rect class="box" x="70" y="130" width="160" height="75"/>
+<text class="label" x="150.0" y="160" text-anchor="middle">CAN</text>
+<text class="small" x="150.0" y="182" text-anchor="middle">GPIO26 RX</text>
+<text class="small" x="150.0" y="200" text-anchor="middle">GPIO27 TX</text>
+<rect class="box" x="260" y="130" width="160" height="75"/>
+<text class="label" x="340.0" y="160" text-anchor="middle">Wi-Fi</text>
+<text class="small" x="340.0" y="182" text-anchor="middle">network manager</text>
+<rect class="box" x="70" y="235" width="160" height="75"/>
+<text class="label" x="150.0" y="265" text-anchor="middle">GPS</text>
+<text class="small" x="150.0" y="287" text-anchor="middle">planned/optional</text>
+<rect class="box" x="260" y="235" width="160" height="75"/>
+<text class="label" x="340.0" y="265" text-anchor="middle">Web / OTA</text>
+<text class="small" x="340.0" y="287" text-anchor="middle">local services</text>
+<rect class="group" x="520" y="80" width="420" height="300"/><text class="label" x="536" y="108">LilyGO T-A7670X firmware</text>
+<rect class="box" x="550" y="130" width="160" height="75"/>
+<text class="label" x="630.0" y="160" text-anchor="middle">CAN</text>
+<text class="small" x="630.0" y="182" text-anchor="middle">vehicle telemetry</text>
+<rect class="box" x="740" y="130" width="160" height="75"/>
+<text class="label" x="820.0" y="160" text-anchor="middle">Wi-Fi</text>
+<text class="small" x="820.0" y="182" text-anchor="middle">AWS production path</text>
+<rect class="box" x="550" y="235" width="160" height="75"/>
+<text class="label" x="630.0" y="265" text-anchor="middle">GPS</text>
+<text class="small" x="630.0" y="287" text-anchor="middle">L76K support</text>
+<rect class="box" x="740" y="235" width="160" height="75"/>
+<text class="label" x="820.0" y="265" text-anchor="middle">LTE / ABRP</text>
+<text class="small" x="820.0" y="287" text-anchor="middle">separate paths</text>
+<rect class="group" x="1000" y="80" width="420" height="300"/><text class="label" x="1016" y="108">Shared libraries</text>
+<rect class="box" x="1040" y="130" width="340" height="100"/>
+<text class="label" x="1210.0" y="160" text-anchor="middle">MotAwsIot</text>
+<text class="small" x="1210.0" y="182" text-anchor="middle">LittleFS credentials · TLS/X.509</text>
+<text class="small" x="1210.0" y="200" text-anchor="middle">MQTT · Last Will · Birth · Heartbeat</text>
+<rect class="box" x="1040" y="265" width="340" height="75"/>
+<text class="label" x="1210.0" y="295" text-anchor="middle">Shared contracts</text>
+<text class="small" x="1210.0" y="317" text-anchor="middle">topic hierarchy · runtime metadata</text>
+<path class="arrow" d="M460,230 L1000,180"/>
+<text class="tiny" x="730.0" y="197.0" text-anchor="middle">shared AWS transport</text>
+<path class="arrow" d="M940,230 L1000,180"/>
+<text class="tiny" x="970.0" y="197.0" text-anchor="middle">shared AWS transport</text>
+</svg>

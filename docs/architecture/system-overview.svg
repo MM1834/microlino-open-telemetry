@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="430" viewBox="0 0 1480 430" role="img" aria-labelledby="title desc">
+<title id="title">MOT system overview</title>
+<desc id="desc">MOT system overview for Microlino Open Telemetry</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+<style><![CDATA[
+.box{fill:#ffffff;stroke:#334155;stroke-width:2;rx:12;ry:12}
+.group{fill:#f8fafc;stroke:#94a3b8;stroke-width:2;stroke-dasharray:7 5;rx:16;ry:16}
+.title{font:700 24px Arial,sans-serif;fill:#0f172a}
+.label{font:700 16px Arial,sans-serif;fill:#0f172a}
+.small{font:14px Arial,sans-serif;fill:#334155}
+.tiny{font:12px Arial,sans-serif;fill:#475569}
+.arrow{stroke:#475569;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+.subarrow{stroke:#64748b;stroke-width:2;fill:none;marker-end:url(#arrow)}
+]]></style>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text class="title" x="30" y="38">MOT system overview</text>
+<rect class="box" x="40" y="95" width="170" height="90"/>
+<text class="label" x="125.0" y="125" text-anchor="middle">Microlino</text>
+<text class="small" x="125.0" y="147" text-anchor="middle">CAN / OBD-II</text>
+<rect class="box" x="270" y="80" width="220" height="120"/>
+<text class="label" x="380.0" y="110" text-anchor="middle">Telemetry device</text>
+<text class="small" x="380.0" y="132" text-anchor="middle">ESP32-WROOM or LilyGO</text>
+<text class="small" x="380.0" y="150" text-anchor="middle">CAN · GPS · Network</text>
+<rect class="box" x="550" y="95" width="190" height="90"/>
+<text class="label" x="645.0" y="125" text-anchor="middle">MotAwsIot</text>
+<text class="small" x="645.0" y="147" text-anchor="middle">TLS · MQTT · Presence</text>
+<rect class="box" x="800" y="95" width="180" height="90"/>
+<text class="label" x="890.0" y="125" text-anchor="middle">AWS IoT Core</text>
+<text class="small" x="890.0" y="147" text-anchor="middle">X.509 device identity</text>
+<rect class="box" x="1040" y="95" width="170" height="90"/>
+<text class="label" x="1125.0" y="125" text-anchor="middle">IoT Rule</text>
+<text class="small" x="1125.0" y="147" text-anchor="middle">mot/#</text>
+<rect class="box" x="1270" y="95" width="170" height="90"/>
+<text class="label" x="1355.0" y="125" text-anchor="middle">State Lambda</text>
+<text class="small" x="1355.0" y="147" text-anchor="middle">decode and validate</text>
+<rect class="box" x="500" y="285" width="220" height="90"/>
+<text class="label" x="610.0" y="315" text-anchor="middle">DynamoDB</text>
+<text class="small" x="610.0" y="337" text-anchor="middle">current state per vehicle</text>
+<rect class="box" x="790" y="285" width="220" height="90"/>
+<text class="label" x="900.0" y="315" text-anchor="middle">Vehicle API</text>
+<text class="small" x="900.0" y="337" text-anchor="middle">HTTPS snapshots</text>
+<rect class="box" x="1080" y="285" width="220" height="90"/>
+<text class="label" x="1190.0" y="315" text-anchor="middle">Dashboard</text>
+<text class="small" x="1190.0" y="337" text-anchor="middle">multi-vehicle UI</text>
+<path class="arrow" d="M210,140 L270,140"/>
+<text class="tiny" x="240.0" y="132.0" text-anchor="middle">CAN</text>
+<path class="arrow" d="M490,140 L550,140"/>
+<path class="arrow" d="M740,140 L800,140"/>
+<text class="tiny" x="770.0" y="132.0" text-anchor="middle">MQTT/TLS</text>
+<path class="arrow" d="M980,140 L1040,140"/>
+<path class="arrow" d="M1210,140 L1270,140"/>
+<path class="arrow" d="M1355,185 L610,285"/>
+<text class="tiny" x="982.5" y="227.0" text-anchor="middle">latest value</text>
+<path class="arrow" d="M720,330 L790,330"/>
+<path class="arrow" d="M1010,330 L1080,330"/>
+<text class="tiny" x="1045.0" y="322.0" text-anchor="middle">HTTPS</text>
+</svg>

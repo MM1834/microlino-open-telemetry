@@ -1,0 +1,15 @@
+MOT Documentation Sprint v0.9.1 — Package 1
+
+Added:
+- README.md
+- docs/README.md
+- docs/adr/ADR-000-documentation-principles.md
+- docs/reference/01-introduction.md
+- docs/reference/02-design-principles.md
+- docs/reference/03-terminology.md
+- docs/architecture/README.md
+- normalized Dashboard and AWS screenshots under docs/images/
+
+This package intentionally does not remove existing documentation.
+Review and migration of historical documents is deferred to the final cleanup
+package.
