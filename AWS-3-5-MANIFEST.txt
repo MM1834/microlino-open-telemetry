@@ -1,0 +1,18 @@
+Added:
+- firmware/shared-libs/MotAwsIot/
+- firmware/esp32-wroom env esp32dev-aws
+- generic credential copy/upload tools
+- AWS-3.5 documentation
+
+Changed:
+- firmware/esp32-wroom/src/mqtt/mqtt_client.cpp
+- firmware/esp32-wroom/platformio.ini
+- .gitignore
+
+Not changed:
+- running LilyGO AWS firmware
+- LTE/TinyGSM
+- CAN
+- ABRP
+- Dashboard
+- AWS backend

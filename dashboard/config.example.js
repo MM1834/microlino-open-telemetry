@@ -1,15 +1,22 @@
+// Copy this file from config.example.js and adjust it for your installation.
 window.MOT_CONFIG = {
-  mqtt: {
-    host: "mqtt.example.com",
-    port: 443,
-    useTls: true,
-    path: "/",
-    username: "",
-    password: "",
-    topicPrefix: "mot",
-    vehicleId: "pioneer",
-    clientIdPrefix: "mot-dashboard"
+  // Production Dashboard uses the AWS Vehicle REST API.
+  dataSource: {
+    type: "aws-backend"
   },
+  mqtt: {
+    // Compatibility values used only to derive the MOT topic namespace.
+    topicPrefix: "mot",
+    vehicleId: "your-default-vehicle"
+  },
+  // Target provider for the production WebApp.
+  // The browser talks to an authenticated application backend, not directly
+  // to AWS IoT Core with device credentials.
+  awsBackend: {
+    apiBaseUrl: "https://YOUR_API_ID.execute-api.eu-north-1.amazonaws.com",
+    pollingIntervalMs: 5000
+  },
+
   vehicle: {
     name: "Microlino Pioneer",
     image: "img/microlino.jpeg",

@@ -1,0 +1,11 @@
+MOT Documentation v0.9.1 – Package 3
+
+Purpose:
+- Consolidate documentation structure.
+- Introduce documentation index.
+- Separate current reference, ADRs, historical notes and legacy entry points.
+- Preserve project history without deleting files.
+
+Recommended next step:
+Review existing top-level documents and gradually replace their content with
+references into docs/reference/.

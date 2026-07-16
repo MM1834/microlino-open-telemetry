@@ -31,7 +31,7 @@
       </nav>
       <div class="side-status card compact">
         <div class="status-line"><span id="side-dot" class="dot"></span><strong id="side-online">Offline</strong></div>
-        <span class="muted">MQTT</span>
+        <span class="muted">Cloud/API</span>
         <div class="device-network">
           <strong id="device-network-mode">--</strong>
           <a id="device-ip" href="#" target="_blank" rel="noopener" aria-disabled="true">--</a>
@@ -50,9 +50,9 @@
           <div class="connection-item">
             <span id="mqtt-dot" class="dot"></span>
             <div class="connection-copy">
-              <span class="connection-label">MQTT</span>
-              <strong id="mqtt-status">Connecting…</strong>
-              <span id="mqtt-detail" class="connection-detail">MQTT wird verbunden</span>
+              <span class="connection-label">Cloud</span>
+              <strong id="mqtt-status">Verbinden…</strong>
+              <span id="mqtt-detail" class="connection-detail">AWS Vehicle API wird verbunden</span>
             </div>
           </div>
 
@@ -70,6 +70,10 @@
           Netzwerk: -- · WebUI: --
         </div>
 
+        <label id="vehicle-selector-wrap" class="vehicle-selector-wrap" hidden>
+          <span class="vehicle-selector-label">Fahrzeug</span>
+          <select id="vehicle-selector" class="vehicle-selector"></select>
+        </label>
         <div class="top-spacer"></div>
         <span id="date-now" class="muted">--</span>
         <span id="time-now">--</span>
@@ -170,7 +174,8 @@
 </main>
   </div>
   <script src="config.js"></script>
-  <script src="libs/mqtt.min.js"></script>
+  <script src="js/providers/provider-registry.js"></script>
+  <script src="js/providers/aws-backend-provider.js"></script>
   <script src="js/app.js"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>

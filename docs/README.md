@@ -1,79 +1,43 @@
-# Documentation contributor guide
+# MOT documentation
 
-The public documentation entry point is [`index.md`](index.md). This file explains how documentation is organized and maintained.
+## Start here
 
-## Canonical structure
+1. [Introduction](reference/01-introduction.md)
+2. [Design principles](reference/02-design-principles.md)
+3. [Terminology](reference/03-terminology.md)
 
-```text
-docs/
-├── index.md
-├── getting-started/
-├── hardware/
-├── webui/
-├── dashboard/
-├── firmware/
-├── api/
-├── architecture/
-├── troubleshooting/
-├── developer/
-├── roadmap/
-├── releases/
-└── assets/images/
-```
+## Architecture decisions
 
-## Audience separation
+- [ADR-000 — Documentation principles](adr/ADR-000-documentation-principles.md)
+- [ADR-001 — AWS IoT Core as the standard telemetry platform](adr/ADR-001-aws-iot-core.md)
+- [ADR-002 — Shared `MotAwsIot` firmware library](adr/ADR-002-shared-mot-aws-iot-library.md)
+- [ADR-003 — Dashboard uses REST instead of browser MQTT](adr/ADR-003-dashboard-rest-api.md)
 
-- `getting-started`, `hardware`, `webui`, `dashboard` and `firmware` contain current user/integrator documentation.
-- `developer` preserves implementation history and experimental details.
-- `releases` contains version-specific release notes.
-- Do not add sprint/debug notes back into `docs/firmware/`; place them under the appropriate `docs/developer/` section.
+## Architecture
 
-## Images
+- [Architecture diagrams](architecture/README.md)
+- [System overview](architecture/system-overview.svg)
+- [Firmware architecture](architecture/firmware.svg)
+- [AWS cloud architecture](architecture/aws-cloud.svg)
+- [Dashboard data flow](architecture/dashboard.svg)
 
-Store images under:
+## Documentation status
 
-```text
-docs/assets/images/branding/
-docs/assets/images/diagrams/
-docs/assets/images/dashboard/
-docs/assets/images/hardware/
-docs/assets/images/webui/
-```
+This is package 2 of the `v0.9.1` documentation sprint.
 
-Use lowercase filenames with hyphens.
+Completed:
 
-Preferred formats:
+- documentation principles
+- introduction
+- design principles
+- terminology
+- first three platform ADRs
+- current system, firmware, AWS and Dashboard diagrams
 
-- technical screenshots: PNG,
-- hardware photos: PNG or JPG,
-- diagrams and logos: SVG.
+Next packages add:
 
-Do not commit macOS metadata files such as `.DS_Store`, `._*` or `.-*`.
-
-## Links
-
-Use relative links. From a document one directory below `docs/`, image links normally look like:
-
-```markdown
-![ESP32-WROOM](assets/images/hardware/esp32-wroom.png)
-```
-
-## Writing style
-
-- Start with the user goal.
-- Mark experimental behavior explicitly.
-- Avoid presenting historical implementation notes as current behavior.
-- Never include real passwords, tokens, IMEIs or private backup JSON.
-- Add cross-links to related guides instead of duplicating long explanations.
-
-## Review checklist
-
-Before committing:
-
-```bash
-git status
-grep -R "docs/images\|../images/" docs --include="*.md"
-find docs -name ".DS_Store" -o -name "._*" -o -name ".-*"
-```
-
-Review rendered Markdown and verify that referenced images exist.
+- credential, current-state, topic and hardware-abstraction ADRs
+- hardware and firmware reference
+- cloud and API reference
+- security and development guides
+- roadmap and historical-document cleanup

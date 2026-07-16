@@ -3,6 +3,7 @@
   const mqttCfg = cfg.mqtt || {};
   const vehicleCfg = cfg.vehicle || {};
   const dashboardCfg = cfg.dashboard || {};
+  const dataSourceCfg = cfg.dataSource || { type: 'legacy-mqtt' };
   const $ = (id) => document.getElementById(id);
   const state = {
     lastMessage: 0,
@@ -12,7 +13,9 @@
     networkMode: '--',
     deviceIp: '--',
     vehicleLastSeenMs: 0,
-    vehicleLastSeenSource: ''
+    vehicleLastSeenSource: '',
+    availableVehicles: [],
+    selectedVehicleId: mqttCfg.vehicleId || 'pioneer'
   };
 
   function configuredSeconds(value, fallback) {
@@ -36,9 +39,9 @@
     const suffix = n >= 0 ? positiveSuffix : negativeSuffix;
     return `${Math.abs(n).toFixed(5)}° ${suffix}`;
   }
-  function baseTopic() {
+  function baseTopic(vehicleId = state.selectedVehicleId) {
     const prefix = (mqttCfg.topicPrefix || 'mot').replace(/\/$/, '');
-    const vehicle = mqttCfg.vehicleId || 'pioneer';
+    const vehicle = vehicleId || mqttCfg.vehicleId || 'pioneer';
     return `${prefix}/${vehicle}`;
   }
   function isUsableIp(value) {
@@ -154,7 +157,7 @@
     }
 
     let detail = state.mqttDetail ||
-      (state.mqttConnected ? 'Verbunden mit MQTT' : 'MQTT getrennt');
+      (state.mqttConnected ? 'Verbunden' : 'MQTT getrennt');
 
     if (state.mqttConnected) {
       const parts = ['Verbunden mit MQTT'];
@@ -270,9 +273,9 @@
       case 'charging/power_signed': case 'charging/power_display': { const p=Number(val)/10; setText('power', `${fmtNum(p,1)} kW`); if(p < -0.1) setText('charging-card','Rekuperation'); break; }
       case 'bms/pack_voltage': setText('voltage', `${fmtNum(val,1)} V`); setText('charge-voltage', `${fmtNum(val,1)} V`); break;
       case 'bms/pack_current': setText('current', `${fmtNum(val,1)} A`); setText('charge-current', `${fmtNum(val,1)} A`); break;
-      case 'system/firmware': case 'system/version': setText('fw-version', val); break;
+      case 'system/firmware': case 'system/version': case 'system/firmware_version': setText('fw-version', val); break;
       case 'system/device_id': setText('device-id', val); break;
-      case 'system/rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
+      case 'system/rssi': case 'system/wifi_rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
       case 'system/ip_address':
         state.deviceIp = String(val || '--');
         updateDeviceInfo();
@@ -291,7 +294,7 @@
     }
 
     window.MOTHistoryRecorder?.update(state.values, {
-      vehicleId: mqttCfg.vehicleId || 'pioneer'
+      vehicleId: state.selectedVehicleId || mqttCfg.vehicleId || 'pioneer'
     });
   }
 
@@ -352,88 +355,160 @@
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
     initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
   }
-  function sanitizeClientIdPart(value) {
-    return String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 32);
+
+
+
+function resetDashboardForVehicle(vehicleId) {
+  state.values = {};
+  state.lastMessage = 0;
+  state.networkMode = '--';
+  state.deviceIp = '--';
+  state.vehicleLastSeenMs = 0;
+  state.vehicleLastSeenSource = '';
+
+  setText('side-vehicle', vehicleId || '--');
+  setText('side-topic', vehicleId ? `${baseTopic(vehicleId)}/#` : '--');
+
+  setText('soc-main', '--');
+  setText('soc-battery', '--');
+  $('soc-ring')?.style.setProperty('--p', 0);
+  $('soc-ring-2')?.style.setProperty('--p', 0);
+  setText('speed-main', '--');
+  setText('speed-card', '--');
+  setText('odo-main', '-- km');
+  setText('range-main', '-- km');
+
+  setText('charging-main', 'Keine Daten');
+  setText('charging-card', 'Keine Daten');
+  setText('power', '-- kW');
+  setText('voltage', '-- V');
+  setText('charge-voltage', '-- V');
+  setText('current', '-- A');
+  setText('charge-current', '-- A');
+
+  setText('fw-version', '--');
+  setText('device-id', '--');
+  setText('rssi', '-- dBm');
+  setText('uptime', '--');
+
+  setText('location-title', 'Kein Standort');
+  setText('location-coords', '--');
+  setText('location-updated', 'Noch keine Standortdaten');
+
+  const mapFrame = $('location-map-frame');
+  if (mapFrame) mapFrame.removeAttribute('src');
+  const mapLink = $('location-map-link');
+  if (mapLink) mapLink.removeAttribute('href');
+
+  updateDeviceInfo();
+  updateVehicleStatus();
+}
+
+
+function updateVehicleSelector(vehicles) {
+  state.availableVehicles = Array.isArray(vehicles) ? vehicles : [];
+  const wrap = $('vehicle-selector-wrap');
+  const select = $('vehicle-selector');
+  if (!wrap || !select) return;
+
+  select.innerHTML = '';
+  state.availableVehicles.forEach(vehicle => {
+    const option = document.createElement('option');
+    option.value = vehicle.vehicleId;
+    const status = vehicle.online === true
+      ? 'online'
+      : (vehicle.online === false ? 'offline' : '');
+    option.textContent = status
+      ? `${vehicle.vehicleId} · ${status}`
+      : vehicle.vehicleId;
+    select.appendChild(option);
+  });
+
+  if (!state.availableVehicles.some(v => v.vehicleId === state.selectedVehicleId)
+      && state.availableVehicles.length) {
+    state.selectedVehicleId = state.availableVehicles[0].vehicleId;
   }
 
-  function createClientIdSuffix() {
-    try {
-      if (window.crypto?.randomUUID) {
-        return window.crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-      }
+  select.value = state.selectedVehicleId;
+  wrap.hidden = state.availableVehicles.length <= 1;
+}
 
-      if (window.crypto?.getRandomValues) {
-        const bytes = new Uint8Array(6);
-        window.crypto.getRandomValues(bytes);
-        return Array.from(bytes, byte =>
-          byte.toString(16).padStart(2, '0')
-        ).join('');
-      }
-    } catch (error) {
-      console.warn('Could not use crypto for MQTT client ID:', error);
-    }
+async function selectVehicle(vehicleId) {
+  if (!vehicleId || vehicleId === state.selectedVehicleId) return;
 
-    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-      .slice(0, 12);
+  state.selectedVehicleId = vehicleId;
+  resetDashboardForVehicle(vehicleId);
+  updateVehicleSelector(state.availableVehicles);
+
+  if (state.dataProvider?.selectVehicle) {
+    await state.dataProvider.selectVehicle(vehicleId);
+  }
+}
+
+function startDataProvider() {
+  const registry = window.MOTDataProviders;
+  if (!registry) {
+    setOnline(false, 'Data Provider Registry fehlt');
+    return;
   }
 
-  function getPersistentMqttClientId() {
-    const configuredId = sanitizeClientIdPart(mqttCfg.clientId);
-    if (configuredId) return configuredId;
+  const type = dataSourceCfg.type || 'legacy-mqtt';
+  let providerConfig;
 
-    const prefix =
-      sanitizeClientIdPart(mqttCfg.clientIdPrefix) || 'mot-dashboard';
-    const vehicle =
-      sanitizeClientIdPart(mqttCfg.vehicleId || vehicleCfg.id || 'vehicle');
-    const broker =
-      sanitizeClientIdPart(mqttCfg.host || 'broker');
-
-    // Each browser profile keeps one stable ID for this broker/vehicle.
-    const storageKey =
-      mqttCfg.clientIdStorageKey ||
-      `mot.mqttClientId.${broker}.${vehicle}`;
-
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) return stored;
-
-      const generated = `${prefix}-${createClientIdSuffix()}`;
-      window.localStorage.setItem(storageKey, generated);
-      return generated;
-    } catch (error) {
-      // Private browsing or restricted storage: stable during this page session.
-      console.warn('localStorage unavailable for MQTT client ID:', error);
-
-      if (!state.sessionMqttClientId) {
-        state.sessionMqttClientId = `${prefix}-${createClientIdSuffix()}`;
-      }
-      return state.sessionMqttClientId;
-    }
+  if (type === 'legacy-mqtt') {
+    providerConfig = mqttCfg;
+  } else if (type === 'aws-backend') {
+    providerConfig = {
+      ...(cfg.awsBackend || {}),
+      vehicleId: mqttCfg.vehicleId || 'pioneer',
+      topicPrefix: mqttCfg.topicPrefix || 'mot'
+    };
+  } else {
+    setOnline(false, `Unbekannte Datenquelle: ${type}`);
+    return;
   }
 
-  function connect() {
-    const mqttLib = window.mqtt || window.MQTT || window.Mqtt;
-    if (!mqttLib || typeof mqttLib.connect !== 'function') { setOnline(false, 'mqtt.min.js fehlt oder ist ungültig'); return; }
-    const protocol = mqttCfg.useTls ? 'wss' : 'ws';
-    const path = mqttCfg.path || '/';
-    const url = `${protocol}://${mqttCfg.host}:${mqttCfg.port}${path}`;
-    setOnline(false, 'Connecting…');
-    const mqttClientId = getPersistentMqttClientId();
-    console.info('MQTT client ID:', mqttClientId);
-    const client = mqttLib.connect(url, { username: mqttCfg.username || undefined, password: mqttCfg.password || undefined, clientId: mqttClientId, reconnectPeriod: 2500, connectTimeout: 15000 });
-    client.on('connect', () => { setOnline(true, 'Verbunden mit MQTT'); client.subscribe(`${baseTopic()}/#`); });
-    client.on('reconnect', () => setOnline(false, 'Reconnect…'));
-    client.on('offline', () => setOnline(false, 'Offline'));
-    client.on('close', () => setOnline(false, 'Verbindung geschlossen'));
-    client.on('error', (err) => setOnline(false, err?.message || 'MQTT Fehler'));
-    client.on('message', applyTopic);
+  try {
+    const provider = registry.create(type, { config: providerConfig });
+    state.dataProvider = provider;
+
+    provider.start({
+      onConnection: (ok, detail) => setOnline(ok, detail),
+      onMessage: (topic, payload) => applyTopic(topic, payload),
+      onVehicles: vehicles => {
+        const previous = state.selectedVehicleId;
+        updateVehicleSelector(vehicles);
+        const selected = provider.getSelectedVehicleId?.();
+
+        if (selected) {
+          state.selectedVehicleId = selected;
+          updateVehicleSelector(vehicles);
+
+          if (selected !== previous) {
+            resetDashboardForVehicle(selected);
+          }
+        }
+      },
+      onSnapshot: snapshot => {
+        if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
+      },
+      onError: error => console.error('MOT data provider error:', error)
+    });
+
+    console.info('MOT provider details:', provider.describe?.());
+  } catch (error) {
+    console.error(error);
+    setOnline(false, error?.message || 'Datenquelle konnte nicht gestartet werden');
   }
-  initStatic(); connect();
+}
+
+  $('vehicle-selector')?.addEventListener('change', event => {
+    selectVehicle(event.target.value);
+  });
+  initStatic();
+  resetDashboardForVehicle(state.selectedVehicleId);
+  updateVehicleSelector([]);
+  startDataProvider();
 })();
 
 
