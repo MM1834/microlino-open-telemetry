@@ -12,7 +12,7 @@ This is intentional for EV use in underground garages and covered charging locat
 
 The REST snapshot already exposes a `receivedAt` timestamp for every topic in `metadata`. The dashboard uses the older of latitude and longitude timestamps for the coordinate pair:
 
-- within `dashboard.locationCurrentSeconds`: **Aktueller Standort**
+- within `dashboard.locationFreshnessMs`: **Aktueller Standort**
 - afterward: **Letzter Standort**
 
 The global snapshot `updatedAt` is not used for this decision because unrelated telemetry may continue to update.

@@ -41,6 +41,7 @@ window.MOT_CONFIG = {
     // More than 600 seconds: Offline
     vehicleOnlineSeconds: 120,
     vehicleStaleSeconds: 600,
-    locationCurrentSeconds: 60
+    locationFreshnessMs: 60000
+
   }
 };

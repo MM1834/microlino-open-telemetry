@@ -42,8 +42,9 @@ window.MOT_CONFIG = {
     vehicleOnlineSeconds: 120,
     vehicleStaleSeconds: 600,
 
+
     // A newer coordinate pair is shown as "Aktueller Standort".
     // Older retained coordinates remain visible as "Letzter Standort".
-    locationCurrentSeconds: 60
+    locationFreshnessMs: 60000
   }
 };

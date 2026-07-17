@@ -33,7 +33,7 @@ Use the shared `MotGps` library in both production firmware families and expose 
 - Verify no location publish before first fix.
 - Verify retained coordinates remain after fix loss.
 - Verify ABRP payload omits `lat` and `lon` without a valid fix.
-- Verify dashboard changes from current to last-known after `locationCurrentSeconds`.
+- Verify dashboard changes from current to last-known after `locationFreshnessMs`.
 
 ## ADR
 

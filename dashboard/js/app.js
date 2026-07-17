@@ -26,8 +26,12 @@
 
   const VEHICLE_ONLINE_MS =
     configuredSeconds(dashboardCfg.vehicleOnlineSeconds, 120) * 1000;
-  const LOCATION_CURRENT_MS =
-    configuredSeconds(dashboardCfg.locationCurrentSeconds, 60) * 1000;
+  const LOCATION_CURRENT_MS = (() => {
+    const milliseconds = Number(dashboardCfg.locationFreshnessMs ?? 60000);
+    return Number.isFinite(milliseconds) && milliseconds >= 0
+      ? milliseconds
+      : 60000;
+  })();
   const VEHICLE_STALE_MS =
     Math.max(
       configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
@@ -250,32 +254,68 @@
     }
   }
   function locationReceivedAtMs() {
-    const latMeta = state.metadata['location/latitude'] || state.metadata['location/lat'];
-    const lonMeta = state.metadata['location/longitude'] || state.metadata['location/lon'];
+    const latMeta =
+      state.metadata['location/latitude'] ||
+      state.metadata['location/lat'] ||
+      state.metadata['gps/latitude'] ||
+      state.metadata['gps/lat'];
+    const lonMeta =
+      state.metadata['location/longitude'] ||
+      state.metadata['location/lon'] ||
+      state.metadata['gps/longitude'] ||
+      state.metadata['gps/lon'];
     const latMs = parseTimestampMs(latMeta?.receivedAt);
     const lonMs = parseTimestampMs(lonMeta?.receivedAt);
     if (latMs && lonMs) return Math.min(latMs, lonMs);
     return latMs || lonMs || 0;
   }
 
+  function formatLocationTimestamp(timestampMs) {
+    const date = new Date(timestampMs);
+    if (Number.isNaN(date.getTime())) return 'Zeitpunkt nicht verfügbar';
+
+    return new Intl.DateTimeFormat(dashboardCfg.locale || 'de-CH', {
+      dateStyle: 'short',
+      timeStyle: 'medium'
+    }).format(date);
+  }
+
   function renderLocationStatus(source = 'mqtt') {
     if (source === 'default') {
-      setText('location-title', vehicleCfg.defaultLocation?.label || 'Default Standort');
-      renderLocationStatus('default');
+      setText(
+        'location-title',
+        vehicleCfg.defaultLocation?.label || 'Default Standort'
+      );
+      setText('location-updated', 'Default Standort aus config.js');
       return;
     }
 
     const receivedAt = locationReceivedAtMs();
+
     if (!receivedAt) {
       setText('location-title', 'Letzter Standort');
       setText('location-updated', 'Zeitpunkt nicht verfügbar');
       return;
     }
 
-    const current = Date.now() - receivedAt <= LOCATION_CURRENT_MS;
-    setText('location-title', current ? 'Aktueller Standort' : 'Letzter Standort');
-    setText('location-updated', `Zuletzt aktualisiert ${relativeTime(receivedAt)}`);
+    const ageMs = Math.max(0, Date.now() - receivedAt);
+    const isCurrent = ageMs <= LOCATION_CURRENT_MS;
+    const absolute = formatLocationTimestamp(receivedAt);
+    const relative = relativeTime(receivedAt);
+
+    setText(
+      'location-title',
+      isCurrent ? 'Aktueller Standort' : 'Letzter Standort'
+    );
+    setText(
+      'location-updated',
+      `Letzte Aktualisierung ${relative} · ${absolute}`
+    );
   }
+
+
+
+
   function uptime(sec) {
     const n = Number(sec); if (!Number.isFinite(n)) return '--';
     const h = Math.floor(n / 3600), m = Math.floor((n % 3600) / 60);
@@ -293,8 +333,13 @@
     const val = parsePayload(payload);
     state.values[key] = val;
     state.lastMessage = Date.now();
-    if (key.startsWith('location/') || key.startsWith('gps/')) {
-      state.metadata[key] = state.metadata[key] || { receivedAt: Date.now() };
+    if (
+      dataSourceCfg.type === 'legacy-mqtt' &&
+      (key.startsWith('location/') || key.startsWith('gps/'))
+    ) {
+      // A direct MQTT message is a real, newly received update. For AWS REST
+      // snapshots the authoritative timestamp comes from snapshot.metadata.
+      state.metadata[key] = { receivedAt: Date.now() };
     }
     switch (key) {
       case 'display/soc': setSoc(val); break;
