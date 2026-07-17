@@ -1,4 +1,5 @@
 #pragma once
+
 #include <Arduino.h>
 
 void setupL76kGps();
@@ -8,6 +9,8 @@ bool l76kGpsValid();
 double l76kLatitude();
 double l76kLongitude();
 double l76kSpeedKmph();
+double l76kAltitudeMeters();
+double l76kCourseDegrees();
 uint32_t l76kSatellites();
 double l76kHdop();
 uint32_t l76kLocationAgeMs();
