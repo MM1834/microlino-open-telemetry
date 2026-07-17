@@ -37,3 +37,6 @@ secrets/aws-iot/*
 !/private/aws/.gitkeep
 /firmware/lilygo-t-a7670/data/aws/**
 !/firmware/lilygo-t-a7670/data/aws/.gitkeep
+
+# Local working packages
+*.zip

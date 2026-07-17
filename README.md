@@ -102,6 +102,15 @@ Start with:
 The detailed hardware, firmware, cloud, API, security and development
 reference follows in subsequent `v0.9.1` documentation packages.
 
+## License
+See  the repository license.
+
+## 👥 Contributors
+
+Thanks to Wolfgang for his support in decoding OBD2 registers on standard bus and the hint to use Display-CAN in the initial version for both, the Microlino Pioneer series and the newer models.
+
+* [Wolfgang] (https://github.com/wolfijenne) –
+
 ## Security essentials
 
 - Never commit private keys, client certificates or AWS access keys.

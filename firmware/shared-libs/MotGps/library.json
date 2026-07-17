@@ -1,0 +1,10 @@
+{
+  "name": "MotGps",
+  "version": "0.1.0",
+  "description": "Shared UART/NMEA GNSS library for MOT ESP32 firmware",
+  "frameworks": ["arduino"],
+  "platforms": ["espressif32"],
+  "dependencies": {
+    "mikalhart/TinyGPSPlus": "^1.0.3"
+  }
+}
