@@ -8,6 +8,7 @@
   const state = {
     lastMessage: 0,
     values: {},
+    metadata: {},
     mqttConnected: false,
     mqttDetail: '',
     networkMode: '--',
@@ -25,6 +26,8 @@
 
   const VEHICLE_ONLINE_MS =
     configuredSeconds(dashboardCfg.vehicleOnlineSeconds, 120) * 1000;
+  const LOCATION_CURRENT_MS =
+    configuredSeconds(dashboardCfg.locationCurrentSeconds, 60) * 1000;
   const VEHICLE_STALE_MS =
     Math.max(
       configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
@@ -230,6 +233,9 @@
     setText('date-now', d.toLocaleDateString(cfg.dashboard?.locale || 'de-CH'));
     setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
     updateVehicleStatus();
+    if (state.values['location/latitude'] !== undefined && state.values['location/longitude'] !== undefined) {
+      renderLocationStatus('mqtt');
+    }
   }
   setInterval(updateClock, 1000); updateClock();
 
@@ -243,9 +249,32 @@
       setText('range-main', `${Math.round(maxRange * soc / 100)} km`);
     }
   }
-  function setUpdated() {
-    const s = new Date().toLocaleTimeString(cfg.dashboard?.locale || 'de-CH');
-    setText('side-updated', s); setText('location-updated', `Letzte Aktualisierung ${s}`);
+  function locationReceivedAtMs() {
+    const latMeta = state.metadata['location/latitude'] || state.metadata['location/lat'];
+    const lonMeta = state.metadata['location/longitude'] || state.metadata['location/lon'];
+    const latMs = parseTimestampMs(latMeta?.receivedAt);
+    const lonMs = parseTimestampMs(lonMeta?.receivedAt);
+    if (latMs && lonMs) return Math.min(latMs, lonMs);
+    return latMs || lonMs || 0;
+  }
+
+  function renderLocationStatus(source = 'mqtt') {
+    if (source === 'default') {
+      setText('location-title', vehicleCfg.defaultLocation?.label || 'Default Standort');
+      renderLocationStatus('default');
+      return;
+    }
+
+    const receivedAt = locationReceivedAtMs();
+    if (!receivedAt) {
+      setText('location-title', 'Letzter Standort');
+      setText('location-updated', 'Zeitpunkt nicht verfügbar');
+      return;
+    }
+
+    const current = Date.now() - receivedAt <= LOCATION_CURRENT_MS;
+    setText('location-title', current ? 'Aktueller Standort' : 'Letzter Standort');
+    setText('location-updated', `Zuletzt aktualisiert ${relativeTime(receivedAt)}`);
   }
   function uptime(sec) {
     const n = Number(sec); if (!Number.isFinite(n)) return '--';
@@ -264,6 +293,9 @@
     const val = parsePayload(payload);
     state.values[key] = val;
     state.lastMessage = Date.now();
+    if (key.startsWith('location/') || key.startsWith('gps/')) {
+      state.metadata[key] = state.metadata[key] || { receivedAt: Date.now() };
+    }
     switch (key) {
       case 'display/soc': setSoc(val); break;
       case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); break;
@@ -289,8 +321,8 @@
         setVehicleLastSeen(val, key);
         break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
-      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); setUpdated(); break;
-      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); setUpdated(); break;
+      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
+      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
     }
 
     window.MOTHistoryRecorder?.update(state.values, {
@@ -327,7 +359,7 @@
     const lon = state.values['location/longitude'] ?? state.values['location/lon'] ?? state.values['gps/longitude'] ?? state.values['gps/lon'];
 
     if (lat !== undefined && lon !== undefined) {
-      setText('location-title', source === 'default' ? (vehicleCfg.defaultLocation?.label || 'Default Standort') : 'Letzter Standort');
+      renderLocationStatus(source);
       setText('location-coords', `${fmtCoord(lat, 'N', 'S')} · ${fmtCoord(lon, 'E', 'W')}`);
       updateLocationMap(lat, lon);
     }
@@ -360,6 +392,7 @@
 
 function resetDashboardForVehicle(vehicleId) {
   state.values = {};
+  state.metadata = {};
   state.lastMessage = 0;
   state.networkMode = '--';
   state.deviceIp = '--';
@@ -491,6 +524,8 @@ function startDataProvider() {
       },
       onSnapshot: snapshot => {
         if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
+        state.metadata = snapshot?.metadata || {};
+        updateCoords('mqtt');
       },
       onError: error => console.error('MOT data provider error:', error)
     });

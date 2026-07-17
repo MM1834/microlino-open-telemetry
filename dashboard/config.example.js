@@ -40,6 +40,7 @@ window.MOT_CONFIG = {
     // 121–600 seconds: Data stale
     // More than 600 seconds: Offline
     vehicleOnlineSeconds: 120,
-    vehicleStaleSeconds: 600
+    vehicleStaleSeconds: 600,
+    locationCurrentSeconds: 60
   }
 };

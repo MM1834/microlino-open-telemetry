@@ -8,6 +8,7 @@
 
 #include "app_config.h"
 #include "telemetry/telemetry.h"
+#include "gps/wroom_gps.h"
 
 static unsigned long lastAbrpSendMs = 0;
 static const uint32_t ABRP_INTERVAL_MS = 60000;
@@ -120,6 +121,12 @@ static String abrpTelemetryJson(time_t now)
     addNumber("power", telemetry.charging.powerSigned, 2);
 
     addBool("is_charging", telemetry.charging.isCharging);
+
+    // ABRP must never receive a cached or stale position.
+    if (wroomGpsValid()) {
+        addNumber("lat", wroomGpsLatitude(), 6);
+        addNumber("lon", wroomGpsLongitude(), 6);
+    }
 
     json += "}";
     return json;
