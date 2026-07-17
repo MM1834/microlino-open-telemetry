@@ -1,6 +1,13 @@
 
 ## Unreleased
 
+### SPR-0004B.1.1
+
+- Split Cognito delivery into independently deployable increments.
+- Added only the Cognito dashboard user pool in the first increment.
+- Quoted `MfaConfiguration: "OFF"` to prevent YAML from converting it to Boolean `false`.
+- Documented the rollback cause and safe change-set workflow.
+
 - Integrate shared GPS parsing into ESP32-WROOM production firmware.
 - Publish location to MQTT/AWS and ABRP only for a current valid fix.
 - Preserve retained coordinates and label stale coordinates as the last known location in the dashboard.
@@ -22,3 +29,9 @@
 ### Known issues
 - ABRP over LTE HTTPS is disabled/deferred.
 - Device online heartbeat is planned but not yet implemented.
+
+## SPR-0004B.1 - Cognito infrastructure
+
+- Added an email-based Amazon Cognito user pool and public dashboard app client.
+- Disabled public self-registration and enabled deletion protection by default.
+- Added developer, administrator and end-user authentication documentation.
