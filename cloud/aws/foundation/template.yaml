@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: MOT AWS-3.2 multi-vehicle current-state store.
+Description: MOT AWS foundation with vehicle state and Cognito user authentication.
 
 Parameters:
   ProjectName:
@@ -31,8 +31,108 @@ Parameters:
     Type: Number
     Default: 7
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
-  
+
+  CognitoSelfRegistrationEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Enables public user sign-up. Keep disabled until the end-user onboarding
+      and abuse-prevention flows are implemented.
+
+  CognitoDeletionProtection:
+    Type: String
+    Default: ACTIVE
+    AllowedValues: [ACTIVE, INACTIVE]
+    Description: Protects the user pool from accidental deletion.
+
+  CognitoDashboardCallbackUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:8080/callback"
+    Description: >
+      Allowed OAuth callback URLs for the dashboard app client. Use HTTPS for
+      deployed environments; localhost HTTP is reserved for local development.
+
+  CognitoDashboardLogoutUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:8080/"
+    Description: >
+      Allowed post-logout redirect URLs for the dashboard app client.
+
+Conditions:
+  CognitoSelfRegistrationIsEnabled: !Equals
+    - !Ref CognitoSelfRegistrationEnabled
+    - "true"
+
 Resources:
+  DashboardUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectName}-${Environment}-dashboard-users"
+      DeletionProtection: !Ref CognitoDeletionProtection
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: !If
+          - CognitoSelfRegistrationIsEnabled
+          - false
+          - true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      UserPoolTags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+        component: identity
+
+
+  DashboardUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${ProjectName}-${Environment}-dashboard"
+      UserPoolId: !Ref DashboardUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs: !Ref CognitoDashboardCallbackUrls
+      LogoutURLs: !Ref CognitoDashboardLogoutUrls
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+
   VehicleStateTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -526,6 +626,22 @@ Resources:
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleHttpApi}/*/*"
   
 Outputs:
+  CognitoUserPoolId:
+    Description: Cognito user pool for dashboard users.
+    Value: !Ref DashboardUserPool
+
+  CognitoUserPoolArn:
+    Description: ARN of the Cognito user pool.
+    Value: !GetAtt DashboardUserPool.Arn
+
+  CognitoIssuerUrl:
+    Description: Issuer URL for the API Gateway JWT authorizer in SPR-0004B.2.
+    Value: !Sub "https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${DashboardUserPool}"
+
+  CognitoUserPoolClientId:
+    Description: Public dashboard app client ID. This value is configuration, not a secret.
+    Value: !Ref DashboardUserPoolClient
+
   StackRegion:
     Value: !Ref AWS::Region
   StateIngestRuleName:
