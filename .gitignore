@@ -40,3 +40,20 @@ secrets/aws-iot/*
 
 # Local working packages
 *.zip
+
+# Local dashboard configuration with credentials
+dashboard/config.js
+dashboard/**/config.js
+
+# Common local copies and backups
+dashboard/**/config.local.js
+dashboard/**/config.dev.js
+dashboard/**/config.prod.js
+dashboard/**/config.*.local.js
+dashboard/**/config.js.*
+dashboard/**/*config*.bak
+dashboard/**/*config*.backup
+dashboard/**/*config*.copy
+dashboard/**/*config*~
+
+
