@@ -1,24 +1,14 @@
+// Copy this file from config.example.js and adjust it for your installation.
 window.MOT_CONFIG = {
-  // Current production target will become "aws-backend".
-  // Keep "legacy-mqtt" while the authenticated backend is not deployed.
+  // Production Dashboard uses the AWS Vehicle REST API.
   dataSource: {
     type: "aws-backend"
   },
-
-
-// Copy this file from config.example.js and adjust it for your installation.
   mqtt: {
-    host: "mmds.muehlberg.ch",
-    port: 22026,
-    useTls: true,
-    path: "/",
-    username: "MMTeam11",
-    password: "11TeamMM",
+    // Compatibility values used only to derive the MOT topic namespace.
     topicPrefix: "mot",
-    vehicleId: "pioneer",
-    clientIdPrefix: "mot-dashboard"
+    vehicleId: "pioneer"
   },
-
   // Target provider for the production WebApp.
   // The browser talks to an authenticated application backend, not directly
   // to AWS IoT Core with device credentials.
@@ -38,13 +28,12 @@ window.MOT_CONFIG = {
       enabled: true,
       latitude: 47.46198,
       longitude: 8.11068,
-      label: "MM location"
+      label: "Default location"
     }
   },
-
   dashboard: {
     title: "MOT Dashboard",
-    locale: "de-CH"
+    locale: "de-CH",
 
     // Microlino / OBD2 presence thresholds.
     // 0–120 seconds: Online
@@ -53,5 +42,4 @@ window.MOT_CONFIG = {
     vehicleOnlineSeconds: 120,
     vehicleStaleSeconds: 600
   }
-
 };

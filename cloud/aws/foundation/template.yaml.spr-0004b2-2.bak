@@ -614,8 +614,6 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles"
-      AuthorizationType: JWT
-      AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"
   
   VehicleApiSnapshotRoute:
@@ -623,8 +621,6 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles/{vehicleId}/snapshot"
-      AuthorizationType: JWT
-      AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"
   
   VehicleApiStage:
