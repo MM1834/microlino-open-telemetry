@@ -1,0 +1,712 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: MOT AWS foundation with vehicle state and Cognito user authentication.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: mot
+  Environment:
+    Type: String
+    Default: dev
+  TopicFilter:
+    Type: String
+    Default: "mot/#"
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+  EnableVerboseMessageLogs:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+
+  ApiAllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      CORS origin for the temporary unauthenticated beta API. Use the exact
+      Dashboard origin when known. Authentication is added in AWS-4.
+  
+  ApiLogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+
+  CognitoSelfRegistrationEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Enables public user sign-up. Keep disabled until the end-user onboarding
+      and abuse-prevention flows are implemented.
+
+  CognitoDeletionProtection:
+    Type: String
+    Default: ACTIVE
+    AllowedValues: [ACTIVE, INACTIVE]
+    Description: Protects the user pool from accidental deletion.
+
+  CognitoDashboardCallbackUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:8080/callback"
+    Description: >
+      Allowed OAuth callback URLs for the dashboard app client. Use HTTPS for
+      deployed environments; localhost HTTP is reserved for local development.
+
+  CognitoDashboardLogoutUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:8080/"
+    Description: >
+      Allowed post-logout redirect URLs for the dashboard app client.
+
+Conditions:
+  CognitoSelfRegistrationIsEnabled: !Equals
+    - !Ref CognitoSelfRegistrationEnabled
+    - "true"
+
+Resources:
+  DashboardUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectName}-${Environment}-dashboard-users"
+      DeletionProtection: !Ref CognitoDeletionProtection
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: !If
+          - CognitoSelfRegistrationIsEnabled
+          - false
+          - true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      UserPoolTags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+        component: identity
+
+
+  DashboardUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${ProjectName}-${Environment}-dashboard"
+      UserPoolId: !Ref DashboardUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs: !Ref CognitoDashboardCallbackUrls
+      LogoutURLs: !Ref CognitoDashboardLogoutUrls
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+
+  DashboardUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "${ProjectName}-${Environment}-${AWS::AccountId}-${AWS::Region}"
+      UserPoolId: !Ref DashboardUserPool
+
+  VehicleStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-vehicle-state"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: vehicleId
+          AttributeType: S
+        - AttributeName: topicSuffix
+          AttributeType: S
+      KeySchema:
+        - AttributeName: vehicleId
+          KeyType: HASH
+        - AttributeName: topicSuffix
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+
+  StateIngestRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-state-ingest-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: vehicle-state-write
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:UpdateItem]
+                Resource: !GetAtt VehicleStateTable.Arn
+
+  StateIngestFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-state-ingest"
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt StateIngestRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref VehicleStateTable
+          VERBOSE_MESSAGE_LOGS: !Ref EnableVerboseMessageLogs
+      Code:
+        ZipFile: |
+          import base64
+          import json
+          import os
+          import time
+          from decimal import Decimal
+          import boto3
+          from botocore.exceptions import ClientError
+
+          table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
+          verbose = os.environ.get("VERBOSE_MESSAGE_LOGS", "false").lower() == "true"
+
+          def decode_payload(encoded):
+              raw = base64.b64decode(encoded or "")
+              try:
+                  text = raw.decode("utf-8")
+              except UnicodeDecodeError:
+                  return "binary", base64.b64encode(raw).decode("ascii"), None, len(raw)
+              try:
+                  value = json.loads(text, parse_float=Decimal)
+                  if isinstance(value, dict): kind = "json_object"
+                  elif isinstance(value, list): kind = "json_array"
+                  elif isinstance(value, bool): kind = "boolean"
+                  elif isinstance(value, (int, Decimal)): kind = "number"
+                  elif value is None: kind = "null"
+                  else: kind = "string"
+                  return kind, value, text, len(raw)
+              except json.JSONDecodeError:
+                  return "text", text, text, len(raw)
+
+          def handler(event, context):
+              topic = str(event.get("mqttTopic", ""))
+              parts = topic.split("/")
+              if len(parts) < 3 or parts[0] != "mot":
+                  return {"accepted": False, "reason": "invalid_topic"}
+
+              received_at = int(event.get("receivedAt") or time.time() * 1000)
+              vehicle_id = parts[1]
+              topic_suffix = "/".join(parts[2:])
+              category = parts[2]
+              value_type, value, payload_text, payload_bytes = decode_payload(event.get("payloadBase64"))
+
+              try:
+                  table.update_item(
+                      Key={"vehicleId": vehicle_id, "topicSuffix": topic_suffix},
+                      UpdateExpression=(
+                          "SET #v=:v, valueType=:t, receivedAt=:r, fullTopic=:f, "
+                          "category=:c, payloadBytes=:b, payloadText=:p"
+                      ),
+                      ConditionExpression="attribute_not_exists(receivedAt) OR receivedAt <= :r",
+                      ExpressionAttributeNames={"#v": "value"},
+                      ExpressionAttributeValues={
+                          ":v": value,
+                          ":t": value_type,
+                          ":r": received_at,
+                          ":f": topic,
+                          ":c": category,
+                          ":b": payload_bytes,
+                          ":p": payload_text or ""
+                      }
+                  )
+                  stored = True
+              except ClientError as error:
+                  if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                      stored = False
+                  else:
+                      print(json.dumps({"eventType":"state_ingest_error","topic":topic,"error":str(error)}))
+                      raise
+
+              if verbose:
+                  print(json.dumps({
+                      "eventType":"state_updated",
+                      "vehicleId":vehicle_id,
+                      "topicSuffix":topic_suffix,
+                      "valueType":value_type,
+                      "receivedAt":received_at,
+                      "stored":stored
+                  }, default=str, separators=(",", ":")))
+
+              return {"accepted": True, "stored": stored}
+
+  StateIngestLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${StateIngestFunction}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  IoTInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref StateIngestFunction
+      Principal: iot.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:rule/${ProjectName}_${Environment}_state"
+
+  StateIngestRule:
+    Type: AWS::IoT::TopicRule
+    DependsOn: [IoTInvokePermission, StateIngestLogGroup]
+    Properties:
+      RuleName: !Sub "${ProjectName}_${Environment}_state"
+      TopicRulePayload:
+        AwsIotSqlVersion: "2016-03-23"
+        RuleDisabled: false
+        Sql: !Sub >
+          SELECT topic() AS mqttTopic,
+                 timestamp() AS receivedAt,
+                 encode(*, 'base64') AS payloadBase64
+          FROM '${TopicFilter}'
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt StateIngestFunction.Arn
+
+
+  VehicleApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-vehicle-api-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-${Environment}-vehicle-state-read"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:GetItem
+                Resource: !GetAtt VehicleStateTable.Arn
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+  
+  VehicleApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-vehicle-api"
+      Description: Read-only beta API for MOT multi-vehicle current state.
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt VehicleApiRole.Arn
+      Environment:
+        Variables:
+          PROJECT_NAME: !Ref ProjectName
+          ENVIRONMENT: !Ref Environment
+          TABLE_NAME: !Ref VehicleStateTable
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import time
+          from decimal import Decimal
+  
+          import boto3
+          from boto3.dynamodb.conditions import Key
+  
+          PROJECT = os.environ.get("PROJECT_NAME", "mot")
+          ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+          TABLE_NAME = os.environ["TABLE_NAME"]
+  
+          table = boto3.resource("dynamodb").Table(TABLE_NAME)
+  
+          def json_value(value):
+              if isinstance(value, Decimal):
+                  return int(value) if value % 1 == 0 else float(value)
+              if isinstance(value, list):
+                  return [json_value(item) for item in value]
+              if isinstance(value, dict):
+                  return {
+                      key: json_value(item)
+                      for key, item in value.items()
+                  }
+              return value
+  
+          def response(status_code, body):
+              return {
+                  "statusCode": status_code,
+                  "headers": {
+                      "content-type": "application/json; charset=utf-8",
+                      "cache-control": "no-store"
+                  },
+                  "body": json.dumps(
+                      body,
+                      ensure_ascii=False,
+                      separators=(",", ":")
+                  )
+              }
+  
+          def route_key(event):
+              return (
+                  event.get("requestContext", {})
+                  .get("http", {})
+                  .get("method", "GET")
+                  + " "
+                  + event.get("rawPath", "/")
+              )
+  
+          def load_vehicle(vehicle_id):
+              result = table.query(
+                  KeyConditionExpression=Key("vehicleId").eq(vehicle_id),
+                  ConsistentRead=True
+              )
+  
+              items = result.get("Items", [])
+              values = {}
+              metadata = {}
+              newest_received_at = 0
+  
+              for item in items:
+                  suffix = item["topicSuffix"]
+                  received_at = int(item.get("receivedAt", 0))
+                  newest_received_at = max(
+                      newest_received_at,
+                      received_at
+                  )
+  
+                  values[suffix] = json_value(item.get("value"))
+                  metadata[suffix] = {
+                      "receivedAt": received_at,
+                      "valueType": item.get("valueType", "unknown"),
+                      "payloadBytes": int(item.get("payloadBytes", 0))
+                  }
+  
+              if not items:
+                  return None
+  
+              return {
+                  "vehicleId": vehicle_id,
+                  "updatedAt": newest_received_at,
+                  "online": values.get("status/online"),
+                  "lastSeenUtc": values.get(
+                      "system/last_seen_utc"
+                  ),
+                  "values": values,
+                  "metadata": metadata
+              }
+  
+          def list_vehicles():
+              vehicle_ids = set()
+              last_evaluated_key = None
+  
+              while True:
+                  kwargs = {
+                      "ProjectionExpression": "vehicleId"
+                  }
+                  if last_evaluated_key:
+                      kwargs["ExclusiveStartKey"] = (
+                          last_evaluated_key
+                      )
+  
+                  result = table.scan(**kwargs)
+                  for item in result.get("Items", []):
+                      vehicle_id = item.get("vehicleId")
+                      if vehicle_id:
+                          vehicle_ids.add(vehicle_id)
+  
+                  last_evaluated_key = result.get(
+                      "LastEvaluatedKey"
+                  )
+                  if not last_evaluated_key:
+                      break
+  
+              vehicles = []
+              for vehicle_id in sorted(vehicle_ids):
+                  snapshot = load_vehicle(vehicle_id)
+                  if snapshot:
+                      vehicles.append({
+                          "vehicleId": vehicle_id,
+                          "online": snapshot.get("online"),
+                          "lastSeenUtc": snapshot.get(
+                              "lastSeenUtc"
+                          ),
+                          "updatedAt": snapshot.get("updatedAt")
+                      })
+  
+              return vehicles
+  
+          def handler(event, context):
+              method = (
+                  event.get("requestContext", {})
+                  .get("http", {})
+                  .get("method", "GET")
+              )
+              path = event.get("rawPath", "/")
+              path_parameters = event.get(
+                  "pathParameters"
+              ) or {}
+  
+              if method == "GET" and path == "/health":
+                  return response(200, {
+                      "ok": True,
+                      "service": "mot-vehicle-api",
+                      "project": PROJECT,
+                      "environment": ENVIRONMENT,
+                      "utc": int(time.time())
+                  })
+  
+              if method == "GET" and path == "/api/vehicles":
+                  vehicles = list_vehicles()
+                  return response(200, {
+                      "count": len(vehicles),
+                      "vehicles": vehicles
+                  })
+  
+              if (
+                  method == "GET"
+                  and path.startswith("/api/vehicles/")
+                  and path.endswith("/snapshot")
+              ):
+                  vehicle_id = path_parameters.get("vehicleId")
+                  if not vehicle_id:
+                      return response(400, {
+                          "error": "vehicle_id_missing"
+                      })
+  
+                  snapshot = load_vehicle(vehicle_id)
+                  if snapshot is None:
+                      return response(404, {
+                          "error": "vehicle_not_found",
+                          "vehicleId": vehicle_id
+                      })
+  
+                  return response(200, snapshot)
+  
+              return response(404, {
+                  "error": "route_not_found",
+                  "method": method,
+                  "path": path,
+                  "routeKey": route_key(event)
+              })
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+  
+  VehicleApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${VehicleApiFunction}"
+      RetentionInDays: !Ref ApiLogRetentionDays
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+  
+  VehicleHttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-vehicle-api"
+      Description: Temporary read-only beta API for MOT vehicle state.
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref ApiAllowedOrigin
+        AllowMethods:
+          - GET
+          - OPTIONS
+        AllowHeaders:
+          - content-type
+          - authorization
+        MaxAge: 300
+      Tags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+  
+  VehicleApiJwtAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      AuthorizerType: JWT
+      IdentitySource:
+        - "$request.header.Authorization"
+      JwtConfiguration:
+        Audience:
+          - !Ref DashboardUserPoolClient
+        Issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${DashboardUserPool}"
+      Name: !Sub "${ProjectName}-${Environment}-dashboard-jwt"
+
+  VehicleApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt VehicleApiFunction.Arn
+      PayloadFormatVersion: "2.0"
+      TimeoutInMillis: 10000
+  
+  VehicleApiHealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      RouteKey: "GET /health"
+      Target: !Sub "integrations/${VehicleApiIntegration}"
+  
+  VehicleApiListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      RouteKey: "GET /api/vehicles"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
+      Target: !Sub "integrations/${VehicleApiIntegration}"
+  
+  VehicleApiSnapshotRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      RouteKey: "GET /api/vehicles/{vehicleId}/snapshot"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
+      Target: !Sub "integrations/${VehicleApiIntegration}"
+  
+  VehicleApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      StageName: "$default"
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+      Tags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+  
+  VehicleApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref VehicleApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleHttpApi}/*/*"
+  
+Outputs:
+  CognitoUserPoolId:
+    Description: Cognito user pool for dashboard users.
+    Value: !Ref DashboardUserPool
+
+  CognitoUserPoolArn:
+    Description: ARN of the Cognito user pool.
+    Value: !GetAtt DashboardUserPool.Arn
+
+  CognitoIssuerUrl:
+    Description: Issuer URL for the API Gateway JWT authorizer in SPR-0004B.2.
+    Value: !Sub "https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${DashboardUserPool}"
+
+  CognitoUserPoolClientId:
+    Description: Public dashboard app client ID. This value is configuration, not a secret.
+    Value: !Ref DashboardUserPoolClient
+
+  CognitoDomainPrefix:
+    Description: Globally unique Cognito managed-login domain prefix.
+    Value: !Ref DashboardUserPoolDomain
+
+  CognitoHostedUiBaseUrl:
+    Description: Base URL of the Cognito managed login and OAuth endpoints.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}"
+
+  CognitoAuthorizationEndpoint:
+    Description: OAuth 2.0 authorization endpoint for browser login.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/oauth2/authorize"
+
+  CognitoTokenEndpoint:
+    Description: OAuth 2.0 token endpoint for authorization-code exchange.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/oauth2/token"
+
+  CognitoLogoutEndpoint:
+    Description: Cognito logout endpoint.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/logout"
+
+  StackRegion:
+    Value: !Ref AWS::Region
+  StateIngestRuleName:
+    Value: !Ref StateIngestRule
+  StateIngestFunctionName:
+    Value: !Ref StateIngestFunction
+  VehicleStateTableName:
+    Value: !Ref VehicleStateTable
+  VehicleStateTableArn:
+    Value: !GetAtt VehicleStateTable.Arn
+  StateIngestLogGroupName:
+    Value: !Ref StateIngestLogGroup
+
+
+  VehicleApiId:
+    Value: !Ref VehicleHttpApi
+  
+  VehicleApiBaseUrl:
+    Value: !Sub "https://${VehicleHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
+  
+  VehicleApiFunctionName:
+    Value: !Ref VehicleApiFunction
+  
+  VehicleApiLogGroupName:
+    Value: !Ref VehicleApiLogGroup
