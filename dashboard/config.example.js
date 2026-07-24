@@ -14,7 +14,13 @@ window.MOT_CONFIG = {
   // to AWS IoT Core with device credentials.
   awsBackend: {
     apiBaseUrl: "https://YOUR_API_ID.execute-api.eu-north-1.amazonaws.com",
-    pollingIntervalMs: 5000
+    websocketUrl: "wss://YOUR_WEBSOCKET_API_ID.execute-api.eu-north-1.amazonaws.com/$default",
+
+    // REST remains the data source in Phase 4A. WebSocket carries connection,
+    // heartbeat and vehicle subscription control messages only.
+    pollingIntervalMs: 5000,
+    heartbeatMs: 30000,
+    reconnectDelaysMs: [5000, 15000, 60000, 120000, 300000]
   },
 
   // Cognito User Pool Authorization Code flow with PKCE.

@@ -175,6 +175,24 @@
     setText('side-updated', relative);
   }
 
+  function setLiveStatus(status = {}) {
+    const stateName = status.state || 'disabled';
+    const labels = {
+      connected: 'Verbunden',
+      connecting: 'Verbinden…',
+      reconnecting: 'Wiederverbinden…',
+      disconnected: 'Getrennt',
+      disabled: 'Deaktiviert'
+    };
+    setText('live-status', labels[stateName] || stateName);
+    setText('live-detail', status.detail || '');
+    const dot = $('live-dot');
+    if (!dot) return;
+    dot.classList.remove('online', 'stale');
+    if (stateName === 'connected') dot.classList.add('online');
+    else if (stateName === 'connecting' || stateName === 'reconnecting') dot.classList.add('stale');
+  }
+
   function setVehicleLastSeen(value, source) {
     const timestampMs = parseTimestampMs(value);
     if (!timestampMs) return;
@@ -604,6 +622,8 @@ function startDataProvider() {
 
     provider.start({
       onConnection: (ok, detail) => setOnline(ok, detail),
+      onLiveConnection: status => setLiveStatus(status),
+      onLiveMessage: message => console.debug('MOT live control message:', message),
       onMessage: (topic, payload) => applyTopic(topic, payload),
       onVehicles: vehicles => {
         const previous = state.selectedVehicleId;
@@ -662,6 +682,7 @@ function startDataProvider() {
         return;
       }
     }
+    setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();
   }
 

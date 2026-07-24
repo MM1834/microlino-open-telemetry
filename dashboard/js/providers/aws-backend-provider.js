@@ -5,6 +5,7 @@
     let timer = null;
     let callbacksRef = null;
     let activeVehicleId = config.vehicleId || 'pioneer';
+    let liveClient = null;
 
     const baseUrl = () => String(config.apiBaseUrl || '').replace(/\/$/, '');
     const interval = () => {
@@ -40,9 +41,7 @@
       const vehicleId = snapshot.vehicleId || activeVehicleId;
       const prefix = String(config.topicPrefix || 'mot').replace(/\/$/, '');
       Object.entries(snapshot.values || {}).forEach(([key, value]) => {
-        const payload = typeof value === 'string'
-          ? value
-          : JSON.stringify(value);
+        const payload = typeof value === 'string' ? value : JSON.stringify(value);
         callbacks.onMessage(`${prefix}/${vehicleId}/${key}`, payload);
       });
       callbacks.onSnapshot?.(snapshot);
@@ -50,16 +49,10 @@
 
     async function poll(callbacks) {
       if (stopped) return;
-
       const requestedVehicleId = activeVehicleId;
-
       try {
-        const snapshot = await get(
-          `/api/vehicles/${encodeURIComponent(requestedVehicleId)}/snapshot`
-        );
-
+        const snapshot = await get(`/api/vehicles/${encodeURIComponent(requestedVehicleId)}/snapshot`);
         if (stopped || requestedVehicleId !== activeVehicleId) return;
-
         callbacks.onConnection(true, 'Verbunden mit AWS Vehicle API');
         emit(snapshot, callbacks);
       } catch (error) {
@@ -69,13 +62,27 @@
       }
     }
 
+    function startLive(callbacks) {
+      if (!window.MOTLive?.createWebSocketClient) {
+        callbacks.onLiveConnection?.({ state: 'disabled', detail: 'WebSocket Client fehlt' });
+        return;
+      }
+      liveClient = window.MOTLive.createWebSocketClient({
+        config,
+        getAccessToken: config.getAccessToken,
+        onState: status => callbacks.onLiveConnection?.(status),
+        onMessage: message => callbacks.onLiveMessage?.(message),
+        onError: error => callbacks.onError(error)
+      });
+      liveClient.start(activeVehicleId);
+    }
+
     return {
       name: 'aws-backend',
 
       async start(callbacks) {
         callbacksRef = callbacks;
         stopped = false;
-
         if (!baseUrl()) {
           callbacks.onConnection(false, 'AWS API URL fehlt');
           return;
@@ -83,16 +90,13 @@
 
         try {
           const result = await get('/api/vehicles');
-          const vehicles = Array.isArray(result)
-            ? result
-            : (result.vehicles || []);
-
+          const vehicles = Array.isArray(result) ? result : (result.vehicles || []);
           const exists = vehicles.some(v => v.vehicleId === activeVehicleId);
           if (!exists && vehicles.length) activeVehicleId = vehicles[0].vehicleId;
-
           callbacks.onVehicles?.(vehicles);
           await poll(callbacks);
           timer = window.setInterval(() => poll(callbacks), interval());
+          startLive(callbacks);
         } catch (error) {
           callbacks.onConnection(false, error.message || 'AWS API Fehler');
           callbacks.onError(error);
@@ -101,16 +105,17 @@
 
       async selectVehicle(vehicleId) {
         activeVehicleId = vehicleId;
+        liveClient?.subscribe(vehicleId);
         if (callbacksRef) await poll(callbacksRef);
       },
 
-      getSelectedVehicleId() {
-        return activeVehicleId;
-      },
+      getSelectedVehicleId() { return activeVehicleId; },
 
       stop() {
         stopped = true;
         callbacksRef = null;
+        liveClient?.stop();
+        liveClient = null;
         if (timer) window.clearInterval(timer);
         timer = null;
       },
@@ -119,8 +124,10 @@
         return {
           type: 'aws-backend',
           apiBaseUrl: baseUrl(),
+          websocketUrl: String(config.websocketUrl || ''),
           vehicleId: activeVehicleId,
-          pollingIntervalMs: interval()
+          pollingIntervalMs: interval(),
+          live: liveClient?.describe?.() || null
         };
       }
     };

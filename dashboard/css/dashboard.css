@@ -108,3 +108,9 @@
 .auth-button:hover:not(:disabled) { background:rgba(255,255,255,.14); }
 .auth-button:disabled { opacity:.55; cursor:not-allowed; }
 @media (max-width: 760px) { .auth-status { display:none; } }
+
+/* SPR-0004B.4A: Live WebSocket connection state */
+#live-dot.stale {
+  background: #d99a00;
+  box-shadow: 0 0 0 4px rgba(217, 154, 0, 0.14);
+}

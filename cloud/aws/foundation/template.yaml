@@ -162,6 +162,37 @@ Resources:
         - Key: environment
           Value: !Ref Environment
 
+  LiveConnectionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-live-connections"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+        - AttributeName: vehicleId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: vehicleId-index
+          KeySchema:
+            - AttributeName: vehicleId
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+
   StateIngestRole:
     Type: AWS::IAM::Role
     Properties:
@@ -648,6 +679,279 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleHttpApi}/*/*"
   
+  LiveWebSocketRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-live-websocket-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: live-connections
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                Resource: !GetAtt LiveConnectionTable.Arn
+              - Effect: Allow
+                Action:
+                  - cognito-idp:GetUser
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
+  LiveAuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-live-authorizer"
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt LiveWebSocketRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          cognito = boto3.client("cognito-idp")
+
+          def policy(principal, effect, resource, context=None):
+              return {
+                  "principalId": principal,
+                  "policyDocument": {
+                      "Version": "2012-10-17",
+                      "Statement": [{
+                          "Action": "execute-api:Invoke",
+                          "Effect": effect,
+                          "Resource": resource
+                      }]
+                  },
+                  "context": context or {}
+              }
+
+          def handler(event, context):
+              token = (event.get("queryStringParameters") or {}).get("access_token")
+              if not token:
+                  raise Exception("Unauthorized")
+              try:
+                  user = cognito.get_user(AccessToken=token)
+                  attributes = {item["Name"]: item["Value"] for item in user.get("UserAttributes", [])}
+                  subject = attributes.get("sub", user.get("Username", "dashboard-user"))
+                  return policy(subject, "Allow", event["methodArn"], {
+                      "sub": subject,
+                      "username": user.get("Username", "")
+                  })
+              except cognito.exceptions.NotAuthorizedException:
+                  raise Exception("Unauthorized")
+
+  LiveHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-live-handler"
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt LiveWebSocketRole.Arn
+      Environment:
+        Variables:
+          CONNECTION_TABLE_NAME: !Ref LiveConnectionTable
+          WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
+          WEBSOCKET_STAGE: "$default"
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import time
+          import boto3
+
+          table = boto3.resource("dynamodb").Table(os.environ["CONNECTION_TABLE_NAME"])
+          management = boto3.client(
+              "apigatewaymanagementapi",
+              endpoint_url=(
+                  f"https://{os.environ['WEBSOCKET_API_ID']}.execute-api."
+                  f"{os.environ['AWS_REGION']}.amazonaws.com/{os.environ['WEBSOCKET_STAGE']}"
+              )
+          )
+
+          def response(status=200, body=None):
+              return {"statusCode": status, "body": json.dumps(body or {"ok": True})}
+
+          def send(connection_id, body):
+              management.post_to_connection(
+                  ConnectionId=connection_id,
+                  Data=json.dumps(body, separators=(",", ":")).encode("utf-8")
+              )
+
+          def handler(event, context):
+              request = event.get("requestContext", {})
+              route = request.get("routeKey")
+              connection_id = request.get("connectionId")
+
+              if route == "$connect":
+                  auth = request.get("authorizer") or {}
+                  table.put_item(Item={
+                      "connectionId": connection_id,
+                      "userSub": auth.get("sub", ""),
+                      "connectedAt": int(time.time()),
+                      "expiresAt": int(time.time()) + 86400
+                  })
+                  return response()
+
+              if route == "$disconnect":
+                  table.delete_item(Key={"connectionId": connection_id})
+                  return response()
+
+              try:
+                  body = json.loads(event.get("body") or "{}")
+              except json.JSONDecodeError:
+                  send(connection_id, {"type": "error", "error": "invalid_json"})
+                  return response(400, {"error": "invalid_json"})
+
+              if route == "subscribe":
+                  vehicle_id = str(body.get("vehicleId", "")).strip()
+                  if not vehicle_id:
+                      send(connection_id, {"type": "error", "error": "vehicle_id_missing"})
+                      return response(400, {"error": "vehicle_id_missing"})
+                  table.update_item(
+                      Key={"connectionId": connection_id},
+                      UpdateExpression="SET vehicleId=:v, expiresAt=:e",
+                      ExpressionAttributeValues={":v": vehicle_id, ":e": int(time.time()) + 86400}
+                  )
+                  send(connection_id, {"type": "subscribed", "vehicleId": vehicle_id})
+                  return response()
+
+              if route == "ping":
+                  now = int(time.time())
+                  table.update_item(
+                      Key={"connectionId": connection_id},
+                      UpdateExpression="SET expiresAt=:e",
+                      ExpressionAttributeValues={":e": now + 86400}
+                  )
+                  send(connection_id, {"type": "pong", "serverTime": now})
+                  return response()
+
+              send(connection_id, {"type": "error", "error": "unsupported_action", "route": route})
+              return response(400, {"error": "unsupported_action", "route": route})
+
+  LiveAuthorizerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LiveAuthorizerFunction}"
+      RetentionInDays: !Ref ApiLogRetentionDays
+
+  LiveHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LiveHandlerFunction}"
+      RetentionInDays: !Ref ApiLogRetentionDays
+
+  VehicleWebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-vehicle-live"
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+      Tags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+
+  LiveWebSocketAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      Name: !Sub "${ProjectName}-${Environment}-live-authorizer"
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LiveAuthorizerFunction.Arn}/invocations"
+      IdentitySource:
+        - "route.request.querystring.access_token"
+
+  LiveWebSocketIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LiveHandlerFunction.Arn}/invocations"
+
+  LiveConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "$connect"
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LiveWebSocketAuthorizer
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "$disconnect"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveSubscribeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "subscribe"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LivePingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "ping"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "$default"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveWebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      StageName: "$default"
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 25
+      Tags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+
+  LiveHandlerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LiveHandlerFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
+  LiveAuthorizerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LiveAuthorizerFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
 Outputs:
   CognitoUserPoolId:
     Description: Cognito user pool for dashboard users.
@@ -710,3 +1014,18 @@ Outputs:
   
   VehicleApiLogGroupName:
     Value: !Ref VehicleApiLogGroup
+
+  VehicleWebSocketApiId:
+    Value: !Ref VehicleWebSocketApi
+
+  VehicleWebSocketUrl:
+    Value: !Sub "wss://${VehicleWebSocketApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/$default"
+
+  LiveConnectionTableName:
+    Value: !Ref LiveConnectionTable
+
+  LiveHandlerFunctionName:
+    Value: !Ref LiveHandlerFunction
+
+  LiveAuthorizerFunctionName:
+    Value: !Ref LiveAuthorizerFunction
