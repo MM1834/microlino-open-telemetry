@@ -18,8 +18,9 @@ window.MOT_CONFIG = {
 
     // REST remains the data source in Phase 4A. WebSocket carries connection,
     // heartbeat and vehicle subscription control messages only.
-    pollingIntervalMs: 5000,
+    pollingIntervalMs: 30000,
     heartbeatMs: 30000,
+    maxReconnectAttempts: 5,
     reconnectDelaysMs: [5000, 15000, 60000, 120000, 300000]
   },
 

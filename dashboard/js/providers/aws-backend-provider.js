@@ -6,6 +6,7 @@
     let callbacksRef = null;
     let activeVehicleId = config.vehicleId || 'pioneer';
     let liveClient = null;
+    let pollInFlight = false;
 
     const baseUrl = () => String(config.apiBaseUrl || '').replace(/\/$/, '');
     const interval = () => {
@@ -48,7 +49,8 @@
     }
 
     async function poll(callbacks) {
-      if (stopped) return;
+      if (stopped || pollInFlight || document.hidden) return;
+      pollInFlight = true;
       const requestedVehicleId = activeVehicleId;
       try {
         const snapshot = await get(`/api/vehicles/${encodeURIComponent(requestedVehicleId)}/snapshot`);
@@ -56,9 +58,12 @@
         callbacks.onConnection(true, 'Verbunden mit AWS Vehicle API');
         emit(snapshot, callbacks);
       } catch (error) {
-        if (requestedVehicleId !== activeVehicleId) return;
-        callbacks.onConnection(false, error.message || 'AWS API Fehler');
-        callbacks.onError(error);
+        if (requestedVehicleId === activeVehicleId) {
+          callbacks.onConnection(false, error.message || 'AWS API Fehler');
+          callbacks.onError(error);
+        }
+      } finally {
+        pollInFlight = false;
       }
     }
 
@@ -75,6 +80,10 @@
         onError: error => callbacks.onError(error)
       });
       liveClient.start(activeVehicleId);
+    }
+
+    function handleVisibilityChange() {
+      if (!document.hidden && callbacksRef && !stopped) poll(callbacksRef);
     }
 
     return {
@@ -96,6 +105,7 @@
           callbacks.onVehicles?.(vehicles);
           await poll(callbacks);
           timer = window.setInterval(() => poll(callbacks), interval());
+          document.addEventListener('visibilitychange', handleVisibilityChange);
           startLive(callbacks);
         } catch (error) {
           callbacks.onConnection(false, error.message || 'AWS API Fehler');
@@ -116,12 +126,17 @@
         callbacksRef = null;
         liveClient?.stop();
         liveClient = null;
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
         if (timer) window.clearInterval(timer);
         timer = null;
       },
 
       describe() {
-        return {
+        function handleVisibilityChange() {
+      if (!document.hidden && callbacksRef && !stopped) poll(callbacksRef);
+    }
+
+    return {
           type: 'aws-backend',
           apiBaseUrl: baseUrl(),
           websocketUrl: String(config.websocketUrl || ''),

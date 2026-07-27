@@ -706,10 +706,6 @@ Resources:
                 Resource: !GetAtt LiveConnectionTable.Arn
               - Effect: Allow
                 Action:
-                  - cognito-idp:GetUser
-                Resource: "*"
-              - Effect: Allow
-                Action:
                   - execute-api:ManageConnections
                 Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
 
@@ -722,11 +718,98 @@ Resources:
       Timeout: 10
       MemorySize: 128
       Role: !GetAtt LiveWebSocketRole.Arn
+      Environment:
+        Variables:
+          COGNITO_ISSUER: !Sub "https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${DashboardUserPool}"
+          COGNITO_CLIENT_ID: !Ref DashboardUserPoolClient
+          JWKS_CACHE_SECONDS: "3600"
       Code:
         ZipFile: |
-          import boto3
+          import base64
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.request
 
-          cognito = boto3.client("cognito-idp")
+          ISSUER = os.environ["COGNITO_ISSUER"].rstrip("/")
+          CLIENT_ID = os.environ["COGNITO_CLIENT_ID"]
+          JWKS_CACHE_SECONDS = int(os.environ.get("JWKS_CACHE_SECONDS", "3600"))
+          JWKS_URL = f"{ISSUER}/.well-known/jwks.json"
+          SHA256_DIGEST_INFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
+          _jwks_cache = {"expires_at": 0, "keys": {}}
+
+          class Unauthorized(Exception):
+              pass
+
+          def b64url_decode(value):
+              value = value.encode("ascii") if isinstance(value, str) else value
+              return base64.urlsafe_b64decode(value + b"=" * (-len(value) % 4))
+
+          def load_json_segment(segment):
+              try:
+                  return json.loads(b64url_decode(segment).decode("utf-8"))
+              except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                  raise Unauthorized("invalid JWT encoding") from error
+
+          def load_jwks(force_refresh=False):
+              now = time.time()
+              if not force_refresh and _jwks_cache["keys"] and now < _jwks_cache["expires_at"]:
+                  return _jwks_cache["keys"]
+              request = urllib.request.Request(JWKS_URL, headers={"Accept": "application/json"})
+              with urllib.request.urlopen(request, timeout=3) as response:
+                  payload = json.load(response)
+              keys = {item["kid"]: item for item in payload.get("keys", []) if item.get("kid")}
+              if not keys:
+                  raise Unauthorized("JWKS contains no signing keys")
+              _jwks_cache["keys"] = keys
+              _jwks_cache["expires_at"] = now + JWKS_CACHE_SECONDS
+              return keys
+
+          def verify_rs256(signing_input, signature, jwk):
+              if jwk.get("kty") != "RSA" or jwk.get("alg", "RS256") != "RS256":
+                  raise Unauthorized("unsupported signing key")
+              modulus = int.from_bytes(b64url_decode(jwk["n"]), "big")
+              exponent = int.from_bytes(b64url_decode(jwk["e"]), "big")
+              key_size = (modulus.bit_length() + 7) // 8
+              if len(signature) != key_size:
+                  raise Unauthorized("invalid signature size")
+              encoded = pow(int.from_bytes(signature, "big"), exponent, modulus).to_bytes(key_size, "big")
+              digest_info = SHA256_DIGEST_INFO_PREFIX + hashlib.sha256(signing_input).digest()
+              padding_length = key_size - len(digest_info) - 3
+              expected = b"\x00\x01" + (b"\xff" * padding_length) + b"\x00" + digest_info
+              if padding_length < 8 or encoded != expected:
+                  raise Unauthorized("invalid JWT signature")
+
+          def validate_access_token(token):
+              parts = token.split(".")
+              if len(parts) != 3:
+                  raise Unauthorized("invalid JWT structure")
+              header = load_json_segment(parts[0])
+              claims = load_json_segment(parts[1])
+              if header.get("alg") != "RS256" or not header.get("kid"):
+                  raise Unauthorized("invalid JWT header")
+              keys = load_jwks()
+              jwk = keys.get(header["kid"])
+              if not jwk:
+                  jwk = load_jwks(force_refresh=True).get(header["kid"])
+              if not jwk:
+                  raise Unauthorized("unknown signing key")
+              verify_rs256(f"{parts[0]}.{parts[1]}".encode("ascii"), b64url_decode(parts[2]), jwk)
+              now = int(time.time())
+              if claims.get("iss") != ISSUER:
+                  raise Unauthorized("invalid issuer")
+              if claims.get("token_use") != "access":
+                  raise Unauthorized("access token required")
+              if claims.get("client_id") != CLIENT_ID:
+                  raise Unauthorized("invalid client")
+              if not isinstance(claims.get("exp"), (int, float)) or int(claims["exp"]) <= now:
+                  raise Unauthorized("token expired")
+              if isinstance(claims.get("nbf"), (int, float)) and int(claims["nbf"]) > now:
+                  raise Unauthorized("token not active")
+              if not claims.get("sub"):
+                  raise Unauthorized("subject missing")
+              return claims
 
           def policy(principal, effect, resource, context=None):
               return {
@@ -747,14 +830,13 @@ Resources:
               if not token:
                   raise Exception("Unauthorized")
               try:
-                  user = cognito.get_user(AccessToken=token)
-                  attributes = {item["Name"]: item["Value"] for item in user.get("UserAttributes", [])}
-                  subject = attributes.get("sub", user.get("Username", "dashboard-user"))
-                  return policy(subject, "Allow", event["methodArn"], {
-                      "sub": subject,
-                      "username": user.get("Username", "")
+                  claims = validate_access_token(token)
+                  return policy(claims["sub"], "Allow", event["methodArn"], {
+                      "sub": claims["sub"],
+                      "username": claims.get("username", "")
                   })
-              except cognito.exceptions.NotAuthorizedException:
+              except Exception as error:
+                  print(json.dumps({"event": "live_authorizer_denied", "reason": str(error)}))
                   raise Exception("Unauthorized")
 
   LiveHandlerFunction:

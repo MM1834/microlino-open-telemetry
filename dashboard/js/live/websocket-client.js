@@ -12,11 +12,17 @@
     let reconnectAttempt = 0;
     let activeVehicleId = null;
     let pingTimer = null;
+    let consecutiveFailures = 0;
+    let lastToken = '';
 
     const endpointUrl = () => String(cfg.websocketUrl || '').trim();
     const heartbeatMs = () => {
       const value = Number(cfg.heartbeatMs ?? 30000);
       return Number.isFinite(value) && value >= 10000 ? value : 30000;
+    };
+    const maxReconnectAttempts = () => {
+      const value = Number(cfg.maxReconnectAttempts ?? 5);
+      return Number.isInteger(value) && value >= 0 ? value : 5;
     };
     const reconnectDelays = () => {
       const configured = Array.isArray(cfg.reconnectDelaysMs)
@@ -51,6 +57,12 @@
 
     function scheduleReconnect() {
       if (stopped || reconnectTimer) return;
+      if (consecutiveFailures >= maxReconnectAttempts()) {
+        emitState('paused', 'Live-Verbindung nach wiederholten Fehlern pausiert', {
+          failures: consecutiveFailures
+        });
+        return;
+      }
       const delays = reconnectDelays();
       const index = Math.min(reconnectAttempt, delays.length - 1);
       const delayMs = delays[index];
@@ -71,6 +83,11 @@
       try {
         const token = typeof getAccessToken === 'function' ? await getAccessToken() : '';
         if (!token) throw new Error('Access Token fehlt');
+        if (lastToken && token !== lastToken) {
+          reconnectAttempt = 0;
+          consecutiveFailures = 0;
+        }
+        lastToken = token;
 
         const endpoint = new URL(endpointUrl());
         endpoint.searchParams.set('access_token', token);
@@ -78,6 +95,7 @@
 
         socket.addEventListener('open', () => {
           reconnectAttempt = 0;
+          consecutiveFailures = 0;
           emitState('connected', 'WebSocket verbunden');
           if (activeVehicleId) subscribe(activeVehicleId);
           pingTimer = window.setInterval(() => send({ action: 'ping' }), heartbeatMs());
@@ -106,13 +124,18 @@
           pingTimer = null;
           socket = null;
           if (!stopped) {
-            emitState('disconnected', `Verbindung getrennt (${event.code})`, { code: event.code });
+            consecutiveFailures += 1;
+            emitState('disconnected', `Verbindung getrennt (${event.code})`, {
+              code: event.code,
+              failures: consecutiveFailures
+            });
             scheduleReconnect();
           } else {
             emitState('disabled', 'Live-Verbindung beendet');
           }
         });
       } catch (error) {
+        consecutiveFailures += 1;
         onError(error);
         emitState('disconnected', error.message || 'Live-Verbindung fehlgeschlagen');
         scheduleReconnect();
@@ -122,6 +145,8 @@
     return {
       start(vehicleId) {
         stopped = false;
+        reconnectAttempt = 0;
+        consecutiveFailures = 0;
         activeVehicleId = vehicleId || activeVehicleId;
         if (!endpointUrl()) {
           emitState('disabled', 'WebSocket URL nicht konfiguriert');
@@ -143,7 +168,9 @@
           websocketUrl: endpointUrl(),
           vehicleId: activeVehicleId,
           reconnectDelaysMs: reconnectDelays(),
-          heartbeatMs: heartbeatMs()
+          heartbeatMs: heartbeatMs(),
+          maxReconnectAttempts: maxReconnectAttempts(),
+          consecutiveFailures
         };
       }
     };
