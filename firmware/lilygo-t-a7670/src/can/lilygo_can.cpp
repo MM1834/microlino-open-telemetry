@@ -5,6 +5,7 @@
 #include "board_config.h"
 #include "can/can_types.h"
 #include "decoders/decoder_engine.h"
+#include "config/lilygo_config.h"
 
 static bool canReadyFlag = false;
 static uint32_t framesRx = 0;
@@ -96,7 +97,7 @@ void setupLilygoCan()
 
     canReadyFlag = true;
     lastError = "";
-    Serial.println("CAN input started");
+    Serial.printf("CAN input started: %s (%s)\n", decoderProfileName(config.canProfile), decoderProfileKey(config.canProfile));
 }
 
 void lilygoCanLoop()
@@ -121,7 +122,7 @@ void lilygoCanLoop()
         for (uint8_t i = 0; i < frame.dlc && i < 8; ++i) {
             frame.data[i] = msg.data[i];
         }
-        decoderEngineHandleFrame(frame);
+        decoderEngineHandleFrame(frame, config.canProfile);
 
         logFrame(msg);
     }
@@ -147,6 +148,10 @@ String lilygoCanStatusJson()
     json += "\"rxPin\":" + String(CAN_RX_PIN) + ",";
     json += "\"txPin\":" + String(CAN_TX_PIN) + ",";
     json += "\"bitrate\":\"500k\",";
+    json += "\"profileId\":" + String((int)config.canProfile) + ",";
+    json += "\"profileKey\":\"" + String(decoderProfileKey(config.canProfile)) + "\",";
+    json += "\"profileName\":\"" + String(decoderProfileName(config.canProfile)) + "\",";
+    json += "\"profileImplemented\":" + String(decoderProfileImplemented(config.canProfile) ? "true" : "false") + ",";
     json += "\"framesRx\":" + String(framesRx) + ",";
     json += "\"framesStd\":" + String(framesStd) + ",";
     json += "\"framesExt\":" + String(framesExt) + ",";

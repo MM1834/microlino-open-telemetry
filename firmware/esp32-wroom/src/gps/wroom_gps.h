@@ -16,4 +16,5 @@ double wroomGpsCourseDegrees();
 uint32_t wroomGpsSatellites();
 double wroomGpsHdop();
 uint32_t wroomGpsLocationAgeMs();
+String wroomGpsUtc();
 String wroomGpsStatusJson();

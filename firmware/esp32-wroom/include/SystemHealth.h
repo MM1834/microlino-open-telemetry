@@ -17,6 +17,15 @@ struct SystemHealthResult {
   bool tcpOk = false;
   bool mqttOk = false;
   bool canOk = false;
+  bool gpsStarted = false;
+  bool gpsSeen = false;
+  bool gpsValid = false;
+  double gpsLatitude = 0.0;
+  double gpsLongitude = 0.0;
+  uint32_t gpsSatellites = 0;
+  double gpsHdop = 0.0;
+  uint32_t gpsAgeMs = 0;
+  String utc;
 
   MqttDiagResult mqtt;
 };

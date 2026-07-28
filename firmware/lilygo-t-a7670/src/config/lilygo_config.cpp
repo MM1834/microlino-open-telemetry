@@ -42,6 +42,8 @@ void loadLilygoConfig()
     config.mqttPort = prefs.isKey("mqttPort") ? prefs.getUShort("mqttPort", 1883) : 1883;
     config.mqttUser = getStringOrDefault("mqttUser", "");
     config.mqttPass = getStringOrDefault("mqttPass", "");
+    config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
+    config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
     config.deviceName = getStringOrDefault("deviceName", "");
     config.vehicleId = getStringOrDefault("vehicleId", "pioneer");
     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
@@ -50,6 +52,7 @@ void loadLilygoConfig()
     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
     config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
+    config.canProfile = decoderProfileNormalize(prefs.isKey("canProfile") ? prefs.getUChar("canProfile", DECODER_PROFILE_DISPLAY_CAN) : DECODER_PROFILE_DISPLAY_CAN);
 
     prefs.end();
 
@@ -71,6 +74,8 @@ void saveLilygoConfig()
     prefs.putUShort("mqttPort", config.mqttPort);
     prefs.putString("mqttUser", config.mqttUser);
     prefs.putString("mqttPass", config.mqttPass);
+    prefs.putBool("svcMqtt", config.mqttServiceEnabled);
+    prefs.putBool("svcAws", config.awsServiceEnabled);
     prefs.putString("deviceName", config.deviceName);
     prefs.putString("vehicleId", config.vehicleId);
     prefs.putString("mqttPrefix", config.mqttPrefix);
@@ -79,6 +84,7 @@ void saveLilygoConfig()
     prefs.putBool("abrpEnabled", config.abrpEnabled);
     prefs.putString("abrpApiKey", config.abrpApiKey);
     prefs.putString("abrpUserToken", config.abrpUserToken);
+    prefs.putUChar("canProfile", (uint8_t)config.canProfile);
     prefs.end();
 }
 
@@ -107,9 +113,11 @@ String lilygoConfigJson(bool includeSecrets)
     json += "\"mqttPrefix\":\"" + esc(config.mqttPrefix) + "\",";
     json += "\"wifiSsid\":\"" + esc(config.wifiSsid) + "\",";
     json += "\"lteApn\":\"" + esc(config.lteApn) + "\",";
+    json += "\"services\":{\"mqtt\":" + String(config.mqttServiceEnabled ? "true" : "false") + ",\"aws\":" + String(config.awsServiceEnabled ? "true" : "false") + ",\"abrp\":" + String(config.abrpEnabled ? "true" : "false") + "},";
     json += "\"mqttHost\":\"" + esc(config.mqttHost) + "\",";
     json += "\"mqttPort\":" + String(config.mqttPort) + ",";
-    json += "\"otaEnabled\":" + String(config.otaEnabled ? "true" : "false");
+    json += "\"otaEnabled\":" + String(config.otaEnabled ? "true" : "false") + ",";
+    json += "\"canProfile\":" + String((int)config.canProfile);
     if (includeSecrets) {
         json += ",\"wifiPass\":\"" + esc(config.wifiPass) + "\"";
         json += ",\"lteUser\":\"" + esc(config.lteUser) + "\"";

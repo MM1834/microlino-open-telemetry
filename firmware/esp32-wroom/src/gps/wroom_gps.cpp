@@ -46,4 +46,8 @@ double wroomGpsCourseDegrees() { return gps.courseDegrees(); }
 uint32_t wroomGpsSatellites() { return gps.satellites(); }
 double wroomGpsHdop() { return gps.hdop(); }
 uint32_t wroomGpsLocationAgeMs() { return gps.locationAgeMs(); }
+String wroomGpsUtc() {
+    char utc[32];
+    return gps.utcIso8601(utc, sizeof(utc)) ? String(utc) : String();
+}
 String wroomGpsStatusJson() { return gps.statusJson(); }

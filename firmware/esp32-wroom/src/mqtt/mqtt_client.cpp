@@ -74,6 +74,7 @@ static void reconnectMqtt()
 void setupMqtt()
 {
 #ifdef MOT_AWS_IOT
+    if (!config.awsEnabled()) { Serial.println("AWS IoT: disabled by service configuration"); return; }
     if (!motLoadAwsCredentials(awsCredentials)) {
         Serial.printf(
             "AWS IoT: credentials unavailable: %s\n",
@@ -108,6 +109,7 @@ void setupMqtt()
 void mqttLoop()
 {
 #ifdef MOT_AWS_IOT
+    if (!config.awsEnabled()) return;
     awsClient.loop(awsRuntime(), networkOnline());
 #else
     if (!config.mqttEnabled()) return;
@@ -119,7 +121,7 @@ void mqttLoop()
 void publishTelemetry()
 {
 #ifdef MOT_AWS_IOT
-    if (!awsClient.connected()) return;
+    if (!config.awsEnabled() || !awsClient.connected()) return;
 
     awsClient.publishFloat("display/soc", telemetry.display.soc);
     awsClient.publishFloat(

@@ -2,11 +2,7 @@
 
 #include <Arduino.h>
 
-enum DecoderProfile {
-    DECODER_DISPLAY_CAN = 0,
-    DECODER_BMS_1 = 1,
-    DECODER_BMS_2 = 2
-};
+#include "common/decoders/decoder_profile.h"
 
 struct AppConfig {
     String vehicleName = "Microlino Pioneer";   // Display name only
@@ -21,12 +17,15 @@ struct AppConfig {
     uint16_t mqttPort = 1883;
     String mqttUser;
     String mqttPass;
+    bool mqttServiceEnabled = false;
+    bool awsServiceEnabled = true;
 
     String abrpApiKey;
     String abrpUserToken;
+    bool abrpServiceEnabled = false;
 
-    DecoderProfile can1Profile = DECODER_DISPLAY_CAN;
-    DecoderProfile can2Profile = DECODER_BMS_1;
+    DecoderProfile can1Profile = DECODER_PROFILE_DISPLAY_CAN;
+    DecoderProfile can2Profile = DECODER_PROFILE_DISABLED;
 
     bool otaEnabled = false;
     String otaPassword;
@@ -34,6 +33,7 @@ struct AppConfig {
     uint32_t publishIntervalMs = 5000;
 
     bool mqttEnabled() const;
+    bool awsEnabled() const;
     bool abrpEnabled() const;
     String mqttClientId() const;
 };
@@ -45,4 +45,3 @@ void saveConfig();
 void clearConfig();
 String configToJson(bool includeSecrets = true);
 bool importConfigJson(const String& json, String& error);
-const char *decoderProfileName(DecoderProfile profile);

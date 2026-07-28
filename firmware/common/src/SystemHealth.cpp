@@ -4,6 +4,10 @@ static String boolJson(bool v) {
   return v ? "true" : "false";
 }
 
+static String numberOrNull(double value, unsigned int decimals) {
+  return isnan(value) ? String("null") : String(value, decimals);
+}
+
 static String esc(const String& s) {
   String out;
   out.reserve(s.length() + 8);
@@ -53,6 +57,16 @@ String SystemHealth::toJson(const SystemHealthResult& h) {
   json += "\"tcpOk\":" + boolJson(h.tcpOk) + ",";
   json += "\"mqttOk\":" + boolJson(h.mqttOk) + ",";
   json += "\"canOk\":" + boolJson(h.canOk) + ",";
+  json += "\"utc\":\"" + esc(h.utc) + "\",";
+  json += "\"gps\":{";
+  json += "\"started\":" + boolJson(h.gpsStarted) + ",";
+  json += "\"seen\":" + boolJson(h.gpsSeen) + ",";
+  json += "\"valid\":" + boolJson(h.gpsValid) + ",";
+  json += "\"latitude\":" + numberOrNull(h.gpsLatitude, 6) + ",";
+  json += "\"longitude\":" + numberOrNull(h.gpsLongitude, 6) + ",";
+  json += "\"satellites\":" + String(h.gpsSatellites) + ",";
+  json += "\"hdop\":" + numberOrNull(h.gpsHdop, 2) + ",";
+  json += "\"ageMs\":" + String(h.gpsAgeMs) + "},";
   json += "\"mqtt\":" + MqttDiagnostics::toJson(h.mqtt);
   json += "}";
   return json;

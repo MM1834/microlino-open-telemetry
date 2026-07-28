@@ -38,10 +38,23 @@ static String pageHeader(const char* title)
     s += "textarea{width:100%;box-sizing:border-box;min-height:180px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}";
     s += ".muted{color:#666}";
     s += "button{padding:10px 16px;border-radius:8px;border:1px solid #999;background:#f5f5f5;margin:4px}";
-    s += "input{padding:9px;width:100%;box-sizing:border-box;margin:6px 0 10px}";
+    s += "input,select{padding:9px;width:100%;box-sizing:border-box;margin:6px 0 10px}";
     s += "label{font-weight:600}";
     s += "</style></head><body>";
 
+    return s;
+}
+
+static String profileOptions(DecoderProfile current)
+{
+    String s;
+    for (size_t i = 0; i < decoderProfileCount(); ++i) {
+        const DecoderProfileDescriptor &profile = decoderProfileAt(i);
+        if (profile.id == DECODER_PROFILE_DISABLED) continue;
+        s += "<option value='" + String((int)profile.id) + "'";
+        if (profile.id == current) s += " selected";
+        s += ">" + String(profile.name) + "</option>";
+    }
     return s;
 }
 
@@ -62,7 +75,7 @@ static void handleRoot()
 
     s += "<div class='card'><h2>Network</h2><button onclick='loadNetwork()'>Refresh</button><pre id='network'>Loading...</pre></div>";
     s += "<div class='card'><h2>LTE Modem</h2><p><a href='/api/lilygo/lte/debug'>LTE Debug</a> · <a href='/api/lilygo/lte/rx-debug'>LTE RX Debug</a> · <a href='/api/lilygo/lte/tcp-test'>LTE TCP Test</a></p><button onclick='loadModem()'>Refresh</button><pre id='modem'>Loading...</pre></div>";
-    s += "<div class='card'><h2>L76K GPS</h2><button onclick='loadGps()'>Refresh</button><pre id='gps'>Loading...</pre></div>";
+    s += "<div class='card'><h2>GPS Status & Location</h2><p class='muted'>Shows UART state, NMEA reception, fix, coordinates, satellites, HDOP, fix age and GPS UTC.</p><button onclick='loadGps()'>Refresh</button><pre id='gps'>Loading...</pre></div>";
     s += "<div class='card'><h2>CAN Input</h2><button onclick='loadCan()'>Refresh</button><pre id='can'>Loading...</pre><p><a href='/api/lilygo/can/frames'>Latest frames JSON</a></p></div>";
     s += "<div class='card'><h2>Decoded Telemetry</h2><button onclick='loadTelemetry()'>Refresh</button><pre id='telemetry'>Loading...</pre></div>";
 
@@ -101,6 +114,15 @@ static void handleConfig()
     s += "<label>Device name</label><input name='deviceName' value='" + lilygoDeviceName() + "'>";
     s += "<label>Vehicle ID</label><input name='vehicleId' value='" + config.vehicleId + "'>";
     s += "<label>MQTT Prefix</label><input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
+    s += "<div class='card'><h2>CAN channels</h2><h3>CAN 1</h3><p>Available · ESP32 TWAI</p>";
+    s += "<label>Decoder profile</label><select name='canProfile'>" + profileOptions(config.canProfile) + "</select>";
+    s += "<p class='muted'>Display CAN is active. Standard CAN is a template and intentionally decodes no values until official PIDs are available.</p><hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on LilyGO T-A7670 hardware.</p></div>";
+
+    s += "<div class='card'><h2>Services</h2>";
+    s += "<label><input type='checkbox' style='width:auto' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label>";
+    s += "<label><input type='checkbox' style='width:auto' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label>";
+    s += "<label><input type='checkbox' style='width:auto' name='abrpEnabled' value='1'" + String(config.abrpEnabled ? " checked" : "") + "> ABRP</label>";
+    s += "<p class='muted'>Each service is optional. GPS and CAN data are shared telemetry sources.</p></div>";
 
     s += "<label>WiFi SSID</label><input name='wifiSsid' value='" + config.wifiSsid + "'>";
     s += "<label>WiFi Password</label><input name='wifiPass' type='password' value='" + config.wifiPass + "'>";
@@ -114,7 +136,6 @@ static void handleConfig()
 
     s += "<label>OTA Password</label><input name='otaPassword' type='password' value='" + config.otaPassword + "'>";
 
-    s += "<label>ABRP enabled</label><input name='abrpEnabled' value='" + String(config.abrpEnabled ? "1" : "0") + "'>";
     s += "<label>ABRP API Key</label><input name='abrpApiKey' type='password' value='" + config.abrpApiKey + "'>";
     s += "<label>ABRP User Token</label><input name='abrpUserToken' type='password' value='" + config.abrpUserToken + "'>";
 
@@ -148,12 +169,15 @@ static void handleConfigSave()
     config.deviceName = server.arg("deviceName");
     config.vehicleId = server.arg("vehicleId");
     config.mqttPrefix = server.arg("mqttPrefix");
+    config.canProfile = decoderProfileNormalize(server.arg("canProfile").toInt());
 
     config.wifiSsid = server.arg("wifiSsid");
     config.wifiPass = server.arg("wifiPass");
 
     config.lteApn = server.arg("lteApn");
 
+    config.awsServiceEnabled = server.hasArg("svcAws");
+    config.mqttServiceEnabled = server.hasArg("svcMqtt");
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = (uint16_t)server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;
@@ -202,6 +226,7 @@ static void handleConfigImport()
     if (doc["deviceName"].is<const char*>()) config.deviceName = doc["deviceName"].as<String>();
     if (doc["vehicleId"].is<const char*>()) config.vehicleId = doc["vehicleId"].as<String>();
     if (doc["mqttPrefix"].is<const char*>()) config.mqttPrefix = doc["mqttPrefix"].as<String>();
+    if (doc["canProfile"].is<int>()) config.canProfile = decoderProfileNormalize(doc["canProfile"].as<int>());
 
     if (doc["wifiSsid"].is<const char*>()) config.wifiSsid = doc["wifiSsid"].as<String>();
     if (doc["wifiPass"].is<const char*>()) config.wifiPass = doc["wifiPass"].as<String>();
@@ -209,6 +234,10 @@ static void handleConfigImport()
     if (doc["lteApn"].is<const char*>()) config.lteApn = doc["lteApn"].as<String>();
     if (doc["lteUser"].is<const char*>()) config.lteUser = doc["lteUser"].as<String>();
     if (doc["ltePass"].is<const char*>()) config.ltePass = doc["ltePass"].as<String>();
+
+    if (doc["services"]["mqtt"].is<bool>()) config.mqttServiceEnabled = doc["services"]["mqtt"].as<bool>();
+    if (doc["services"]["aws"].is<bool>()) config.awsServiceEnabled = doc["services"]["aws"].as<bool>();
+    if (doc["services"]["abrp"].is<bool>()) config.abrpEnabled = doc["services"]["abrp"].as<bool>();
 
     if (doc["mqttHost"].is<const char*>()) config.mqttHost = doc["mqttHost"].as<String>();
     if (doc["mqttPort"].is<int>()) config.mqttPort = (uint16_t)doc["mqttPort"].as<int>();

@@ -5,6 +5,7 @@
 #include "driver/twai.h"
 #include "can/can_types.h"
 #include "decoders/decoder_engine.h"
+#include "../app_config.h"
 
 static bool canStarted = false;
 
@@ -32,7 +33,7 @@ void setupCanInput()
     }
 
     canStarted = true;
-    Serial.println("CAN input 1 started: Microlino Display CAN");
+    Serial.printf("CAN input 1 started: %s (%s)\n", decoderProfileName(config.can1Profile), decoderProfileKey(config.can1Profile));
 }
 
 void processCanInput()
@@ -53,5 +54,5 @@ void processCanInput()
         frame.data[i] = msg.data[i];
     }
 
-    decoderEngineHandleFrame(frame);
+    decoderEngineHandleFrame(frame, config.can1Profile);
 }

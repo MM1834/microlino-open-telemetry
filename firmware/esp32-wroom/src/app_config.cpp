@@ -39,10 +39,13 @@ void loadConfig()
     config.mqttPort = prefs.getUShort("mqttPort", 1883);
     config.mqttUser = prefs.getString("mqttUser", "");
     config.mqttPass = prefs.getString("mqttPass", "");
+    config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
+    config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
     config.abrpApiKey = prefs.getString("abrpKey", "");
     config.abrpUserToken = prefs.getString("abrpToken", "");
-    config.can1Profile = (DecoderProfile)prefs.getUChar("can1", DECODER_DISPLAY_CAN);
-    config.can2Profile = (DecoderProfile)prefs.getUChar("can2", DECODER_BMS_1);
+    config.abrpServiceEnabled = prefs.isKey("svcAbrp") ? prefs.getBool("svcAbrp", false) : (!config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty());
+    config.can1Profile = decoderProfileNormalize(prefs.getUChar("can1", DECODER_PROFILE_DISPLAY_CAN));
+    config.can2Profile = decoderProfileNormalize(prefs.getUChar("can2", DECODER_PROFILE_DISABLED), DECODER_PROFILE_DISABLED);
     config.otaEnabled = prefs.getBool("otaEn", false);
     config.otaPassword = prefs.getString("otaPass", "");
     config.publishIntervalMs = prefs.getUInt("pubMs", 5000);
@@ -62,8 +65,11 @@ void saveConfig()
     prefs.putUShort("mqttPort", config.mqttPort);
     prefs.putString("mqttUser", config.mqttUser);
     prefs.putString("mqttPass", config.mqttPass);
+    prefs.putBool("svcMqtt", config.mqttServiceEnabled);
+    prefs.putBool("svcAws", config.awsServiceEnabled);
     prefs.putString("abrpKey", config.abrpApiKey);
     prefs.putString("abrpToken", config.abrpUserToken);
+    prefs.putBool("svcAbrp", config.abrpServiceEnabled);
     prefs.putUChar("can1", config.can1Profile);
     prefs.putUChar("can2", config.can2Profile);
     prefs.putBool("otaEn", config.otaEnabled);
@@ -80,22 +86,20 @@ void clearConfig()
     config = AppConfig();
 }
 
-const char *decoderProfileName(DecoderProfile profile)
-{
-    switch (profile) {
-        case DECODER_DISPLAY_CAN: return "Microlino Display CAN";
-        case DECODER_BMS_1: return "Microlino CAN (BMS 1 / Pioneer)";
-        case DECODER_BMS_2: return "Microlino CAN (BMS 2 / Standard CAN)";
-        default: return "Unknown";
-    }
-}
-
-
 bool AppConfig::mqttEnabled() const
 {
     String h = mqttHost;
     h.trim();
-    return !h.isEmpty();
+    return mqttServiceEnabled && !h.isEmpty();
+}
+
+bool AppConfig::awsEnabled() const
+{
+#ifdef MOT_AWS_IOT
+    return awsServiceEnabled;
+#else
+    return false;
+#endif
 }
 
 bool AppConfig::abrpEnabled() const
@@ -104,7 +108,7 @@ bool AppConfig::abrpEnabled() const
     String token = abrpUserToken;
     key.trim();
     token.trim();
-    return !key.isEmpty() && !token.isEmpty();
+    return abrpServiceEnabled && !key.isEmpty() && !token.isEmpty();
 }
 
 String AppConfig::mqttClientId() const
@@ -130,6 +134,10 @@ String configToJson(bool includeSecrets)
 
     doc["wifiSsid"] = config.wifiSsid;
     if (includeSecrets) doc["wifiPass"] = config.wifiPass;
+
+    doc["services"]["mqtt"] = config.mqttServiceEnabled;
+    doc["services"]["aws"] = config.awsServiceEnabled;
+    doc["services"]["abrp"] = config.abrpServiceEnabled;
 
     doc["mqttHost"] = config.mqttHost;
     doc["mqttPort"] = config.mqttPort;
@@ -173,6 +181,10 @@ bool importConfigJson(const String& json, String& error)
     setStringIfPresent(doc, "wifiSsid", config.wifiSsid);
     setStringIfPresent(doc, "wifiPass", config.wifiPass);
 
+    if (!doc["services"]["mqtt"].isNull()) config.mqttServiceEnabled = doc["services"]["mqtt"].as<bool>();
+    if (!doc["services"]["aws"].isNull()) config.awsServiceEnabled = doc["services"]["aws"].as<bool>();
+    if (!doc["services"]["abrp"].isNull()) config.abrpServiceEnabled = doc["services"]["abrp"].as<bool>();
+
     setStringIfPresent(doc, "mqttHost", config.mqttHost);
     if (!doc["mqttPort"].isNull()) config.mqttPort = doc["mqttPort"].as<uint16_t>();
     setStringIfPresent(doc, "mqttUser", config.mqttUser);
@@ -182,8 +194,8 @@ bool importConfigJson(const String& json, String& error)
     setStringIfPresent(doc, "abrpApiKey", config.abrpApiKey);
     setStringIfPresent(doc, "abrpUserToken", config.abrpUserToken);
 
-    if (!doc["can1Profile"].isNull()) config.can1Profile = (DecoderProfile)doc["can1Profile"].as<int>();
-    if (!doc["can2Profile"].isNull()) config.can2Profile = (DecoderProfile)doc["can2Profile"].as<int>();
+    if (!doc["can1Profile"].isNull()) config.can1Profile = decoderProfileNormalize(doc["can1Profile"].as<int>());
+    if (!doc["can2Profile"].isNull()) config.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
 
     if (!doc["otaEnabled"].isNull()) config.otaEnabled = doc["otaEnabled"].as<bool>();
     setStringIfPresent(doc, "otaPassword", config.otaPassword);

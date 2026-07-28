@@ -13,6 +13,7 @@
 #include "system/version.h"
 #include "MqttDiagnostics.h"
 #include "SystemHealth.h"
+#include "../gps/wroom_gps.h"
 #include <WiFi.h>
 
 static WebServer server(80);
@@ -40,6 +41,17 @@ static String option(int value, int current, const char *label)
     return s;
 }
 
+static String profileOptions(DecoderProfile current, bool includeDisabled)
+{
+    String s;
+    for (size_t i = 0; i < decoderProfileCount(); ++i) {
+        const DecoderProfileDescriptor &profile = decoderProfileAt(i);
+        if (!includeDisabled && profile.id == DECODER_PROFILE_DISABLED) continue;
+        s += option((int)profile.id, (int)current, profile.name);
+    }
+    return s;
+}
+
 static void handleStatus()
 {
     String s = htmlHeader("MOT Status");
@@ -47,7 +59,9 @@ static void handleStatus()
     s += "<p class='muted'>" MOT_VERSION " · "; s += motDeviceId(); s += "</p>";
 
     s += "<div class='card'><h2>Live Data</h2>";
-    s += "Display CAN: "; s += telemetry.display.valid ? "valid" : "waiting"; s += "<br>";
+    s += "CAN profile: "; s += decoderProfileName(config.can1Profile); s += "<br>";
+    s += "Decoder: "; s += decoderProfileImplemented(config.can1Profile) ? "active" : "template / no decoded values"; s += "<br>";
+    s += "Telemetry: "; s += telemetry.display.valid ? "valid" : "waiting"; s += "<br>";
     s += "SOC: " + String(telemetry.display.soc, 1) + " %<br>";
     s += "Speed: " + String(telemetry.display.speedKmh, 1) + " km/h<br>";
     s += "ODO: " + String(telemetry.display.odometerKm, 1) + " km<br>";
@@ -65,14 +79,15 @@ static void handleStatus()
 
 
     s += "<div class='card'><h2>System Health</h2>";
-    s += "<p class='muted'>Prüft WiFi, DNS, TCP, MQTT und CAN-Status.</p>";
+    s += "<p class='muted'>Prüft System, Netzwerk, CAN sowie GPS-Modul, Fix, Position und UTC-Zeit.</p>";
     s += "<button type='button' onclick='loadSystemHealth()'>System Health prüfen</button>";
     s += "<pre id='system-health-result'>Noch nicht geprüft.</pre></div>";
     s += "<script>";
     s += "async function loadSystemHealth(){";
     s += "const out=document.getElementById('system-health-result');out.textContent='Prüfe System Health…';";
     s += "try{const r=await fetch('/api/system-health');const d=await r.json();";
-    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`;}";
+    s += "const g=d.gps||{};const pos=(g.latitude==null||g.longitude==null)?'--':`${Number(g.latitude).toFixed(6)}, ${Number(g.longitude).toFixed(6)}`;const hdop=g.hdop==null?'--':Number(g.hdop).toFixed(2);";
+    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS data  : ${g.seen?'RECEIVED':'WAITING'}\\nGPS fix   : ${g.valid?'VALID':'NO FIX'}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`; }";
     s += "catch(e){out.textContent='Fehler beim System-Health-Test: '+e.message;}}";
     s += "</script>";
 
@@ -102,6 +117,12 @@ static void handleConfig()
     s += "WiFi SSID<input name='wifiSsid' value='" + config.wifiSsid + "'>";
     s += "WiFi Password<input name='wifiPass' type='password' value='" + config.wifiPass + "'></div>";
 
+    s += "<div class='card'><h2>Services</h2>";
+    s += "<label><input style='width:auto' type='checkbox' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label><br>";
+    s += "<label><input style='width:auto' type='checkbox' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label><br>";
+    s += "<label><input style='width:auto' type='checkbox' name='svcAbrp' value='1'" + String(config.abrpServiceEnabled ? " checked" : "") + "> ABRP</label>";
+    s += "<p class='muted'>Services are independently configurable. AWS availability depends on the selected build target and provisioned credentials.</p></div>";
+
     s += "<div class='card'><h2>MQTT</h2>";
     s += "<p class='muted'>MQTT is optional. Leave host empty to disable MQTT without connection errors.</p>";
     s += "MQTT Host<input name='mqttHost' value='" + config.mqttHost + "'>";
@@ -123,17 +144,15 @@ static void handleConfig()
     s += "</script>";
 
 
-    s += "<div class='card'><h2>CAN</h2>";
-    s += "CAN 1 profile<select name='can1Profile'>";
-    s += option(0, (int)config.can1Profile, "Microlino Display CAN");
-    s += option(1, (int)config.can1Profile, "Microlino CAN (BMS 1 / Pioneer)");
-    s += option(2, (int)config.can1Profile, "Microlino CAN (BMS 2 / Standard CAN)");
+    s += "<div class='card'><h2>CAN channels</h2>";
+    s += "<h3>CAN 1</h3><p class='ok'>Available · ESP32 TWAI</p>";
+    s += "Active CAN profile<select name='can1Profile'>";
+    s += profileOptions(config.can1Profile, false);
     s += "</select>";
-    s += "CAN 2 profile<select name='can2Profile'>";
-    s += option(0, (int)config.can2Profile, "Disabled / unused");
-    s += option(1, (int)config.can2Profile, "Microlino CAN (BMS 1 / Pioneer)");
-    s += option(2, (int)config.can2Profile, "Microlino CAN (BMS 2 / Standard CAN)");
-    s += "</select><p class='muted'>v0.9.x WROOM uses CAN 1 only.</p></div>";
+    s += "<p class='muted'>Display CAN is production-ready. Standard CAN is a safe template and intentionally decodes no values until official PIDs are available.</p>";
+    s += "<input type='hidden' name='can2Profile' value='255'>";
+    s += "<hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on ESP32-WROOM hardware. Future multi-CAN targets can assign an independent decoder profile here.</p>";
+    s += "</div>";
 
     s += "<div class='card'><h2>OTA / ABRP</h2>";
     s += "<p class='muted'>ABRP is optional. It is only active when API key and user token are both configured.</p>";
@@ -191,6 +210,9 @@ static void handleSave()
     if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
     config.wifiSsid = server.arg("wifiSsid");
     config.wifiPass = server.arg("wifiPass");
+    config.awsServiceEnabled = server.hasArg("svcAws");
+    config.mqttServiceEnabled = server.hasArg("svcMqtt");
+    config.abrpServiceEnabled = server.hasArg("svcAbrp");
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;
@@ -198,8 +220,8 @@ static void handleSave()
     config.mqttPass = server.arg("mqttPass");
     config.publishIntervalMs = server.arg("pubMs").toInt();
     if (config.publishIntervalMs < 1000) config.publishIntervalMs = 5000;
-    config.can1Profile = (DecoderProfile)server.arg("can1Profile").toInt();
-    config.can2Profile = (DecoderProfile)server.arg("can2Profile").toInt();
+    config.can1Profile = decoderProfileNormalize(server.arg("can1Profile").toInt());
+    config.can2Profile = decoderProfileNormalize(server.arg("can2Profile").toInt(), DECODER_PROFILE_DISABLED);
     config.abrpApiKey = server.arg("abrpApiKey");
     config.abrpUserToken = server.arg("abrpToken");
     config.otaPassword = server.arg("otaPass");
@@ -287,6 +309,15 @@ static void handleApiSystemHealth()
     health.tcpOk = mqtt.tcpOk;
     health.mqttOk = mqtt.mqttOk;
     health.canOk = telemetry.display.valid;
+    health.gpsStarted = wroomGpsStarted();
+    health.gpsSeen = wroomGpsSeen();
+    health.gpsValid = wroomGpsValid();
+    health.gpsLatitude = wroomGpsLatitude();
+    health.gpsLongitude = wroomGpsLongitude();
+    health.gpsSatellites = wroomGpsSatellites();
+    health.gpsHdop = wroomGpsHdop();
+    health.gpsAgeMs = wroomGpsLocationAgeMs();
+    health.utc = wroomGpsUtc();
     health.mqtt = mqtt;
 
     server.send(200, "application/json", SystemHealth::toJson(health));
@@ -299,6 +330,7 @@ void setupWebUi()
     server.on("/api/status", handleApiStatus);
     server.on("/api/mqtt-test", handleApiMqttTest);
     server.on("/api/system-health", handleApiSystemHealth);
+    server.on("/api/gps", []() { server.send(200, "application/json", wroomGpsStatusJson()); });
     server.on("/config", handleConfig);
     server.on("/save", HTTP_POST, handleSave);
     server.on("/api/config/export", HTTP_GET, handleConfigExport);
