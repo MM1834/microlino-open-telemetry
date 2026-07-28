@@ -214,6 +214,16 @@ Resources:
               - Effect: Allow
                 Action: [dynamodb:UpdateItem]
                 Resource: !GetAtt VehicleStateTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:DeleteItem
+                Resource:
+                  - !GetAtt LiveConnectionTable.Arn
+                  - !Sub "${LiveConnectionTable.Arn}/index/vehicleId-index"
+              - Effect: Allow
+                Action: [execute-api:ManageConnections]
+                Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
 
   StateIngestFunction:
     Type: AWS::Lambda::Function
@@ -227,6 +237,9 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref VehicleStateTable
+          CONNECTION_TABLE_NAME: !Ref LiveConnectionTable
+          WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
+          WEBSOCKET_STAGE: "$default"
           VERBOSE_MESSAGE_LOGS: !Ref EnableVerboseMessageLogs
       Code:
         ZipFile: |
@@ -236,9 +249,19 @@ Resources:
           import time
           from decimal import Decimal
           import boto3
+          from boto3.dynamodb.conditions import Key
           from botocore.exceptions import ClientError
 
-          table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
+          dynamodb = boto3.resource("dynamodb")
+          table = dynamodb.Table(os.environ["TABLE_NAME"])
+          connections = dynamodb.Table(os.environ["CONNECTION_TABLE_NAME"])
+          management = boto3.client(
+              "apigatewaymanagementapi",
+              endpoint_url=(
+                  f"https://{os.environ['WEBSOCKET_API_ID']}.execute-api."
+                  f"{os.environ['AWS_REGION']}.amazonaws.com/{os.environ['WEBSOCKET_STAGE']}"
+              )
+          )
           verbose = os.environ.get("VERBOSE_MESSAGE_LOGS", "false").lower() == "true"
 
           def decode_payload(encoded):
@@ -258,6 +281,58 @@ Resources:
                   return kind, value, text, len(raw)
               except json.JSONDecodeError:
                   return "text", text, text, len(raw)
+
+          def json_value(value):
+              if isinstance(value, Decimal):
+                  return int(value) if value == value.to_integral_value() else float(value)
+              if isinstance(value, list):
+                  return [json_value(item) for item in value]
+              if isinstance(value, dict):
+                  return {key: json_value(item) for key, item in value.items()}
+              return value
+
+          def broadcast_live_update(vehicle_id, topic, topic_suffix, value, value_type, received_at):
+              result = connections.query(
+                  IndexName="vehicleId-index",
+                  KeyConditionExpression=Key("vehicleId").eq(vehicle_id),
+                  ProjectionExpression="connectionId"
+              )
+              connection_ids = [item.get("connectionId") for item in result.get("Items", [])]
+              if not connection_ids:
+                  return {"sent": 0, "removed": 0}
+
+              payload = json.dumps({
+                  "type": "telemetry",
+                  "vehicleId": vehicle_id,
+                  "topic": topic,
+                  "topicSuffix": topic_suffix,
+                  "value": json_value(value),
+                  "valueType": value_type,
+                  "receivedAt": received_at
+              }, separators=(",", ":")).encode("utf-8")
+
+              sent = 0
+              removed = 0
+              for connection_id in connection_ids:
+                  if not connection_id:
+                      continue
+                  try:
+                      management.post_to_connection(ConnectionId=connection_id, Data=payload)
+                      sent += 1
+                  except ClientError as error:
+                      code = error.response.get("Error", {}).get("Code")
+                      status = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+                      if code == "GoneException" or status == 410:
+                          connections.delete_item(Key={"connectionId": connection_id})
+                          removed += 1
+                      else:
+                          print(json.dumps({
+                              "eventType": "live_fanout_error",
+                              "vehicleId": vehicle_id,
+                              "connectionId": connection_id,
+                              "error": str(error)
+                          }, separators=(",", ":")))
+              return {"sent": sent, "removed": removed}
 
           def handler(event, context):
               topic = str(event.get("mqttTopic", ""))
@@ -298,6 +373,20 @@ Resources:
                       print(json.dumps({"eventType":"state_ingest_error","topic":topic,"error":str(error)}))
                       raise
 
+              fanout = {"sent": 0, "removed": 0}
+              if stored:
+                  try:
+                      fanout = broadcast_live_update(
+                          vehicle_id, topic, topic_suffix, value, value_type, received_at
+                      )
+                  except Exception as error:
+                      print(json.dumps({
+                          "eventType": "live_fanout_failed",
+                          "vehicleId": vehicle_id,
+                          "topicSuffix": topic_suffix,
+                          "error": str(error)
+                      }, separators=(",", ":")))
+
               if verbose:
                   print(json.dumps({
                       "eventType":"state_updated",
@@ -305,10 +394,12 @@ Resources:
                       "topicSuffix":topic_suffix,
                       "valueType":value_type,
                       "receivedAt":received_at,
-                      "stored":stored
+                      "stored":stored,
+                      "liveSent":fanout["sent"],
+                      "staleConnectionsRemoved":fanout["removed"]
                   }, default=str, separators=(",", ":")))
 
-              return {"accepted": True, "stored": stored}
+              return {"accepted": True, "stored": stored, "live": fanout}
 
   StateIngestLogGroup:
     Type: AWS::Logs::LogGroup

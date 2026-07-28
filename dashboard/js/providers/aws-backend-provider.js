@@ -76,7 +76,20 @@
         config,
         getAccessToken: config.getAccessToken,
         onState: status => callbacks.onLiveConnection?.(status),
-        onMessage: message => callbacks.onLiveMessage?.(message),
+        onMessage: message => {
+          if (message?.type === 'telemetry') {
+            const vehicleId = String(message.vehicleId || '');
+            const topicSuffix = String(message.topicSuffix || '');
+            if (!vehicleId || !topicSuffix || vehicleId !== activeVehicleId) return;
+            const prefix = String(config.topicPrefix || 'mot').replace(/\/$/, '');
+            const payload = typeof message.value === 'string'
+              ? message.value
+              : JSON.stringify(message.value);
+            callbacks.onMessage(`${prefix}/${vehicleId}/${topicSuffix}`, payload);
+            return;
+          }
+          callbacks.onLiveMessage?.(message);
+        },
         onError: error => callbacks.onError(error)
       });
       liveClient.start(activeVehicleId);
@@ -132,11 +145,7 @@
       },
 
       describe() {
-        function handleVisibilityChange() {
-      if (!document.hidden && callbacksRef && !stopped) poll(callbacksRef);
-    }
-
-    return {
+        return {
           type: 'aws-backend',
           apiBaseUrl: baseUrl(),
           websocketUrl: String(config.websocketUrl || ''),
