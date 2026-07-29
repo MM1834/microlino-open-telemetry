@@ -49,6 +49,7 @@ void loadConfig()
     config.otaEnabled = prefs.getBool("otaEn", false);
     config.otaPassword = prefs.getString("otaPass", "");
     config.publishIntervalMs = prefs.getUInt("pubMs", 5000);
+    config.onboardingComplete = prefs.getBool("onboarded", false);
     prefs.end();
 }
 
@@ -75,6 +76,7 @@ void saveConfig()
     prefs.putBool("otaEn", config.otaEnabled);
     prefs.putString("otaPass", config.otaPassword);
     prefs.putUInt("pubMs", config.publishIntervalMs);
+    prefs.putBool("onboarded", config.onboardingComplete);
     prefs.end();
 }
 
@@ -151,6 +153,8 @@ String configToJson(bool includeSecrets)
     doc["can1Profile"] = (int)config.can1Profile;
     doc["can2Profile"] = (int)config.can2Profile;
 
+    doc["onboardingComplete"] = config.onboardingComplete;
+
     doc["otaEnabled"] = config.otaEnabled;
     if (includeSecrets) doc["otaPassword"] = config.otaPassword;
 
@@ -196,6 +200,8 @@ bool importConfigJson(const String& json, String& error)
 
     if (!doc["can1Profile"].isNull()) config.can1Profile = decoderProfileNormalize(doc["can1Profile"].as<int>());
     if (!doc["can2Profile"].isNull()) config.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
+
+    if (!doc["onboardingComplete"].isNull()) config.onboardingComplete = doc["onboardingComplete"].as<bool>();
 
     if (!doc["otaEnabled"].isNull()) config.otaEnabled = doc["otaEnabled"].as<bool>();
     setStringIfPresent(doc, "otaPassword", config.otaPassword);

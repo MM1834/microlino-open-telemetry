@@ -32,6 +32,8 @@ struct AppConfig {
 
     uint32_t publishIntervalMs = 5000;
 
+    bool onboardingComplete = false;
+
     bool mqttEnabled() const;
     bool awsEnabled() const;
     bool abrpEnabled() const;

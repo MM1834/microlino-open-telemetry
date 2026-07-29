@@ -19,7 +19,9 @@ struct SystemHealthResult {
   bool canOk = false;
   bool gpsStarted = false;
   bool gpsSeen = false;
+  bool gpsDetected = false;
   bool gpsValid = false;
+  String gpsState = "GPS_DISABLED";
   double gpsLatitude = 0.0;
   double gpsLongitude = 0.0;
   uint32_t gpsSatellites = 0;

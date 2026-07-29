@@ -61,7 +61,9 @@ String SystemHealth::toJson(const SystemHealthResult& h) {
   json += "\"gps\":{";
   json += "\"started\":" + boolJson(h.gpsStarted) + ",";
   json += "\"seen\":" + boolJson(h.gpsSeen) + ",";
+  json += "\"detected\":" + boolJson(h.gpsDetected) + ",";
   json += "\"valid\":" + boolJson(h.gpsValid) + ",";
+  json += "\"state\":\"" + esc(h.gpsState) + "\",";
   json += "\"latitude\":" + numberOrNull(h.gpsLatitude, 6) + ",";
   json += "\"longitude\":" + numberOrNull(h.gpsLongitude, 6) + ",";
   json += "\"satellites\":" + String(h.gpsSatellites) + ",";

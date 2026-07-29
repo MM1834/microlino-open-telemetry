@@ -37,7 +37,9 @@ void setupWroomGps()
 void wroomGpsLoop() { gps.loop(); }
 bool wroomGpsStarted() { return gps.started(); }
 bool wroomGpsSeen() { return gps.seen(); }
+bool wroomGpsDetected() { return gps.status().detected; }
 bool wroomGpsValid() { return gps.valid(); }
+String wroomGpsState() { return String(gps.stateName()); }
 double wroomGpsLatitude() { return gps.latitude(); }
 double wroomGpsLongitude() { return gps.longitude(); }
 double wroomGpsSpeedKmph() { return gps.speedKmph(); }

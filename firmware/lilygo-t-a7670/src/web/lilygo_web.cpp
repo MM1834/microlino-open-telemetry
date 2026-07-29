@@ -12,6 +12,7 @@
 #include "can/lilygo_can.h"
 #include "config/lilygo_config.h"
 #include "gps/l76k_gps.h"
+#include "onboarding/onboarding.h"
 #include "modem/lilygo_modem.h"
 #include "mqtt/lilygo_mqtt.h"
 #include "network/lilygo_network.h"
@@ -21,6 +22,21 @@
 static WebServer server(80);
 static bool rebootPending = false;
 static unsigned long rebootAtMs = 0;
+
+static String requestedReturnUrl()
+{
+    if (!server.hasArg("return")) return "";
+    String target = server.arg("return");
+    target.trim();
+    if (!target.startsWith("/wizard")) return "";
+    return target;
+}
+
+static String returnField(const String &target)
+{
+    if (target.isEmpty()) return "";
+    return "<input type='hidden' name='return' value='" + target + "'>";
+}
 
 static String pageHeader(const char* title)
 {
@@ -70,6 +86,8 @@ static void handleRoot()
     s += " · ";
     s += lilygoDeviceName();
     s += "</p>";
+    const String returnTo = requestedReturnUrl();
+    if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
 
     s += "<p><a href='/config'>Config</a> · <a href='/ota'>OTA</a> · <a href='/api/status'>Status JSON</a></p>";
 
@@ -106,11 +124,13 @@ static void handleRoot()
 
 static void handleConfig()
 {
+    const String returnTo = requestedReturnUrl();
     String s = pageHeader("MOT LilyGO Config");
 
     s += "<h1>Configuration</h1>";
 
     s += "<form method='POST' action='/config/save'>";
+    s += returnField(returnTo);
     s += "<label>Device name</label><input name='deviceName' value='" + lilygoDeviceName() + "'>";
     s += "<label>Vehicle ID</label><input name='vehicleId' value='" + config.vehicleId + "'>";
     s += "<label>MQTT Prefix</label><input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
@@ -159,7 +179,9 @@ static void handleConfig()
     s += "<form method='POST' action='/factory-reset' onsubmit=\"return confirm('Factory Reset wirklich ausführen? Alle Einstellungen werden gelöscht.');\">";
     s += "<button type='submit'>Clear config & reboot</button></form></div>";
 
-    s += "<p><a href='/'>Back</a></p></body></html>";
+    if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
+    else s += "<p><a href='/'>Back</a></p>";
+    s += "</body></html>";
 
     server.send(200, "text/html", s);
 }
@@ -195,7 +217,14 @@ static void handleConfigSave()
 
     saveLilygoConfig();
 
-    server.send(200, "text/html", "<p>Saved. Rebooting...</p>");
+    const String returnTo = requestedReturnUrl();
+    String response = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device is rebooting...</p>";
+    if (!returnTo.isEmpty()) {
+        response += "<p>Onboarding will resume automatically.</p><p><a href='" + returnTo + "'>Return to onboarding now</a></p>";
+        response += "<script>setTimeout(function(){location.href='" + returnTo + "';},4000);</script>";
+    }
+    response += "</body></html>";
+    server.send(200, "text/html", response);
     rebootPending = true;
     rebootAtMs = millis() + 1000;
 }
@@ -440,9 +469,102 @@ static void handleOtaUpload()
     }
 }
 
+
+static int requestedWizardStep()
+{
+    int step = server.hasArg("step") ? server.arg("step").toInt() : 1;
+    if (step < 1) step = 1;
+    if (step > onboardingStepCount()) step = onboardingStepCount();
+    return step;
+}
+
+static String wizardNavigation(int step)
+{
+    String html = "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:18px'>";
+    if (step > 1) html += "<a href='/wizard?step=" + String(step - 1) + "'><button type='button'>Back</button></a>";
+    if (step < onboardingStepCount()) html += "<a href='/wizard?step=" + String(step + 1) + "'><button type='button'>Next</button></a>";
+    html += "<a href='/?skip=1'><button type='button'>Skip for now</button></a></div>";
+    return html;
+}
+
+static void handleWizard()
+{
+    const int step = requestedWizardStep();
+    String html = pageHeader("MOT Onboarding");
+    html += "<h1>Microlino Open Telemetry</h1><p class='muted'>" MOT_VERSION " · " MOT_BOARD "</p>";
+    html += "<div class='card'><div class='muted'>Step " + String(step) + " of " + String(onboardingStepCount()) + "</div>";
+    html += "<progress value='" + String(step) + "' max='" + String(onboardingStepCount()) + "' style='width:100%'></progress>";
+
+    switch (step) {
+        case 1:
+            html += "<h2>Welcome</h2><p>This assistant guides you through the existing MOT configuration. It does not create a second configuration store.</p>";
+            html += "<p>You can leave the wizard at any time and continue later.</p>";
+            break;
+        case 2:
+            html += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>LTE modem: available</li><li>GPS module: <span id=\"wizard-gps-hardware\">checking…</span></li><li>CAN1: available</li><li>CAN2: reserved</li></ul>";
+            html += "<script>fetch('/api/lilygo/gps').then(r=>r.json()).then(g=>{const labels={GPS_DISABLED:'disabled',GPS_NOT_DETECTED:'not detected',GPS_DETECTED:'detected',GPS_FIX:'detected with fix'};document.getElementById('wizard-gps-hardware').textContent=labels[g.state]||'unknown';}).catch(()=>{document.getElementById('wizard-gps-hardware').textContent='unknown';});</script>";
+            html += "<p class='muted'>Runtime checks are performed in the validation step.</p>";
+            break;
+        case 3:
+            html += "<h2>Connectivity</h2><p>Configure WiFi and the mobile-network parameters required by your SIM.</p><p><a href='/config?return=/wizard?step=3'><button type='button'>Open connectivity configuration</button></a></p>";
+            break;
+        case 4:
+            html += "<h2>Vehicle and CAN profile</h2><p>Set the vehicle ID and select the decoder profile used by CAN1.</p><p><a href='/config?return=/wizard?step=4'><button type='button'>Open vehicle configuration</button></a></p>";
+            break;
+        case 5:
+            html += "<h2>Telemetry services</h2><p>Configure MQTT and ABRP using the existing service settings.</p><p><a href='/config?return=/wizard?step=5'><button type='button'>Open service configuration</button></a></p>";
+            break;
+        case 6:
+            html += "<h2>Validation</h2><p>Read the live LilyGO diagnostics before completing onboarding.</p>";
+            html += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
+            html += "<script>async function getj(u){const r=await fetch(u);return await r.json()}async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const n=await getj('/api/lilygo/network'),m=await getj('/api/lilygo/modem'),g=await getj('/api/lilygo/gps'),c=await getj('/api/lilygo/can'),q=await getj('/api/lilygo/mqtt');o.textContent=`Network:\n${JSON.stringify(n,null,2)}\n\nModem:\n${JSON.stringify(m,null,2)}\n\nGPS:\n${JSON.stringify(g,null,2)}\n\nCAN:\n${JSON.stringify(c,null,2)}\n\nMQTT:\n${JSON.stringify(q,null,2)}`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            html += "<p><a href='/?skip=1&return=/wizard?step=6'>Open full status</a></p>";
+            break;
+        default:
+            html += "<h2>Finish</h2><p>Completing onboarding disables automatic wizard launch. All settings remain editable in the normal configuration page.</p>";
+            html += "<form method='POST' action='/api/onboarding/complete'><button type='submit'>Complete onboarding</button></form>";
+            break;
+    }
+
+    html += wizardNavigation(step);
+    html += "<hr><form method='POST' action='/api/onboarding/restart'><button type='submit'>Restart wizard</button></form></div></body></html>";
+    server.send(200, "text/html", html);
+}
+
+static void handleOnboardingStatus()
+{
+    const int step = config.onboardingComplete ? onboardingStepCount() : requestedWizardStep();
+    String json = "{\"complete\":" + String(config.onboardingComplete ? "true" : "false") +
+                  ",\"step\":\"" + String(onboardingStepId(static_cast<OnboardingStep>(step - 1))) +
+                  "\",\"stepNumber\":" + String(step) +
+                  ",\"stepCount\":" + String(onboardingStepCount()) +
+                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":true,\"gps\":" + String(l76kGpsDetected() ? "true" : "false") + ",\"gpsState\":\"" + String(l76kGpsStateName()) + "\",\"canChannels\":1}";
+    server.send(200, "application/json", json);
+}
+
+static void handleOnboardingComplete()
+{
+    config.onboardingComplete = true;
+    saveLilygoConfig();
+    server.sendHeader("Location", "/");
+    server.send(303, "text/plain", "");
+}
+
+static void handleOnboardingRestart()
+{
+    config.onboardingComplete = false;
+    saveLilygoConfig();
+    server.sendHeader("Location", "/wizard?step=1");
+    server.send(303, "text/plain", "");
+}
+
 void setupLilygoWeb()
 {
-    server.on("/", HTTP_GET, handleRoot);
+    server.on("/", HTTP_GET, []() { if (config.onboardingComplete || server.hasArg("skip")) handleRoot(); else handleWizard(); });
+    server.on("/wizard", HTTP_GET, handleWizard);
+    server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
+    server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
+    server.on("/api/onboarding/restart", HTTP_POST, handleOnboardingRestart);
     server.on("/config", HTTP_GET, handleConfig);
     server.on("/config/save", HTTP_POST, handleConfigSave);
     server.on("/config/import", HTTP_POST, handleConfigImport);

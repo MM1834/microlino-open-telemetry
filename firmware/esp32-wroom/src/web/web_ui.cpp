@@ -14,6 +14,7 @@
 #include "MqttDiagnostics.h"
 #include "SystemHealth.h"
 #include "../gps/wroom_gps.h"
+#include "onboarding/onboarding.h"
 #include <WiFi.h>
 
 static WebServer server(80);
@@ -52,11 +53,127 @@ static String profileOptions(DecoderProfile current, bool includeDisabled)
     return s;
 }
 
+
+static String requestedReturnUrl()
+{
+    if (!server.hasArg("return")) return "";
+    String target = server.arg("return");
+    target.trim();
+    if (!target.startsWith("/wizard")) return "";
+    return target;
+}
+
+static String returnField(const String &target)
+{
+    if (target.isEmpty()) return "";
+    return "<input type='hidden' name='return' value='" + target + "'>";
+}
+
+static int requestedWizardStep()
+{
+    int step = server.hasArg("step") ? server.arg("step").toInt() : 1;
+    if (step < 1) step = 1;
+    if (step > onboardingStepCount()) step = onboardingStepCount();
+    return step;
+}
+
+static String wizardNavigation(int step)
+{
+    String s = "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:18px'>";
+    if (step > 1) s += "<a href='/wizard?step=" + String(step - 1) + "'><button type='button'>Back</button></a>";
+    if (step < onboardingStepCount()) s += "<a href='/wizard?step=" + String(step + 1) + "'><button type='button'>Next</button></a>";
+    s += "<a href='/status'><button type='button'>Skip for now</button></a>";
+    s += "</div>";
+    return s;
+}
+
+static String wizardPage()
+{
+    const int step = requestedWizardStep();
+    OnboardingCapabilities caps{MOT_BOARD, true, false, true, 1};
+    String s = htmlHeader("MOT Onboarding");
+    s += "<h1>Microlino Open Telemetry</h1><p class='muted'>" MOT_VERSION " · " + String(caps.board) + "</p>";
+    s += "<div class='card'><div class='muted'>Step " + String(step) + " of " + String(onboardingStepCount()) + "</div>";
+    s += "<progress value='" + String(step) + "' max='" + String(onboardingStepCount()) + "' style='width:100%'></progress>";
+
+    switch (step) {
+        case 1:
+            s += "<h2>Welcome</h2><p>This assistant guides you through the existing MOT configuration. It does not create a second configuration store.</p>";
+            s += "<p>You can leave the wizard at any time and continue later.</p>";
+            break;
+        case 2:
+            s += "<h2>Detected hardware</h2><ul>";
+            s += "<li>Board: <b>" + String(caps.board) + "</b></li>";
+            s += "<li>WiFi: available</li><li>GPS module: <b id='wizard-gps-hardware'>checking…</b></li><li>CAN1: available</li><li>CAN2: reserved</li>";
+            s += "</ul><p class='muted'>GPS is reported as detected only after a checksum-valid NMEA sentence has been received. Runtime checks continue in the validation step.</p>";
+            s += "<script>fetch('/api/gps').then(r=>r.json()).then(g=>{const labels={GPS_DISABLED:'disabled',GPS_NOT_DETECTED:'not detected',GPS_DETECTED:'detected',GPS_FIX:'detected with fix'};document.getElementById('wizard-gps-hardware').textContent=labels[g.state]||'unknown';}).catch(()=>{document.getElementById('wizard-gps-hardware').textContent='unknown';});</script>";
+            break;
+        case 3:
+            s += "<h2>Network</h2><p>Configure the WiFi network used outside AP setup mode.</p>";
+            s += "<p><a href='/config?return=/wizard?step=3'><button type='button'>Open network configuration</button></a></p>";
+            s += "<p class='muted'>Save & Reboot returns the device with the stored network settings.</p>";
+            break;
+        case 4:
+            s += "<h2>Vehicle and CAN profile</h2><p>Set vehicle name, vehicle ID and the decoder profile for CAN1.</p>";
+            s += "<p><a href='/config?return=/wizard?step=4'><button type='button'>Open vehicle configuration</button></a></p>";
+            s += "<p class='muted'>CAN2 remains reserved and is not enabled by onboarding.</p>";
+            break;
+        case 5:
+            s += "<h2>Telemetry services</h2><p>Enable and configure only the services you use: MQTT, AWS IoT and ABRP.</p>";
+            s += "<p><a href='/config?return=/wizard?step=5'><button type='button'>Open service configuration</button></a></p>";
+            s += "<p class='muted'>The build determines whether AWS IoT is available. Empty credentials keep optional services inactive.</p>";
+            break;
+        case 6:
+            s += "<h2>Validation</h2><p>Run the existing system-health diagnostics before finishing onboarding.</p>";
+            s += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
+            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{};o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\nDNS: ${d.dnsOk?'OK':'WAITING'}\nMQTT: ${d.mqttOk?'OK':'OPTIONAL / WAITING'}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${(g.state==='GPS_DETECTED'||g.state==='GPS_FIX')?'DETECTED':(g.state==='GPS_NOT_DETECTED'?'NOT DETECTED':'N/A')}\nGPS NMEA: ${g.detected?'VALID':'WAITING'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            s += "<p><a href='/status?return=/wizard?step=6'>Open full status</a></p>";
+            break;
+        default:
+            s += "<h2>Finish</h2><p>Configuration remains managed by the normal MOT configuration pages. Completing onboarding only disables the automatic wizard launch.</p>";
+            s += "<form method='POST' action='/api/onboarding/complete'><button type='submit'>Complete onboarding</button></form>";
+            break;
+    }
+
+    s += wizardNavigation(step);
+    s += "<hr><form method='POST' action='/api/onboarding/restart'><button type='submit'>Restart wizard</button></form></div>";
+    s += "</body></html>";
+    return s;
+}
+
+static void handleWizard() { server.send(200, "text/html", wizardPage()); }
+static void handleOnboardingStatus()
+{
+    const int step = config.onboardingComplete ? onboardingStepCount() : requestedWizardStep();
+    String json = "{\"complete\":" + String(config.onboardingComplete ? "true" : "false") +
+                  ",\"step\":\"" + String(onboardingStepId(static_cast<OnboardingStep>(step - 1))) +
+                  "\",\"stepNumber\":" + String(step) +
+                  ",\"stepCount\":" + String(onboardingStepCount()) +
+                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":false,\"gps\":" + String(wroomGpsDetected() ? "true" : "false") + ",\"canChannels\":1}";
+    server.send(200, "application/json", json);
+}
+static void handleOnboardingComplete()
+{
+    config.onboardingComplete = true;
+    saveConfig();
+    server.sendHeader("Location", "/status");
+    server.send(303, "text/plain", "");
+}
+static void handleOnboardingRestart()
+{
+    config.onboardingComplete = false;
+    saveConfig();
+    server.sendHeader("Location", "/wizard?step=1");
+    server.send(303, "text/plain", "");
+}
+
 static void handleStatus()
 {
     String s = htmlHeader("MOT Status");
     s += "<h1>Microlino Open Telemetry</h1>";
     s += "<p class='muted'>" MOT_VERSION " · "; s += motDeviceId(); s += "</p>";
+    const String returnTo = requestedReturnUrl();
+    if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
 
     s += "<div class='card'><h2>Live Data</h2>";
     s += "CAN profile: "; s += decoderProfileName(config.can1Profile); s += "<br>";
@@ -102,8 +219,10 @@ static void handleApiStatus()
 
 static void handleConfig()
 {
+    const String returnTo = requestedReturnUrl();
     String s = htmlHeader("MOT Config");
     s += "<h1>Config</h1><form method='POST' action='/save'>";
+    s += returnField(returnTo);
     s += "<div class='card'><h2>Vehicle</h2>";
     s += "Vehicle name<input name='vehicleName' value='" + config.vehicleName + "'>";
     s += "Device name<input name='deviceName' value='" + config.deviceName + "'>";
@@ -179,7 +298,9 @@ static void handleConfig()
     s += "<button type='submit'>Import config & reboot</button></form>";
     s += "<p class='muted'>Export contains local secrets such as WiFi and MQTT passwords. Keep it private.</p></div>";
     s += "<div class='card'><h2>Factory Reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Factory Reset wirklich ausführen? Alle Einstellungen werden gelöscht.');\"><button type='submit'>Clear config & reboot</button></form></div>";
-    s += "<p><a href='/status'>Status</a></p></body></html>";
+    if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
+    else s += "<p><a href='/status'>Status</a></p>";
+    s += "</body></html>";
     server.send(200, "text/html", s);
 }
 
@@ -226,7 +347,14 @@ static void handleSave()
     config.abrpUserToken = server.arg("abrpToken");
     config.otaPassword = server.arg("otaPass");
     saveConfig();
-    server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p></body></html>");
+    const String returnTo = requestedReturnUrl();
+    String response = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p>";
+    if (!returnTo.isEmpty()) {
+        response += "<p>Onboarding will resume automatically.</p><p><a href='" + returnTo + "'>Return to onboarding now</a></p>";
+        response += "<script>setTimeout(function(){location.href='" + returnTo + "';},8000);</script>";
+    }
+    response += "</body></html>";
+    server.send(200, "text/html", response);
     rebootPending = true;
     rebootAtMs = millis() + 5000;
 }
@@ -311,7 +439,9 @@ static void handleApiSystemHealth()
     health.canOk = telemetry.display.valid;
     health.gpsStarted = wroomGpsStarted();
     health.gpsSeen = wroomGpsSeen();
+    health.gpsDetected = wroomGpsDetected();
     health.gpsValid = wroomGpsValid();
+    health.gpsState = wroomGpsState();
     health.gpsLatitude = wroomGpsLatitude();
     health.gpsLongitude = wroomGpsLongitude();
     health.gpsSatellites = wroomGpsSatellites();
@@ -325,7 +455,11 @@ static void handleApiSystemHealth()
 
 void setupWebUi()
 {
-    server.on("/", handleStatus);
+    server.on("/", []() { if (config.onboardingComplete) handleStatus(); else handleWizard(); });
+    server.on("/wizard", HTTP_GET, handleWizard);
+    server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
+    server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
+    server.on("/api/onboarding/restart", HTTP_POST, handleOnboardingRestart);
     server.on("/status", handleStatus);
     server.on("/api/status", handleApiStatus);
     server.on("/api/mqtt-test", handleApiMqttTest);

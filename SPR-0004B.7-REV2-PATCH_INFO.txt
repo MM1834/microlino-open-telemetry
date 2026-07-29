@@ -1,0 +1,50 @@
+SPR-0004B.7 Rev.2 — ESP32-WROOM GPS State Model
+
+Basis
+-----
+- Current uncommitted repository snapshot supplied by the user
+- SPR-0004B.6 Rev.6 return mechanism
+- Replaces the incomplete first SPR-0004B.7 GPS detection package
+
+Scope
+-----
+- Complete shared MotGps API update
+- Explicit GPS state model
+- ESP32-WROOM System Health and WebUI integration
+- No LilyGO-specific changes
+- No PlatformIO environment cleanup yet
+- No removal of legacy firmware variants yet
+
+GPS states
+----------
+DISABLED
+  GPS UART was not started.
+
+NO_MODULE
+  GPS UART is running, but no checksum-valid NMEA sentence has been received.
+
+MODULE_DETECTED
+  At least one checksum-valid NMEA sentence was received, but no current
+  position fix is available.
+
+FIX_VALID
+  A current position fix is available.
+
+Compatibility
+-------------
+The existing booleans started, seen, detected and valid remain available.
+The new state is added as the canonical interpretation for the GUI and APIs.
+
+PlatformIO cache
+----------------
+The MotGps library version was increased from 0.1.0 to 0.2.0.
+
+Before the first build after installation, run:
+
+  pio run -e esp32dev-aws -t clean
+  pio run -e esp32dev-aws
+
+Installation
+------------
+Extract directly over the repository root and overwrite the listed files.
+The ZIP contains no wrapper folder.

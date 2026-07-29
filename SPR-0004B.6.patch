@@ -1,0 +1,419 @@
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/common/onboarding/onboarding.h "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/common/onboarding/onboarding.h"
+--- /mnt/data/spr0004b6/base-rev3/firmware/common/onboarding/onboarding.h	1970-01-01 00:00:00.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/common/onboarding/onboarding.h"	2026-07-29 06:42:01.391096822 +0000
+@@ -0,0 +1,37 @@
++#pragma once
++#include <Arduino.h>
++
++enum class OnboardingStep : uint8_t {
++    Welcome = 0,
++    Hardware,
++    Connectivity,
++    Vehicle,
++    Services,
++    Validation,
++    Finish
++};
++
++struct OnboardingCapabilities {
++    const char* board;
++    bool wifi;
++    bool lte;
++    bool gps;
++    uint8_t canChannels;
++};
++
++inline const char* onboardingStepId(OnboardingStep step)
++{
++    switch (step) {
++        case OnboardingStep::Welcome: return "welcome";
++        case OnboardingStep::Hardware: return "hardware";
++        case OnboardingStep::Connectivity: return "connectivity";
++        case OnboardingStep::Vehicle: return "vehicle";
++        case OnboardingStep::Services: return "services";
++        case OnboardingStep::Validation: return "validation";
++        case OnboardingStep::Finish: return "finish";
++    }
++    return "welcome";
++}
++
++inline uint8_t onboardingStepNumber(OnboardingStep step) { return static_cast<uint8_t>(step) + 1; }
++inline constexpr uint8_t onboardingStepCount() { return 7; }
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/common/system/version.h "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/common/system/version.h"
+--- /mnt/data/spr0004b6/base-rev3/firmware/common/system/version.h	2026-07-29 06:40:35.207099841 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/common/system/version.h"	2026-07-29 06:42:01.391096822 +0000
+@@ -2,12 +2,16 @@
+ 
+ #define MOT_NAME "Microlino Open Telemetry"
+ #define MOT_SHORT_NAME "MOT"
+-#define MOT_SPRINT "SPR-0004B.5R3"
++#define MOT_SPRINT "SPR-0004B.6"
+ #ifdef MOT_AWS_IOT
+ #define MOT_BUILD_VARIANT "AWS"
+-#define MOT_VERSION "SPR-0004B.5R3-AWS"
++#define MOT_VERSION "SPR-0004B.6-AWS"
+ #else
+ #define MOT_BUILD_VARIANT "MQTT"
+-#define MOT_VERSION "SPR-0004B.5R3-MQTT"
++#define MOT_VERSION "SPR-0004B.6-MQTT"
+ #endif
++#if defined(MOT_BOARD_LILYGO_T_A7670)
++#define MOT_BOARD "lilygo-t-a7670"
++#else
+ #define MOT_BOARD "esp32-wroom"
++#endif
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/app_config.cpp "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/app_config.cpp"
+--- /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/app_config.cpp	2026-07-28 15:50:17.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/app_config.cpp"	2026-07-29 06:42:01.391096822 +0000
+@@ -49,6 +49,7 @@
+     config.otaEnabled = prefs.getBool("otaEn", false);
+     config.otaPassword = prefs.getString("otaPass", "");
+     config.publishIntervalMs = prefs.getUInt("pubMs", 5000);
++    config.onboardingComplete = prefs.getBool("onboarded", false);
+     prefs.end();
+ }
+ 
+@@ -75,6 +76,7 @@
+     prefs.putBool("otaEn", config.otaEnabled);
+     prefs.putString("otaPass", config.otaPassword);
+     prefs.putUInt("pubMs", config.publishIntervalMs);
++    prefs.putBool("onboarded", config.onboardingComplete);
+     prefs.end();
+ }
+ 
+@@ -151,6 +153,8 @@
+     doc["can1Profile"] = (int)config.can1Profile;
+     doc["can2Profile"] = (int)config.can2Profile;
+ 
++    doc["onboardingComplete"] = config.onboardingComplete;
++
+     doc["otaEnabled"] = config.otaEnabled;
+     if (includeSecrets) doc["otaPassword"] = config.otaPassword;
+ 
+@@ -197,6 +201,8 @@
+     if (!doc["can1Profile"].isNull()) config.can1Profile = decoderProfileNormalize(doc["can1Profile"].as<int>());
+     if (!doc["can2Profile"].isNull()) config.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
+ 
++    if (!doc["onboardingComplete"].isNull()) config.onboardingComplete = doc["onboardingComplete"].as<bool>();
++
+     if (!doc["otaEnabled"].isNull()) config.otaEnabled = doc["otaEnabled"].as<bool>();
+     setStringIfPresent(doc, "otaPassword", config.otaPassword);
+ 
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/app_config.h "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/app_config.h"
+--- /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/app_config.h	2026-07-28 15:50:17.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/app_config.h"	2026-07-29 06:42:01.391096822 +0000
+@@ -32,6 +32,8 @@
+ 
+     uint32_t publishIntervalMs = 5000;
+ 
++    bool onboardingComplete = false;
++
+     bool mqttEnabled() const;
+     bool awsEnabled() const;
+     bool abrpEnabled() const;
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/common/onboarding/onboarding.h "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/common/onboarding/onboarding.h"
+--- /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/common/onboarding/onboarding.h	1970-01-01 00:00:00.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/common/onboarding/onboarding.h"	2026-07-29 06:42:01.391096822 +0000
+@@ -0,0 +1,37 @@
++#pragma once
++#include <Arduino.h>
++
++enum class OnboardingStep : uint8_t {
++    Welcome = 0,
++    Hardware,
++    Connectivity,
++    Vehicle,
++    Services,
++    Validation,
++    Finish
++};
++
++struct OnboardingCapabilities {
++    const char* board;
++    bool wifi;
++    bool lte;
++    bool gps;
++    uint8_t canChannels;
++};
++
++inline const char* onboardingStepId(OnboardingStep step)
++{
++    switch (step) {
++        case OnboardingStep::Welcome: return "welcome";
++        case OnboardingStep::Hardware: return "hardware";
++        case OnboardingStep::Connectivity: return "connectivity";
++        case OnboardingStep::Vehicle: return "vehicle";
++        case OnboardingStep::Services: return "services";
++        case OnboardingStep::Validation: return "validation";
++        case OnboardingStep::Finish: return "finish";
++    }
++    return "welcome";
++}
++
++inline uint8_t onboardingStepNumber(OnboardingStep step) { return static_cast<uint8_t>(step) + 1; }
++inline constexpr uint8_t onboardingStepCount() { return 7; }
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/common/system/version.h "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/common/system/version.h"
+--- /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/common/system/version.h	2026-07-29 06:40:35.207099841 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/common/system/version.h"	2026-07-29 06:42:01.391096822 +0000
+@@ -2,12 +2,16 @@
+ 
+ #define MOT_NAME "Microlino Open Telemetry"
+ #define MOT_SHORT_NAME "MOT"
+-#define MOT_SPRINT "SPR-0004B.5R3"
++#define MOT_SPRINT "SPR-0004B.6"
+ #ifdef MOT_AWS_IOT
+ #define MOT_BUILD_VARIANT "AWS"
+-#define MOT_VERSION "SPR-0004B.5R3-AWS"
++#define MOT_VERSION "SPR-0004B.6-AWS"
+ #else
+ #define MOT_BUILD_VARIANT "MQTT"
+-#define MOT_VERSION "SPR-0004B.5R3-MQTT"
++#define MOT_VERSION "SPR-0004B.6-MQTT"
+ #endif
++#if defined(MOT_BOARD_LILYGO_T_A7670)
++#define MOT_BOARD "lilygo-t-a7670"
++#else
+ #define MOT_BOARD "esp32-wroom"
++#endif
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/web/web_ui.cpp "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/web/web_ui.cpp"
+--- /mnt/data/spr0004b6/base-rev3/firmware/esp32-wroom/src/web/web_ui.cpp	2026-07-29 06:40:35.207099841 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/web/web_ui.cpp"	2026-07-29 06:42:21.923096102 +0000
+@@ -14,6 +14,7 @@
+ #include "MqttDiagnostics.h"
+ #include "SystemHealth.h"
+ #include "../gps/wroom_gps.h"
++#include "onboarding/onboarding.h"
+ #include <WiFi.h>
+ 
+ static WebServer server(80);
+@@ -52,6 +53,46 @@
+     return s;
+ }
+ 
++
++static String wizardPage()
++{
++    OnboardingCapabilities caps{MOT_BOARD, true, false, true, 1};
++    String s = htmlHeader("MOT Onboarding");
++    s += "<h1>Microlino Open Telemetry</h1><p class='muted'>" MOT_VERSION " · " + String(caps.board) + "</p>";
++    s += "<div class='card'><div class='muted'>Step 1 of " + String(onboardingStepCount()) + "</div>";
++    s += "<progress value='1' max='" + String(onboardingStepCount()) + "' style='width:100%'></progress>";
++    s += "<h2>Guided Device Onboarding</h2><p>This assistant uses the existing configuration and health APIs. It does not maintain a second configuration.</p>";
++    s += "<p><b>Hardware:</b> " + String(caps.board) + " · WiFi · GPS · CAN1</p>";
++    s += "<p><a href='/config'><button>Start configuration</button></a></p>";
++    s += "<form method='POST' action='/api/onboarding/complete'><button type='submit'>Mark onboarding complete</button></form></div>";
++    s += "<p><a href='/status'>Skip for now</a></p></body></html>";
++    return s;
++}
++
++static void handleWizard() { server.send(200, "text/html", wizardPage()); }
++static void handleOnboardingStatus()
++{
++    String json = "{\"complete\":" + String(config.onboardingComplete ? "true" : "false") +
++                  ",\"step\":\"" + String(config.onboardingComplete ? "finish" : "welcome") +
++                  "\",\"stepCount\":" + String(onboardingStepCount()) +
++                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":false,\"gps\":true,\"canChannels\":1}";
++    server.send(200, "application/json", json);
++}
++static void handleOnboardingComplete()
++{
++    config.onboardingComplete = true;
++    saveConfig();
++    server.sendHeader("Location", "/status");
++    server.send(303, "text/plain", "");
++}
++static void handleOnboardingRestart()
++{
++    config.onboardingComplete = false;
++    saveConfig();
++    server.sendHeader("Location", "/wizard");
++    server.send(303, "text/plain", "");
++}
++
+ static void handleStatus()
+ {
+     String s = htmlHeader("MOT Status");
+@@ -325,7 +366,11 @@
+ 
+ void setupWebUi()
+ {
+-    server.on("/", handleStatus);
++    server.on("/", []() { if (config.onboardingComplete) handleStatus(); else handleWizard(); });
++    server.on("/wizard", HTTP_GET, handleWizard);
++    server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
++    server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
++    server.on("/api/onboarding/restart", HTTP_POST, handleOnboardingRestart);
+     server.on("/status", handleStatus);
+     server.on("/api/status", handleApiStatus);
+     server.on("/api/mqtt-test", handleApiMqttTest);
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp"
+--- /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp	2026-07-28 15:50:17.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp"	2026-07-29 06:42:01.391096822 +0000
+@@ -52,6 +52,7 @@
+     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
+     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
+     config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
++    config.onboardingComplete = prefs.getBool("onboarded", false);
+     config.canProfile = decoderProfileNormalize(prefs.isKey("canProfile") ? prefs.getUChar("canProfile", DECODER_PROFILE_DISPLAY_CAN) : DECODER_PROFILE_DISPLAY_CAN);
+ 
+     prefs.end();
+@@ -85,6 +86,7 @@
+     prefs.putString("abrpApiKey", config.abrpApiKey);
+     prefs.putString("abrpUserToken", config.abrpUserToken);
+     prefs.putUChar("canProfile", (uint8_t)config.canProfile);
++    prefs.putBool("onboarded", config.onboardingComplete);
+     prefs.end();
+ }
+ 
+@@ -117,7 +119,8 @@
+     json += "\"mqttHost\":\"" + esc(config.mqttHost) + "\",";
+     json += "\"mqttPort\":" + String(config.mqttPort) + ",";
+     json += "\"otaEnabled\":" + String(config.otaEnabled ? "true" : "false") + ",";
+-    json += "\"canProfile\":" + String((int)config.canProfile);
++    json += "\"canProfile\":" + String((int)config.canProfile) + ",";
++    json += "\"onboardingComplete\":" + String(config.onboardingComplete ? "true" : "false");
+     if (includeSecrets) {
+         json += ",\"wifiPass\":\"" + esc(config.wifiPass) + "\"";
+         json += ",\"lteUser\":\"" + esc(config.lteUser) + "\"";
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/config/lilygo_config.h "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/config/lilygo_config.h"
+--- /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/config/lilygo_config.h	2026-07-28 15:50:17.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/config/lilygo_config.h"	2026-07-29 06:42:01.391096822 +0000
+@@ -2,7 +2,7 @@
+ #include <Arduino.h>
+ #include "decoders/decoder_profile.h"
+ struct LilygoConfig {
+- String wifiSsid; String wifiPass; bool mqttServiceEnabled = false; bool awsServiceEnabled = true; String lteApn = "gprs.swisscom.ch"; String lteUser; String ltePass; String mqttHost; uint16_t mqttPort = 1883; String mqttUser; String mqttPass; String deviceName; String vehicleId = "pioneer"; String mqttPrefix = "mot"; bool otaEnabled = true; String otaPassword; bool abrpEnabled = false; DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN;
++ String wifiSsid; String wifiPass; bool mqttServiceEnabled = false; bool awsServiceEnabled = true; String lteApn = "gprs.swisscom.ch"; String lteUser; String ltePass; String mqttHost; uint16_t mqttPort = 1883; String mqttUser; String mqttPass; String deviceName; String vehicleId = "pioneer"; String mqttPrefix = "mot"; bool otaEnabled = true; String otaPassword; bool abrpEnabled = false; DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN; bool onboardingComplete = false;
+ String abrpApiKey;
+ String abrpUserToken;
+ };
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/main.cpp "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/main.cpp"
+--- /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/main.cpp	2026-07-15 09:15:48.000000000 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/main.cpp"	2026-07-29 06:42:01.391096822 +0000
+@@ -1,5 +1,6 @@
+ #include <Arduino.h>
+ #include <WiFi.h>
++
+ #include "board_config.h"
+ #include "telemetry/telemetry.h"
+ #include "config/lilygo_config.h"
+@@ -11,7 +12,50 @@
+ #include "abrp/lilygo_abrp.h"
+ #include "can/lilygo_can.h"
+ 
+-void setup(){Serial.begin(115200);delay(1000);Serial.println();Serial.println("========================================");Serial.println(MOT_NAME);Serial.printf("Version : %s\n",MOT_VERSION);Serial.printf("Board   : %s\n",MOT_BOARD);Serial.println("========================================");Serial.println("LilyGO integration cleanup: LTE + external L76K GPS + config/status/OTA");Serial.println("CAN input is enabled via SN65HVD230.");Serial.printf("Documented CAN pins: RX=%d TX=%d\n",CAN_RX_PIN,CAN_TX_PIN);Serial.println("CAN enabled via SN65HVD230: RX GPIO32, TX GPIO13. GPIO33 remains MODEM_RI.");loadLilygoConfig();setupLilygoModem();setupL76kGps();setupLilygoCan();setupLilygoNetwork();setupLilygoMqtt();setupLilygoAbrp();setup;setupLilygoWeb();Serial.println("LilyGO setup ready");} void loop(){
+-    static unsigned long lastSystemUpdateMs = 0;
+-lilygoModemLoop();lilygoNetworkLoop();l76kGpsLoop();lilygoMqttLoop();lilygoAbrpLoop();lilygoWebLoop();lilygoCanLoop();if (millis() - lastSystemUpdateMs > 1000) { lastSystemUpdateMs = millis(); telemetryUpdateSystemRuntime(); telemetry.system.networkMode = lilygoNetworkModeName(); telemetry.system.ipAddress = lilygoNetworkIp(); telemetry.system.wifiRssi = lilygoNetworkModeName() == "WiFi" ? WiFi.RSSI() : 0; }
+-    delay(2);} 
++static unsigned long lastSystemUpdateMs = 0;
++
++void setup()
++{
++    Serial.begin(115200);
++    delay(1000);
++
++    Serial.println();
++    Serial.println("========================================");
++    Serial.println(MOT_NAME);
++    Serial.printf("Version : %s\n", MOT_VERSION);
++    Serial.printf("Board   : %s\n", MOT_BOARD);
++    Serial.println("========================================");
++    Serial.printf("CAN: RX GPIO%d, TX GPIO%d\n", CAN_RX_PIN, CAN_TX_PIN);
++
++    loadLilygoConfig();
++    setupLilygoModem();
++    setupL76kGps();
++    setupLilygoCan();
++    setupLilygoNetwork();
++    setupLilygoMqtt();
++    setupLilygoAbrp();
++    setupLilygoWeb();
++
++    Serial.println("LilyGO setup ready");
++}
++
++void loop()
++{
++    lilygoModemLoop();
++    lilygoNetworkLoop();
++    l76kGpsLoop();
++    lilygoMqttLoop();
++    lilygoAbrpLoop();
++    lilygoWebLoop();
++    lilygoCanLoop();
++
++    if (millis() - lastSystemUpdateMs > 1000) {
++        lastSystemUpdateMs = millis();
++        telemetryUpdateSystemRuntime();
++        telemetry.system.networkMode = lilygoNetworkModeName();
++        telemetry.system.ipAddress = lilygoNetworkIp();
++        telemetry.system.wifiRssi = lilygoNetworkModeName() == "WiFi" ? WiFi.RSSI() : 0;
++    }
++
++    delay(2);
++}
+diff -ruN '--exclude=.DS_Store' '--exclude=.pio' /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp"
+--- /mnt/data/spr0004b6/base-rev3/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp	2026-07-29 06:40:35.207099841 +0000
++++ "/mnt/data/spr0004b6/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp"	2026-07-29 06:42:51.051095082 +0000
+@@ -12,6 +12,7 @@
+ #include "can/lilygo_can.h"
+ #include "config/lilygo_config.h"
+ #include "gps/l76k_gps.h"
++#include "onboarding/onboarding.h"
+ #include "modem/lilygo_modem.h"
+ #include "mqtt/lilygo_mqtt.h"
+ #include "network/lilygo_network.h"
+@@ -440,9 +441,52 @@
+     }
+ }
+ 
++
++static void handleWizard()
++{
++    String html = pageHeader("MOT Onboarding");
++    html += "<h1>Microlino Open Telemetry</h1><p class='muted'>" MOT_VERSION " · " MOT_BOARD "</p>";
++    html += "<div class='card'><div class='muted'>Step 1 of " + String(onboardingStepCount()) + "</div>";
++    html += "<progress value='1' max='" + String(onboardingStepCount()) + "' style='width:100%'></progress>";
++    html += "<h2>Guided Device Onboarding</h2><p>Detected: WiFi, LTE, GPS and CAN1.</p>";
++    html += "<p><a href='/config'><button>Start configuration</button></a></p>";
++    html += "<form method='POST' action='/api/onboarding/complete'><button type='submit'>Mark onboarding complete</button></form></div>";
++    html += "<p><a href='/'>Skip for now</a></p></body></html>";
++    server.send(200, "text/html", html);
++}
++
++static void handleOnboardingStatus()
++{
++    String json = "{\"complete\":" + String(config.onboardingComplete ? "true" : "false") +
++                  ",\"step\":\"" + String(config.onboardingComplete ? "finish" : "welcome") +
++                  "\",\"stepCount\":" + String(onboardingStepCount()) +
++                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":true,\"gps\":true,\"canChannels\":1}";
++    server.send(200, "application/json", json);
++}
++
++static void handleOnboardingComplete()
++{
++    config.onboardingComplete = true;
++    saveLilygoConfig();
++    server.sendHeader("Location", "/");
++    server.send(303, "text/plain", "");
++}
++
++static void handleOnboardingRestart()
++{
++    config.onboardingComplete = false;
++    saveLilygoConfig();
++    server.sendHeader("Location", "/wizard");
++    server.send(303, "text/plain", "");
++}
++
+ void setupLilygoWeb()
+ {
+-    server.on("/", HTTP_GET, handleRoot);
++    server.on("/", HTTP_GET, []() { if (config.onboardingComplete) handleRoot(); else handleWizard(); });
++    server.on("/wizard", HTTP_GET, handleWizard);
++    server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
++    server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
++    server.on("/api/onboarding/restart", HTTP_POST, handleOnboardingRestart);
+     server.on("/config", HTTP_GET, handleConfig);
+     server.on("/config/save", HTTP_POST, handleConfigSave);
+     server.on("/config/import", HTTP_POST, handleConfigImport);

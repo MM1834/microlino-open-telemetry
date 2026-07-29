@@ -12,10 +12,19 @@ struct MotGpsConfig {
     bool setSystemTimeFromGps = false;
 };
 
+enum class MotGpsState : uint8_t {
+    GPS_DISABLED = 0,
+    GPS_NOT_DETECTED,
+    GPS_DETECTED,
+    GPS_FIX
+};
+
 struct MotGpsStatus {
     bool started = false;
-    bool seen = false;
+    bool seen = false;          // raw UART bytes received
+    bool detected = false;      // at least one checksum-valid NMEA sentence
     bool valid = false;
+    MotGpsState state = MotGpsState::GPS_DISABLED;
     bool timeValid = false;
     uint64_t chars = 0;
     uint32_t lastCharMs = 0;
@@ -34,7 +43,10 @@ public:
 
     bool started();
     bool seen();
+    bool detected();
     bool valid();
+    MotGpsState state();
+    const char* stateName();
     bool dateTimeValid();
 
     double latitude();

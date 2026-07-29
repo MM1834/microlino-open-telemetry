@@ -52,6 +52,7 @@ void loadLilygoConfig()
     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
     config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
+    config.onboardingComplete = prefs.getBool("onboarded", false);
     config.canProfile = decoderProfileNormalize(prefs.isKey("canProfile") ? prefs.getUChar("canProfile", DECODER_PROFILE_DISPLAY_CAN) : DECODER_PROFILE_DISPLAY_CAN);
 
     prefs.end();
@@ -85,6 +86,7 @@ void saveLilygoConfig()
     prefs.putString("abrpApiKey", config.abrpApiKey);
     prefs.putString("abrpUserToken", config.abrpUserToken);
     prefs.putUChar("canProfile", (uint8_t)config.canProfile);
+    prefs.putBool("onboarded", config.onboardingComplete);
     prefs.end();
 }
 
@@ -117,7 +119,8 @@ String lilygoConfigJson(bool includeSecrets)
     json += "\"mqttHost\":\"" + esc(config.mqttHost) + "\",";
     json += "\"mqttPort\":" + String(config.mqttPort) + ",";
     json += "\"otaEnabled\":" + String(config.otaEnabled ? "true" : "false") + ",";
-    json += "\"canProfile\":" + String((int)config.canProfile);
+    json += "\"canProfile\":" + String((int)config.canProfile) + ",";
+    json += "\"onboardingComplete\":" + String(config.onboardingComplete ? "true" : "false");
     if (includeSecrets) {
         json += ",\"wifiPass\":\"" + esc(config.wifiPass) + "\"";
         json += ",\"lteUser\":\"" + esc(config.lteUser) + "\"";

@@ -119,6 +119,7 @@ void MotGps::loop()
 
 void MotGps::refreshStatus()
 {
+    status_.detected = gps_.passedChecksum() > 0;
     status_.timeValid = validDateTime(gps_);
     status_.ageMs = gps_.location.isValid()
         ? gps_.location.age()
@@ -130,12 +131,18 @@ void MotGps::refreshStatus()
     status_.hdop = hdop();
 
     if (!status_.started) {
+        status_.state = MotGpsState::GPS_DISABLED;
         status_.message = "GNSS not started";
-    } else if (!status_.seen) {
-        status_.message = "Waiting for NMEA data";
+    } else if (!status_.detected) {
+        status_.state = MotGpsState::GPS_NOT_DETECTED;
+        status_.message = status_.seen
+            ? "UART activity detected, no valid NMEA received"
+            : "No GNSS module detected";
     } else if (!status_.valid) {
-        status_.message = "NMEA received, waiting for fix";
+        status_.state = MotGpsState::GPS_DETECTED;
+        status_.message = "GNSS module detected, waiting for fix";
     } else {
+        status_.state = MotGpsState::GPS_FIX;
         status_.message = "GNSS fix valid";
     }
 }
@@ -168,9 +175,32 @@ bool MotGps::seen()
     return status_.seen;
 }
 
+bool MotGps::detected()
+{
+    refreshStatus();
+    return status_.detected;
+}
+
 bool MotGps::valid()
 {
     return status_.valid;
+}
+
+MotGpsState MotGps::state()
+{
+    refreshStatus();
+    return status_.state;
+}
+
+const char* MotGps::stateName()
+{
+    switch (state()) {
+        case MotGpsState::GPS_DISABLED: return "GPS_DISABLED";
+        case MotGpsState::GPS_NOT_DETECTED: return "GPS_NOT_DETECTED";
+        case MotGpsState::GPS_DETECTED: return "GPS_DETECTED";
+        case MotGpsState::GPS_FIX: return "GPS_FIX";
+        default: return "UNKNOWN";
+    }
 }
 
 bool MotGps::dateTimeValid()
@@ -256,7 +286,9 @@ String MotGps::statusJson()
     JsonDocument doc;
     doc["started"] = status_.started;
     doc["seen"] = status_.seen;
+    doc["detected"] = status_.detected;
     doc["valid"] = status_.valid;
+    doc["state"] = stateName();
     doc["timeValid"] = status_.timeValid;
     doc["chars"] = status_.chars;
     doc["lastCharMs"] = status_.lastCharMs;

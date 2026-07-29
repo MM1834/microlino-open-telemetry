@@ -7,7 +7,9 @@ void wroomGpsLoop();
 
 bool wroomGpsStarted();
 bool wroomGpsSeen();
+bool wroomGpsDetected();
 bool wroomGpsValid();
+String wroomGpsState();
 double wroomGpsLatitude();
 double wroomGpsLongitude();
 double wroomGpsSpeedKmph();

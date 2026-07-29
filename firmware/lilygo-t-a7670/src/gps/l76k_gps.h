@@ -5,6 +5,9 @@
 void setupL76kGps();
 void l76kGpsLoop();
 
+bool l76kGpsStarted();
+bool l76kGpsDetected();
+const char* l76kGpsStateName();
 bool l76kGpsValid();
 double l76kLatitude();
 double l76kLongitude();
