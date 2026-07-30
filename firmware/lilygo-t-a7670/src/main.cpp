@@ -27,7 +27,7 @@ void setup()
     Serial.println("========================================");
     Serial.printf("CAN: RX GPIO%d, TX GPIO%d\n", CAN_RX_PIN, CAN_TX_PIN);
 
-    loadLilygoConfig();
+    lilygoConfigManager.load();
     setupLilygoModem();
     setupL76kGps();
     setupLilygoCan();

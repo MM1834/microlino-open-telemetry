@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "common/decoders/decoder_profile.h"
+#include "config/configuration_manager.h"
 
 struct AppConfig {
     String vehicleName = "Microlino Pioneer";   // Display name only
@@ -31,7 +32,6 @@ struct AppConfig {
     String otaPassword;
 
     uint32_t publishIntervalMs = 5000;
-
     bool onboardingComplete = false;
 
     bool mqttEnabled() const;
@@ -40,10 +40,17 @@ struct AppConfig {
     String mqttClientId() const;
 };
 
-extern AppConfig config;
+class AppConfigurationManager final : public ConfigurationManager {
+public:
+    void load() override;
+    void save() override;
+    void clear() override;
+    String exportJson(bool includeSecrets) const override;
+    bool importJson(const String& json, String& error) override;
+    ConfigurationValidationResult validate() const override;
 
-void loadConfig();
-void saveConfig();
-void clearConfig();
-String configToJson(bool includeSecrets = true);
-bool importConfigJson(const String& json, String& error);
+    void normalize();
+};
+
+extern AppConfig config;
+extern AppConfigurationManager appConfigManager;

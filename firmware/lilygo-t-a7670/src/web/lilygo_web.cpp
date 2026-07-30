@@ -17,6 +17,7 @@
 #include "mqtt/lilygo_mqtt.h"
 #include "network/lilygo_network.h"
 #include "telemetry/telemetry.h"
+#include "config/configuration_readiness.h"
 #include "lte/lilygo_lte_client.h"
 
 static WebServer server(80);
@@ -215,7 +216,7 @@ static void handleConfigSave()
     config.abrpApiKey = server.arg("abrpApiKey");
     config.abrpUserToken = server.arg("abrpUserToken");
 
-    saveLilygoConfig();
+    lilygoConfigManager.save();
 
     const String returnTo = requestedReturnUrl();
     String response = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device is rebooting...</p>";
@@ -229,69 +230,42 @@ static void handleConfigSave()
     rebootAtMs = millis() + 1000;
 }
 
+static bool importRequestConfig(String& error)
+{
+    String body = server.hasArg("configJson") ? server.arg("configJson") : server.arg("plain");
+    body.trim();
+    if (body.isEmpty()) {
+        error = "empty config JSON";
+        return false;
+    }
+    return lilygoConfigManager.importJson(body, error);
+}
+
 static void handleConfigImport()
 {
-    if (!server.hasArg("configJson")) {
-        server.send(400, "text/plain", "Missing configJson field");
+    String error;
+    if (!importRequestConfig(error)) {
+        server.send(400, "text/plain", "Config import failed: " + error);
         return;
     }
-
-    String body = server.arg("configJson");
-    body.trim();
-
-    if (body.isEmpty()) {
-        server.send(400, "text/plain", "Empty config JSON");
-        return;
-    }
-
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, body);
-
-    if (err) {
-        server.send(400, "text/plain", String("Invalid JSON: ") + err.c_str());
-        return;
-    }
-
-    if (doc["deviceName"].is<const char*>()) config.deviceName = doc["deviceName"].as<String>();
-    if (doc["vehicleId"].is<const char*>()) config.vehicleId = doc["vehicleId"].as<String>();
-    if (doc["mqttPrefix"].is<const char*>()) config.mqttPrefix = doc["mqttPrefix"].as<String>();
-    if (doc["canProfile"].is<int>()) config.canProfile = decoderProfileNormalize(doc["canProfile"].as<int>());
-
-    if (doc["wifiSsid"].is<const char*>()) config.wifiSsid = doc["wifiSsid"].as<String>();
-    if (doc["wifiPass"].is<const char*>()) config.wifiPass = doc["wifiPass"].as<String>();
-
-    if (doc["lteApn"].is<const char*>()) config.lteApn = doc["lteApn"].as<String>();
-    if (doc["lteUser"].is<const char*>()) config.lteUser = doc["lteUser"].as<String>();
-    if (doc["ltePass"].is<const char*>()) config.ltePass = doc["ltePass"].as<String>();
-
-    if (doc["services"]["mqtt"].is<bool>()) config.mqttServiceEnabled = doc["services"]["mqtt"].as<bool>();
-    if (doc["services"]["aws"].is<bool>()) config.awsServiceEnabled = doc["services"]["aws"].as<bool>();
-    if (doc["services"]["abrp"].is<bool>()) config.abrpEnabled = doc["services"]["abrp"].as<bool>();
-
-    if (doc["mqttHost"].is<const char*>()) config.mqttHost = doc["mqttHost"].as<String>();
-    if (doc["mqttPort"].is<int>()) config.mqttPort = (uint16_t)doc["mqttPort"].as<int>();
-    if (config.mqttPort == 0) config.mqttPort = 1883;
-    if (doc["mqttUser"].is<const char*>()) config.mqttUser = doc["mqttUser"].as<String>();
-    if (doc["mqttPass"].is<const char*>()) config.mqttPass = doc["mqttPass"].as<String>();
-
-    if (doc["otaEnabled"].is<bool>()) config.otaEnabled = doc["otaEnabled"].as<bool>();
-    if (doc["otaPassword"].is<const char*>()) config.otaPassword = doc["otaPassword"].as<String>();
-
-    if (doc["abrpEnabled"].is<bool>()) config.abrpEnabled = doc["abrpEnabled"].as<bool>();
-    if (doc["abrpEnabled"].is<int>()) config.abrpEnabled = doc["abrpEnabled"].as<int>() != 0;
-    if (doc["abrpApiKey"].is<const char*>()) config.abrpApiKey = doc["abrpApiKey"].as<String>();
-    if (doc["abrpUserToken"].is<const char*>()) config.abrpUserToken = doc["abrpUserToken"].as<String>();
-
-    saveLilygoConfig();
-
     server.send(200, "text/html", "<p>Config restored. Rebooting...</p>");
     rebootPending = true;
     rebootAtMs = millis() + 1000;
 }
 
+static void handleApiConfigImport()
+{
+    String error;
+    if (!importRequestConfig(error)) {
+        server.send(400, "application/json", "{\"ok\":false,\"error\":\"" + error + "\"}");
+        return;
+    }
+    server.send(200, "application/json", "{\"ok\":true,\"rebootRequired\":true}");
+}
+
 static void handleFactoryReset()
 {
-    clearLilygoConfig();
+    lilygoConfigManager.clear();
 
     server.send(200, "text/html", "<p>Config cleared. Rebooting...</p>");
     rebootPending = true;
@@ -301,7 +275,32 @@ static void handleFactoryReset()
 static void handleConfigExport()
 {
     server.sendHeader("Content-Disposition", "attachment; filename=mot-lilygo-config.json");
-    server.send(200, "application/json", lilygoConfigJson(true));
+    server.send(200, "application/json", lilygoConfigManager.exportJson(true));
+}
+
+static void handleReadiness()
+{
+    ConfigurationReadinessInput input;
+    input.onboardingComplete = config.onboardingComplete;
+    input.networkConfigured = !config.wifiSsid.isEmpty() || !config.lteApn.isEmpty();
+    input.networkOnline = lilygoNetworkOnline();
+    input.canConfigured = config.canProfile != DECODER_PROFILE_DISABLED;
+    input.canOnline = lilygoCanReady();
+    input.gpsDetected = l76kGpsDetected();
+    input.gpsFix = l76kGpsValid();
+    input.gpsState = l76kGpsStateName();
+    input.mqttEnabled = config.mqttServiceEnabled;
+    input.mqttConfigured = !config.mqttHost.isEmpty() && config.mqttPort > 0;
+    input.mqttOnline = lilygoMqttConnected();
+    input.awsEnabled = config.awsServiceEnabled;
+#ifdef MOT_AWS_IOT
+    input.awsConfigured = true;
+#else
+    input.awsConfigured = false;
+#endif
+    input.abrpEnabled = config.abrpEnabled;
+    input.abrpConfigured = !config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty();
+    server.send(200, "application/json", ConfigurationReadiness::toJson(input));
 }
 
 static void handleStatusJson()
@@ -545,7 +544,7 @@ static void handleOnboardingStatus()
 static void handleOnboardingComplete()
 {
     config.onboardingComplete = true;
-    saveLilygoConfig();
+    lilygoConfigManager.save();
     server.sendHeader("Location", "/");
     server.send(303, "text/plain", "");
 }
@@ -553,7 +552,7 @@ static void handleOnboardingComplete()
 static void handleOnboardingRestart()
 {
     config.onboardingComplete = false;
-    saveLilygoConfig();
+    lilygoConfigManager.save();
     server.sendHeader("Location", "/wizard?step=1");
     server.send(303, "text/plain", "");
 }
@@ -570,7 +569,11 @@ void setupLilygoWeb()
     server.on("/config/import", HTTP_POST, handleConfigImport);
     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
 
+    server.on("/api/config", HTTP_GET, handleConfigExport);
+    server.on("/api/config", HTTP_POST, handleApiConfigImport);
     server.on("/api/config/export", HTTP_GET, handleConfigExport);
+    server.on("/api/config/import", HTTP_POST, handleApiConfigImport);
+    server.on("/api/readiness", HTTP_GET, handleReadiness);
     server.on("/api/status", HTTP_GET, handleStatusJson);
 
     server.on("/api/lilygo/network", HTTP_GET, handleNetwork);

@@ -31,7 +31,7 @@ void setup()
     Serial.printf("Device  : %s\n", telemetry.system.deviceId.c_str());
     Serial.println("========================================");
 
-    loadConfig();
+    appConfigManager.load();
 
     setupNetwork();
     setupMqtt();

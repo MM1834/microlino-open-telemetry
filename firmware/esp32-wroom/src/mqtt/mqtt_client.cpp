@@ -258,3 +258,12 @@ void publishTelemetry()
     }
 #endif
 }
+
+bool mqttTransportConnected()
+{
+#ifdef MOT_AWS_IOT
+    return awsClient.connected();
+#else
+    return mqtt.connected();
+#endif
+}

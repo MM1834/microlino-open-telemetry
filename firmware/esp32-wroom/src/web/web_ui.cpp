@@ -14,7 +14,9 @@
 #include "MqttDiagnostics.h"
 #include "SystemHealth.h"
 #include "../gps/wroom_gps.h"
+#include "../mqtt/mqtt_client.h"
 #include "onboarding/onboarding.h"
+#include "config/configuration_readiness.h"
 #include <WiFi.h>
 
 static WebServer server(80);
@@ -155,14 +157,14 @@ static void handleOnboardingStatus()
 static void handleOnboardingComplete()
 {
     config.onboardingComplete = true;
-    saveConfig();
+    appConfigManager.save();
     server.sendHeader("Location", "/status");
     server.send(303, "text/plain", "");
 }
 static void handleOnboardingRestart()
 {
     config.onboardingComplete = false;
-    saveConfig();
+    appConfigManager.save();
     server.sendHeader("Location", "/wizard?step=1");
     server.send(303, "text/plain", "");
 }
@@ -346,7 +348,7 @@ static void handleSave()
     config.abrpApiKey = server.arg("abrpApiKey");
     config.abrpUserToken = server.arg("abrpToken");
     config.otaPassword = server.arg("otaPass");
-    saveConfig();
+    appConfigManager.save();
     const String returnTo = requestedReturnUrl();
     String response = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p>";
     if (!returnTo.isEmpty()) {
@@ -375,7 +377,7 @@ static void handleAbrpTest()
 static void handleConfigExport()
 {
     server.sendHeader("Content-Disposition", "attachment; filename=mot-config.json");
-    server.send(200, "application/json", configToJson(true));
+    server.send(200, "application/json", appConfigManager.exportJson(true));
 }
 
 static void handleConfigImport()
@@ -384,7 +386,7 @@ static void handleConfigImport()
     if (json.isEmpty()) json = server.arg("plain");
 
     String error;
-    if (!importConfigJson(json, error)) {
+    if (!appConfigManager.importJson(json, error)) {
         server.send(400, "text/plain", "Config import failed: " + error);
         return;
     }
@@ -396,7 +398,7 @@ static void handleConfigImport()
 
 static void handleFactoryReset()
 {
-    clearConfig();
+    appConfigManager.clear();
     server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration cleared.</h2><p>Device will reboot in 5 seconds.</p></body></html>");
     rebootPending = true;
     rebootAtMs = millis() + 5000;
@@ -418,6 +420,43 @@ static void handleApiMqttTest()
 {
     MqttDiagResult result = runMqttDiagnostics("mot-diag");
     server.send(200, "application/json", MqttDiagnostics::toJson(result));
+}
+
+static void handleApiReadiness()
+{
+    ConfigurationReadinessInput input;
+    input.onboardingComplete = config.onboardingComplete;
+    input.networkConfigured = !config.wifiSsid.isEmpty();
+    input.networkOnline = WiFi.status() == WL_CONNECTED;
+    input.canConfigured = config.can1Profile != DECODER_PROFILE_DISABLED;
+    input.canOnline = telemetry.display.valid;
+    input.gpsDetected = wroomGpsDetected();
+    input.gpsFix = wroomGpsValid();
+    input.gpsState = wroomGpsState();
+    input.mqttEnabled = config.mqttServiceEnabled;
+    input.mqttConfigured = !config.mqttHost.isEmpty() && config.mqttPort > 0;
+    input.mqttOnline = mqttTransportConnected();
+    input.awsEnabled = config.awsServiceEnabled;
+#ifdef MOT_AWS_IOT
+    input.awsConfigured = true;
+#else
+    input.awsConfigured = false;
+#endif
+    input.abrpEnabled = config.abrpServiceEnabled;
+    input.abrpConfigured = !config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty();
+    server.send(200, "application/json", ConfigurationReadiness::toJson(input));
+}
+
+static void handleApiConfigImport()
+{
+    String json = server.arg("plain");
+    if (json.isEmpty()) json = server.arg("configJson");
+    String error;
+    if (!appConfigManager.importJson(json, error)) {
+        server.send(400, "application/json", "{\"ok\":false,\"error\":\"" + error + "\"}");
+        return;
+    }
+    server.send(200, "application/json", "{\"ok\":true,\"rebootRequired\":true}");
 }
 
 static void handleApiSystemHealth()
@@ -467,7 +506,11 @@ void setupWebUi()
     server.on("/api/gps", []() { server.send(200, "application/json", wroomGpsStatusJson()); });
     server.on("/config", handleConfig);
     server.on("/save", HTTP_POST, handleSave);
+    server.on("/api/config", HTTP_GET, handleConfigExport);
+    server.on("/api/config", HTTP_POST, handleApiConfigImport);
     server.on("/api/config/export", HTTP_GET, handleConfigExport);
+    server.on("/api/config/import", HTTP_POST, handleApiConfigImport);
+    server.on("/api/readiness", HTTP_GET, handleApiReadiness);
     server.on("/config/import", HTTP_POST, handleConfigImport);
     server.on("/api/abrp/status", HTTP_GET, handleAbrpStatus);
     server.on("/api/abrp/test", HTTP_POST, handleAbrpTest);

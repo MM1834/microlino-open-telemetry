@@ -640,3 +640,12 @@ String lilygoMqttDebugJson()
 }
 
 #endif
+
+bool lilygoMqttConnected()
+{
+#ifdef MOT_AWS_IOT
+    return awsClient.connected();
+#else
+    return mqtt.connected();
+#endif
+}

@@ -6,3 +6,5 @@
 #include "../../../common/decoders/decoder_engine.cpp"
 #include "../../../common/mqtt/mqtt_topics.cpp"
 #include "../../../common/system/device_id.cpp"
+
+#include "../../../common/config/configuration_readiness.cpp"
