@@ -3,6 +3,7 @@
 
 #include "board_config.h"
 #include "telemetry/telemetry.h"
+#include "system/device_id.h"
 #include "config/lilygo_config.h"
 #include "modem/lilygo_modem.h"
 #include "network/lilygo_network.h"
@@ -18,6 +19,10 @@ void setup()
 {
     Serial.begin(115200);
     delay(1000);
+
+    telemetryInit();
+    telemetry.system.firmwareVersion = MOT_VERSION;
+    telemetry.system.deviceId = motDeviceId();
 
     Serial.println();
     Serial.println("========================================");

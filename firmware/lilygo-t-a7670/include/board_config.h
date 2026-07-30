@@ -1,8 +1,6 @@
 #pragma once
 
-#define MOT_NAME "Microlino Open Telemetry"
-#define MOT_VERSION "1.1.0-lilygo-sprint2"
-#define MOT_BOARD "lilygo-t-a7670"
+#include "system/version.h"
 
 // LilyGO T-A7670G R2 / T-A7670X-GPS V1.1 2024-04-26
 // MCU: ESP32-WROVER
