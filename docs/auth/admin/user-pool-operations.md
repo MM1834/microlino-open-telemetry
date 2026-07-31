@@ -1,5 +1,7 @@
 # Cognito User Pool – administrator guide
 
+> **Status:** Historical increment procedure; do not use its capability status as current state.
+
 ## Current capability
 
 After SPR-0004B.1.1, the user directory exists, but there is no dashboard app client or login page. Do not create production users yet. A test user may be created only after SPR-0004B.1.2 provides an app client and the authentication flow can be tested.

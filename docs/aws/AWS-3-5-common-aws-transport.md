@@ -1,5 +1,7 @@
 # AWS-3.5 — Common AWS transport
 
+> **Status:** Historical delivery record; current implementation lives in the shared `MotAwsIot` library.
+
 AWS-3.5 introduces a shared PlatformIO library:
 
 ```text

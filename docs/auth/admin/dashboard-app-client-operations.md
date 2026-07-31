@@ -1,5 +1,7 @@
 # Dashboard app client operations
 
+> **Status:** Historical increment procedure; current code already includes the Cognito domain and PKCE login.
+
 ## Administrator scope
 
 The app client identifies the Microlino dashboard to Cognito. Administrators normally manage its allowed callback and logout URLs through CloudFormation rather than editing the Cognito console manually.

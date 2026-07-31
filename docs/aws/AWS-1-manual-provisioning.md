@@ -1,5 +1,7 @@
 # AWS-1: Manual AWS IoT bootstrap
 
+> **Status:** Historical delivery procedure; current deployment state is unverified.
+
 This package prepares one manually provisioned beta device.
 
 ## Recommended first device

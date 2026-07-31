@@ -1,5 +1,7 @@
 # AWS-2.3 telemetry contract
 
+> **Status:** Historical delivery contract; current topic documentation remains under code verification.
+
 - **Status:** Initial contract
 - **Scope:** Firmware, AWS ingestion, application backend and dashboard
 - **Compatibility namespace:** `mot/<vehicleId>/...`

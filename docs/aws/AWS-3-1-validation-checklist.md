@@ -1,5 +1,7 @@
 # AWS-3.1 validation checklist
 
+> **Status:** Historical validation record; not evidence for the current commit or AWS account.
+
 - [ ] CloudFormation reaches `CREATE_COMPLETE`
 - [ ] IoT Rule is enabled
 - [ ] `status/online` appears in Lambda logs

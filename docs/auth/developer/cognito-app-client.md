@@ -1,5 +1,7 @@
 # Cognito dashboard app client
 
+> **Status:** Historical implementation increment; resource details remain useful, scope statements are superseded.
+
 ## Purpose
 
 `DashboardUserPoolClient` represents the browser dashboard in Amazon Cognito. It is a **public OAuth client** and therefore has no client secret.

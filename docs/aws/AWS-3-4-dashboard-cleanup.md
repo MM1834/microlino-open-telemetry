@@ -1,5 +1,7 @@
 # AWS-3.4 Dashboard cleanup
 
+> **Status:** Historical delivery record; use current dashboard documentation.
+
 The production Dashboard now labels its connection as **Cloud** instead of
 MQTT and loads only the AWS REST provider.
 

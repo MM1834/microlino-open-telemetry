@@ -1,5 +1,7 @@
 # Cognito User Pool – developer guide
 
+> **Status:** Historical implementation increment; deployment commands are not current operational guidance.
+
 ## Purpose
 
 SPR-0004B.1.1 introduces only the managed user directory. AWS IoT device authentication remains independent and unchanged.

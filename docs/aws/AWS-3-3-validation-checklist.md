@@ -1,5 +1,7 @@
 # AWS-3.3 validation checklist
 
+> **Status:** Historical validation record; not evidence for the current commit or AWS account.
+
 - [ ] CloudFormation reaches `UPDATE_COMPLETE`
 - [ ] `VehicleApiBaseUrl` appears in stack outputs
 - [ ] `GET /health` returns `ok: true`

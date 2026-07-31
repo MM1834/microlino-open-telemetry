@@ -1,5 +1,7 @@
 # AWS-3.6 — LilyGO on shared MotAwsIot
 
+> **Status:** Historical delivery record; LilyGO LTE/GPRS remains unvalidated for beta use.
+
 The LilyGO AWS WiFi build now uses the same shared `MotAwsIot` library as the
 ESP32-WROOM.
 
