@@ -1,8 +1,8 @@
 # Governance
 
-This directory contains the governance framework for the Microlino Open Telemetry (MOT) repository.
+This directory contains the governance framework for the **Microlino Open Telemetry (MOT)** repository.
 
-The governance documents define how engineering knowledge is organized, preserved and maintained throughout the lifetime of the project.
+The governance documents define how engineering knowledge is organized, preserved, and maintained throughout the lifetime of the project.
 
 Their purpose is to provide future maintainers with a consistent and long-term engineering framework rather than implementation-specific documentation.
 
@@ -12,13 +12,13 @@ Their purpose is to provide future maintainers with a consistent and long-term e
 
 | Document | Purpose |
 |----------|---------|
-| PROJECT_CONSTITUTION.md | Defines the governance principles of the repository. |
-| PROJECT_HANDOVER.md | Introduces the project, its objectives and engineering philosophy. |
-| CURRENT_STATUS.md | Provides a validated snapshot of the repository's current state. |
-| ENGINEERING_BACKLOG.md | Preserves long-term engineering opportunities that are intentionally deferred. |
-| WORK_ORDER.md | Describes the engineering work that is currently planned or in progress. |
-| SELF_REVIEW.md | Preserves engineering knowledge and experience gained during development. |
-| RELEASE.md | Records governance releases and significant governance milestones. |
+| [PROJECT_CONSTITUTION.md](PROJECT_CONSTITUTION.md) | Defines the governance principles of the repository. |
+| [PROJECT_HANDOVER.md](PROJECT_HANDOVER.md) | Introduces the project, its objectives, and engineering philosophy. |
+| [CURRENT_STATUS.md](CURRENT_STATUS.md) | Provides a validated snapshot of the repository's current technical state. |
+| [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md) | Preserves long-term engineering opportunities that are intentionally deferred. |
+| [WORK_ORDER.md](WORK_ORDER.md) | Describes the engineering work currently planned or in progress. |
+| [SELF_REVIEW.md](SELF_REVIEW.md) | Preserves engineering knowledge and experience gained during development. |
+| [RELEASE.md](RELEASE.md) | Records governance releases and significant governance milestones. |
 
 ---
 
@@ -26,20 +26,20 @@ Their purpose is to provide future maintainers with a consistent and long-term e
 
 The governance documents are intentionally separated according to their individual responsibilities.
 
-```
+```text
 Governance
-        │
-        ▼
+     │
+     ▼
 Project Orientation
-        │
-        ▼
+     │
+     ▼
 Current Repository State
-        │
-        ├──────────────┐
-        ▼              ▼
-Active Work     Engineering Opportunities
-        │              │
-        └──────┬───────┘
+     │
+ ┌───┴────────────────┐
+ ▼                    ▼
+Active Work    Engineering Opportunities
+     │                    │
+     └─────────┬──────────┘
                ▼
       Engineering Memory
 ```
@@ -54,21 +54,24 @@ Together they establish the long-term knowledge architecture of the repository.
 
 The governance framework is based on the following principles:
 
-- documentation is an engineering artifact
-- knowledge should remain inside the repository
-- governance evolves more slowly than the repository
-- maintainability takes precedence over complexity
-- each document has a clearly defined responsibility
+- Documentation is an engineering artifact.
+- Knowledge should remain inside the repository.
+- Governance evolves more slowly than the repository.
+- Maintainability takes precedence over complexity.
+- Each document has a clearly defined responsibility.
 
 ---
 
 # Governance Lifecycle
 
-```
+```text
 Draft
    │
    ▼
-Review
+Chief Repository Maintainer Review
+   │
+   ▼
+User Review
    │
    ▼
 Repository Ready
@@ -85,6 +88,8 @@ Architectural changes should be exceptional and may require a future governance 
 
 # Repository
 
-Microlino Open Telemetry (MOT)
+**Project:** Microlino Open Telemetry (MOT)
 
-Governance Version: **1.0**
+**Governance Version:** 1.0
+
+**Status:** Repository Release
