@@ -1,4 +1,6 @@
-# SPR-0004B.2.1 – HTTP API JWT Authorizer (vollständig)
+# Microlino Open Telemetry (MOT)
 
-Dieses Paket ergänzt den fehlenden `VehicleApiJwtAuthorizer`.
-Es ändert noch keine API-Route. Danach kann SPR-0004B.2.2 angewendet werden.
+> **Microlino Open Telemetry (MOT) is a modular telemetry platform for light electric vehicles. It cleanly separates vehicle data acquisition, the telemetry core, and connected services, enabling new hardware, cloud integrations, and analytics to evolve independently while sharing a common architecture.**
+
+## Documentation
+See `docs/README.md`.
