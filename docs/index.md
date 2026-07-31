@@ -28,7 +28,8 @@ when that workflow is implemented and validated.
 
 ## Service operation
 
-- [Authentication administration](auth/admin/user-pool-operations.md)
+- [Authentication documentation](auth/README.md)
+- [API reference](api/README.md)
 - [Protected API routes](administrator/authentication/protected-api-routes.md)
 - [AWS IoT credential handling](security/aws-iot-credentials.md)
 
@@ -39,6 +40,7 @@ These pages require environment-specific revalidation before production use.
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Migration tracker](MIGRATION.md)
 - [Active documentation sprint DOC-001](project/sprints/DOC-001.md)
+- [Classification register](project/DOCUMENT_CLASSIFICATION.md)
 - [Engineering backlog](governance/ENGINEERING_BACKLOG.md)
 
 Sprint documents, AWS delivery stages and release notes are retained as historical

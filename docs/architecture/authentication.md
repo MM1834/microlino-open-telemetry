@@ -1,5 +1,9 @@
 # Dashboard Authentication
 
+> **Status:** Implemented in repository; deployed integration not revalidated
+>
+> **Audience:** Portal developer and security reviewer
+
 ## Scope
 
 The dashboard uses a Cognito User Pool Authorization Code flow with PKCE. API
@@ -85,3 +89,11 @@ to API requests. It does not own Cognito state or token persistence.
 Refresh-token rotation, roles and user-to-vehicle permissions remain outside
 this sprint. An expired access token causes the local session to be cleared and
 requires a new explicit login.
+
+## Current authorization limitation
+
+The authentication implementation identifies a Cognito user but does not assign
+vehicles. The current REST list/snapshot handlers and WebSocket `subscribe` action
+do not enforce a user-to-vehicle relationship. See the current
+[Vehicle REST API](../api/vehicle-api.md) and
+[Live WebSocket API](../api/live-websocket-api.md).

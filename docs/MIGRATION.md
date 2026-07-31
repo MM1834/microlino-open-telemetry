@@ -17,6 +17,9 @@ DOC-001 is the official execution vehicle for this migration. This page remains
 the operational ledger; the sprint document owns scope, acceptance criteria and
 review gates.
 
+The complete directory rules and source ownership are recorded in the
+[documentation classification register](project/DOCUMENT_CLASSIFICATION.md).
+
 ## Migration rules
 
 1. Compare a document with current code and configuration.
@@ -37,8 +40,8 @@ review gates.
 | Firmware reference | `firmware/` | Active consolidation |
 | Local device UI | `webui/` | Structurally current; screenshots await revalidation |
 | Hosted portal/dashboard | `dashboard/` and `user/` | Must be updated with onboarding work |
-| AWS implementation history | `aws/` | Historical; current design moves to architecture/admin/API |
-| Authentication operations | `auth/`, `administrator/` | Needs role-based consolidation |
+| AWS implementation history | `aws/` | Historical index added; current architecture/API separated |
+| Authentication operations | `auth/`, `administrator/` | Historical increments indexed; current API/auth sources established |
 | Hardware | `hardware/` | Current base; vehicle/CAN variants incomplete |
 | LTE diagnostics | `developer/lte/` | Historical investigation knowledge |
 | Sprint records | `project/sprints/` | Historical |

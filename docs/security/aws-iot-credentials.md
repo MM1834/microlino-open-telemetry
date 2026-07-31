@@ -1,6 +1,10 @@
 # AWS IoT credential handling
 
-> 🔒 **Security:** Device private keys are production secrets.
+> **Status:** Current security requirement; operational process not revalidated
+>
+> **Audience:** Device provisioner, administrator and security reviewer
+
+Device private keys are production secrets.
 
 ## Files per manually provisioned beta device
 
@@ -12,6 +16,10 @@ thing metadata
 ```
 
 Only the Amazon root CA is public.
+
+The current firmware expects `device.json` metadata containing endpoint, port,
+Thing name, vehicle ID and topic prefix, plus the CA, device certificate and
+private key in LittleFS.
 
 ## Repository rules
 
@@ -45,6 +53,9 @@ Prototype options:
 - USB provisioning into NVS.
 
 For an end-user release, prefer protected device storage rather than shared credentials compiled into public firmware binaries.
+
+The current beta tooling uses ignored local directories and LittleFS staging. Git
+ignore is not encryption and is accepted only as a temporary provisioning workflow.
 
 ## Rotation and ownership transfer
 
