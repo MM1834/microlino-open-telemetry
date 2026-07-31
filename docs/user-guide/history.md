@@ -1,14 +1,7 @@
-# History View
+# Portal History View
 
-Screenshot placeholders:
+> **Status:** Existing browser-local feature; cloud history is planned.
 
-```text
-docs/images/history/
-```
-
-Document:
-
-- What is stored
-- How long history is kept
-- Which values are shown
-- How to interpret gaps
+Use [dashboard history](../dashboard/history.md) for the current browser-local
+implementation. A future portal guide must clearly state storage location,
+retention, gaps, export and deletion behaviour before cloud history is offered.

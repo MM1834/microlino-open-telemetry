@@ -11,6 +11,8 @@ history for Microlino Open Telemetry.
 - [Architecture](architecture/README.md)
 - [Firmware overview](firmware/overview.md)
 - [AWS IoT roadmap](roadmap/aws-iot.md)
+- [Documentation standard](DOCUMENTATION_STANDARD.md)
+- [Migration tracker](MIGRATION.md)
 
 ## Documentation lifecycle
 

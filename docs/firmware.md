@@ -1,3 +1,6 @@
-# Firmware
+# Firmware Entry Point
 
-CAN decoder, MQTT client and OTA.
+> **Status:** Compatibility redirect
+
+Current firmware documentation starts at
+[firmware/overview.md](firmware/overview.md).

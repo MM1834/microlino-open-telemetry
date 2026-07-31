@@ -1,15 +1,7 @@
-# Location Map
+# Portal Location Map
 
-Screenshot placeholders:
+> **Status:** Existing feature; screenshots await portal revalidation.
 
-```text
-docs/images/location-map/
-```
-
-Document:
-
-- Location source
-- GPS validity
-- LilyGO GPS behavior
-- ESP32-WROOM behavior without GPS
-- ABRP mobile-app fallback
+Use [dashboard location](../dashboard/location.md) for current behaviour. The beta
+guide must distinguish valid live GPS, last-known location and configured fallback
+location, including ESP32-WROOM devices without GPS.

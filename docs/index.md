@@ -1,26 +1,44 @@
 # MOT Documentation Index
 
-Welcome to the consolidated documentation.
+> **Status:** Current navigation
+>
+> **Audience:** All readers
+>
+> **Last verified:** 2026-07-31; content pages remain under migration
 
-## Start here
-1. `README.md`
-2. `reference/01-introduction.md`
-3. `reference/02-design-principles.md`
-4. `reference/03-terminology.md`
+## Beta users
 
-## Architecture decisions
-See `docs/adr/README.md`.
+1. [Getting started](getting-started/overview.md)
+2. [Hardware overview](hardware/overview.md)
+3. [Local WebUI](webui/overview.md)
+4. [Troubleshooting](troubleshooting/overview.md)
 
-## Reference
-Current documentation lives in `docs/reference/`.
+Portal account and device-onboarding documentation will be added under `user/`
+when that workflow is implemented and validated.
 
-## Historical implementation notes
-Sprint and implementation documents under `docs/aws/` remain part of the project history.
+## Maintainers and developers
 
-## Legacy
-Superseded entry documents are tracked via `docs/legacy/README.md` rather than deleted.
+1. [Project handover](governance/PROJECT_HANDOVER.md)
+2. [Current status](governance/CURRENT_STATUS.md)
+3. [Active work](governance/WORK_ORDER.md)
+4. [Architecture](architecture/README.md)
+5. [Architecture decisions](adr/README.md)
+6. [Firmware](firmware/overview.md)
+7. [Developer documentation](developer/README.md)
 
-## GPS-2
+## Service operation
 
-- [GPS-2 production integration](gps/GPS-2-production-integration.md)
-- [SPR-0003 sprint record](project/sprints/SPR-0003-GPS-2.md)
+- [Authentication administration](auth/admin/user-pool-operations.md)
+- [Protected API routes](administrator/authentication/protected-api-routes.md)
+- [AWS IoT credential handling](security/aws-iot-credentials.md)
+
+These pages require environment-specific revalidation before production use.
+
+## Documentation maintenance
+
+- [Documentation standard](DOCUMENTATION_STANDARD.md)
+- [Migration tracker](MIGRATION.md)
+- [Engineering backlog](governance/ENGINEERING_BACKLOG.md)
+
+Sprint documents, AWS delivery stages and release notes are retained as historical
+evidence and are not current operational instructions unless explicitly marked.

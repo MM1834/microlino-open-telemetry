@@ -1,103 +1,81 @@
-# Architecture Overview
+# System Architecture Overview
 
-Microlino Open Telemetry supports two firmware targets:
+> **Status:** Current repository architecture
+>
+> **Audience:** Developer and maintainer
+>
+> **Last verified:** 2026-07-31; builds and deployed AWS state not revalidated
 
-- ESP32-WROOM
-- CAN485
-- LilyGO T-A7670G R2
+## Scope
 
-Both targets share the same core telemetry concepts:
+MOT currently has two firmware targets: ESP32-WROOM and LilyGO T-A7670G. The
+WeAct CAN485 board is a hardware option in the ESP32 family, not a third firmware
+architecture. Both firmware targets assemble a shared telemetry pipeline and can
+operate locally without the hosted portal.
 
-```text
-CAN frames
-  -> decoder
-  -> telemetry model
-  -> Web UI / JSON API
-  -> MQTT
-  -> ABRP
-```
-
-## High-level architecture
+## System boundaries
 
 ```mermaid
 flowchart LR
-    subgraph Vehicle["Microlino"]
-        CAN["Display CAN bus"]
+    Vehicle["Microlino CAN bus"] --> Device["MOT device\nESP32-WROOM or LilyGO"]
+    GPS["Optional GPS"] --> Device
+
+    subgraph Local["Device-local trust boundary"]
+      Device --> WebUI["Local WebUI\nsetup, diagnostics, recovery, OTA"]
+      Device --> Legacy["Optional legacy MQTT / ABRP"]
     end
 
-    subgraph Firmware["MOT firmware"]
-        TWAI["ESP32 TWAI / CAN transceiver"]
-        Decoder["CAN decoder engine"]
-        Telemetry["Shared telemetry model"]
-        Status["Status JSON API"]
-        WebUI["Local Web UI"]
-        MQTT["MQTT publisher"]
-        ABRP["ABRP telemetry sender"]
-        Config["Configuration / Backup / Restore"]
-        OTA["OTA update"]
-    end
+    Device -->|"MQTT/TLS + unique X.509 identity"| IoT["AWS IoT Core"]
+    IoT --> Ingest["IoT Rule + ingestion Lambda"]
+    Ingest --> State["DynamoDB vehicle state"]
+    Ingest --> Live["WebSocket live fan-out"]
 
-    subgraph Network["Network transport"]
-        WiFi["WiFi"]
-        LTE["LTE modem (LilyGO)"]
-    end
+    User["Beta user"] -->|"Cognito Authorization Code + PKCE"| Portal["Hosted portal"]
+    Portal -->|"Bearer JWT"| Api["Vehicle REST API"]
+    Portal -->|"Authenticated WSS"| Live
+    Api --> State
 
-    subgraph External["External services"]
-        Broker["MQTT broker / ioBroker"]
-        AbrpApi["ABRP telemetry API"]
-        Browser["Browser / local diagnostics"]
-    end
-
-    CAN --> TWAI --> Decoder --> Telemetry
-
-    Telemetry --> Status
-    Telemetry --> WebUI
-    Telemetry --> MQTT
-    Telemetry --> ABRP
-
-    Config --> WebUI
-    OTA --> WebUI
-
-    WebUI --> Browser
-    Status --> Browser
-
-    MQTT --> WiFi
-    MQTT -. experimental .-> LTE
-    WiFi --> Broker
-    LTE -. field test pending .-> Broker
-
-    ABRP --> WiFi
-    ABRP -. planned .-> LTE
-    WiFi --> AbrpApi
-    LTE -. planned .-> AbrpApi
+    Access["User-to-vehicle access\nplanned, required before multi-user beta"]
+    Access -.-> Api
+    Access -.-> Live
 ```
 
-## Shared concepts
+Solid edges are represented in the repository. Dotted authorization edges are the
+next implementation boundary and are not yet enforced.
 
-- CAN input from the Microlino display CAN bus
-- Shared telemetry model
-- JSON status endpoints
-- Web UI diagnostics
-- MQTT publishing
-- ABRP telemetry sender
-- OTA update
-- Configuration backup / restore
+## Firmware pipeline
+
+```mermaid
+flowchart LR
+    CAN["CAN input"] --> Decoder["Decoder profile"] --> Telemetry["Shared telemetry model"]
+    GPS["Optional GPS"] --> Telemetry
+    Config["Preferences / JSON configuration"] --> Services["Runtime services"]
+    Telemetry --> Services
+    Services --> LocalUI["Local WebUI and JSON API"]
+    Services --> MQTT["Legacy MQTT or AWS IoT"]
+    Services --> ABRP["Optional ABRP"]
+```
 
 ## Platform differences
 
-| Area | ESP32-WROOM | CAN485 | LilyGO T-A7670G R2 |
+| Area | ESP32-WROOM | LilyGO T-A7670G |
 |---|---|---|
-| Network | WiFi | WiFi + LTE |
-| GPS | none | external L76K GPS |
-| CAN | ESP32 TWAI + transceiver | ESP32 TWAI + SN65HVD230 |
-| ABRP location | ABRP/mobile-app fallback unless GPS exists | L76K GPS if valid |
-| MQTT transport | WiFi | WiFi, LTE experimental |
-| ABRP transport | WiFi | WiFi, LTE planned |
-| OTA | Web OTA | Web OTA |
+| Reference network | WiFi | WiFi |
+| Mobile network | Not available | LTE/GPRS present, not beta-ready |
+| GPS | Optional external module | External L76K |
+| CAN | ESP32 TWAI plus external transceiver/board | ESP32 TWAI plus external SN65HVD230 |
+| AWS IoT | Implemented option | Implemented option over dependable network path |
+| Local WebUI and OTA | Implemented | Implemented |
 
-## Notes
+## Availability principle
 
-- ABRP receives telemetry from the shared telemetry model.
-- Latitude and longitude are included only when a valid GPS source exists.
-- LilyGO MQTT over LTE is experimental until field-tested.
-- LilyGO ABRP over LTE is planned, not yet final.
+Loss of AWS, the portal or Internet connectivity must not prevent device-local
+configuration, diagnostics or recovery. Conversely, the local WebUI must not
+become the hosted account or fleet-management system.
+
+## Related documents
+
+- [AWS IoT and portal](aws-iot.md)
+- [Firmware overview](../firmware/overview.md)
+- [Hardware comparison](../hardware/comparison.md)
+- [Current status](../governance/CURRENT_STATUS.md)
