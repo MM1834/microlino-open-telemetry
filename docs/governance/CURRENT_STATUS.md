@@ -1,170 +1,133 @@
-# CURRENT_STATUS
+# Current Status
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Document Type:** Governance
-
-**Status:** Active
+**Status:** Active beta preparation
 
 **Governance Version:** 1.0
 
-**Maintainer:** Repository Maintainers
+**Last reviewed:** 2026-07-31
 
----
+## Purpose
 
-# Purpose
+This document records the current repository state. A capability is only called
+validated when the repository contains corresponding evidence. Historical sprint
+notes remain useful audit material, but are not by themselves proof of the current
+revision.
 
-This document provides a validated snapshot of the current technical state of the Microlino Open Telemetry (MOT) repository.
+## Current product direction
 
-Its purpose is to summarize the repository's current capabilities, supported platforms, implemented functionality and documentation maturity without describing future work, engineering history or implementation details.
+MOT is preparing a small ESP32-WROOM beta fleet. The immediate engineering focus
+is documentation consolidation, followed by secure user and device onboarding in
+the portal website. Onboarding is not planned for the firmware's local WebUI.
 
-This document represents the present state of the repository and is expected to evolve as the project evolves.
+The local WebUI remains the device-local setup, diagnostics, recovery and OTA
+interface. The portal is the user-facing service for accounts, vehicle access and
+future fleet functions.
 
----
+## Supported hardware paths
 
-# Scope
+### ESP32-WROOM
 
-CURRENT_STATUS records the repository as it exists today.
+- Current reference platform for the beta devices.
+- Supports CAN telemetry over WiFi.
+- Can be deployed with or without an optional GPS module.
+- Local WebUI, configuration, diagnostics and local OTA are implemented.
+- AWS IoT support is implemented as a build option.
 
-Typical topics include:
+### LilyGO T-A7670G
 
-- supported platforms
-- implemented capabilities
-- supported interfaces
-- available integrations
-- validated functionality
-- known technical limitations
-- documentation maturity
+- Shares the telemetry and AWS IoT architecture with ESP32-WROOM.
+- WiFi operation is the currently dependable path.
+- LTE/GPRS code exists, but the complete mobile MQTT/TLS path is not yet accepted
+  as beta-ready.
+- External L76K GPS support exists.
 
-The document intentionally excludes engineering decisions, implementation history, active development and future planning.
+## Firmware structure
 
----
+The repository contains shared telemetry, CAN decoding, configuration, readiness,
+MQTT topics, AWS IoT and GPS components under `firmware/common` and
+`firmware/shared-libs`.
 
-# Repository Snapshot
+PlatformIO currently exposes these environments:
 
-This section provides a concise overview of the repository.
+- `esp32dev`
+- `esp32dev-aws`
+- `esp32dev-gps-test`
+- `lilygo-t-a7670`
+- `T-A7670X-AWS`
 
-Typical information may include:
+This environment set is legacy structure, not the desired maintenance model. GPS
+test firmware is no longer a maintained product variant. Pre-AWS environments are
+also no longer intended as separate firmware generations. The target is one
+maintained firmware line per board, with AWS IoT treated as a configurable feature.
+That simplification is planned and has not yet been applied to PlatformIO.
 
-- repository maturity
-- implementation stability
-- current engineering focus
-- overall documentation completeness
+## Portal and AWS backend
 
-The objective is to provide immediate orientation for maintainers without requiring detailed technical knowledge.
+Implemented in the repository:
 
----
+- static portal/dashboard;
+- Cognito Authorization Code flow with PKCE;
+- API Gateway JWT protection for vehicle REST routes;
+- authenticated WebSocket connection;
+- IoT Rule ingestion into DynamoDB;
+- REST snapshots and live telemetry fan-out;
+- per-device AWS IoT credentials loaded from LittleFS;
+- shared AWS IoT firmware transport for both boards.
 
-# Supported Platforms
+Not implemented:
 
-This section lists all hardware platforms currently supported by the repository.
+- user-to-vehicle authorization;
+- user/device registration and claim flow;
+- ownership transfer and recovery;
+- automated device certificate provisioning or rotation;
+- cloud-managed OTA.
 
-For each platform, document:
+Authentication therefore exists, but tenant isolation does not. At present, an
+authenticated portal user is not restricted to an assigned vehicle. The portal
+must not be opened to multiple untrusted beta users until this is corrected.
 
-- support status
-- implementation maturity
-- validation status
-- significant limitations
+## Vehicle integration
 
-Only actively maintained and validated platforms should be listed.
+The implemented firmware receives telemetry passively and does not control vehicle
+behaviour. The current decoder and wiring are centered on the presently supported
+Microlino CAN connection. Extending support to other vehicle models requires both
+decoder work and a hardware decision for standard CAN access.
 
----
+Known candidate paths are:
 
-# Supported Interfaces
+- rewire the current module from pins 1 and 9 to standard CAN;
+- add another CAN interface/module;
+- evaluate an ESP32-C6 generation design for the affected hardware variant.
 
-Summarize the interfaces currently supported by the repository.
+No choice is currently approved.
 
-Typical examples include:
+## Validation status
 
-- CAN
-- GNSS
-- Wi-Fi
-- Cellular
-- MQTT
-- Bluetooth (if applicable)
+The repository contains extensive historical validation notes and local ignored
+PlatformIO build artifacts. During the 2026-07-31 Codex takeover audit, no build,
+hardware test, deployment or cloud inspection was performed. Current head builds,
+deployed AWS state and physical-device behaviour therefore remain to be
+revalidated before beta release.
 
-The section should describe available functionality rather than implementation details.
+## Documentation status
 
----
+Governance 1.0 is present on `develop`. The wider documentation still contains two
+generations plus historical sprint packages. Several status and roadmap pages are
+stale. Consolidation is active work; historical material should be retained as
+history rather than presented as current truth.
 
-# Vehicle Integration
+## Security and local credentials
 
-Summarize the current vehicle integration capabilities.
+Local AWS IoT credential directories exist and are ignored by Git. Only `.gitkeep`
+files are tracked. Ignore rules reduce accidental commits but do not provide
+encryption, rotation or access control. Credential contents and deployed AWS
+resources were not inspected during the takeover audit.
 
-Typical information includes:
+## Related documents
 
-- telemetry acquisition
-- supported vehicle interfaces
-- passive monitoring capabilities
-- validated signal groups
-
-Detailed protocol descriptions belong in technical reference documentation.
-
----
-
-# Telemetry Capabilities
-
-Summarize the telemetry currently available.
-
-Typical topics include:
-
-- vehicle telemetry
-- positioning
-- connectivity status
-- diagnostic information
-- external telemetry outputs
-
-The purpose is to describe available capabilities rather than message formats or implementation details.
-
----
-
-# Known Limitations
-
-Document validated technical limitations that currently affect the repository.
-
-Limitations should be factual, objective and verifiable.
-
-Future improvements belong in ENGINEERING_BACKLOG or WORK_ORDER.
-
----
-
-# Documentation Status
-
-Summarize the maturity of the repository documentation.
-
-Typical areas include:
-
-- governance
-- architecture
-- technical references
-- configuration
-- deployment
-- developer documentation
-
-The objective is to identify documentation completeness rather than implementation progress.
-
----
-
-# Relationship to Other Documents
-
-PROJECT_HANDOVER explains the project.
-
-PROJECT_CONSTITUTION defines repository governance.
-
-WORK_ORDER describes active engineering work.
-
-ENGINEERING_BACKLOG preserves future engineering opportunities.
-
-SELF_REVIEW preserves engineering knowledge gained through development.
-
-CURRENT_STATUS describes the repository as it exists today.
-
----
-
-# Related Documents
-
-- PROJECT_CONSTITUTION.md
-- PROJECT_HANDOVER.md
-- ENGINEERING_BACKLOG.md
-- WORK_ORDER.md
-- SELF_REVIEW.md
+- [PROJECT_HANDOVER.md](PROJECT_HANDOVER.md)
+- [WORK_ORDER.md](WORK_ORDER.md)
+- [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)

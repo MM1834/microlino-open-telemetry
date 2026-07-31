@@ -18,7 +18,6 @@ Their purpose is to provide future maintainers with a consistent and long-term e
 | ENGINEERING_BACKLOG.md | Preserves long-term engineering opportunities that are intentionally deferred. |
 | WORK_ORDER.md | Describes the engineering work that is currently planned or in progress. |
 | SELF_REVIEW.md | Preserves engineering knowledge and experience gained during development. |
-| RELEASE.md | Records governance releases and significant governance milestones. |
 
 ---
 
@@ -88,3 +87,7 @@ Architectural changes should be exceptional and may require a future governance 
 Microlino Open Telemetry (MOT)
 
 Governance Version: **1.0**
+
+The governance framework was restored to the active `develop` branch on
+2026-07-31. Governance release history is currently represented by Git tags and
+commit history; there is no separate `RELEASE.md` yet.

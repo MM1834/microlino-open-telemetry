@@ -17,6 +17,7 @@ The firmware receives vehicle and location data, normalizes it into a common mod
 | GPS | Read and validate L76K location data |
 | Network | Manage AP, WiFi and LilyGO LTE availability |
 | MQTT | Publish retained telemetry and system values |
+| AWS IoT | Optional MQTT/TLS transport with per-device credentials |
 | WebUI | Local configuration, status, OTA and recovery |
 | Configuration | Store settings in ESP32 Preferences/NVS |
 | ABRP | Build and send optional route-planning telemetry |
@@ -51,5 +52,13 @@ flowchart LR
 | LTE registration/GPRS | — | Working |
 | MQTT over LTE | — | Experimental |
 | ABRP over LTE HTTPS | — | Deferred |
+
+## Maintained firmware direction
+
+The multiple PlatformIO environments reflect implementation history. The intended
+maintenance model is one firmware line per board, with AWS IoT and optional GPS as
+features rather than separate firmware generations. Until the PlatformIO files are
+simplified, `esp32dev-gps-test` and the pre-AWS environments should be treated as
+legacy build structure, not distinct supported products.
 
 The WiFi path is the current reference for end-to-end validation. Detailed LTE investigations are kept under `docs/developer/lte/`.

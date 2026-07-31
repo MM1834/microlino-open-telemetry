@@ -1,139 +1,99 @@
-# ENGINEERING_BACKLOG
+# Engineering Backlog
 
 **Project:** Microlino Open Telemetry (MOT)
-
-**Document Type:** Governance
 
 **Status:** Active
 
 **Governance Version:** 1.0
 
-**Maintainer:** Repository Maintainers
+**Last reviewed:** 2026-07-31
 
----
+This backlog contains relevant work that is not part of the immediate active
+delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
 
-# Purpose
+## Cloud-managed firmware updates
 
-This document preserves engineering opportunities that are intentionally deferred but remain relevant to the long-term evolution of the Microlino Open Telemetry (MOT) repository.
+Evaluate OTA distribution through the portal or AWS after beta onboarding is
+stable. The firmware already supports local WebUI OTA, but remote OTA additionally
+requires signed artifacts, integrity verification, rollout controls, rollback,
+device status reporting and recovery procedures. AWS IoT Jobs is a candidate, not
+an approved implementation.
 
-Its purpose is to capture engineering topics with strategic value without creating implementation commitments. The Engineering Backlog represents future engineering opportunities rather than planned work.
+## AWS IoT fleet operations
 
----
+Design fleet provisioning, certificate rotation, revocation, device replacement
+and ownership transfer. Continue to prohibit a shared operational certificate for
+multiple deployed devices.
 
-# Scope
+## Telemetry history and retention
 
-The Engineering Backlog records engineering topics that:
+Define durable cloud history storage, retention periods, export, deletion and cost
+controls. Browser-local history and the current DynamoDB state snapshot are not a
+complete fleet history service.
 
-- provide long-term technical value
-- are intentionally deferred
-- require additional validation or research
-- may influence future repository architecture
-- should remain visible to future maintainers
+## Portal roles and vehicle sharing
 
-The document intentionally excludes active engineering work, implementation tasks, bug tracking and release planning.
+After basic ownership enforcement, evaluate support/operator roles, multiple users
+per vehicle, temporary sharing and least-privilege support access. Avoid encoding
+vehicle ownership solely in Cognito attributes.
 
----
+## Authentication session lifecycle
 
-# Guiding Principle
+Add a reviewed refresh-token and reauthentication strategy. The current portal
+clears expired sessions and requires a new login.
 
-The Engineering Backlog exists to preserve engineering opportunities without creating implementation pressure.
+## Additional Microlino model decoders
 
-A topic may remain in this document indefinitely if there is no compelling reason to implement it.
+Extend OBD/CAN decoding to additional vehicle models after obtaining verified
+traces and choosing the required hardware interface. Preserve passive monitoring
+and record signal confidence.
 
-Deferred does not mean forgotten.
+Hardware options requiring evaluation:
 
----
+- rewire pins 1 and 9 of the current module to standard CAN;
+- add another CAN transceiver/interface;
+- use an ESP32-C6 generation board for the affected hardware variant.
 
-# Entry Criteria
+The decision must consider electrical safety, isolation, connector compatibility,
+available CAN controllers, firmware portability and support burden.
 
-An entry should only be created when it represents a meaningful engineering opportunity.
+## Decoder profiles and compatibility data
 
-Typical examples include:
+Create a versioned vehicle-profile model with traceable signal evidence, firmware
+compatibility and safe fallback behaviour for unknown models.
 
-- architectural improvements
-- platform evolution
-- maintainability improvements
-- technology evaluations
-- engineering research
-- future abstraction opportunities
+## Beta support tooling
 
-The backlog should remain intentionally selective.
+Evaluate privacy-conscious support bundles, device health summaries and audit-safe
+diagnostics. Support tooling must redact WiFi passwords, tokens, certificates and
+private keys by default.
 
----
+## Automated verification
 
-# Recommended Entry Structure
+Introduce CI for documentation links, configuration/schema tests, firmware compile
+checks and isolated tests for inline backend handlers. Hardware-in-the-loop tests
+may be added later where they provide repeatable value.
 
-Each entry should provide sufficient context for future evaluation.
+## Cloud infrastructure modularization
 
-## Title
+Consider extracting inline Lambda code from the monolithic CloudFormation template
+when the backend begins changing frequently. Keep infrastructure and deployable
+code versioned together.
 
-A concise description of the engineering opportunity.
+## Local credential protection
 
-## Motivation
+Move beyond ignore-only storage toward an explicit encrypted or OS-protected local
+workflow once beta onboarding no longer depends on the temporary credential
+directories.
 
-Why is this topic relevant?
+## Future transports and integrations
 
-## Current Decision
+Reassess Device Shadows, ABRP over LTE, notification processing and other external
+services only after the beta identity, authorization and connectivity foundations
+are reliable.
 
-Why is implementation intentionally deferred?
+## Related documents
 
-## Expected Benefit
-
-What long-term value could be achieved?
-
-## Dependencies
-
-Which technical, architectural or project conditions should exist before the topic is reconsidered?
-
----
-
-# Maintenance
-
-Engineering Backlog entries should be reviewed periodically.
-
-Possible outcomes include:
-
-- remain deferred
-- move to WORK_ORDER
-- remove because no longer relevant
-
-Removing an entry is acceptable when the original engineering motivation no longer exists.
-
----
-
-# What Does Not Belong Here
-
-The following information shall not be recorded in the Engineering Backlog:
-
-- active implementation work
-- sprint planning
-- release planning
-- bug reports
-- feature requests
-- implementation notes
-- temporary ideas
-
-These topics belong elsewhere within the repository.
-
----
-
-# Relationship to Other Documents
-
-PROJECT_CONSTITUTION defines how engineering decisions are governed.
-
-CURRENT_STATUS describes what currently exists.
-
-WORK_ORDER defines engineering work that is actively being performed.
-
-SELF_REVIEW preserves engineering knowledge gained through implementation.
-
-ENGINEERING_BACKLOG preserves engineering opportunities before implementation begins.
-
----
-
-# Related Documents
-
-- PROJECT_CONSTITUTION.md
-- CURRENT_STATUS.md
-- WORK_ORDER.md
-- SELF_REVIEW.md
+- [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- [WORK_ORDER.md](WORK_ORDER.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)

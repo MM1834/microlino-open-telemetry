@@ -58,10 +58,16 @@ Typical responsibilities include:
 - telemetry transport
 - configuration management
 - platform abstraction
+- authenticated portal access and telemetry services
 
 The repository does not aim to modify vehicle control systems or influence vehicle behaviour.
 
 Telemetry is intentionally passive unless explicitly documented otherwise.
+
+The local firmware WebUI and the portal have different trust boundaries. The local
+WebUI is for device-local setup, diagnostics, recovery and OTA. User accounts,
+device claiming, vehicle ownership and fleet administration belong in the portal
+and its backend, not in an Internet-facing firmware UI.
 
 ---
 
@@ -82,6 +88,10 @@ The project is designed to support multiple hardware platforms over time.
 Platform support should be achieved through well-defined abstractions rather than independent implementations.
 
 Platform-specific functionality should remain isolated behind stable interfaces whenever practical.
+
+The maintained product direction is one firmware line per supported board.
+Connectivity and optional hardware capabilities should be configuration or feature
+choices, not permanently forked firmware generations.
 
 ---
 
@@ -194,6 +204,14 @@ New maintainers are encouraged to explore the repository in the following order:
 6. SELF_REVIEW
 
 After completing these documents, the repository structure and engineering philosophy should be understandable before exploring the implementation.
+
+Current beta work should then be approached in this order:
+
+1. consolidate documentation and revalidate the current revision;
+2. secure portal user-to-vehicle authorization and onboarding;
+3. prepare individually provisioned ESP32-WROOM beta devices and support material;
+4. stabilize LilyGO LTE/GPRS;
+5. expand vehicle decoders after the CAN hardware strategy is approved.
 
 ---
 

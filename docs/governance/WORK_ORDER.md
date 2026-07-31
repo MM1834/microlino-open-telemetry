@@ -1,145 +1,90 @@
-# WORK_ORDER
+# Work Order
 
 **Project:** Microlino Open Telemetry (MOT)
-
-**Document Type:** Governance
 
 **Status:** Active
 
 **Governance Version:** 1.0
 
-**Maintainer:** Repository Maintainers
+**Last reviewed:** 2026-07-31
 
----
+## High priority
 
-# Purpose
+### Consolidate repository documentation
 
-This document defines the engineering work that is currently planned or actively being performed within the Microlino Open Telemetry (MOT) repository.
+**Objective:** Establish one current documentation generation and preserve older
+material as explicitly historical evidence.
 
-Its purpose is to provide maintainers with a clear view of current priorities, ongoing implementation efforts and the next engineering objectives.
+**Current status:** In progress. Governance has been restored to `develop` and the
+takeover audit identified stale roadmaps, sprint status pages and contradictory AWS
+descriptions.
 
-Unlike the Engineering Backlog, this document represents work that is expected to progress in the foreseeable future.
+**Expected outcome:** Maintainers and beta users can distinguish current product
+behaviour, planned work and historical implementation records.
 
----
+### Prepare the ESP32-WROOM beta release
 
-# Scope
+**Objective:** Deliver a small number of ESP32-WROOM devices, with or without GPS,
+to beta testers with the essential setup, diagnostics, recovery and support
+documentation.
 
-WORK_ORDER contains engineering activities that are currently relevant for repository development.
+**Dependencies:** Reproducible firmware builds, supported firmware-environment
+definition, device provisioning procedure, security review and a beta support
+runbook.
 
-Typical topics include:
+**Expected outcome:** Individually identifiable devices can be provisioned,
+recovered and supported without sharing credentials.
 
-- active implementation work
-- planned engineering tasks
-- current development priorities
-- validation activities
-- documentation work
-- repository maintenance
+### Implement portal user and device onboarding
 
-Completed work should be removed or reflected in CURRENT_STATUS where appropriate.
+**Objective:** Add secure account onboarding, device claiming and per-user vehicle
+authorization to the portal website and backend.
 
----
+**Scope boundary:** This is a portal/backend capability. It must not be implemented
+as an Internet-facing extension of the firmware's local WebUI.
 
-# Guiding Principle
+**Required design work:**
 
-Only engineering work that is expected to receive active attention should appear in this document.
+- canonical identity model for user, vehicle, device, Thing and certificate;
+- server-side `UserVehicleAccess` or equivalent authorization store;
+- authorization on REST list/snapshot routes and WebSocket subscriptions;
+- invitation or controlled beta account creation;
+- one-time device claim/bootstrap mechanism;
+- recovery, replacement, ownership transfer and revocation;
+- audit events and support-safe diagnostics.
 
-WORK_ORDER represents the current engineering focus of the repository rather than a complete history of development.
+**Current status:** Authentication and telemetry APIs exist. Ownership enforcement,
+registration and claiming do not.
 
----
+## Medium priority
 
-# Priority Categories
+### Simplify maintained firmware environments
 
-Engineering work may be grouped into practical priority categories.
+Maintain one firmware line per board. Retire the GPS test environment and stop
+treating pre-AWS environments as separate product firmware generations. Preserve
+AWS IoT as a normal configurable feature while keeping local standalone operation.
 
-## High Priority
+### Stabilize LilyGO LTE/GPRS
 
-Work currently receiving active engineering effort.
+Bring the LilyGO mobile transport to the same operational standard as its WiFi
+path. Validate modem ownership, TLS, time, reconnect/backoff, watchdog behaviour,
+power conditions and long-running telemetry before declaring it beta-ready.
 
-## Medium Priority
+### Revalidate the current repository revision
 
-Important work planned after current activities.
+Run controlled offline builds first, followed by isolated static/backend tests,
+read-only AWS inventory and explicitly approved hardware tests. Record evidence
+against the exact commit and environment.
 
-## Low Priority
+## Completion policy
 
-Useful work without immediate implementation priority.
+Work only moves to `CURRENT_STATUS` when it is present in the current code and has
+appropriate validation evidence. Deferred opportunities move to
+`ENGINEERING_BACKLOG`; historical implementation detail belongs under legacy or
+release documentation.
 
-Priorities should remain simple and should support engineering planning rather than formal project management.
+## Related documents
 
----
-
-# Recommended Entry Structure
-
-Each work item should provide enough information for maintainers to understand its purpose.
-
-## Title
-
-A concise description of the work item.
-
-## Objective
-
-What should be achieved?
-
-## Current Status
-
-Current implementation progress.
-
-## Dependencies
-
-Technical or organizational prerequisites.
-
-## Expected Outcome
-
-What will be available after completion?
-
----
-
-# Maintenance
-
-WORK_ORDER should be reviewed regularly.
-
-Possible outcomes include:
-
-- continue active work
-- reprioritize
-- move completed work to CURRENT_STATUS
-- move deferred work to ENGINEERING_BACKLOG
-
-The document should always reflect the repository's current engineering priorities.
-
----
-
-# What Does Not Belong Here
-
-The following information should not be recorded in WORK_ORDER:
-
-- completed work
-- engineering history
-- long-term research ideas
-- architectural governance
-- implementation experience
-- bug tracking details
-
-Those topics belong in other repository documents.
-
----
-
-# Relationship to Other Documents
-
-PROJECT_CONSTITUTION defines repository governance.
-
-CURRENT_STATUS describes the validated state of the repository.
-
-ENGINEERING_BACKLOG preserves engineering opportunities that are intentionally deferred.
-
-SELF_REVIEW preserves engineering knowledge gained during implementation.
-
-WORK_ORDER represents the engineering work that is currently planned or in progress.
-
----
-
-# Related Documents
-
-- PROJECT_CONSTITUTION.md
-- CURRENT_STATUS.md
-- ENGINEERING_BACKLOG.md
-- SELF_REVIEW.md
+- [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)
