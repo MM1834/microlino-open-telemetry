@@ -1,0 +1,139 @@
+diff --git a/firmware/common/src/SystemHealth.cpp b/firmware/common/src/SystemHealth.cpp
+index 53d878f..38f954e 100644
+--- a/firmware/common/src/SystemHealth.cpp
++++ b/firmware/common/src/SystemHealth.cpp
+@@ -4,6 +4,10 @@ static String boolJson(bool v) {
+   return v ? "true" : "false";
+ }
+ 
++static String numberOrNull(double value, unsigned int decimals) {
++  return isnan(value) ? String("null") : String(value, decimals);
++}
++
+ static String esc(const String& s) {
+   String out;
+   out.reserve(s.length() + 8);
+@@ -58,10 +62,10 @@ String SystemHealth::toJson(const SystemHealthResult& h) {
+   json += "\"started\":" + boolJson(h.gpsStarted) + ",";
+   json += "\"seen\":" + boolJson(h.gpsSeen) + ",";
+   json += "\"valid\":" + boolJson(h.gpsValid) + ",";
+-  json += "\"latitude\":" + String(h.gpsLatitude, 6) + ",";
+-  json += "\"longitude\":" + String(h.gpsLongitude, 6) + ",";
++  json += "\"latitude\":" + numberOrNull(h.gpsLatitude, 6) + ",";
++  json += "\"longitude\":" + numberOrNull(h.gpsLongitude, 6) + ",";
+   json += "\"satellites\":" + String(h.gpsSatellites) + ",";
+-  json += "\"hdop\":" + String(h.gpsHdop, 2) + ",";
++  json += "\"hdop\":" + numberOrNull(h.gpsHdop, 2) + ",";
+   json += "\"ageMs\":" + String(h.gpsAgeMs) + "},";
+   json += "\"mqtt\":" + MqttDiagnostics::toJson(h.mqtt);
+   json += "}";
+diff --git a/firmware/common/system/version.h b/firmware/common/system/version.h
+index 8dfb742..d11179d 100644
+--- a/firmware/common/system/version.h
++++ b/firmware/common/system/version.h
+@@ -2,12 +2,12 @@
+ 
+ #define MOT_NAME "Microlino Open Telemetry"
+ #define MOT_SHORT_NAME "MOT"
+-#define MOT_SPRINT "SPR-0004B.5R2"
++#define MOT_SPRINT "SPR-0004B.5R3"
+ #ifdef MOT_AWS_IOT
+ #define MOT_BUILD_VARIANT "AWS"
+-#define MOT_VERSION "SPR-0004B.5R2-AWS"
++#define MOT_VERSION "SPR-0004B.5R3-AWS"
+ #else
+ #define MOT_BUILD_VARIANT "MQTT"
+-#define MOT_VERSION "SPR-0004B.5R2-MQTT"
++#define MOT_VERSION "SPR-0004B.5R3-MQTT"
+ #endif
+ #define MOT_BOARD "esp32-wroom"
+diff --git a/firmware/esp32-wroom/src/gps/wroom_gps.cpp b/firmware/esp32-wroom/src/gps/wroom_gps.cpp
+index ed2ef43..08c8023 100644
+--- a/firmware/esp32-wroom/src/gps/wroom_gps.cpp
++++ b/firmware/esp32-wroom/src/gps/wroom_gps.cpp
+@@ -46,4 +46,8 @@ double wroomGpsCourseDegrees() { return gps.courseDegrees(); }
+ uint32_t wroomGpsSatellites() { return gps.satellites(); }
+ double wroomGpsHdop() { return gps.hdop(); }
+ uint32_t wroomGpsLocationAgeMs() { return gps.locationAgeMs(); }
++String wroomGpsUtc() {
++    char utc[32];
++    return gps.utcIso8601(utc, sizeof(utc)) ? String(utc) : String();
++}
+ String wroomGpsStatusJson() { return gps.statusJson(); }
+diff --git a/firmware/esp32-wroom/src/gps/wroom_gps.h b/firmware/esp32-wroom/src/gps/wroom_gps.h
+index 814b32e..1708777 100644
+--- a/firmware/esp32-wroom/src/gps/wroom_gps.h
++++ b/firmware/esp32-wroom/src/gps/wroom_gps.h
+@@ -16,4 +16,5 @@ double wroomGpsCourseDegrees();
+ uint32_t wroomGpsSatellites();
+ double wroomGpsHdop();
+ uint32_t wroomGpsLocationAgeMs();
++String wroomGpsUtc();
+ String wroomGpsStatusJson();
+diff --git a/firmware/esp32-wroom/src/web/web_ui.cpp b/firmware/esp32-wroom/src/web/web_ui.cpp
+index 5cf5e9c..1b37571 100644
+--- a/firmware/esp32-wroom/src/web/web_ui.cpp
++++ b/firmware/esp32-wroom/src/web/web_ui.cpp
+@@ -13,6 +13,7 @@
+ #include "system/version.h"
+ #include "MqttDiagnostics.h"
+ #include "SystemHealth.h"
++#include "../gps/wroom_gps.h"
+ #include <WiFi.h>
+ 
+ static WebServer server(80);
+@@ -78,14 +79,15 @@ static void handleStatus()
+ 
+ 
+     s += "<div class='card'><h2>System Health</h2>";
+-    s += "<p class='muted'>Prüft WiFi, DNS, TCP, MQTT und CAN-Status.</p>";
++    s += "<p class='muted'>Prüft System, Netzwerk, CAN sowie GPS-Modul, Fix, Position und UTC-Zeit.</p>";
+     s += "<button type='button' onclick='loadSystemHealth()'>System Health prüfen</button>";
+     s += "<pre id='system-health-result'>Noch nicht geprüft.</pre></div>";
+     s += "<script>";
+     s += "async function loadSystemHealth(){";
+     s += "const out=document.getElementById('system-health-result');out.textContent='Prüfe System Health…';";
+     s += "try{const r=await fetch('/api/system-health');const d=await r.json();";
+-    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`;}";
++    s += "const g=d.gps||{};const pos=(g.latitude==null||g.longitude==null)?'--':`${Number(g.latitude).toFixed(6)}, ${Number(g.longitude).toFixed(6)}`;const hdop=g.hdop==null?'--':Number(g.hdop).toFixed(2);";
++    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS data  : ${g.seen?'RECEIVED':'WAITING'}\\nGPS fix   : ${g.valid?'VALID':'NO FIX'}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`; }";
+     s += "catch(e){out.textContent='Fehler beim System-Health-Test: '+e.message;}}";
+     s += "</script>";
+ 
+@@ -307,6 +309,15 @@ static void handleApiSystemHealth()
+     health.tcpOk = mqtt.tcpOk;
+     health.mqttOk = mqtt.mqttOk;
+     health.canOk = telemetry.display.valid;
++    health.gpsStarted = wroomGpsStarted();
++    health.gpsSeen = wroomGpsSeen();
++    health.gpsValid = wroomGpsValid();
++    health.gpsLatitude = wroomGpsLatitude();
++    health.gpsLongitude = wroomGpsLongitude();
++    health.gpsSatellites = wroomGpsSatellites();
++    health.gpsHdop = wroomGpsHdop();
++    health.gpsAgeMs = wroomGpsLocationAgeMs();
++    health.utc = wroomGpsUtc();
+     health.mqtt = mqtt;
+ 
+     server.send(200, "application/json", SystemHealth::toJson(health));
+@@ -319,6 +330,7 @@ void setupWebUi()
+     server.on("/api/status", handleApiStatus);
+     server.on("/api/mqtt-test", handleApiMqttTest);
+     server.on("/api/system-health", handleApiSystemHealth);
++    server.on("/api/gps", []() { server.send(200, "application/json", wroomGpsStatusJson()); });
+     server.on("/config", handleConfig);
+     server.on("/save", HTTP_POST, handleSave);
+     server.on("/api/config/export", HTTP_GET, handleConfigExport);
+diff --git a/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp b/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp
+index 6c0b98b..6b6b7e6 100644
+--- a/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp
++++ b/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp
+@@ -75,7 +75,7 @@ static void handleRoot()
+ 
+     s += "<div class='card'><h2>Network</h2><button onclick='loadNetwork()'>Refresh</button><pre id='network'>Loading...</pre></div>";
+     s += "<div class='card'><h2>LTE Modem</h2><p><a href='/api/lilygo/lte/debug'>LTE Debug</a> · <a href='/api/lilygo/lte/rx-debug'>LTE RX Debug</a> · <a href='/api/lilygo/lte/tcp-test'>LTE TCP Test</a></p><button onclick='loadModem()'>Refresh</button><pre id='modem'>Loading...</pre></div>";
+-    s += "<div class='card'><h2>L76K GPS</h2><button onclick='loadGps()'>Refresh</button><pre id='gps'>Loading...</pre></div>";
++    s += "<div class='card'><h2>GPS Status & Location</h2><p class='muted'>Shows UART state, NMEA reception, fix, coordinates, satellites, HDOP, fix age and GPS UTC.</p><button onclick='loadGps()'>Refresh</button><pre id='gps'>Loading...</pre></div>";
+     s += "<div class='card'><h2>CAN Input</h2><button onclick='loadCan()'>Refresh</button><pre id='can'>Loading...</pre><p><a href='/api/lilygo/can/frames'>Latest frames JSON</a></p></div>";
+     s += "<div class='card'><h2>Decoded Telemetry</h2><button onclick='loadTelemetry()'>Refresh</button><pre id='telemetry'>Loading...</pre></div>";
+ 

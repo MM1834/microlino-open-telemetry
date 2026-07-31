@@ -9,6 +9,7 @@
 
 #include "telemetry/telemetry.h"
 #include "system/device_id.h"
+#include "../gps/wroom_gps.h"
 
 #ifdef MOT_AWS_IOT
 #include <MotAwsIot.h>
@@ -73,6 +74,7 @@ static void reconnectMqtt()
 void setupMqtt()
 {
 #ifdef MOT_AWS_IOT
+    if (!config.awsEnabled()) { Serial.println("AWS IoT: disabled by service configuration"); return; }
     if (!motLoadAwsCredentials(awsCredentials)) {
         Serial.printf(
             "AWS IoT: credentials unavailable: %s\n",
@@ -107,6 +109,7 @@ void setupMqtt()
 void mqttLoop()
 {
 #ifdef MOT_AWS_IOT
+    if (!config.awsEnabled()) return;
     awsClient.loop(awsRuntime(), networkOnline());
 #else
     if (!config.mqttEnabled()) return;
@@ -118,7 +121,7 @@ void mqttLoop()
 void publishTelemetry()
 {
 #ifdef MOT_AWS_IOT
-    if (!awsClient.connected()) return;
+    if (!config.awsEnabled() || !awsClient.connected()) return;
 
     awsClient.publishFloat("display/soc", telemetry.display.soc);
     awsClient.publishFloat(
@@ -193,6 +196,19 @@ void publishTelemetry()
     );
     awsClient.publishLastSeenUtc();
 
+    // Preserve retained cloud coordinates when no current fix is available.
+    // The backend derives "current" versus "last known" from receivedAt.
+    if (wroomGpsValid()) {
+        awsClient.publishFloat("location/latitude", static_cast<float>(wroomGpsLatitude()), 6, true);
+        awsClient.publishFloat("location/longitude", static_cast<float>(wroomGpsLongitude()), 6, true);
+        awsClient.publishFloat("location/speed_kmph", static_cast<float>(wroomGpsSpeedKmph()), 2, true);
+        awsClient.publishInt("location/satellites", static_cast<long>(wroomGpsSatellites()), true);
+        if (!isnan(wroomGpsHdop())) {
+            awsClient.publishFloat("location/hdop", static_cast<float>(wroomGpsHdop()), 2, true);
+        }
+        awsClient.publishInt("location/age_ms", static_cast<long>(wroomGpsLocationAgeMs()), true);
+    }
+
 #else
     if (!config.mqttEnabled() || !mqtt.connected()) return;
 
@@ -231,5 +247,23 @@ void publishTelemetry()
         "charging/power_signed",
         telemetry.charging.powerSigned
     );
+
+    if (wroomGpsValid()) {
+        publishFloat("location/latitude", wroomGpsLatitude(), 6);
+        publishFloat("location/longitude", wroomGpsLongitude(), 6);
+        publishFloat("location/speed_kmph", wroomGpsSpeedKmph(), 2);
+        publishInt("location/satellites", wroomGpsSatellites());
+        publishFloat("location/hdop", wroomGpsHdop(), 2);
+        publishInt("location/age_ms", wroomGpsLocationAgeMs());
+    }
+#endif
+}
+
+bool mqttTransportConnected()
+{
+#ifdef MOT_AWS_IOT
+    return awsClient.connected();
+#else
+    return mqtt.connected();
 #endif
 }

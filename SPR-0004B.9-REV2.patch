@@ -1,0 +1,112 @@
+--- "/mnt/data/mot_rev2_original/microlino-open-telemetry Kopie/firmware/common/system/version.h"	2026-07-30 06:59:58.000000000 +0000
++++ "/mnt/data/mot_rev2/microlino-open-telemetry Kopie/firmware/common/system/version.h"	2026-07-30 07:48:36.468959487 +0000
+@@ -5,14 +5,14 @@
+ #define MOT_NAME "Microlino Open Telemetry"
+ #define MOT_SHORT_NAME "MOT"
+ #define MOT_SPRINT "SPR-0004B.9"
+-#define MOT_REVISION "REV1"
++#define MOT_REVISION "REV2"
+ 
+ #ifdef MOT_AWS_IOT
+ #define MOT_BUILD_VARIANT "AWS"
+-#define MOT_VERSION "SPR-0004B.9-REV1-AWS"
++#define MOT_VERSION "SPR-0004B.9-REV2-AWS"
+ #else
+ #define MOT_BUILD_VARIANT "MQTT"
+-#define MOT_VERSION "SPR-0004B.9-REV1-MQTT"
++#define MOT_VERSION "SPR-0004B.9-REV2-MQTT"
+ #endif
+ 
+ #if defined(MOT_BOARD_LILYGO_T_A7670)
+--- "/mnt/data/mot_rev2_original/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/web/web_ui.cpp"	2026-07-29 19:40:26.000000000 +0000
++++ "/mnt/data/mot_rev2/microlino-open-telemetry Kopie/firmware/esp32-wroom/src/web/web_ui.cpp"	2026-07-30 07:48:36.468959487 +0000
+@@ -17,6 +17,7 @@
+ #include "../mqtt/mqtt_client.h"
+ #include "onboarding/onboarding.h"
+ #include "config/configuration_readiness.h"
++#include "web/http_not_found.h"
+ #include <WiFi.h>
+ 
+ static WebServer server(80);
+@@ -515,9 +516,8 @@
+     server.on("/api/abrp/status", HTTP_GET, handleAbrpStatus);
+     server.on("/api/abrp/test", HTTP_POST, handleAbrpTest);
+     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
+-    server.on("/favicon.ico", []() { server.send(204); });
+     setupOtaRoutes(server);
+-    server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
++    MotHttp::registerFallbackRoutes(server);
+     server.begin();
+     Serial.println("Web UI started");
+ }
+--- "/mnt/data/mot_rev2_original/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp"	2026-07-29 19:40:26.000000000 +0000
++++ "/mnt/data/mot_rev2/microlino-open-telemetry Kopie/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp"	2026-07-30 07:48:36.468959487 +0000
+@@ -19,6 +19,7 @@
+ #include "telemetry/telemetry.h"
+ #include "config/configuration_readiness.h"
+ #include "lte/lilygo_lte_client.h"
++#include "web/http_not_found.h"
+ 
+ static WebServer server(80);
+ static bool rebootPending = false;
+@@ -597,6 +598,8 @@
+     server.on("/ota", HTTP_GET, handleOtaPage);
+     server.on("/ota/update", HTTP_POST, handleOtaDone, handleOtaUpload);
+ 
++    MotHttp::registerFallbackRoutes(server);
++
+     server.begin();
+     Serial.println("LilyGO Web UI started");
+ }
+--- /dev/null	2026-07-30 06:51:14.508880884 +0000
++++ "/mnt/data/mot_rev2/microlino-open-telemetry Kopie/firmware/common/web/http_not_found.h"	2026-07-30 07:48:35.888959474 +0000
+@@ -0,0 +1,49 @@
++#pragma once
++
++#include <Arduino.h>
++#include <ArduinoJson.h>
++#include <WebServer.h>
++
++namespace MotHttp {
++
++inline const char* methodName(HTTPMethod method)
++{
++    switch (method) {
++        case HTTP_GET: return "GET";
++        case HTTP_HEAD: return "HEAD";
++        case HTTP_POST: return "POST";
++        case HTTP_PUT: return "PUT";
++        case HTTP_PATCH: return "PATCH";
++        case HTTP_DELETE: return "DELETE";
++        case HTTP_OPTIONS: return "OPTIONS";
++        default: return "UNKNOWN";
++    }
++}
++
++inline void registerFallbackRoutes(WebServer &server)
++{
++    // Browsers request this automatically. A 204 avoids a misleading 404 log.
++    server.on("/favicon.ico", HTTP_GET, [&server]() {
++        server.send(204);
++    });
++
++    server.onNotFound([&server]() {
++        const String path = server.uri();
++        const char* method = methodName(server.method());
++
++        Serial.printf("[HTTP] 404 %s %s\n", method, path.c_str());
++
++        JsonDocument response;
++        response["success"] = false;
++        response["status"] = 404;
++        response["error"] = "Not Found";
++        response["method"] = method;
++        response["path"] = path;
++
++        String payload;
++        serializeJson(response, payload);
++        server.send(404, "application/json", payload);
++    });
++}
++
++} // namespace MotHttp

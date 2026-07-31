@@ -19,3 +19,5 @@ pio run -t upload
 - Factory Reset fragt nach Bestätigung.
 - Ohne MQTT Host erscheinen keine leeren DNS-Fehler mehr.
 - ABRP funktioniert weiterhin.
+
+fix(dashboard): show active AWS Vehicle API provider instead of MQTT

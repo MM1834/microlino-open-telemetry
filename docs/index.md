@@ -19,3 +19,8 @@ Sprint and implementation documents under `docs/aws/` remain part of the project
 
 ## Legacy
 Superseded entry documents are tracked via `docs/legacy/README.md` rather than deleted.
+
+## GPS-2
+
+- [GPS-2 production integration](gps/GPS-2-production-integration.md)
+- [SPR-0003 sprint record](project/sprints/SPR-0003-GPS-2.md)

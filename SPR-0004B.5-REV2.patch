@@ -1,0 +1,297 @@
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/esp32-wroom/src/app_config.cpp base/firmware/esp32-wroom/src/app_config.cpp
+--- rev1/firmware/esp32-wroom/src/app_config.cpp	2026-07-28 15:41:03.951770607 +0000
++++ base/firmware/esp32-wroom/src/app_config.cpp	2026-07-28 15:40:09.471772697 +0000
+@@ -39,8 +39,11 @@
+     config.mqttPort = prefs.getUShort("mqttPort", 1883);
+     config.mqttUser = prefs.getString("mqttUser", "");
+     config.mqttPass = prefs.getString("mqttPass", "");
++    config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
++    config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
+     config.abrpApiKey = prefs.getString("abrpKey", "");
+     config.abrpUserToken = prefs.getString("abrpToken", "");
++    config.abrpServiceEnabled = prefs.isKey("svcAbrp") ? prefs.getBool("svcAbrp", false) : (!config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty());
+     config.can1Profile = decoderProfileNormalize(prefs.getUChar("can1", DECODER_PROFILE_DISPLAY_CAN));
+     config.can2Profile = decoderProfileNormalize(prefs.getUChar("can2", DECODER_PROFILE_DISABLED), DECODER_PROFILE_DISABLED);
+     config.otaEnabled = prefs.getBool("otaEn", false);
+@@ -62,8 +65,11 @@
+     prefs.putUShort("mqttPort", config.mqttPort);
+     prefs.putString("mqttUser", config.mqttUser);
+     prefs.putString("mqttPass", config.mqttPass);
++    prefs.putBool("svcMqtt", config.mqttServiceEnabled);
++    prefs.putBool("svcAws", config.awsServiceEnabled);
+     prefs.putString("abrpKey", config.abrpApiKey);
+     prefs.putString("abrpToken", config.abrpUserToken);
++    prefs.putBool("svcAbrp", config.abrpServiceEnabled);
+     prefs.putUChar("can1", config.can1Profile);
+     prefs.putUChar("can2", config.can2Profile);
+     prefs.putBool("otaEn", config.otaEnabled);
+@@ -84,7 +90,16 @@
+ {
+     String h = mqttHost;
+     h.trim();
+-    return !h.isEmpty();
++    return mqttServiceEnabled && !h.isEmpty();
++}
++
++bool AppConfig::awsEnabled() const
++{
++#ifdef MOT_AWS_IOT
++    return awsServiceEnabled;
++#else
++    return false;
++#endif
+ }
+ 
+ bool AppConfig::abrpEnabled() const
+@@ -93,7 +108,7 @@
+     String token = abrpUserToken;
+     key.trim();
+     token.trim();
+-    return !key.isEmpty() && !token.isEmpty();
++    return abrpServiceEnabled && !key.isEmpty() && !token.isEmpty();
+ }
+ 
+ String AppConfig::mqttClientId() const
+@@ -120,6 +135,10 @@
+     doc["wifiSsid"] = config.wifiSsid;
+     if (includeSecrets) doc["wifiPass"] = config.wifiPass;
+ 
++    doc["services"]["mqtt"] = config.mqttServiceEnabled;
++    doc["services"]["aws"] = config.awsServiceEnabled;
++    doc["services"]["abrp"] = config.abrpServiceEnabled;
++
+     doc["mqttHost"] = config.mqttHost;
+     doc["mqttPort"] = config.mqttPort;
+     doc["mqttUser"] = config.mqttUser;
+@@ -162,6 +181,10 @@
+     setStringIfPresent(doc, "wifiSsid", config.wifiSsid);
+     setStringIfPresent(doc, "wifiPass", config.wifiPass);
+ 
++    if (!doc["services"]["mqtt"].isNull()) config.mqttServiceEnabled = doc["services"]["mqtt"].as<bool>();
++    if (!doc["services"]["aws"].isNull()) config.awsServiceEnabled = doc["services"]["aws"].as<bool>();
++    if (!doc["services"]["abrp"].isNull()) config.abrpServiceEnabled = doc["services"]["abrp"].as<bool>();
++
+     setStringIfPresent(doc, "mqttHost", config.mqttHost);
+     if (!doc["mqttPort"].isNull()) config.mqttPort = doc["mqttPort"].as<uint16_t>();
+     setStringIfPresent(doc, "mqttUser", config.mqttUser);
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/esp32-wroom/src/app_config.h base/firmware/esp32-wroom/src/app_config.h
+--- rev1/firmware/esp32-wroom/src/app_config.h	2026-07-28 15:41:03.951770607 +0000
++++ base/firmware/esp32-wroom/src/app_config.h	2026-07-28 15:40:09.471772697 +0000
+@@ -17,9 +17,12 @@
+     uint16_t mqttPort = 1883;
+     String mqttUser;
+     String mqttPass;
++    bool mqttServiceEnabled = false;
++    bool awsServiceEnabled = true;
+ 
+     String abrpApiKey;
+     String abrpUserToken;
++    bool abrpServiceEnabled = false;
+ 
+     DecoderProfile can1Profile = DECODER_PROFILE_DISPLAY_CAN;
+     DecoderProfile can2Profile = DECODER_PROFILE_DISABLED;
+@@ -30,6 +33,7 @@
+     uint32_t publishIntervalMs = 5000;
+ 
+     bool mqttEnabled() const;
++    bool awsEnabled() const;
+     bool abrpEnabled() const;
+     String mqttClientId() const;
+ };
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/esp32-wroom/src/mqtt/mqtt_client.cpp base/firmware/esp32-wroom/src/mqtt/mqtt_client.cpp
+--- rev1/firmware/esp32-wroom/src/mqtt/mqtt_client.cpp	2026-07-28 11:02:47.000000000 +0000
++++ base/firmware/esp32-wroom/src/mqtt/mqtt_client.cpp	2026-07-28 15:40:09.471772697 +0000
+@@ -74,6 +74,7 @@
+ void setupMqtt()
+ {
+ #ifdef MOT_AWS_IOT
++    if (!config.awsEnabled()) { Serial.println("AWS IoT: disabled by service configuration"); return; }
+     if (!motLoadAwsCredentials(awsCredentials)) {
+         Serial.printf(
+             "AWS IoT: credentials unavailable: %s\n",
+@@ -108,6 +109,7 @@
+ void mqttLoop()
+ {
+ #ifdef MOT_AWS_IOT
++    if (!config.awsEnabled()) return;
+     awsClient.loop(awsRuntime(), networkOnline());
+ #else
+     if (!config.mqttEnabled()) return;
+@@ -119,7 +121,7 @@
+ void publishTelemetry()
+ {
+ #ifdef MOT_AWS_IOT
+-    if (!awsClient.connected()) return;
++    if (!config.awsEnabled() || !awsClient.connected()) return;
+ 
+     awsClient.publishFloat("display/soc", telemetry.display.soc);
+     awsClient.publishFloat(
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/esp32-wroom/src/web/web_ui.cpp base/firmware/esp32-wroom/src/web/web_ui.cpp
+--- rev1/firmware/esp32-wroom/src/web/web_ui.cpp	2026-07-28 15:41:03.951770607 +0000
++++ base/firmware/esp32-wroom/src/web/web_ui.cpp	2026-07-28 15:40:09.471772697 +0000
+@@ -115,6 +115,12 @@
+     s += "WiFi SSID<input name='wifiSsid' value='" + config.wifiSsid + "'>";
+     s += "WiFi Password<input name='wifiPass' type='password' value='" + config.wifiPass + "'></div>";
+ 
++    s += "<div class='card'><h2>Services</h2>";
++    s += "<label><input style='width:auto' type='checkbox' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label><br>";
++    s += "<label><input style='width:auto' type='checkbox' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label><br>";
++    s += "<label><input style='width:auto' type='checkbox' name='svcAbrp' value='1'" + String(config.abrpServiceEnabled ? " checked" : "") + "> ABRP</label>";
++    s += "<p class='muted'>Services are independently configurable. AWS availability depends on the selected build target and provisioned credentials.</p></div>";
++
+     s += "<div class='card'><h2>MQTT</h2>";
+     s += "<p class='muted'>MQTT is optional. Leave host empty to disable MQTT without connection errors.</p>";
+     s += "MQTT Host<input name='mqttHost' value='" + config.mqttHost + "'>";
+@@ -136,12 +142,14 @@
+     s += "</script>";
+ 
+ 
+-    s += "<div class='card'><h2>CAN profile</h2>";
++    s += "<div class='card'><h2>CAN channels</h2>";
++    s += "<h3>CAN 1</h3><p class='ok'>Available · ESP32 TWAI</p>";
+     s += "Active CAN profile<select name='can1Profile'>";
+     s += profileOptions(config.can1Profile, false);
+     s += "</select>";
+     s += "<p class='muted'>Display CAN is production-ready. Standard CAN is a safe template and intentionally decodes no values until official PIDs are available.</p>";
+     s += "<input type='hidden' name='can2Profile' value='255'>";
++    s += "<hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on ESP32-WROOM hardware. Future multi-CAN targets can assign an independent decoder profile here.</p>";
+     s += "</div>";
+ 
+     s += "<div class='card'><h2>OTA / ABRP</h2>";
+@@ -200,6 +208,9 @@
+     if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
+     config.wifiSsid = server.arg("wifiSsid");
+     config.wifiPass = server.arg("wifiPass");
++    config.awsServiceEnabled = server.hasArg("svcAws");
++    config.mqttServiceEnabled = server.hasArg("svcMqtt");
++    config.abrpServiceEnabled = server.hasArg("svcAbrp");
+     config.mqttHost = server.arg("mqttHost");
+     config.mqttPort = server.arg("mqttPort").toInt();
+     if (config.mqttPort == 0) config.mqttPort = 1883;
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp base/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp
+--- rev1/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp	2026-07-28 15:41:03.951770607 +0000
++++ base/firmware/lilygo-t-a7670/src/config/lilygo_config.cpp	2026-07-28 15:40:09.471772697 +0000
+@@ -42,6 +42,8 @@
+     config.mqttPort = prefs.isKey("mqttPort") ? prefs.getUShort("mqttPort", 1883) : 1883;
+     config.mqttUser = getStringOrDefault("mqttUser", "");
+     config.mqttPass = getStringOrDefault("mqttPass", "");
++    config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
++    config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
+     config.deviceName = getStringOrDefault("deviceName", "");
+     config.vehicleId = getStringOrDefault("vehicleId", "pioneer");
+     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
+@@ -72,6 +74,8 @@
+     prefs.putUShort("mqttPort", config.mqttPort);
+     prefs.putString("mqttUser", config.mqttUser);
+     prefs.putString("mqttPass", config.mqttPass);
++    prefs.putBool("svcMqtt", config.mqttServiceEnabled);
++    prefs.putBool("svcAws", config.awsServiceEnabled);
+     prefs.putString("deviceName", config.deviceName);
+     prefs.putString("vehicleId", config.vehicleId);
+     prefs.putString("mqttPrefix", config.mqttPrefix);
+@@ -109,6 +113,7 @@
+     json += "\"mqttPrefix\":\"" + esc(config.mqttPrefix) + "\",";
+     json += "\"wifiSsid\":\"" + esc(config.wifiSsid) + "\",";
+     json += "\"lteApn\":\"" + esc(config.lteApn) + "\",";
++    json += "\"services\":{\"mqtt\":" + String(config.mqttServiceEnabled ? "true" : "false") + ",\"aws\":" + String(config.awsServiceEnabled ? "true" : "false") + ",\"abrp\":" + String(config.abrpEnabled ? "true" : "false") + "},";
+     json += "\"mqttHost\":\"" + esc(config.mqttHost) + "\",";
+     json += "\"mqttPort\":" + String(config.mqttPort) + ",";
+     json += "\"otaEnabled\":" + String(config.otaEnabled ? "true" : "false") + ",";
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/lilygo-t-a7670/src/config/lilygo_config.h base/firmware/lilygo-t-a7670/src/config/lilygo_config.h
+--- rev1/firmware/lilygo-t-a7670/src/config/lilygo_config.h	2026-07-28 15:41:03.951770607 +0000
++++ base/firmware/lilygo-t-a7670/src/config/lilygo_config.h	2026-07-28 15:40:09.471772697 +0000
+@@ -2,7 +2,7 @@
+ #include <Arduino.h>
+ #include "decoders/decoder_profile.h"
+ struct LilygoConfig {
+- String wifiSsid; String wifiPass; String lteApn = "gprs.swisscom.ch"; String lteUser; String ltePass; String mqttHost; uint16_t mqttPort = 1883; String mqttUser; String mqttPass; String deviceName; String vehicleId = "pioneer"; String mqttPrefix = "mot"; bool otaEnabled = true; String otaPassword; bool abrpEnabled = false; DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN;
++ String wifiSsid; String wifiPass; bool mqttServiceEnabled = false; bool awsServiceEnabled = true; String lteApn = "gprs.swisscom.ch"; String lteUser; String ltePass; String mqttHost; uint16_t mqttPort = 1883; String mqttUser; String mqttPass; String deviceName; String vehicleId = "pioneer"; String mqttPrefix = "mot"; bool otaEnabled = true; String otaPassword; bool abrpEnabled = false; DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN;
+ String abrpApiKey;
+ String abrpUserToken;
+ };
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp base/firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp
+--- rev1/firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp	2026-07-28 11:02:47.000000000 +0000
++++ base/firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp	2026-07-28 15:40:09.475772697 +0000
+@@ -74,6 +74,7 @@
+ 
+ void setupLilygoMqtt()
+ {
++    if (!config.awsServiceEnabled) { Serial.println("AWS IoT: disabled by service configuration"); return; }
+     if (!motLoadAwsCredentials(awsCredentials)) {
+         Serial.printf(
+             "AWS IoT: credential load failed: %s\n",
+@@ -102,6 +103,7 @@
+ 
+ void lilygoMqttLoop()
+ {
++    if (!config.awsServiceEnabled) return;
+     requestUtcSyncIfPossible();
+ 
+     awsClient.loop(
+@@ -119,7 +121,7 @@
+ 
+ void publishLilygoTelemetry()
+ {
+-    if (!awsClient.connected()) return;
++    if (!config.awsServiceEnabled || !awsClient.connected()) return;
+ 
+     awsClient.publishFloat(
+         "display/soc",
+@@ -340,7 +342,7 @@
+ {
+     String host = config.mqttHost;
+     host.trim();
+-    return !host.isEmpty();
++    return config.mqttServiceEnabled && !host.isEmpty();
+ }
+ 
+ static String mqttClientId()
+diff -ruN '--exclude=.pio' '--exclude=.DS_Store' rev1/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp base/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp
+--- rev1/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp	2026-07-28 15:41:03.951770607 +0000
++++ base/firmware/lilygo-t-a7670/src/web/lilygo_web.cpp	2026-07-28 15:40:09.471772697 +0000
+@@ -114,8 +114,15 @@
+     s += "<label>Device name</label><input name='deviceName' value='" + lilygoDeviceName() + "'>";
+     s += "<label>Vehicle ID</label><input name='vehicleId' value='" + config.vehicleId + "'>";
+     s += "<label>MQTT Prefix</label><input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
+-    s += "<label>CAN profile</label><select name='canProfile'>" + profileOptions(config.canProfile) + "</select>";
+-    s += "<p class='muted'>Display CAN is active. Standard CAN is a template and intentionally decodes no values until official PIDs are available.</p>";
++    s += "<div class='card'><h2>CAN channels</h2><h3>CAN 1</h3><p>Available · ESP32 TWAI</p>";
++    s += "<label>Decoder profile</label><select name='canProfile'>" + profileOptions(config.canProfile) + "</select>";
++    s += "<p class='muted'>Display CAN is active. Standard CAN is a template and intentionally decodes no values until official PIDs are available.</p><hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on LilyGO T-A7670 hardware.</p></div>";
++
++    s += "<div class='card'><h2>Services</h2>";
++    s += "<label><input type='checkbox' style='width:auto' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label>";
++    s += "<label><input type='checkbox' style='width:auto' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label>";
++    s += "<label><input type='checkbox' style='width:auto' name='abrpEnabled' value='1'" + String(config.abrpEnabled ? " checked" : "") + "> ABRP</label>";
++    s += "<p class='muted'>Each service is optional. GPS and CAN data are shared telemetry sources.</p></div>";
+ 
+     s += "<label>WiFi SSID</label><input name='wifiSsid' value='" + config.wifiSsid + "'>";
+     s += "<label>WiFi Password</label><input name='wifiPass' type='password' value='" + config.wifiPass + "'>";
+@@ -129,7 +136,6 @@
+ 
+     s += "<label>OTA Password</label><input name='otaPassword' type='password' value='" + config.otaPassword + "'>";
+ 
+-    s += "<label>ABRP enabled</label><input name='abrpEnabled' value='" + String(config.abrpEnabled ? "1" : "0") + "'>";
+     s += "<label>ABRP API Key</label><input name='abrpApiKey' type='password' value='" + config.abrpApiKey + "'>";
+     s += "<label>ABRP User Token</label><input name='abrpUserToken' type='password' value='" + config.abrpUserToken + "'>";
+ 
+@@ -170,6 +176,8 @@
+ 
+     config.lteApn = server.arg("lteApn");
+ 
++    config.awsServiceEnabled = server.hasArg("svcAws");
++    config.mqttServiceEnabled = server.hasArg("svcMqtt");
+     config.mqttHost = server.arg("mqttHost");
+     config.mqttPort = (uint16_t)server.arg("mqttPort").toInt();
+     if (config.mqttPort == 0) config.mqttPort = 1883;
+@@ -227,6 +235,10 @@
+     if (doc["lteUser"].is<const char*>()) config.lteUser = doc["lteUser"].as<String>();
+     if (doc["ltePass"].is<const char*>()) config.ltePass = doc["ltePass"].as<String>();
+ 
++    if (doc["services"]["mqtt"].is<bool>()) config.mqttServiceEnabled = doc["services"]["mqtt"].as<bool>();
++    if (doc["services"]["aws"].is<bool>()) config.awsServiceEnabled = doc["services"]["aws"].as<bool>();
++    if (doc["services"]["abrp"].is<bool>()) config.abrpEnabled = doc["services"]["abrp"].as<bool>();
++
+     if (doc["mqttHost"].is<const char*>()) config.mqttHost = doc["mqttHost"].as<String>();
+     if (doc["mqttPort"].is<int>()) config.mqttPort = (uint16_t)doc["mqttPort"].as<int>();
+     if (config.mqttPort == 0) config.mqttPort = 1883;

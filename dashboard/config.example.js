@@ -14,7 +14,29 @@ window.MOT_CONFIG = {
   // to AWS IoT Core with device credentials.
   awsBackend: {
     apiBaseUrl: "https://YOUR_API_ID.execute-api.eu-north-1.amazonaws.com",
-    pollingIntervalMs: 5000
+    websocketUrl: "wss://YOUR_WEBSOCKET_API_ID.execute-api.eu-north-1.amazonaws.com/$default",
+
+    // REST remains the data source in Phase 4A. WebSocket carries connection,
+    // heartbeat and vehicle subscription control messages only.
+    pollingIntervalMs: 30000,
+    heartbeatMs: 30000,
+    maxReconnectAttempts: 5,
+    reconnectDelaysMs: [5000, 15000, 60000, 120000, 300000]
+  },
+
+  // Cognito User Pool Authorization Code flow with PKCE.
+  // The app client must have no client secret and must allow the exact callback
+  // and sign-out URL configured below.
+  auth: {
+    region: "eu-north-1",
+    userPoolId: "eu-north-1_EXAMPLE",
+    clientId: "YOUR_COGNITO_APP_CLIENT_ID",
+    issuer: "https://cognito-idp.eu-north-1.amazonaws.com/eu-north-1_EXAMPLE",
+    authorizeEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/oauth2/authorize",
+    tokenEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/oauth2/token",
+    logoutEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/logout",
+    redirectUri: "https://YOUR_DASHBOARD_URL/",
+    scopes: ["openid", "email", "profile"]
   },
 
   vehicle: {
@@ -40,6 +62,8 @@ window.MOT_CONFIG = {
     // 121–600 seconds: Data stale
     // More than 600 seconds: Offline
     vehicleOnlineSeconds: 120,
-    vehicleStaleSeconds: 600
+    vehicleStaleSeconds: 600,
+    locationFreshnessMs: 60000
+
   }
 };

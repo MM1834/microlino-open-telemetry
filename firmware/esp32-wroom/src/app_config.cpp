@@ -1,19 +1,27 @@
 #include "app_config.h"
-#include <Preferences.h>
+
 #include <ArduinoJson.h>
+#include <Preferences.h>
+
+#include "config/config_keys.h"
 #include "system/device_id.h"
+#include "system/version.h"
 
 AppConfig config;
-static Preferences prefs;
+AppConfigurationManager appConfigManager;
 
-void loadConfig()
+namespace {
+Preferences prefs;
+constexpr char PREFERENCES_NAMESPACE[] = "mot";
+
+void setStringIfPresent(const JsonDocument& doc, const char* key, String& target)
 {
-    prefs.begin("mot", true);
-    config.vehicleName = prefs.getString("vehicle", "Microlino Pioneer");
-    config.deviceName = prefs.getString("deviceName", "");
-    config.vehicleId = prefs.getString("vehicleId", "");
-    config.mqttPrefix = prefs.getString("prefix", "mot");
+    if (!doc[key].isNull()) target = doc[key].as<String>();
+}
+}
 
+void AppConfigurationManager::normalize()
+{
     // Migration from older builds where mqttPrefix contained the full base topic,
     // for example "mot/microlino". New format is prefix="mot" + vehicleId.
     config.mqttPrefix.trim();
@@ -26,32 +34,50 @@ void loadConfig()
             config.vehicleId = "pioneer";
         }
     }
-    if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
-    config.deviceName.trim();
-    config.deviceName.toLowerCase();
-    config.deviceName.replace(" ", "-");
-    config.deviceName.replace("/", "-");
-    if (config.deviceName.isEmpty()) config.deviceName = motHostname();
-    if (config.vehicleId.isEmpty()) config.vehicleId = "pioneer";
+
+    config.deviceName = normalizeIdentifier(config.deviceName, motHostname());
+    config.vehicleId = normalizeIdentifier(config.vehicleId, "pioneer");
+    config.mqttPrefix = normalizeTopicPrefix(config.mqttPrefix);
+    config.mqttPort = normalizePort(config.mqttPort);
+    config.publishIntervalMs = normalizePublishInterval(config.publishIntervalMs);
+    config.can1Profile = decoderProfileNormalize(config.can1Profile);
+    config.can2Profile = decoderProfileNormalize(config.can2Profile, DECODER_PROFILE_DISABLED);
+}
+
+void AppConfigurationManager::load()
+{
+    prefs.begin(PREFERENCES_NAMESPACE, true);
+    config.vehicleName = prefs.getString("vehicle", "Microlino Pioneer");
+    config.deviceName = prefs.getString("deviceName", "");
+    config.vehicleId = prefs.getString("vehicleId", "");
+    config.mqttPrefix = prefs.getString("prefix", "mot");
     config.wifiSsid = prefs.getString("ssid", "");
     config.wifiPass = prefs.getString("pass", "");
     config.mqttHost = prefs.getString("mqttHost", "");
     config.mqttPort = prefs.getUShort("mqttPort", 1883);
     config.mqttUser = prefs.getString("mqttUser", "");
     config.mqttPass = prefs.getString("mqttPass", "");
+    config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
+    config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
     config.abrpApiKey = prefs.getString("abrpKey", "");
     config.abrpUserToken = prefs.getString("abrpToken", "");
-    config.can1Profile = (DecoderProfile)prefs.getUChar("can1", DECODER_DISPLAY_CAN);
-    config.can2Profile = (DecoderProfile)prefs.getUChar("can2", DECODER_BMS_1);
+    config.abrpServiceEnabled = prefs.isKey("svcAbrp") ? prefs.getBool("svcAbrp", false) : (!config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty());
+    config.can1Profile = decoderProfileNormalize(prefs.getUChar("can1", DECODER_PROFILE_DISPLAY_CAN));
+    config.can2Profile = decoderProfileNormalize(prefs.getUChar("can2", DECODER_PROFILE_DISABLED), DECODER_PROFILE_DISABLED);
     config.otaEnabled = prefs.getBool("otaEn", false);
     config.otaPassword = prefs.getString("otaPass", "");
     config.publishIntervalMs = prefs.getUInt("pubMs", 5000);
+    config.onboardingComplete = prefs.getBool("onboarded", false);
     prefs.end();
+
+    normalize();
 }
 
-void saveConfig()
+void AppConfigurationManager::save()
 {
-    prefs.begin("mot", false);
+    normalize();
+
+    prefs.begin(PREFERENCES_NAMESPACE, false);
     prefs.putString("vehicle", config.vehicleName);
     prefs.putString("deviceName", config.deviceName);
     prefs.putString("vehicleId", config.vehicleId);
@@ -62,40 +88,43 @@ void saveConfig()
     prefs.putUShort("mqttPort", config.mqttPort);
     prefs.putString("mqttUser", config.mqttUser);
     prefs.putString("mqttPass", config.mqttPass);
+    prefs.putBool("svcMqtt", config.mqttServiceEnabled);
+    prefs.putBool("svcAws", config.awsServiceEnabled);
     prefs.putString("abrpKey", config.abrpApiKey);
     prefs.putString("abrpToken", config.abrpUserToken);
+    prefs.putBool("svcAbrp", config.abrpServiceEnabled);
     prefs.putUChar("can1", config.can1Profile);
     prefs.putUChar("can2", config.can2Profile);
     prefs.putBool("otaEn", config.otaEnabled);
     prefs.putString("otaPass", config.otaPassword);
     prefs.putUInt("pubMs", config.publishIntervalMs);
+    prefs.putBool("onboarded", config.onboardingComplete);
     prefs.end();
 }
 
-void clearConfig()
+void AppConfigurationManager::clear()
 {
-    prefs.begin("mot", false);
+    prefs.begin(PREFERENCES_NAMESPACE, false);
     prefs.clear();
     prefs.end();
     config = AppConfig();
+    normalize();
 }
-
-const char *decoderProfileName(DecoderProfile profile)
-{
-    switch (profile) {
-        case DECODER_DISPLAY_CAN: return "Microlino Display CAN";
-        case DECODER_BMS_1: return "Microlino CAN (BMS 1 / Pioneer)";
-        case DECODER_BMS_2: return "Microlino CAN (BMS 2 / Standard CAN)";
-        default: return "Unknown";
-    }
-}
-
 
 bool AppConfig::mqttEnabled() const
 {
-    String h = mqttHost;
-    h.trim();
-    return !h.isEmpty();
+    String host = mqttHost;
+    host.trim();
+    return mqttServiceEnabled && !host.isEmpty();
+}
+
+bool AppConfig::awsEnabled() const
+{
+#ifdef MOT_AWS_IOT
+    return awsServiceEnabled;
+#else
+    return false;
+#endif
 }
 
 bool AppConfig::abrpEnabled() const
@@ -104,111 +133,121 @@ bool AppConfig::abrpEnabled() const
     String token = abrpUserToken;
     key.trim();
     token.trim();
-    return !key.isEmpty() && !token.isEmpty();
+    return abrpServiceEnabled && !key.isEmpty() && !token.isEmpty();
 }
 
 String AppConfig::mqttClientId() const
 {
-    String id = deviceName;
-    id.trim();
-    id.toLowerCase();
-    id.replace(" ", "-");
-    id.replace("/", "-");
-    if (id.isEmpty()) id = motHostname();
+    String id = ConfigurationManager::normalizeIdentifier(deviceName, motHostname());
     if (!id.startsWith("mot-")) id = "mot-" + id;
     return id;
 }
 
-String configToJson(bool includeSecrets)
+String AppConfigurationManager::exportJson(bool includeSecrets) const
 {
     JsonDocument doc;
 
-    doc["vehicleName"] = config.vehicleName;
-    doc["vehicleId"] = config.vehicleId;
-    doc["deviceName"] = config.deviceName;
-    doc["mqttPrefix"] = config.mqttPrefix;
+    doc[ConfigKeys::SCHEMA_VERSION_KEY] = ConfigKeys::SCHEMA_VERSION;
+    doc[ConfigKeys::FIRMWARE] = MOT_VERSION;
+    doc[ConfigKeys::BOARD] = MOT_BOARD;
+    doc[ConfigKeys::VEHICLE_NAME] = config.vehicleName;
+    doc[ConfigKeys::VEHICLE_ID] = config.vehicleId;
+    doc[ConfigKeys::DEVICE_NAME] = config.deviceName;
+    doc[ConfigKeys::MQTT_PREFIX] = config.mqttPrefix;
 
-    doc["wifiSsid"] = config.wifiSsid;
-    if (includeSecrets) doc["wifiPass"] = config.wifiPass;
+    doc[ConfigKeys::WIFI_SSID] = config.wifiSsid;
+    if (includeSecrets) doc[ConfigKeys::WIFI_PASS] = config.wifiPass;
 
-    doc["mqttHost"] = config.mqttHost;
-    doc["mqttPort"] = config.mqttPort;
-    doc["mqttUser"] = config.mqttUser;
-    if (includeSecrets) doc["mqttPass"] = config.mqttPass;
-    doc["publishIntervalMs"] = config.publishIntervalMs;
+    doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE] = config.mqttServiceEnabled;
+    doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE] = config.awsServiceEnabled;
+    doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE] = config.abrpServiceEnabled;
 
-    doc["abrpApiKey"] = config.abrpApiKey;
-    if (includeSecrets) doc["abrpUserToken"] = config.abrpUserToken;
+    doc[ConfigKeys::MQTT_HOST] = config.mqttHost;
+    doc[ConfigKeys::MQTT_PORT] = config.mqttPort;
+    doc[ConfigKeys::MQTT_USER] = config.mqttUser;
+    if (includeSecrets) doc[ConfigKeys::MQTT_PASS] = config.mqttPass;
+    doc[ConfigKeys::PUBLISH_INTERVAL_MS] = config.publishIntervalMs;
 
-    doc["can1Profile"] = (int)config.can1Profile;
-    doc["can2Profile"] = (int)config.can2Profile;
+    doc[ConfigKeys::ABRP_API_KEY] = config.abrpApiKey;
+    if (includeSecrets) doc[ConfigKeys::ABRP_USER_TOKEN] = config.abrpUserToken;
 
-    doc["otaEnabled"] = config.otaEnabled;
-    if (includeSecrets) doc["otaPassword"] = config.otaPassword;
+    doc[ConfigKeys::CAN1_PROFILE] = static_cast<int>(config.can1Profile);
+    doc[ConfigKeys::CAN2_PROFILE] = static_cast<int>(config.can2Profile);
+    doc[ConfigKeys::ONBOARDING_COMPLETE] = config.onboardingComplete;
+    doc[ConfigKeys::OTA_ENABLED] = config.otaEnabled;
+    if (includeSecrets) doc[ConfigKeys::OTA_PASSWORD] = config.otaPassword;
 
     String out;
     serializeJsonPretty(doc, out);
     return out;
 }
 
-static void setStringIfPresent(JsonDocument& doc, const char *key, String& target)
+ConfigurationValidationResult AppConfigurationManager::validate() const
 {
-    if (!doc[key].isNull()) target = doc[key].as<String>();
+    ConfigurationValidationResult result;
+    if (config.mqttPort == 0) {
+        result.valid = false;
+        result.error = "mqttPort must be between 1 and 65535";
+    } else if (config.publishIntervalMs < 1000) {
+        result.valid = false;
+        result.error = "publishIntervalMs must be at least 1000";
+    }
+    return result;
 }
 
-bool importConfigJson(const String& json, String& error)
+bool AppConfigurationManager::importJson(const String& json, String& error)
 {
     JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, json);
-    if (err) {
-        error = err.c_str();
+    const DeserializationError parseError = deserializeJson(doc, json);
+    if (parseError) {
+        error = parseError.c_str();
         return false;
     }
 
-    setStringIfPresent(doc, "vehicleName", config.vehicleName);
-    setStringIfPresent(doc, "vehicleId", config.vehicleId);
-    setStringIfPresent(doc, "deviceName", config.deviceName);
-    setStringIfPresent(doc, "mqttPrefix", config.mqttPrefix);
-
-    setStringIfPresent(doc, "wifiSsid", config.wifiSsid);
-    setStringIfPresent(doc, "wifiPass", config.wifiPass);
-
-    setStringIfPresent(doc, "mqttHost", config.mqttHost);
-    if (!doc["mqttPort"].isNull()) config.mqttPort = doc["mqttPort"].as<uint16_t>();
-    setStringIfPresent(doc, "mqttUser", config.mqttUser);
-    setStringIfPresent(doc, "mqttPass", config.mqttPass);
-    if (!doc["publishIntervalMs"].isNull()) config.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
-
-    setStringIfPresent(doc, "abrpApiKey", config.abrpApiKey);
-    setStringIfPresent(doc, "abrpUserToken", config.abrpUserToken);
-
-    if (!doc["can1Profile"].isNull()) config.can1Profile = (DecoderProfile)doc["can1Profile"].as<int>();
-    if (!doc["can2Profile"].isNull()) config.can2Profile = (DecoderProfile)doc["can2Profile"].as<int>();
-
-    if (!doc["otaEnabled"].isNull()) config.otaEnabled = doc["otaEnabled"].as<bool>();
-    setStringIfPresent(doc, "otaPassword", config.otaPassword);
-
-    config.vehicleId.trim();
-    config.vehicleId.toLowerCase();
-    config.vehicleId.replace(" ", "-");
-    config.vehicleId.replace("/", "-");
-    if (config.vehicleId.isEmpty()) config.vehicleId = "pioneer";
-
-    config.deviceName.trim();
-    config.deviceName.toLowerCase();
-    config.deviceName.replace(" ", "-");
-    config.deviceName.replace("/", "-");
-    if (config.deviceName.isEmpty()) config.deviceName = motHostname();
-
-    config.mqttPrefix.trim();
-    while (config.mqttPrefix.endsWith("/")) {
-        config.mqttPrefix.remove(config.mqttPrefix.length() - 1);
+    if (!doc[ConfigKeys::SCHEMA_VERSION_KEY].isNull() &&
+        doc[ConfigKeys::SCHEMA_VERSION_KEY].as<int>() > ConfigKeys::SCHEMA_VERSION) {
+        error = "unsupported schemaVersion";
+        return false;
     }
-    if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
 
-    if (config.mqttPort == 0) config.mqttPort = 1883;
-    if (config.publishIntervalMs < 1000) config.publishIntervalMs = 5000;
+    const AppConfig previous = config;
+    AppConfig candidate = config;
+    config = candidate;
 
-    saveConfig();
+    setStringIfPresent(doc, ConfigKeys::VEHICLE_NAME, config.vehicleName);
+    setStringIfPresent(doc, ConfigKeys::VEHICLE_ID, config.vehicleId);
+    setStringIfPresent(doc, ConfigKeys::DEVICE_NAME, config.deviceName);
+    setStringIfPresent(doc, ConfigKeys::MQTT_PREFIX, config.mqttPrefix);
+    setStringIfPresent(doc, ConfigKeys::WIFI_SSID, config.wifiSsid);
+    setStringIfPresent(doc, ConfigKeys::WIFI_PASS, config.wifiPass);
+
+    if (!doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].isNull()) config.mqttServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].as<bool>();
+    if (!doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].isNull()) config.awsServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].as<bool>();
+    if (!doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].isNull()) config.abrpServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].as<bool>();
+
+    setStringIfPresent(doc, ConfigKeys::MQTT_HOST, config.mqttHost);
+    if (!doc[ConfigKeys::MQTT_PORT].isNull()) config.mqttPort = doc[ConfigKeys::MQTT_PORT].as<uint16_t>();
+    setStringIfPresent(doc, ConfigKeys::MQTT_USER, config.mqttUser);
+    setStringIfPresent(doc, ConfigKeys::MQTT_PASS, config.mqttPass);
+    if (!doc[ConfigKeys::PUBLISH_INTERVAL_MS].isNull()) config.publishIntervalMs = doc[ConfigKeys::PUBLISH_INTERVAL_MS].as<uint32_t>();
+
+    setStringIfPresent(doc, ConfigKeys::ABRP_API_KEY, config.abrpApiKey);
+    setStringIfPresent(doc, ConfigKeys::ABRP_USER_TOKEN, config.abrpUserToken);
+
+    if (!doc[ConfigKeys::CAN1_PROFILE].isNull()) config.can1Profile = decoderProfileNormalize(doc[ConfigKeys::CAN1_PROFILE].as<int>());
+    if (!doc[ConfigKeys::CAN2_PROFILE].isNull()) config.can2Profile = decoderProfileNormalize(doc[ConfigKeys::CAN2_PROFILE].as<int>(), DECODER_PROFILE_DISABLED);
+    if (!doc[ConfigKeys::ONBOARDING_COMPLETE].isNull()) config.onboardingComplete = doc[ConfigKeys::ONBOARDING_COMPLETE].as<bool>();
+    if (!doc[ConfigKeys::OTA_ENABLED].isNull()) config.otaEnabled = doc[ConfigKeys::OTA_ENABLED].as<bool>();
+    setStringIfPresent(doc, ConfigKeys::OTA_PASSWORD, config.otaPassword);
+
+    normalize();
+    const ConfigurationValidationResult validation = validate();
+    if (!validation.valid) {
+        config = previous;
+        error = validation.error;
+        return false;
+    }
+
+    save();
     return true;
 }

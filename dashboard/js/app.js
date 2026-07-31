@@ -4,10 +4,14 @@
   const vehicleCfg = cfg.vehicle || {};
   const dashboardCfg = cfg.dashboard || {};
   const dataSourceCfg = cfg.dataSource || { type: 'legacy-mqtt' };
+  const auth = dataSourceCfg.type === 'aws-backend' && window.MOTAuth
+    ? window.MOTAuth.create({ config: cfg.auth || {} })
+    : null;
   const $ = (id) => document.getElementById(id);
   const state = {
     lastMessage: 0,
     values: {},
+    metadata: {},
     mqttConnected: false,
     mqttDetail: '',
     networkMode: '--',
@@ -15,8 +19,53 @@
     vehicleLastSeenMs: 0,
     vehicleLastSeenSource: '',
     availableVehicles: [],
-    selectedVehicleId: mqttCfg.vehicleId || 'pioneer'
+    selectedVehicleId: mqttCfg.vehicleId || 'pioneer',
+    authBusy: false
   };
+
+
+  function renderAuthState(message = '') {
+    const container = $('auth-controls');
+    const loginButton = $('auth-login');
+    const logoutButton = $('auth-logout');
+    const status = $('auth-status');
+    if (!container || !auth) return;
+
+    container.hidden = false;
+    const authenticated = auth.isAuthenticated();
+    loginButton.hidden = authenticated;
+    logoutButton.hidden = !authenticated;
+    loginButton.disabled = state.authBusy || !auth.isConfigured();
+    logoutButton.disabled = state.authBusy;
+
+    if (message) status.textContent = message;
+    else if (!auth.isConfigured()) status.textContent = 'Cognito nicht konfiguriert';
+    else status.textContent = authenticated ? 'Angemeldet' : 'Nicht angemeldet';
+  }
+
+  async function beginLogin() {
+    if (!auth || state.authBusy) return;
+    state.authBusy = true;
+    renderAuthState('Weiterleitung…');
+    try { await auth.login(); }
+    catch (error) {
+      state.authBusy = false;
+      console.error('MOT login failed:', error);
+      renderAuthState(error.message || 'Login fehlgeschlagen');
+    }
+  }
+
+  async function beginLogout() {
+    if (!auth || state.authBusy) return;
+    state.authBusy = true;
+    renderAuthState('Abmeldung…');
+    try { await auth.logout(); }
+    catch (error) {
+      state.authBusy = false;
+      console.error('MOT logout failed:', error);
+      renderAuthState(error.message || 'Logout fehlgeschlagen');
+    }
+  }
 
   function configuredSeconds(value, fallback) {
     const seconds = Number(value ?? fallback);
@@ -25,6 +74,12 @@
 
   const VEHICLE_ONLINE_MS =
     configuredSeconds(dashboardCfg.vehicleOnlineSeconds, 120) * 1000;
+  const LOCATION_CURRENT_MS = (() => {
+    const milliseconds = Number(dashboardCfg.locationFreshnessMs ?? 60000);
+    return Number.isFinite(milliseconds) && milliseconds >= 0
+      ? milliseconds
+      : 60000;
+  })();
   const VEHICLE_STALE_MS =
     Math.max(
       configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
@@ -118,6 +173,24 @@
 
     detailEl.textContent = `Letztes Update ${relative}`;
     setText('side-updated', relative);
+  }
+
+  function setLiveStatus(status = {}) {
+    const stateName = status.state || 'disabled';
+    const labels = {
+      connected: 'Verbunden',
+      connecting: 'Verbinden…',
+      reconnecting: 'Wiederverbinden…',
+      disconnected: 'Getrennt',
+      disabled: 'Deaktiviert'
+    };
+    setText('live-status', labels[stateName] || stateName);
+    setText('live-detail', status.detail || '');
+    const dot = $('live-dot');
+    if (!dot) return;
+    dot.classList.remove('online', 'stale');
+    if (stateName === 'connected') dot.classList.add('online');
+    else if (stateName === 'connecting' || stateName === 'reconnecting') dot.classList.add('stale');
   }
 
   function setVehicleLastSeen(value, source) {
@@ -230,6 +303,9 @@
     setText('date-now', d.toLocaleDateString(cfg.dashboard?.locale || 'de-CH'));
     setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
     updateVehicleStatus();
+    if (state.values['location/latitude'] !== undefined && state.values['location/longitude'] !== undefined) {
+      renderLocationStatus('mqtt');
+    }
   }
   setInterval(updateClock, 1000); updateClock();
 
@@ -243,10 +319,69 @@
       setText('range-main', `${Math.round(maxRange * soc / 100)} km`);
     }
   }
-  function setUpdated() {
-    const s = new Date().toLocaleTimeString(cfg.dashboard?.locale || 'de-CH');
-    setText('side-updated', s); setText('location-updated', `Letzte Aktualisierung ${s}`);
+  function locationReceivedAtMs() {
+    const latMeta =
+      state.metadata['location/latitude'] ||
+      state.metadata['location/lat'] ||
+      state.metadata['gps/latitude'] ||
+      state.metadata['gps/lat'];
+    const lonMeta =
+      state.metadata['location/longitude'] ||
+      state.metadata['location/lon'] ||
+      state.metadata['gps/longitude'] ||
+      state.metadata['gps/lon'];
+    const latMs = parseTimestampMs(latMeta?.receivedAt);
+    const lonMs = parseTimestampMs(lonMeta?.receivedAt);
+    if (latMs && lonMs) return Math.min(latMs, lonMs);
+    return latMs || lonMs || 0;
   }
+
+  function formatLocationTimestamp(timestampMs) {
+    const date = new Date(timestampMs);
+    if (Number.isNaN(date.getTime())) return 'Zeitpunkt nicht verfügbar';
+
+    return new Intl.DateTimeFormat(dashboardCfg.locale || 'de-CH', {
+      dateStyle: 'short',
+      timeStyle: 'medium'
+    }).format(date);
+  }
+
+  function renderLocationStatus(source = 'mqtt') {
+    if (source === 'default') {
+      setText(
+        'location-title',
+        vehicleCfg.defaultLocation?.label || 'Default Standort'
+      );
+      setText('location-updated', 'Default Standort aus config.js');
+      return;
+    }
+
+    const receivedAt = locationReceivedAtMs();
+
+    if (!receivedAt) {
+      setText('location-title', 'Letzter Standort');
+      setText('location-updated', 'Zeitpunkt nicht verfügbar');
+      return;
+    }
+
+    const ageMs = Math.max(0, Date.now() - receivedAt);
+    const isCurrent = ageMs <= LOCATION_CURRENT_MS;
+    const absolute = formatLocationTimestamp(receivedAt);
+    const relative = relativeTime(receivedAt);
+
+    setText(
+      'location-title',
+      isCurrent ? 'Aktueller Standort' : 'Letzter Standort'
+    );
+    setText(
+      'location-updated',
+      `Letzte Aktualisierung ${relative} · ${absolute}`
+    );
+  }
+
+
+
+
   function uptime(sec) {
     const n = Number(sec); if (!Number.isFinite(n)) return '--';
     const h = Math.floor(n / 3600), m = Math.floor((n % 3600) / 60);
@@ -264,6 +399,14 @@
     const val = parsePayload(payload);
     state.values[key] = val;
     state.lastMessage = Date.now();
+    if (
+      dataSourceCfg.type === 'legacy-mqtt' &&
+      (key.startsWith('location/') || key.startsWith('gps/'))
+    ) {
+      // A direct MQTT message is a real, newly received update. For AWS REST
+      // snapshots the authoritative timestamp comes from snapshot.metadata.
+      state.metadata[key] = { receivedAt: Date.now() };
+    }
     switch (key) {
       case 'display/soc': setSoc(val); break;
       case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); break;
@@ -289,8 +432,8 @@
         setVehicleLastSeen(val, key);
         break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
-      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); setUpdated(); break;
-      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); setUpdated(); break;
+      case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
+      case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
     }
 
     window.MOTHistoryRecorder?.update(state.values, {
@@ -327,7 +470,7 @@
     const lon = state.values['location/longitude'] ?? state.values['location/lon'] ?? state.values['gps/longitude'] ?? state.values['gps/lon'];
 
     if (lat !== undefined && lon !== undefined) {
-      setText('location-title', source === 'default' ? (vehicleCfg.defaultLocation?.label || 'Default Standort') : 'Letzter Standort');
+      renderLocationStatus(source);
       setText('location-coords', `${fmtCoord(lat, 'N', 'S')} · ${fmtCoord(lon, 'E', 'W')}`);
       updateLocationMap(lat, lon);
     }
@@ -360,6 +503,7 @@
 
 function resetDashboardForVehicle(vehicleId) {
   state.values = {};
+  state.metadata = {};
   state.lastMessage = 0;
   state.networkMode = '--';
   state.deviceIp = '--';
@@ -461,7 +605,11 @@ function startDataProvider() {
     providerConfig = {
       ...(cfg.awsBackend || {}),
       vehicleId: mqttCfg.vehicleId || 'pioneer',
-      topicPrefix: mqttCfg.topicPrefix || 'mot'
+      topicPrefix: mqttCfg.topicPrefix || 'mot',
+      getAccessToken: auth?.getAccessToken,
+      onUnauthorized: () => {
+        renderAuthState('Sitzung abgelaufen – erneut anmelden');
+      }
     };
   } else {
     setOnline(false, `Unbekannte Datenquelle: ${type}`);
@@ -474,6 +622,8 @@ function startDataProvider() {
 
     provider.start({
       onConnection: (ok, detail) => setOnline(ok, detail),
+      onLiveConnection: status => setLiveStatus(status),
+      onLiveMessage: message => console.debug('MOT live control message:', message),
       onMessage: (topic, payload) => applyTopic(topic, payload),
       onVehicles: vehicles => {
         const previous = state.selectedVehicleId;
@@ -491,11 +641,15 @@ function startDataProvider() {
       },
       onSnapshot: snapshot => {
         if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
+        state.metadata = snapshot?.metadata || {};
+        updateCoords('mqtt');
       },
       onError: error => console.error('MOT data provider error:', error)
     });
 
     console.info('MOT provider details:', provider.describe?.());
+    console.info('MOT provider capabilities:', registry.capabilities?.(type));
+    if (auth) console.info('MOT auth details:', auth.describe?.());
   } catch (error) {
     console.error(error);
     setOnline(false, error?.message || 'Datenquelle konnte nicht gestartet werden');
@@ -505,10 +659,37 @@ function startDataProvider() {
   $('vehicle-selector')?.addEventListener('change', event => {
     selectVehicle(event.target.value);
   });
-  initStatic();
-  resetDashboardForVehicle(state.selectedVehicleId);
-  updateVehicleSelector([]);
-  startDataProvider();
+  $('auth-login')?.addEventListener('click', beginLogin);
+  $('auth-logout')?.addEventListener('click', beginLogout);
+  async function bootstrap() {
+    initStatic();
+    resetDashboardForVehicle(state.selectedVehicleId);
+    updateVehicleSelector([]);
+
+    if (auth) {
+      renderAuthState('Sitzung wird geprüft…');
+      try {
+        await auth.restoreSession();
+      } catch (error) {
+        console.error('MOT authentication callback failed:', error);
+        renderAuthState(error.message || 'Anmeldung fehlgeschlagen');
+        setOnline(false, 'Anmeldung fehlgeschlagen');
+        return;
+      }
+      renderAuthState();
+      if (!auth.isAuthenticated()) {
+        setOnline(false, 'Anmeldung erforderlich');
+        return;
+      }
+    }
+    setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
+    startDataProvider();
+  }
+
+  bootstrap().catch(error => {
+    console.error('MOT dashboard bootstrap failed:', error);
+    setOnline(false, error?.message || 'Dashboard konnte nicht gestartet werden');
+  });
 })();
 
 

@@ -74,6 +74,7 @@ static MotAwsRuntime awsRuntime()
 
 void setupLilygoMqtt()
 {
+    if (!config.awsServiceEnabled) { Serial.println("AWS IoT: disabled by service configuration"); return; }
     if (!motLoadAwsCredentials(awsCredentials)) {
         Serial.printf(
             "AWS IoT: credential load failed: %s\n",
@@ -102,6 +103,7 @@ void setupLilygoMqtt()
 
 void lilygoMqttLoop()
 {
+    if (!config.awsServiceEnabled) return;
     requestUtcSyncIfPossible();
 
     awsClient.loop(
@@ -119,7 +121,7 @@ void lilygoMqttLoop()
 
 void publishLilygoTelemetry()
 {
-    if (!awsClient.connected()) return;
+    if (!config.awsServiceEnabled || !awsClient.connected()) return;
 
     awsClient.publishFloat(
         "display/soc",
@@ -340,7 +342,7 @@ static bool mqttEnabled()
 {
     String host = config.mqttHost;
     host.trim();
-    return !host.isEmpty();
+    return config.mqttServiceEnabled && !host.isEmpty();
 }
 
 static String mqttClientId()
@@ -638,3 +640,12 @@ String lilygoMqttDebugJson()
 }
 
 #endif
+
+bool lilygoMqttConnected()
+{
+#ifdef MOT_AWS_IOT
+    return awsClient.connected();
+#else
+    return mqtt.connected();
+#endif
+}

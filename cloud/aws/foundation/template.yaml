@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: MOT AWS-3.2 multi-vehicle current-state store.
+Description: MOT AWS foundation with vehicle state and Cognito user authentication.
 
 Parameters:
   ProjectName:
@@ -31,8 +31,114 @@ Parameters:
     Type: Number
     Default: 7
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
-  
+
+  CognitoSelfRegistrationEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Enables public user sign-up. Keep disabled until the end-user onboarding
+      and abuse-prevention flows are implemented.
+
+  CognitoDeletionProtection:
+    Type: String
+    Default: ACTIVE
+    AllowedValues: [ACTIVE, INACTIVE]
+    Description: Protects the user pool from accidental deletion.
+
+  CognitoDashboardCallbackUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:8080/callback"
+    Description: >
+      Allowed OAuth callback URLs for the dashboard app client. Use HTTPS for
+      deployed environments; localhost HTTP is reserved for local development.
+
+  CognitoDashboardLogoutUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:8080/"
+    Description: >
+      Allowed post-logout redirect URLs for the dashboard app client.
+
+Conditions:
+  CognitoSelfRegistrationIsEnabled: !Equals
+    - !Ref CognitoSelfRegistrationEnabled
+    - "true"
+
 Resources:
+  DashboardUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectName}-${Environment}-dashboard-users"
+      DeletionProtection: !Ref CognitoDeletionProtection
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: !If
+          - CognitoSelfRegistrationIsEnabled
+          - false
+          - true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      UserPoolTags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+        component: identity
+
+
+  DashboardUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${ProjectName}-${Environment}-dashboard"
+      UserPoolId: !Ref DashboardUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs: !Ref CognitoDashboardCallbackUrls
+      LogoutURLs: !Ref CognitoDashboardLogoutUrls
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+
+  DashboardUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "${ProjectName}-${Environment}-${AWS::AccountId}-${AWS::Region}"
+      UserPoolId: !Ref DashboardUserPool
+
   VehicleStateTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -48,6 +154,37 @@ Resources:
           KeyType: HASH
         - AttributeName: topicSuffix
           KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+
+  LiveConnectionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-live-connections"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+        - AttributeName: vehicleId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: vehicleId-index
+          KeySchema:
+            - AttributeName: vehicleId
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
       SSESpecification:
         SSEEnabled: true
       Tags:
@@ -77,6 +214,16 @@ Resources:
               - Effect: Allow
                 Action: [dynamodb:UpdateItem]
                 Resource: !GetAtt VehicleStateTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:DeleteItem
+                Resource:
+                  - !GetAtt LiveConnectionTable.Arn
+                  - !Sub "${LiveConnectionTable.Arn}/index/vehicleId-index"
+              - Effect: Allow
+                Action: [execute-api:ManageConnections]
+                Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
 
   StateIngestFunction:
     Type: AWS::Lambda::Function
@@ -90,6 +237,9 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref VehicleStateTable
+          CONNECTION_TABLE_NAME: !Ref LiveConnectionTable
+          WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
+          WEBSOCKET_STAGE: "$default"
           VERBOSE_MESSAGE_LOGS: !Ref EnableVerboseMessageLogs
       Code:
         ZipFile: |
@@ -99,9 +249,19 @@ Resources:
           import time
           from decimal import Decimal
           import boto3
+          from boto3.dynamodb.conditions import Key
           from botocore.exceptions import ClientError
 
-          table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
+          dynamodb = boto3.resource("dynamodb")
+          table = dynamodb.Table(os.environ["TABLE_NAME"])
+          connections = dynamodb.Table(os.environ["CONNECTION_TABLE_NAME"])
+          management = boto3.client(
+              "apigatewaymanagementapi",
+              endpoint_url=(
+                  f"https://{os.environ['WEBSOCKET_API_ID']}.execute-api."
+                  f"{os.environ['AWS_REGION']}.amazonaws.com/{os.environ['WEBSOCKET_STAGE']}"
+              )
+          )
           verbose = os.environ.get("VERBOSE_MESSAGE_LOGS", "false").lower() == "true"
 
           def decode_payload(encoded):
@@ -121,6 +281,58 @@ Resources:
                   return kind, value, text, len(raw)
               except json.JSONDecodeError:
                   return "text", text, text, len(raw)
+
+          def json_value(value):
+              if isinstance(value, Decimal):
+                  return int(value) if value == value.to_integral_value() else float(value)
+              if isinstance(value, list):
+                  return [json_value(item) for item in value]
+              if isinstance(value, dict):
+                  return {key: json_value(item) for key, item in value.items()}
+              return value
+
+          def broadcast_live_update(vehicle_id, topic, topic_suffix, value, value_type, received_at):
+              result = connections.query(
+                  IndexName="vehicleId-index",
+                  KeyConditionExpression=Key("vehicleId").eq(vehicle_id),
+                  ProjectionExpression="connectionId"
+              )
+              connection_ids = [item.get("connectionId") for item in result.get("Items", [])]
+              if not connection_ids:
+                  return {"sent": 0, "removed": 0}
+
+              payload = json.dumps({
+                  "type": "telemetry",
+                  "vehicleId": vehicle_id,
+                  "topic": topic,
+                  "topicSuffix": topic_suffix,
+                  "value": json_value(value),
+                  "valueType": value_type,
+                  "receivedAt": received_at
+              }, separators=(",", ":")).encode("utf-8")
+
+              sent = 0
+              removed = 0
+              for connection_id in connection_ids:
+                  if not connection_id:
+                      continue
+                  try:
+                      management.post_to_connection(ConnectionId=connection_id, Data=payload)
+                      sent += 1
+                  except ClientError as error:
+                      code = error.response.get("Error", {}).get("Code")
+                      status = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+                      if code == "GoneException" or status == 410:
+                          connections.delete_item(Key={"connectionId": connection_id})
+                          removed += 1
+                      else:
+                          print(json.dumps({
+                              "eventType": "live_fanout_error",
+                              "vehicleId": vehicle_id,
+                              "connectionId": connection_id,
+                              "error": str(error)
+                          }, separators=(",", ":")))
+              return {"sent": sent, "removed": removed}
 
           def handler(event, context):
               topic = str(event.get("mqttTopic", ""))
@@ -161,6 +373,20 @@ Resources:
                       print(json.dumps({"eventType":"state_ingest_error","topic":topic,"error":str(error)}))
                       raise
 
+              fanout = {"sent": 0, "removed": 0}
+              if stored:
+                  try:
+                      fanout = broadcast_live_update(
+                          vehicle_id, topic, topic_suffix, value, value_type, received_at
+                      )
+                  except Exception as error:
+                      print(json.dumps({
+                          "eventType": "live_fanout_failed",
+                          "vehicleId": vehicle_id,
+                          "topicSuffix": topic_suffix,
+                          "error": str(error)
+                      }, separators=(",", ":")))
+
               if verbose:
                   print(json.dumps({
                       "eventType":"state_updated",
@@ -168,10 +394,12 @@ Resources:
                       "topicSuffix":topic_suffix,
                       "valueType":value_type,
                       "receivedAt":received_at,
-                      "stored":stored
+                      "stored":stored,
+                      "liveSent":fanout["sent"],
+                      "staleConnectionsRemoved":fanout["removed"]
                   }, default=str, separators=(",", ":")))
 
-              return {"accepted": True, "stored": stored}
+              return {"accepted": True, "stored": stored, "live": fanout}
 
   StateIngestLogGroup:
     Type: AWS::Logs::LogGroup
@@ -474,6 +702,19 @@ Resources:
         project: !Ref ProjectName
         environment: !Ref Environment
   
+  VehicleApiJwtAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      AuthorizerType: JWT
+      IdentitySource:
+        - "$request.header.Authorization"
+      JwtConfiguration:
+        Audience:
+          - !Ref DashboardUserPoolClient
+        Issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${DashboardUserPool}"
+      Name: !Sub "${ProjectName}-${Environment}-dashboard-jwt"
+
   VehicleApiIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -495,6 +736,8 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"
   
   VehicleApiSnapshotRoute:
@@ -502,6 +745,8 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles/{vehicleId}/snapshot"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"
   
   VehicleApiStage:
@@ -525,7 +770,398 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleHttpApi}/*/*"
   
+  LiveWebSocketRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-live-websocket-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: live-connections
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                Resource: !GetAtt LiveConnectionTable.Arn
+              - Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
+  LiveAuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-live-authorizer"
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt LiveWebSocketRole.Arn
+      Environment:
+        Variables:
+          COGNITO_ISSUER: !Sub "https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${DashboardUserPool}"
+          COGNITO_CLIENT_ID: !Ref DashboardUserPoolClient
+          JWKS_CACHE_SECONDS: "3600"
+      Code:
+        ZipFile: |
+          import base64
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.request
+
+          ISSUER = os.environ["COGNITO_ISSUER"].rstrip("/")
+          CLIENT_ID = os.environ["COGNITO_CLIENT_ID"]
+          JWKS_CACHE_SECONDS = int(os.environ.get("JWKS_CACHE_SECONDS", "3600"))
+          JWKS_URL = f"{ISSUER}/.well-known/jwks.json"
+          SHA256_DIGEST_INFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
+          _jwks_cache = {"expires_at": 0, "keys": {}}
+
+          class Unauthorized(Exception):
+              pass
+
+          def b64url_decode(value):
+              value = value.encode("ascii") if isinstance(value, str) else value
+              return base64.urlsafe_b64decode(value + b"=" * (-len(value) % 4))
+
+          def load_json_segment(segment):
+              try:
+                  return json.loads(b64url_decode(segment).decode("utf-8"))
+              except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                  raise Unauthorized("invalid JWT encoding") from error
+
+          def load_jwks(force_refresh=False):
+              now = time.time()
+              if not force_refresh and _jwks_cache["keys"] and now < _jwks_cache["expires_at"]:
+                  return _jwks_cache["keys"]
+              request = urllib.request.Request(JWKS_URL, headers={"Accept": "application/json"})
+              with urllib.request.urlopen(request, timeout=3) as response:
+                  payload = json.load(response)
+              keys = {item["kid"]: item for item in payload.get("keys", []) if item.get("kid")}
+              if not keys:
+                  raise Unauthorized("JWKS contains no signing keys")
+              _jwks_cache["keys"] = keys
+              _jwks_cache["expires_at"] = now + JWKS_CACHE_SECONDS
+              return keys
+
+          def verify_rs256(signing_input, signature, jwk):
+              if jwk.get("kty") != "RSA" or jwk.get("alg", "RS256") != "RS256":
+                  raise Unauthorized("unsupported signing key")
+              modulus = int.from_bytes(b64url_decode(jwk["n"]), "big")
+              exponent = int.from_bytes(b64url_decode(jwk["e"]), "big")
+              key_size = (modulus.bit_length() + 7) // 8
+              if len(signature) != key_size:
+                  raise Unauthorized("invalid signature size")
+              encoded = pow(int.from_bytes(signature, "big"), exponent, modulus).to_bytes(key_size, "big")
+              digest_info = SHA256_DIGEST_INFO_PREFIX + hashlib.sha256(signing_input).digest()
+              padding_length = key_size - len(digest_info) - 3
+              expected = b"\x00\x01" + (b"\xff" * padding_length) + b"\x00" + digest_info
+              if padding_length < 8 or encoded != expected:
+                  raise Unauthorized("invalid JWT signature")
+
+          def validate_access_token(token):
+              parts = token.split(".")
+              if len(parts) != 3:
+                  raise Unauthorized("invalid JWT structure")
+              header = load_json_segment(parts[0])
+              claims = load_json_segment(parts[1])
+              if header.get("alg") != "RS256" or not header.get("kid"):
+                  raise Unauthorized("invalid JWT header")
+              keys = load_jwks()
+              jwk = keys.get(header["kid"])
+              if not jwk:
+                  jwk = load_jwks(force_refresh=True).get(header["kid"])
+              if not jwk:
+                  raise Unauthorized("unknown signing key")
+              verify_rs256(f"{parts[0]}.{parts[1]}".encode("ascii"), b64url_decode(parts[2]), jwk)
+              now = int(time.time())
+              if claims.get("iss") != ISSUER:
+                  raise Unauthorized("invalid issuer")
+              if claims.get("token_use") != "access":
+                  raise Unauthorized("access token required")
+              if claims.get("client_id") != CLIENT_ID:
+                  raise Unauthorized("invalid client")
+              if not isinstance(claims.get("exp"), (int, float)) or int(claims["exp"]) <= now:
+                  raise Unauthorized("token expired")
+              if isinstance(claims.get("nbf"), (int, float)) and int(claims["nbf"]) > now:
+                  raise Unauthorized("token not active")
+              if not claims.get("sub"):
+                  raise Unauthorized("subject missing")
+              return claims
+
+          def policy(principal, effect, resource, context=None):
+              return {
+                  "principalId": principal,
+                  "policyDocument": {
+                      "Version": "2012-10-17",
+                      "Statement": [{
+                          "Action": "execute-api:Invoke",
+                          "Effect": effect,
+                          "Resource": resource
+                      }]
+                  },
+                  "context": context or {}
+              }
+
+          def handler(event, context):
+              token = (event.get("queryStringParameters") or {}).get("access_token")
+              if not token:
+                  raise Exception("Unauthorized")
+              try:
+                  claims = validate_access_token(token)
+                  return policy(claims["sub"], "Allow", event["methodArn"], {
+                      "sub": claims["sub"],
+                      "username": claims.get("username", "")
+                  })
+              except Exception as error:
+                  print(json.dumps({"event": "live_authorizer_denied", "reason": str(error)}))
+                  raise Exception("Unauthorized")
+
+  LiveHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-live-handler"
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt LiveWebSocketRole.Arn
+      Environment:
+        Variables:
+          CONNECTION_TABLE_NAME: !Ref LiveConnectionTable
+          WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
+          WEBSOCKET_STAGE: "$default"
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import time
+          import boto3
+
+          table = boto3.resource("dynamodb").Table(os.environ["CONNECTION_TABLE_NAME"])
+          management = boto3.client(
+              "apigatewaymanagementapi",
+              endpoint_url=(
+                  f"https://{os.environ['WEBSOCKET_API_ID']}.execute-api."
+                  f"{os.environ['AWS_REGION']}.amazonaws.com/{os.environ['WEBSOCKET_STAGE']}"
+              )
+          )
+
+          def response(status=200, body=None):
+              return {"statusCode": status, "body": json.dumps(body or {"ok": True})}
+
+          def send(connection_id, body):
+              management.post_to_connection(
+                  ConnectionId=connection_id,
+                  Data=json.dumps(body, separators=(",", ":")).encode("utf-8")
+              )
+
+          def handler(event, context):
+              request = event.get("requestContext", {})
+              route = request.get("routeKey")
+              connection_id = request.get("connectionId")
+
+              if route == "$connect":
+                  auth = request.get("authorizer") or {}
+                  table.put_item(Item={
+                      "connectionId": connection_id,
+                      "userSub": auth.get("sub", ""),
+                      "connectedAt": int(time.time()),
+                      "expiresAt": int(time.time()) + 86400
+                  })
+                  return response()
+
+              if route == "$disconnect":
+                  table.delete_item(Key={"connectionId": connection_id})
+                  return response()
+
+              try:
+                  body = json.loads(event.get("body") or "{}")
+              except json.JSONDecodeError:
+                  send(connection_id, {"type": "error", "error": "invalid_json"})
+                  return response(400, {"error": "invalid_json"})
+
+              if route == "subscribe":
+                  vehicle_id = str(body.get("vehicleId", "")).strip()
+                  if not vehicle_id:
+                      send(connection_id, {"type": "error", "error": "vehicle_id_missing"})
+                      return response(400, {"error": "vehicle_id_missing"})
+                  table.update_item(
+                      Key={"connectionId": connection_id},
+                      UpdateExpression="SET vehicleId=:v, expiresAt=:e",
+                      ExpressionAttributeValues={":v": vehicle_id, ":e": int(time.time()) + 86400}
+                  )
+                  send(connection_id, {"type": "subscribed", "vehicleId": vehicle_id})
+                  return response()
+
+              if route == "ping":
+                  now = int(time.time())
+                  table.update_item(
+                      Key={"connectionId": connection_id},
+                      UpdateExpression="SET expiresAt=:e",
+                      ExpressionAttributeValues={":e": now + 86400}
+                  )
+                  send(connection_id, {"type": "pong", "serverTime": now})
+                  return response()
+
+              send(connection_id, {"type": "error", "error": "unsupported_action", "route": route})
+              return response(400, {"error": "unsupported_action", "route": route})
+
+  LiveAuthorizerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LiveAuthorizerFunction}"
+      RetentionInDays: !Ref ApiLogRetentionDays
+
+  LiveHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LiveHandlerFunction}"
+      RetentionInDays: !Ref ApiLogRetentionDays
+
+  VehicleWebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-vehicle-live"
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+      Tags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+
+  LiveWebSocketAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      Name: !Sub "${ProjectName}-${Environment}-live-authorizer"
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LiveAuthorizerFunction.Arn}/invocations"
+      IdentitySource:
+        - "route.request.querystring.access_token"
+
+  LiveWebSocketIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LiveHandlerFunction.Arn}/invocations"
+
+  LiveConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "$connect"
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LiveWebSocketAuthorizer
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "$disconnect"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveSubscribeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "subscribe"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LivePingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "ping"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      RouteKey: "$default"
+      Target: !Sub "integrations/${LiveWebSocketIntegration}"
+
+  LiveWebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref VehicleWebSocketApi
+      StageName: "$default"
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 25
+      Tags:
+        project: !Ref ProjectName
+        environment: !Ref Environment
+
+  LiveHandlerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LiveHandlerFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
+  LiveAuthorizerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LiveAuthorizerFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
 Outputs:
+  CognitoUserPoolId:
+    Description: Cognito user pool for dashboard users.
+    Value: !Ref DashboardUserPool
+
+  CognitoUserPoolArn:
+    Description: ARN of the Cognito user pool.
+    Value: !GetAtt DashboardUserPool.Arn
+
+  CognitoIssuerUrl:
+    Description: Issuer URL for the API Gateway JWT authorizer in SPR-0004B.2.
+    Value: !Sub "https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${DashboardUserPool}"
+
+  CognitoUserPoolClientId:
+    Description: Public dashboard app client ID. This value is configuration, not a secret.
+    Value: !Ref DashboardUserPoolClient
+
+  CognitoDomainPrefix:
+    Description: Globally unique Cognito managed-login domain prefix.
+    Value: !Ref DashboardUserPoolDomain
+
+  CognitoHostedUiBaseUrl:
+    Description: Base URL of the Cognito managed login and OAuth endpoints.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}"
+
+  CognitoAuthorizationEndpoint:
+    Description: OAuth 2.0 authorization endpoint for browser login.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/oauth2/authorize"
+
+  CognitoTokenEndpoint:
+    Description: OAuth 2.0 token endpoint for authorization-code exchange.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/oauth2/token"
+
+  CognitoLogoutEndpoint:
+    Description: Cognito logout endpoint.
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/logout"
+
   StackRegion:
     Value: !Ref AWS::Region
   StateIngestRuleName:
@@ -551,3 +1187,18 @@ Outputs:
   
   VehicleApiLogGroupName:
     Value: !Ref VehicleApiLogGroup
+
+  VehicleWebSocketApiId:
+    Value: !Ref VehicleWebSocketApi
+
+  VehicleWebSocketUrl:
+    Value: !Sub "wss://${VehicleWebSocketApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/$default"
+
+  LiveConnectionTableName:
+    Value: !Ref LiveConnectionTable
+
+  LiveHandlerFunctionName:
+    Value: !Ref LiveHandlerFunction
+
+  LiveAuthorizerFunctionName:
+    Value: !Ref LiveAuthorizerFunction

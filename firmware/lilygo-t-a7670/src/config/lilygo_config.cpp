@@ -1,38 +1,57 @@
 #include "lilygo_config.h"
+
+#include <ArduinoJson.h>
 #include <Preferences.h>
 
-LilygoConfig config;
-static Preferences prefs;
+#include "config/config_keys.h"
+#include "system/version.h"
 
-static String chipSuffix()
+LilygoConfig config;
+LilygoConfigurationManager lilygoConfigManager;
+
+namespace {
+Preferences prefs;
+constexpr char PREFERENCES_NAMESPACE[] = "mot-lg";
+
+String chipSuffix()
 {
-    uint64_t mac = ESP.getEfuseMac();
+    const uint64_t mac = ESP.getEfuseMac();
     char buf[16];
-    snprintf(buf, sizeof(buf), "%06X", (uint32_t)(mac & 0xFFFFFF));
+    snprintf(buf, sizeof(buf), "%06X", static_cast<uint32_t>(mac & 0xFFFFFF));
     return String(buf);
 }
 
-String lilygoDeviceName()
-{
-    String n = config.deviceName;
-    n.trim();
-    n.toLowerCase();
-    n.replace(" ", "-");
-    n.replace("/", "-");
-    if (n.isEmpty()) n = "mot-lilygo-" + chipSuffix();
-    return n;
-}
-
-static String getStringOrDefault(const char* key, const char* fallback)
+String getStringOrDefault(const char* key, const char* fallback)
 {
     if (!prefs.isKey(key)) return String(fallback);
     return prefs.getString(key, fallback);
 }
 
-void loadLilygoConfig()
+void setStringIfPresent(const JsonDocument& doc, const char* key, String& target)
 {
-    prefs.begin("mot-lg", false);
+    if (!doc[key].isNull()) target = doc[key].as<String>();
+}
+}
 
+String lilygoDeviceName()
+{
+    return ConfigurationManager::normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
+}
+
+void LilygoConfigurationManager::normalize()
+{
+    config.deviceName = normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
+    config.vehicleId = normalizeIdentifier(config.vehicleId, "pioneer");
+    config.mqttPrefix = normalizeTopicPrefix(config.mqttPrefix);
+    config.mqttPort = normalizePort(config.mqttPort);
+    config.lteApn.trim();
+    if (config.lteApn.isEmpty()) config.lteApn = "gprs.swisscom.ch";
+    config.canProfile = decoderProfileNormalize(config.canProfile);
+}
+
+void LilygoConfigurationManager::load()
+{
+    prefs.begin(PREFERENCES_NAMESPACE, false);
     config.wifiSsid = getStringOrDefault("wifiSsid", "");
     config.wifiPass = getStringOrDefault("wifiPass", "");
     config.lteApn = getStringOrDefault("lteApn", "gprs.swisscom.ch");
@@ -42,6 +61,8 @@ void loadLilygoConfig()
     config.mqttPort = prefs.isKey("mqttPort") ? prefs.getUShort("mqttPort", 1883) : 1883;
     config.mqttUser = getStringOrDefault("mqttUser", "");
     config.mqttPass = getStringOrDefault("mqttPass", "");
+    config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
+    config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
     config.deviceName = getStringOrDefault("deviceName", "");
     config.vehicleId = getStringOrDefault("vehicleId", "pioneer");
     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
@@ -50,18 +71,18 @@ void loadLilygoConfig()
     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
     config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
-
+    config.onboardingComplete = prefs.getBool("onboarded", false);
+    config.canProfile = decoderProfileNormalize(prefs.isKey("canProfile") ? prefs.getUChar("canProfile", DECODER_PROFILE_DISPLAY_CAN) : DECODER_PROFILE_DISPLAY_CAN);
     prefs.end();
 
-    config.lteApn.trim();
-    if (config.lteApn.isEmpty()) config.lteApn = "gprs.swisscom.ch";
-    if (config.vehicleId.isEmpty()) config.vehicleId = "pioneer";
-    if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
+    normalize();
 }
 
-void saveLilygoConfig()
+void LilygoConfigurationManager::save()
 {
-    prefs.begin("mot-lg", false);
+    normalize();
+
+    prefs.begin(PREFERENCES_NAMESPACE, false);
     prefs.putString("wifiSsid", config.wifiSsid);
     prefs.putString("wifiPass", config.wifiPass);
     prefs.putString("lteApn", config.lteApn);
@@ -71,6 +92,8 @@ void saveLilygoConfig()
     prefs.putUShort("mqttPort", config.mqttPort);
     prefs.putString("mqttUser", config.mqttUser);
     prefs.putString("mqttPass", config.mqttPass);
+    prefs.putBool("svcMqtt", config.mqttServiceEnabled);
+    prefs.putBool("svcAws", config.awsServiceEnabled);
     prefs.putString("deviceName", config.deviceName);
     prefs.putString("vehicleId", config.vehicleId);
     prefs.putString("mqttPrefix", config.mqttPrefix);
@@ -79,48 +102,118 @@ void saveLilygoConfig()
     prefs.putBool("abrpEnabled", config.abrpEnabled);
     prefs.putString("abrpApiKey", config.abrpApiKey);
     prefs.putString("abrpUserToken", config.abrpUserToken);
+    prefs.putUChar("canProfile", static_cast<uint8_t>(config.canProfile));
+    prefs.putBool("onboarded", config.onboardingComplete);
     prefs.end();
 }
 
-void clearLilygoConfig()
+void LilygoConfigurationManager::clear()
 {
-    prefs.begin("mot-lg", false);
+    prefs.begin(PREFERENCES_NAMESPACE, false);
     prefs.clear();
     prefs.end();
     config = LilygoConfig();
+    normalize();
 }
 
-static String esc(String s)
+String LilygoConfigurationManager::exportJson(bool includeSecrets) const
 {
-    s.replace("\\", "\\\\");
-    s.replace("\"", "\\\"");
-    s.replace("\r", "\\r");
-    s.replace("\n", "\\n");
-    return s;
-}
+    JsonDocument doc;
+    doc[ConfigKeys::SCHEMA_VERSION_KEY] = ConfigKeys::SCHEMA_VERSION;
+    doc[ConfigKeys::FIRMWARE] = MOT_VERSION;
+    doc[ConfigKeys::BOARD] = MOT_BOARD;
+    doc[ConfigKeys::DEVICE_NAME] = lilygoDeviceName();
+    doc[ConfigKeys::VEHICLE_ID] = config.vehicleId;
+    doc[ConfigKeys::MQTT_PREFIX] = config.mqttPrefix;
+    doc[ConfigKeys::WIFI_SSID] = config.wifiSsid;
+    doc[ConfigKeys::LTE_APN] = config.lteApn;
+    doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE] = config.mqttServiceEnabled;
+    doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE] = config.awsServiceEnabled;
+    doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE] = config.abrpEnabled;
+    doc[ConfigKeys::MQTT_HOST] = config.mqttHost;
+    doc[ConfigKeys::MQTT_PORT] = config.mqttPort;
+    doc[ConfigKeys::OTA_ENABLED] = config.otaEnabled;
+    doc[ConfigKeys::CAN1_PROFILE] = static_cast<int>(config.canProfile);
+    doc[ConfigKeys::ONBOARDING_COMPLETE] = config.onboardingComplete;
+    doc[ConfigKeys::ABRP_API_KEY] = config.abrpApiKey;
 
-String lilygoConfigJson(bool includeSecrets)
-{
-    String json = "{";
-    json += "\"deviceName\":\"" + esc(lilygoDeviceName()) + "\",";
-    json += "\"vehicleId\":\"" + esc(config.vehicleId) + "\",";
-    json += "\"mqttPrefix\":\"" + esc(config.mqttPrefix) + "\",";
-    json += "\"wifiSsid\":\"" + esc(config.wifiSsid) + "\",";
-    json += "\"lteApn\":\"" + esc(config.lteApn) + "\",";
-    json += "\"mqttHost\":\"" + esc(config.mqttHost) + "\",";
-    json += "\"mqttPort\":" + String(config.mqttPort) + ",";
-    json += "\"otaEnabled\":" + String(config.otaEnabled ? "true" : "false");
     if (includeSecrets) {
-        json += ",\"wifiPass\":\"" + esc(config.wifiPass) + "\"";
-        json += ",\"lteUser\":\"" + esc(config.lteUser) + "\"";
-        json += ",\"ltePass\":\"" + esc(config.ltePass) + "\"";
-        json += ",\"mqttUser\":\"" + esc(config.mqttUser) + "\"";
-        json += ",\"mqttPass\":\"" + esc(config.mqttPass) + "\"";
-        json += ",\"otaPassword\":\"" + esc(config.otaPassword) + "\"";
+        doc[ConfigKeys::WIFI_PASS] = config.wifiPass;
+        doc[ConfigKeys::LTE_USER] = config.lteUser;
+        doc[ConfigKeys::LTE_PASS] = config.ltePass;
+        doc[ConfigKeys::MQTT_USER] = config.mqttUser;
+        doc[ConfigKeys::MQTT_PASS] = config.mqttPass;
+        doc[ConfigKeys::OTA_PASSWORD] = config.otaPassword;
+        doc[ConfigKeys::ABRP_USER_TOKEN] = config.abrpUserToken;
     }
-    json += ",\"abrpEnabled\":" + String(config.abrpEnabled ? "true" : "false");
-    json += ",\"abrpApiKey\":\"" + esc(config.abrpApiKey) + "\"";
-    json += ",\"abrpUserToken\":\"" + esc(config.abrpUserToken) + "\"";
-    json += "}";
-    return json;
+
+    String out;
+    serializeJsonPretty(doc, out);
+    return out;
+}
+
+ConfigurationValidationResult LilygoConfigurationManager::validate() const
+{
+    ConfigurationValidationResult result;
+    if (config.mqttPort == 0) {
+        result.valid = false;
+        result.error = "mqttPort must be between 1 and 65535";
+    }
+    return result;
+}
+
+bool LilygoConfigurationManager::importJson(const String& json, String& error)
+{
+    JsonDocument doc;
+    const DeserializationError parseError = deserializeJson(doc, json);
+    if (parseError) {
+        error = parseError.c_str();
+        return false;
+    }
+
+    if (!doc[ConfigKeys::SCHEMA_VERSION_KEY].isNull() &&
+        doc[ConfigKeys::SCHEMA_VERSION_KEY].as<int>() > ConfigKeys::SCHEMA_VERSION) {
+        error = "unsupported schemaVersion";
+        return false;
+    }
+
+    const LilygoConfig previous = config;
+
+    setStringIfPresent(doc, ConfigKeys::DEVICE_NAME, config.deviceName);
+    setStringIfPresent(doc, ConfigKeys::VEHICLE_ID, config.vehicleId);
+    setStringIfPresent(doc, ConfigKeys::MQTT_PREFIX, config.mqttPrefix);
+    setStringIfPresent(doc, ConfigKeys::WIFI_SSID, config.wifiSsid);
+    setStringIfPresent(doc, ConfigKeys::WIFI_PASS, config.wifiPass);
+    setStringIfPresent(doc, ConfigKeys::LTE_APN, config.lteApn);
+    setStringIfPresent(doc, ConfigKeys::LTE_USER, config.lteUser);
+    setStringIfPresent(doc, ConfigKeys::LTE_PASS, config.ltePass);
+
+    if (!doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].isNull()) config.mqttServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].as<bool>();
+    if (!doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].isNull()) config.awsServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].as<bool>();
+    if (!doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].isNull()) config.abrpEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].as<bool>();
+
+    setStringIfPresent(doc, ConfigKeys::MQTT_HOST, config.mqttHost);
+    if (!doc[ConfigKeys::MQTT_PORT].isNull()) config.mqttPort = doc[ConfigKeys::MQTT_PORT].as<uint16_t>();
+    setStringIfPresent(doc, ConfigKeys::MQTT_USER, config.mqttUser);
+    setStringIfPresent(doc, ConfigKeys::MQTT_PASS, config.mqttPass);
+    if (!doc[ConfigKeys::OTA_ENABLED].isNull()) config.otaEnabled = doc[ConfigKeys::OTA_ENABLED].as<bool>();
+    setStringIfPresent(doc, ConfigKeys::OTA_PASSWORD, config.otaPassword);
+    setStringIfPresent(doc, ConfigKeys::ABRP_API_KEY, config.abrpApiKey);
+    setStringIfPresent(doc, ConfigKeys::ABRP_USER_TOKEN, config.abrpUserToken);
+
+    if (!doc[ConfigKeys::CAN1_PROFILE].isNull()) config.canProfile = decoderProfileNormalize(doc[ConfigKeys::CAN1_PROFILE].as<int>());
+    else if (!doc[ConfigKeys::LEGACY_CAN_PROFILE].isNull()) config.canProfile = decoderProfileNormalize(doc[ConfigKeys::LEGACY_CAN_PROFILE].as<int>());
+
+    if (!doc[ConfigKeys::ONBOARDING_COMPLETE].isNull()) config.onboardingComplete = doc[ConfigKeys::ONBOARDING_COMPLETE].as<bool>();
+
+    normalize();
+    const ConfigurationValidationResult validation = validate();
+    if (!validation.valid) {
+        config = previous;
+        error = validation.error;
+        return false;
+    }
+
+    save();
+    return true;
 }

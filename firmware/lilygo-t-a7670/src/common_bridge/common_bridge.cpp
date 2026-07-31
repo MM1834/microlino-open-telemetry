@@ -1,6 +1,10 @@
-// Bridge shared MOT common code into the standalone LilyGO PlatformIO project.
 #include "../../../common/telemetry/telemetry.cpp"
-#include "../../../common/decoders/decoder_display_can.cpp"
-#include "../../../common/decoders/decoder_engine.cpp"
 #include "../../../common/api/telemetry_json.cpp"
+#include "../../../common/decoders/decoder_profile.cpp"
+#include "../../../common/decoders/decoder_display_can.cpp"
+#include "../../../common/decoders/decoder_standard_can.cpp"
+#include "../../../common/decoders/decoder_engine.cpp"
 #include "../../../common/mqtt/mqtt_topics.cpp"
+#include "../../../common/system/device_id.cpp"
+
+#include "../../../common/config/configuration_readiness.cpp"

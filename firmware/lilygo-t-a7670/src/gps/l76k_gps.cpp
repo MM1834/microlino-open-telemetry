@@ -31,6 +31,21 @@ void l76kGpsLoop()
     gps.loop();
 }
 
+bool l76kGpsStarted()
+{
+    return gps.started();
+}
+
+bool l76kGpsDetected()
+{
+    return gps.detected();
+}
+
+const char* l76kGpsStateName()
+{
+    return gps.stateName();
+}
+
 bool l76kGpsValid()
 {
     return gps.valid();

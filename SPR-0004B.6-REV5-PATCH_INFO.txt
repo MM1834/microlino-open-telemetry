@@ -1,0 +1,21 @@
+SPR-0004B.6 Rev.5 — Guided Onboarding
+
+Basis
+-----
+SPR-0004B.6 Rev.4, successfully integrated and compiled by the user.
+
+Installation
+------------
+Extract this ZIP directly into the project root:
+
+.../microlino-open-telemetry/
+
+Overwrite the existing files.
+
+The ZIP contains project-root-relative paths and no wrapper folder.
+
+Important
+---------
+This package adds the actual seven-step onboarding flow.
+It does not create duplicate configuration storage.
+The existing configuration and diagnostics pages remain authoritative.

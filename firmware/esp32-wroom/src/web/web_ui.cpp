@@ -13,6 +13,10 @@
 #include "system/version.h"
 #include "MqttDiagnostics.h"
 #include "SystemHealth.h"
+#include "../gps/wroom_gps.h"
+#include "../mqtt/mqtt_client.h"
+#include "onboarding/onboarding.h"
+#include "config/configuration_readiness.h"
 #include <WiFi.h>
 
 static WebServer server(80);
@@ -40,14 +44,143 @@ static String option(int value, int current, const char *label)
     return s;
 }
 
+static String profileOptions(DecoderProfile current, bool includeDisabled)
+{
+    String s;
+    for (size_t i = 0; i < decoderProfileCount(); ++i) {
+        const DecoderProfileDescriptor &profile = decoderProfileAt(i);
+        if (!includeDisabled && profile.id == DECODER_PROFILE_DISABLED) continue;
+        s += option((int)profile.id, (int)current, profile.name);
+    }
+    return s;
+}
+
+
+static String requestedReturnUrl()
+{
+    if (!server.hasArg("return")) return "";
+    String target = server.arg("return");
+    target.trim();
+    if (!target.startsWith("/wizard")) return "";
+    return target;
+}
+
+static String returnField(const String &target)
+{
+    if (target.isEmpty()) return "";
+    return "<input type='hidden' name='return' value='" + target + "'>";
+}
+
+static int requestedWizardStep()
+{
+    int step = server.hasArg("step") ? server.arg("step").toInt() : 1;
+    if (step < 1) step = 1;
+    if (step > onboardingStepCount()) step = onboardingStepCount();
+    return step;
+}
+
+static String wizardNavigation(int step)
+{
+    String s = "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:18px'>";
+    if (step > 1) s += "<a href='/wizard?step=" + String(step - 1) + "'><button type='button'>Back</button></a>";
+    if (step < onboardingStepCount()) s += "<a href='/wizard?step=" + String(step + 1) + "'><button type='button'>Next</button></a>";
+    s += "<a href='/status'><button type='button'>Skip for now</button></a>";
+    s += "</div>";
+    return s;
+}
+
+static String wizardPage()
+{
+    const int step = requestedWizardStep();
+    OnboardingCapabilities caps{MOT_BOARD, true, false, true, 1};
+    String s = htmlHeader("MOT Onboarding");
+    s += "<h1>Microlino Open Telemetry</h1><p class='muted'>" MOT_VERSION " · " + String(caps.board) + "</p>";
+    s += "<div class='card'><div class='muted'>Step " + String(step) + " of " + String(onboardingStepCount()) + "</div>";
+    s += "<progress value='" + String(step) + "' max='" + String(onboardingStepCount()) + "' style='width:100%'></progress>";
+
+    switch (step) {
+        case 1:
+            s += "<h2>Welcome</h2><p>This assistant guides you through the existing MOT configuration. It does not create a second configuration store.</p>";
+            s += "<p>You can leave the wizard at any time and continue later.</p>";
+            break;
+        case 2:
+            s += "<h2>Detected hardware</h2><ul>";
+            s += "<li>Board: <b>" + String(caps.board) + "</b></li>";
+            s += "<li>WiFi: available</li><li>GPS module: <b id='wizard-gps-hardware'>checking…</b></li><li>CAN1: available</li><li>CAN2: reserved</li>";
+            s += "</ul><p class='muted'>GPS is reported as detected only after a checksum-valid NMEA sentence has been received. Runtime checks continue in the validation step.</p>";
+            s += "<script>fetch('/api/gps').then(r=>r.json()).then(g=>{const labels={GPS_DISABLED:'disabled',GPS_NOT_DETECTED:'not detected',GPS_DETECTED:'detected',GPS_FIX:'detected with fix'};document.getElementById('wizard-gps-hardware').textContent=labels[g.state]||'unknown';}).catch(()=>{document.getElementById('wizard-gps-hardware').textContent='unknown';});</script>";
+            break;
+        case 3:
+            s += "<h2>Network</h2><p>Configure the WiFi network used outside AP setup mode.</p>";
+            s += "<p><a href='/config?return=/wizard?step=3'><button type='button'>Open network configuration</button></a></p>";
+            s += "<p class='muted'>Save & Reboot returns the device with the stored network settings.</p>";
+            break;
+        case 4:
+            s += "<h2>Vehicle and CAN profile</h2><p>Set vehicle name, vehicle ID and the decoder profile for CAN1.</p>";
+            s += "<p><a href='/config?return=/wizard?step=4'><button type='button'>Open vehicle configuration</button></a></p>";
+            s += "<p class='muted'>CAN2 remains reserved and is not enabled by onboarding.</p>";
+            break;
+        case 5:
+            s += "<h2>Telemetry services</h2><p>Enable and configure only the services you use: MQTT, AWS IoT and ABRP.</p>";
+            s += "<p><a href='/config?return=/wizard?step=5'><button type='button'>Open service configuration</button></a></p>";
+            s += "<p class='muted'>The build determines whether AWS IoT is available. Empty credentials keep optional services inactive.</p>";
+            break;
+        case 6:
+            s += "<h2>Validation</h2><p>Run the existing system-health diagnostics before finishing onboarding.</p>";
+            s += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
+            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{};o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\nDNS: ${d.dnsOk?'OK':'WAITING'}\nMQTT: ${d.mqttOk?'OK':'OPTIONAL / WAITING'}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${(g.state==='GPS_DETECTED'||g.state==='GPS_FIX')?'DETECTED':(g.state==='GPS_NOT_DETECTED'?'NOT DETECTED':'N/A')}\nGPS NMEA: ${g.detected?'VALID':'WAITING'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            s += "<p><a href='/status?return=/wizard?step=6'>Open full status</a></p>";
+            break;
+        default:
+            s += "<h2>Finish</h2><p>Configuration remains managed by the normal MOT configuration pages. Completing onboarding only disables the automatic wizard launch.</p>";
+            s += "<form method='POST' action='/api/onboarding/complete'><button type='submit'>Complete onboarding</button></form>";
+            break;
+    }
+
+    s += wizardNavigation(step);
+    s += "<hr><form method='POST' action='/api/onboarding/restart'><button type='submit'>Restart wizard</button></form></div>";
+    s += "</body></html>";
+    return s;
+}
+
+static void handleWizard() { server.send(200, "text/html", wizardPage()); }
+static void handleOnboardingStatus()
+{
+    const int step = config.onboardingComplete ? onboardingStepCount() : requestedWizardStep();
+    String json = "{\"complete\":" + String(config.onboardingComplete ? "true" : "false") +
+                  ",\"step\":\"" + String(onboardingStepId(static_cast<OnboardingStep>(step - 1))) +
+                  "\",\"stepNumber\":" + String(step) +
+                  ",\"stepCount\":" + String(onboardingStepCount()) +
+                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":false,\"gps\":" + String(wroomGpsDetected() ? "true" : "false") + ",\"canChannels\":1}";
+    server.send(200, "application/json", json);
+}
+static void handleOnboardingComplete()
+{
+    config.onboardingComplete = true;
+    appConfigManager.save();
+    server.sendHeader("Location", "/status");
+    server.send(303, "text/plain", "");
+}
+static void handleOnboardingRestart()
+{
+    config.onboardingComplete = false;
+    appConfigManager.save();
+    server.sendHeader("Location", "/wizard?step=1");
+    server.send(303, "text/plain", "");
+}
+
 static void handleStatus()
 {
     String s = htmlHeader("MOT Status");
     s += "<h1>Microlino Open Telemetry</h1>";
     s += "<p class='muted'>" MOT_VERSION " · "; s += motDeviceId(); s += "</p>";
+    const String returnTo = requestedReturnUrl();
+    if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
 
     s += "<div class='card'><h2>Live Data</h2>";
-    s += "Display CAN: "; s += telemetry.display.valid ? "valid" : "waiting"; s += "<br>";
+    s += "CAN profile: "; s += decoderProfileName(config.can1Profile); s += "<br>";
+    s += "Decoder: "; s += decoderProfileImplemented(config.can1Profile) ? "active" : "template / no decoded values"; s += "<br>";
+    s += "Telemetry: "; s += telemetry.display.valid ? "valid" : "waiting"; s += "<br>";
     s += "SOC: " + String(telemetry.display.soc, 1) + " %<br>";
     s += "Speed: " + String(telemetry.display.speedKmh, 1) + " km/h<br>";
     s += "ODO: " + String(telemetry.display.odometerKm, 1) + " km<br>";
@@ -65,14 +198,15 @@ static void handleStatus()
 
 
     s += "<div class='card'><h2>System Health</h2>";
-    s += "<p class='muted'>Prüft WiFi, DNS, TCP, MQTT und CAN-Status.</p>";
+    s += "<p class='muted'>Prüft System, Netzwerk, CAN sowie GPS-Modul, Fix, Position und UTC-Zeit.</p>";
     s += "<button type='button' onclick='loadSystemHealth()'>System Health prüfen</button>";
     s += "<pre id='system-health-result'>Noch nicht geprüft.</pre></div>";
     s += "<script>";
     s += "async function loadSystemHealth(){";
     s += "const out=document.getElementById('system-health-result');out.textContent='Prüfe System Health…';";
     s += "try{const r=await fetch('/api/system-health');const d=await r.json();";
-    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`;}";
+    s += "const g=d.gps||{};const pos=(g.latitude==null||g.longitude==null)?'--':`${Number(g.latitude).toFixed(6)}, ${Number(g.longitude).toFixed(6)}`;const hdop=g.hdop==null?'--':Number(g.hdop).toFixed(2);";
+    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS data  : ${g.seen?'RECEIVED':'WAITING'}\\nGPS fix   : ${g.valid?'VALID':'NO FIX'}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`; }";
     s += "catch(e){out.textContent='Fehler beim System-Health-Test: '+e.message;}}";
     s += "</script>";
 
@@ -87,8 +221,10 @@ static void handleApiStatus()
 
 static void handleConfig()
 {
+    const String returnTo = requestedReturnUrl();
     String s = htmlHeader("MOT Config");
     s += "<h1>Config</h1><form method='POST' action='/save'>";
+    s += returnField(returnTo);
     s += "<div class='card'><h2>Vehicle</h2>";
     s += "Vehicle name<input name='vehicleName' value='" + config.vehicleName + "'>";
     s += "Device name<input name='deviceName' value='" + config.deviceName + "'>";
@@ -101,6 +237,12 @@ static void handleConfig()
     s += "<div class='card'><h2>Network</h2>";
     s += "WiFi SSID<input name='wifiSsid' value='" + config.wifiSsid + "'>";
     s += "WiFi Password<input name='wifiPass' type='password' value='" + config.wifiPass + "'></div>";
+
+    s += "<div class='card'><h2>Services</h2>";
+    s += "<label><input style='width:auto' type='checkbox' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label><br>";
+    s += "<label><input style='width:auto' type='checkbox' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label><br>";
+    s += "<label><input style='width:auto' type='checkbox' name='svcAbrp' value='1'" + String(config.abrpServiceEnabled ? " checked" : "") + "> ABRP</label>";
+    s += "<p class='muted'>Services are independently configurable. AWS availability depends on the selected build target and provisioned credentials.</p></div>";
 
     s += "<div class='card'><h2>MQTT</h2>";
     s += "<p class='muted'>MQTT is optional. Leave host empty to disable MQTT without connection errors.</p>";
@@ -123,17 +265,15 @@ static void handleConfig()
     s += "</script>";
 
 
-    s += "<div class='card'><h2>CAN</h2>";
-    s += "CAN 1 profile<select name='can1Profile'>";
-    s += option(0, (int)config.can1Profile, "Microlino Display CAN");
-    s += option(1, (int)config.can1Profile, "Microlino CAN (BMS 1 / Pioneer)");
-    s += option(2, (int)config.can1Profile, "Microlino CAN (BMS 2 / Standard CAN)");
+    s += "<div class='card'><h2>CAN channels</h2>";
+    s += "<h3>CAN 1</h3><p class='ok'>Available · ESP32 TWAI</p>";
+    s += "Active CAN profile<select name='can1Profile'>";
+    s += profileOptions(config.can1Profile, false);
     s += "</select>";
-    s += "CAN 2 profile<select name='can2Profile'>";
-    s += option(0, (int)config.can2Profile, "Disabled / unused");
-    s += option(1, (int)config.can2Profile, "Microlino CAN (BMS 1 / Pioneer)");
-    s += option(2, (int)config.can2Profile, "Microlino CAN (BMS 2 / Standard CAN)");
-    s += "</select><p class='muted'>v0.9.x WROOM uses CAN 1 only.</p></div>";
+    s += "<p class='muted'>Display CAN is production-ready. Standard CAN is a safe template and intentionally decodes no values until official PIDs are available.</p>";
+    s += "<input type='hidden' name='can2Profile' value='255'>";
+    s += "<hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on ESP32-WROOM hardware. Future multi-CAN targets can assign an independent decoder profile here.</p>";
+    s += "</div>";
 
     s += "<div class='card'><h2>OTA / ABRP</h2>";
     s += "<p class='muted'>ABRP is optional. It is only active when API key and user token are both configured.</p>";
@@ -160,7 +300,9 @@ static void handleConfig()
     s += "<button type='submit'>Import config & reboot</button></form>";
     s += "<p class='muted'>Export contains local secrets such as WiFi and MQTT passwords. Keep it private.</p></div>";
     s += "<div class='card'><h2>Factory Reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Factory Reset wirklich ausführen? Alle Einstellungen werden gelöscht.');\"><button type='submit'>Clear config & reboot</button></form></div>";
-    s += "<p><a href='/status'>Status</a></p></body></html>";
+    if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
+    else s += "<p><a href='/status'>Status</a></p>";
+    s += "</body></html>";
     server.send(200, "text/html", s);
 }
 
@@ -191,6 +333,9 @@ static void handleSave()
     if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
     config.wifiSsid = server.arg("wifiSsid");
     config.wifiPass = server.arg("wifiPass");
+    config.awsServiceEnabled = server.hasArg("svcAws");
+    config.mqttServiceEnabled = server.hasArg("svcMqtt");
+    config.abrpServiceEnabled = server.hasArg("svcAbrp");
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;
@@ -198,13 +343,20 @@ static void handleSave()
     config.mqttPass = server.arg("mqttPass");
     config.publishIntervalMs = server.arg("pubMs").toInt();
     if (config.publishIntervalMs < 1000) config.publishIntervalMs = 5000;
-    config.can1Profile = (DecoderProfile)server.arg("can1Profile").toInt();
-    config.can2Profile = (DecoderProfile)server.arg("can2Profile").toInt();
+    config.can1Profile = decoderProfileNormalize(server.arg("can1Profile").toInt());
+    config.can2Profile = decoderProfileNormalize(server.arg("can2Profile").toInt(), DECODER_PROFILE_DISABLED);
     config.abrpApiKey = server.arg("abrpApiKey");
     config.abrpUserToken = server.arg("abrpToken");
     config.otaPassword = server.arg("otaPass");
-    saveConfig();
-    server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p></body></html>");
+    appConfigManager.save();
+    const String returnTo = requestedReturnUrl();
+    String response = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p>";
+    if (!returnTo.isEmpty()) {
+        response += "<p>Onboarding will resume automatically.</p><p><a href='" + returnTo + "'>Return to onboarding now</a></p>";
+        response += "<script>setTimeout(function(){location.href='" + returnTo + "';},8000);</script>";
+    }
+    response += "</body></html>";
+    server.send(200, "text/html", response);
     rebootPending = true;
     rebootAtMs = millis() + 5000;
 }
@@ -225,7 +377,7 @@ static void handleAbrpTest()
 static void handleConfigExport()
 {
     server.sendHeader("Content-Disposition", "attachment; filename=mot-config.json");
-    server.send(200, "application/json", configToJson(true));
+    server.send(200, "application/json", appConfigManager.exportJson(true));
 }
 
 static void handleConfigImport()
@@ -234,7 +386,7 @@ static void handleConfigImport()
     if (json.isEmpty()) json = server.arg("plain");
 
     String error;
-    if (!importConfigJson(json, error)) {
+    if (!appConfigManager.importJson(json, error)) {
         server.send(400, "text/plain", "Config import failed: " + error);
         return;
     }
@@ -246,7 +398,7 @@ static void handleConfigImport()
 
 static void handleFactoryReset()
 {
-    clearConfig();
+    appConfigManager.clear();
     server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration cleared.</h2><p>Device will reboot in 5 seconds.</p></body></html>");
     rebootPending = true;
     rebootAtMs = millis() + 5000;
@@ -270,6 +422,43 @@ static void handleApiMqttTest()
     server.send(200, "application/json", MqttDiagnostics::toJson(result));
 }
 
+static void handleApiReadiness()
+{
+    ConfigurationReadinessInput input;
+    input.onboardingComplete = config.onboardingComplete;
+    input.networkConfigured = !config.wifiSsid.isEmpty();
+    input.networkOnline = WiFi.status() == WL_CONNECTED;
+    input.canConfigured = config.can1Profile != DECODER_PROFILE_DISABLED;
+    input.canOnline = telemetry.display.valid;
+    input.gpsDetected = wroomGpsDetected();
+    input.gpsFix = wroomGpsValid();
+    input.gpsState = wroomGpsState();
+    input.mqttEnabled = config.mqttServiceEnabled;
+    input.mqttConfigured = !config.mqttHost.isEmpty() && config.mqttPort > 0;
+    input.mqttOnline = mqttTransportConnected();
+    input.awsEnabled = config.awsServiceEnabled;
+#ifdef MOT_AWS_IOT
+    input.awsConfigured = true;
+#else
+    input.awsConfigured = false;
+#endif
+    input.abrpEnabled = config.abrpServiceEnabled;
+    input.abrpConfigured = !config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty();
+    server.send(200, "application/json", ConfigurationReadiness::toJson(input));
+}
+
+static void handleApiConfigImport()
+{
+    String json = server.arg("plain");
+    if (json.isEmpty()) json = server.arg("configJson");
+    String error;
+    if (!appConfigManager.importJson(json, error)) {
+        server.send(400, "application/json", "{\"ok\":false,\"error\":\"" + error + "\"}");
+        return;
+    }
+    server.send(200, "application/json", "{\"ok\":true,\"rebootRequired\":true}");
+}
+
 static void handleApiSystemHealth()
 {
     MqttDiagResult mqtt = runMqttDiagnostics("mot-health");
@@ -287,6 +476,17 @@ static void handleApiSystemHealth()
     health.tcpOk = mqtt.tcpOk;
     health.mqttOk = mqtt.mqttOk;
     health.canOk = telemetry.display.valid;
+    health.gpsStarted = wroomGpsStarted();
+    health.gpsSeen = wroomGpsSeen();
+    health.gpsDetected = wroomGpsDetected();
+    health.gpsValid = wroomGpsValid();
+    health.gpsState = wroomGpsState();
+    health.gpsLatitude = wroomGpsLatitude();
+    health.gpsLongitude = wroomGpsLongitude();
+    health.gpsSatellites = wroomGpsSatellites();
+    health.gpsHdop = wroomGpsHdop();
+    health.gpsAgeMs = wroomGpsLocationAgeMs();
+    health.utc = wroomGpsUtc();
     health.mqtt = mqtt;
 
     server.send(200, "application/json", SystemHealth::toJson(health));
@@ -294,14 +494,23 @@ static void handleApiSystemHealth()
 
 void setupWebUi()
 {
-    server.on("/", handleStatus);
+    server.on("/", []() { if (config.onboardingComplete) handleStatus(); else handleWizard(); });
+    server.on("/wizard", HTTP_GET, handleWizard);
+    server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
+    server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
+    server.on("/api/onboarding/restart", HTTP_POST, handleOnboardingRestart);
     server.on("/status", handleStatus);
     server.on("/api/status", handleApiStatus);
     server.on("/api/mqtt-test", handleApiMqttTest);
     server.on("/api/system-health", handleApiSystemHealth);
+    server.on("/api/gps", []() { server.send(200, "application/json", wroomGpsStatusJson()); });
     server.on("/config", handleConfig);
     server.on("/save", HTTP_POST, handleSave);
+    server.on("/api/config", HTTP_GET, handleConfigExport);
+    server.on("/api/config", HTTP_POST, handleApiConfigImport);
     server.on("/api/config/export", HTTP_GET, handleConfigExport);
+    server.on("/api/config/import", HTTP_POST, handleApiConfigImport);
+    server.on("/api/readiness", HTTP_GET, handleApiReadiness);
     server.on("/config/import", HTTP_POST, handleConfigImport);
     server.on("/api/abrp/status", HTTP_GET, handleAbrpStatus);
     server.on("/api/abrp/test", HTTP_POST, handleAbrpTest);

@@ -1,0 +1,35 @@
+SPR-0004B.6 Rev.6 — Wizard Return Mechanism
+
+Source
+------
+Based exclusively on the current uncommitted working-tree snapshot supplied by the user:
+microlino-open-telemetry Kopie.zip
+
+Installation
+------------
+Extract this ZIP directly into the repository project root:
+
+.../microlino-open-telemetry/
+
+Overwrite the existing files.
+
+Package layout
+--------------
+The ZIP has no wrapper directory. Every path is relative to the repository root.
+
+Scope
+-----
+- Return from the complete configuration page to the originating wizard step
+- Preserve the wizard step while saving and rebooting
+- Return from the full status page to wizard step 6
+- Same behavior for ESP32-WROOM and LilyGO
+
+Security
+--------
+The return target is accepted only when it starts with /wizard.
+External redirect targets are rejected.
+
+Build status
+------------
+The package was structurally checked. PlatformIO was not available in the package environment,
+so the firmware builds must be validated locally.

@@ -5,6 +5,7 @@
 #include "mqtt/mqtt_client.h"
 #include "web/web_ui.h"
 #include "can/can_input.h"
+#include "gps/wroom_gps.h"
 
 #include "telemetry/telemetry.h"
 #include "system/version.h"
@@ -30,13 +31,14 @@ void setup()
     Serial.printf("Device  : %s\n", telemetry.system.deviceId.c_str());
     Serial.println("========================================");
 
-    loadConfig();
+    appConfigManager.load();
 
     setupNetwork();
     setupMqtt();
     setupAbrp();
     setupWebUi();
     setupCanInput();
+    setupWroomGps();
 
     Serial.println("MOT setup ready");
 }
@@ -44,6 +46,7 @@ void setup()
 void loop()
 {
     processCanInput();
+    wroomGpsLoop();
     mqttLoop();
     webUiLoop();
     abrpLoop();

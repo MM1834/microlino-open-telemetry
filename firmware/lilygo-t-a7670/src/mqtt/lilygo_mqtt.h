@@ -6,3 +6,4 @@ void lilygoMqttLoop();
 void publishLilygoTelemetry();
 String lilygoMqttStatusJson();
 String lilygoMqttDebugJson();
+bool lilygoMqttConnected();

@@ -99,3 +99,18 @@
 .vehicle-selector-label{color:var(--muted);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase}
 .vehicle-selector{min-height:34px;border:1px solid var(--line);border-radius:8px;padding:5px 9px;color:var(--text);background:var(--panel)}
 @media (max-width:900px){.vehicle-selector-wrap{flex:1 1 100%;min-width:0}}
+
+
+/* SPR-0004B.3 Phase 2 authentication controls */
+.auth-controls { display:flex; align-items:center; gap:.55rem; }
+.auth-status { font-size:.78rem; color:var(--muted, #9fb0c3); white-space:nowrap; }
+.auth-button { border:1px solid rgba(255,255,255,.18); border-radius:.55rem; padding:.45rem .7rem; background:rgba(255,255,255,.08); color:inherit; cursor:pointer; }
+.auth-button:hover:not(:disabled) { background:rgba(255,255,255,.14); }
+.auth-button:disabled { opacity:.55; cursor:not-allowed; }
+@media (max-width: 760px) { .auth-status { display:none; } }
+
+/* SPR-0004B.4A: Live WebSocket connection state */
+#live-dot.stale {
+  background: #d99a00;
+  box-shadow: 0 0 0 4px rgba(217, 154, 0, 0.14);
+}
