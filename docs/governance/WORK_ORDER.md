@@ -15,12 +15,18 @@
 **Objective:** Establish one current documentation generation and preserve older
 material as explicitly historical evidence.
 
-**Current status:** In progress. Governance has been restored to `develop` and the
-takeover audit identified stale roadmaps, sprint status pages and contradictory AWS
-descriptions.
+**Active sprint:** [DOC-001 — Documentation Consolidation and Beta Baseline](../project/sprints/DOC-001.md)
+
+**Current status:** DOC-001 started on 2026-07-31 from `develop` commit `ee2c2b4`.
+Governance, the documentation standard, canonical navigation and the first system
+and AWS architecture pages are present. Inventory, current-reference consolidation,
+beta documentation and historical classification remain in progress.
 
 **Expected outcome:** Maintainers and beta users can distinguish current product
 behaviour, planned work and historical implementation records.
+
+**Review boundary:** Historically ambiguous decisions and validation claims are
+preserved for reconciliation with the future ChatGPT Classic export.
 
 ### Prepare the ESP32-WROOM beta release
 

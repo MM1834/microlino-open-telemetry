@@ -2,12 +2,20 @@
 
 > **Status:** Active
 
+> **Active sprint:** [DOC-001](project/sprints/DOC-001.md)
+>
+> **Branch:** `codex/doc-001-documentation-baseline`
+
 ## Goal
 
 Consolidate two documentation generations and historical delivery packages into
 the structure defined by [DOCUMENTATION_STANDARD.md](DOCUMENTATION_STANDARD.md).
 Migration preserves useful engineering evidence while ensuring only one source is
 presented as current for each topic.
+
+DOC-001 is the official execution vehicle for this migration. This page remains
+the operational ledger; the sprint document owns scope, acceptance criteria and
+review gates.
 
 ## Migration rules
 

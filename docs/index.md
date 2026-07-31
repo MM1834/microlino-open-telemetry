@@ -38,6 +38,7 @@ These pages require environment-specific revalidation before production use.
 
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Migration tracker](MIGRATION.md)
+- [Active documentation sprint DOC-001](project/sprints/DOC-001.md)
 - [Engineering backlog](governance/ENGINEERING_BACKLOG.md)
 
 Sprint documents, AWS delivery stages and release notes are retained as historical
