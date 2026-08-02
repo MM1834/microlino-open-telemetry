@@ -15,6 +15,7 @@ authorization is not implemented.
 ## Device-local APIs
 
 - [Configuration and readiness API](configuration-api.md)
+- [Local device HTTP API](local-device-api.md)
 - [Backup JSON](backup-json.md)
 - [MQTT topics](mqtt-topics.md)
 - [Legacy REST overview](rest-api.md)

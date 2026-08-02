@@ -136,6 +136,7 @@ An ADR's own declared status controls after DOC-001 resolves numbering. Until th
 | Declared AWS stack state | `administrator/aws/declared-stack-state.md` | CloudFormation and historical AWS records |
 | Cloud risks/gaps | `security/cloud-risk-register.md` | code/configuration findings |
 | Firmware | `firmware/overview.md` plus subsystem pages | developer investigations and release notes |
+| Firmware/hardware gaps | `firmware/known-gaps.md` | source/configuration findings |
 | Local WebUI | `webui/overview.md` plus feature pages | old screenshots/user guides |
 | Portal UI | `dashboard/overview.md` plus feature pages | dashboard sprint records |
 | Beta guide | `user-guide/` planned documents | getting-started and WebUI reference |

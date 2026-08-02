@@ -1,15 +1,7 @@
-# REST API
+# Legacy Local REST Overview
 
-## Common endpoints
+> **Status:** Compatibility redirect
 
-```text
-GET  /api/status
-GET  /api/lilygo/mqtt
-GET  /api/lilygo/abrp
-POST /api/lilygo/abrp/test
-GET  /api/config/export
-POST /config/import
-POST /factory-reset
-```
-
-> TODO: Verify final endpoint list against `lilygo_web.cpp`.
+Use [Local Device HTTP API](local-device-api.md) for source-verified route
+registration. Hosted cloud endpoints are documented under
+[Vehicle REST API](vehicle-api.md).

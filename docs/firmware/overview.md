@@ -1,64 +1,104 @@
-# Firmware overview
+# Firmware Overview
 
-Microlino Open Telemetry (MOT) uses a shared telemetry model across two ESP32 firmware families:
+> **Status:** Confirmed in source structure; build and hardware behaviour unverified
+>
+> **Audience:** Developer, maintainer and beta-support author
+>
+> **Evidence date:** 2026-08-02
 
-- **ESP32-WROOM** for WiFi-based CAN telemetry.
-- **LilyGO T-A7670G** for WiFi, LTE development and external L76K GPS.
+## Firmware targets
 
-The firmware receives vehicle and location data, normalizes it into a common model and exposes that state through MQTT, the local WebUI and REST status endpoints.
+MOT contains two board-specific applications sharing common telemetry, decoder,
+configuration, AWS IoT and GPS components:
 
-## Responsibilities
+- `firmware/esp32-wroom/`
+- `firmware/lilygo-t-a7670/`
 
-| Subsystem | Responsibility |
+The WeAct ESP32 CAN485 is a hardware/transceiver option in the ESP32 family, not a
+third application target in the repository.
+
+## Declared PlatformIO environments
+
+| Environment | Source meaning | DOC-001 status |
+|---|---|---|
+| `esp32dev` | ESP32-WROOM with legacy plain MQTT path | Legacy build structure |
+| `esp32dev-aws` | ESP32-WROOM with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant |
+| `esp32dev-gps-test` | Standalone GPS diagnostic main | Retired product variant; historical test utility |
+| `lilygo-t-a7670` | LilyGO with legacy WiFi/LTE MQTT path | Legacy build structure |
+| `T-A7670X-AWS` | LilyGO with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant; AWS transport is WiFi-only |
+
+The target maintenance model is one firmware line per board, with AWS IoT and GPS
+as capabilities rather than generations. PlatformIO has not yet been simplified;
+DOC-001 documents the discrepancy but does not change firmware configuration.
+
+## Shared components
+
+| Path | Responsibility |
 |---|---|
-| CAN | Receive Microlino CAN frames and maintain diagnostics |
-| Decoder | Convert raw frames into normalized vehicle values |
-| Telemetry | Shared state used by MQTT, WebUI and integrations |
-| GPS | Read and validate L76K location data |
-| Network | Manage AP, WiFi and LilyGO LTE availability |
-| MQTT | Publish retained telemetry and system values |
-| AWS IoT | Optional MQTT/TLS transport with per-device credentials |
-| WebUI | Local configuration, status, OTA and recovery |
-| Configuration | Store settings in ESP32 Preferences/NVS |
-| ABRP | Build and send optional route-planning telemetry |
-| OTA | Update firmware through the local WebUI |
+| `firmware/common/telemetry` | Normalized display, charging, location and system state |
+| `firmware/common/decoders` | Decoder registry, Display-CAN decoder and empty Standard-CAN template |
+| `firmware/common/config` | Configuration contract, keys and readiness model |
+| `firmware/common/api` | Shared telemetry JSON |
+| `firmware/common/abrp` | Optional ABRP client |
+| `firmware/common/system` | Version and stable device identity helpers |
+| `firmware/shared-libs/MotAwsIot` | X.509 MQTT/TLS, presence, heartbeat and telemetry publishing |
+| `firmware/shared-libs/MotGps` | NMEA parsing and detected/fix state |
 
-## Data flow
+## Runtime assembly
+
+Both targets initialize configuration, networking, CAN/GPS, MQTT/AWS, local WebUI
+and optional ABRP, then update the shared telemetry state in their main loop.
+Board-specific modules still own their transport and WebUI implementations.
 
 ```mermaid
 flowchart LR
-    Vehicle[Microlino CAN] --> TWAI[TWAI driver]
-    TWAI --> Decoder[CAN decoder]
-    Decoder --> Telemetry[Shared telemetry model]
-    GPS[L76K GPS] --> Telemetry
-    Telemetry --> MQTT[MQTT publisher]
-    Telemetry --> WebUI[Local WebUI / REST API]
-    Telemetry --> ABRP[ABRP integration]
-    Config[Preferences / Backup] --> Network
-    Config --> MQTT
-    Config --> ABRP
+    CAN["TWAI CAN input"] --> Decoder["Selected decoder profile"] --> Telemetry["Shared telemetry"]
+    GPS["Optional NMEA GPS"] --> Telemetry
+    Config["Preferences / JSON"] --> Services["Network, MQTT/AWS, ABRP"]
+    Telemetry --> Services
+    Telemetry --> Local["Local WebUI / JSON APIs"]
+    Services --> Cloud["Legacy broker or AWS IoT"]
 ```
 
-## Platform status
+## Source-confirmed capability matrix
 
-| Function | ESP32-WROOM | LilyGO T-A7670G |
-|---|---:|---:|
-| CAN receive | Stable | Working |
-| WiFi MQTT | Stable | Working |
-| Local WebUI | Stable | Working |
-| OTA | Stable | Working |
-| Backup/Restore | Stable | Working |
-| GPS | Optional | Working with L76K |
-| LTE registration/GPRS | — | Working |
-| MQTT over LTE | — | Experimental |
-| ABRP over LTE HTTPS | — | Deferred |
+“Present” means code/configuration exists; it does not mean the current commit has
+been built or tested on hardware.
 
-## Maintained firmware direction
+| Capability | ESP32-WROOM | LilyGO T-A7670G |
+|---|---|---|
+| TWAI receive at 500 kbit/s | Present, RX 27/TX 26 | Present, RX 32/TX 13 |
+| Display-CAN decoder | Shared, implemented | Shared, implemented |
+| Standard-CAN decoder | Shared empty template | Shared empty template |
+| WiFi and open fallback/setup AP | Present | Present |
+| Local WebUI/config/readiness | Present | Present |
+| Local browser OTA | Present | Present |
+| Optional GPS | UART RX 16/TX 17 | L76K UART RX 22/TX 21 |
+| AWS IoT X.509 | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi only |
+| Legacy MQTT | WiFi | WiFi with LTE candidate/fallback path |
+| LTE/GPRS | Not applicable | Modem/network code present; beta readiness unverified |
+| ABRP | Present | Present; transport status requires validation |
 
-The multiple PlatformIO environments reflect implementation history. The intended
-maintenance model is one firmware line per board, with AWS IoT and optional GPS as
-features rather than separate firmware generations. Until the PlatformIO files are
-simplified, `esp32dev-gps-test` and the pre-AWS environments should be treated as
-legacy build structure, not distinct supported products.
+## Security boundary
 
-The WiFi path is the current reference for end-to-end validation. Detailed LTE investigations are kept under `docs/developer/lte/`.
+The firmware local WebUI and APIs have no application authentication in current
+source. Both network implementations start an open AP (`WiFi.softAP` without a
+password). The local interface must not be exposed to the public Internet. Beta
+provisioning and support procedures must account for physical proximity and local
+network access until a separate device-local security decision is implemented.
+
+Portal accounts and device ownership do not belong in this local WebUI.
+
+## Validation boundary
+
+DOC-001 has not compiled these environments or tested CAN, GPS, WiFi, LTE, MQTT,
+AWS, OTA or WebUI on hardware. Historical tests remain history until repeated
+against an exact current commit.
+
+## Related documents
+
+- [Firmware architecture](architecture.md)
+- [Local device API](../api/local-device-api.md)
+- [MQTT topics](../api/mqtt-topics.md)
+- [Hardware comparison](../hardware/comparison.md)
+- [Current status](../governance/CURRENT_STATUS.md)

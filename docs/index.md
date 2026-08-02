@@ -24,7 +24,8 @@ when that workflow is implemented and validated.
 4. [Architecture](architecture/README.md)
 5. [Architecture decisions](adr/README.md)
 6. [Firmware](firmware/overview.md)
-7. [Developer documentation](developer/README.md)
+7. [Firmware gap register](firmware/known-gaps.md)
+8. [Developer documentation](developer/README.md)
 
 ## Service operation
 

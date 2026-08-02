@@ -1,29 +1,43 @@
 # ESP32-WROOM
 
-The ESP32-WROOM setup is the reference WiFi hardware path. It is inexpensive, simple to debug and ideal for the first working installation.
+> **Status:** Intended beta reference; physical wiring and current firmware unverified
+>
+> **Audience:** Hardware reviewer, beta provisioner and firmware developer
 
 ![ESP32-WROOM](../assets/images/hardware/esp32-wroom.png)
 
 ![ESP32-WROOM board top](../assets/images/hardware/esp32-wroom-board-top.png)
 
-## CAN wiring
+## Source-declared interfaces
 
-| Signal | ESP32 GPIO | Notes |
+| Function | GPIO/configuration | Notes |
 |---|---:|---|
-| CAN RX | GPIO32 | From SN65HVD230 RXD |
-| CAN TX | GPIO13 | To SN65HVD230 TXD |
-| GND | GND | Common ground |
-| 3.3 V | 3V3 | Depending on CAN module |
+| CAN RX | GPIO27 | From transceiver RXD |
+| CAN TX | GPIO26 | To transceiver TXD |
+| Optional GPS RX | GPIO16 | NMEA UART input |
+| Optional GPS TX | GPIO17 | UART output/configuration path |
+| GPS baud | 9600 | PlatformIO build flag |
 
-## Advantages
+An external CAN transceiver and correct vehicle-side wiring are required. Module
+voltage compatibility, termination and grounding must be reviewed for the exact
+beta assembly; this page is not an electrical installation approval.
 
-- Simple and inexpensive.
-- Stable WiFi MQTT path.
-- Good development baseline.
-- Easy to flash and debug.
+## Intended beta variants
 
-## Limitations
+- ESP32-WROOM without GPS;
+- ESP32-WROOM with optional GPS on the declared UART pins.
 
-- No integrated LTE.
-- Requires separate CAN transceiver module.
-- GPS requires extra hardware.
+These are hardware options of one firmware line, not separate maintained firmware
+generations. GPS availability is determined from valid NMEA input at runtime.
+
+## Network and recovery
+
+Source includes WiFi station operation, an open fallback AP, local WebUI,
+configuration backup/restore, factory reset and browser OTA. Runtime behaviour must
+be revalidated before devices are handed to beta testers.
+
+## Related documents
+
+- [Firmware overview](../firmware/overview.md)
+- [CAN pipeline](../firmware/can.md)
+- [Beta work order](../governance/WORK_ORDER.md)

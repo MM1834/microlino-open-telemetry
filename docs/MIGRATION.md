@@ -37,7 +37,7 @@ The complete directory rules and source ownership are recorded in the
 | Governance and current priorities | `governance/` | Current |
 | Architecture decisions | `adr/` | Needs numbering/status cleanup |
 | System architecture | `architecture/` | Active consolidation |
-| Firmware reference | `firmware/` | Active consolidation |
+| Firmware reference | `firmware/` | Source-based core consolidated; runtime unverified |
 | Local device UI | `webui/` | Structurally current; screenshots await revalidation |
 | Hosted portal/dashboard | `dashboard/` and `user/` | Must be updated with onboarding work |
 | AWS implementation history | `aws/` | Historical index added; current architecture/API separated |
