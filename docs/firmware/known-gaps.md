@@ -23,10 +23,13 @@
 | FW-015 | Local OTA protection is configuration-sensitive | OTA routes are registered regardless of `otaEnabled`; an empty OTA password permits unauthenticated local upload | Require non-empty per-device password now; redesign authorization later |
 | FW-016 | System Health does not validate AWS transport | MQTT diagnostic uses legacy host credentials and may expose network/location fields | Add AWS-specific, privacy-safe connection diagnostics |
 | FW-017 | Two ESP32 version headers remain | Shared `common/system/version.h` declares the active SPR build while board-local `include/version.h` still says `1.0.3-hotfix` | Remove or clearly retire the unused version source after build verification |
+| FW-018 | Clean WROOM AWS builds are not bit-identical | Two successful `esp32dev-aws` builds at `5758191` produced different SHA-256 hashes; build date/time is compiled into metadata | Isolate nondeterministic inputs or adopt a controlled stored-artifact model |
+| FW-019 | WROOM AWS application partition is 87% used | Compile at `5758191` uses 1,140,957 of 1,310,720 bytes | Track margin before firmware growth and define OTA partition constraints |
 
 ## Beta blockers
 
-Before ESP32-WROOM beta handoff, FW-002, FW-004, FW-009 and FW-012 through FW-016
+Before ESP32-WROOM beta handoff, FW-002, FW-004, FW-009, FW-012 through FW-016,
+FW-018 and FW-019
 require an explicit review, correction or bounded acceptance. LilyGO beta use
 additionally requires FW-005/FW-006 validation.
 
