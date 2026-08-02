@@ -10,6 +10,7 @@
 - [Authentication flow](../architecture/authentication-flow.md)
 - [Vehicle REST API](../api/vehicle-api.md)
 - [Live WebSocket API](../api/live-websocket-api.md)
+- [User-to-vehicle assignment operations](admin/user-vehicle-assignments.md)
 
 ## Current repository state
 

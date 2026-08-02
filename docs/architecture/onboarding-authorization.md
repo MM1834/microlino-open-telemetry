@@ -1,6 +1,6 @@
 # Portal Onboarding Authorization Foundation
 
-> **Status:** Implemented locally in ONB-001.A; not deployed or cloud-validated
+> **Status:** Deployed to the controlled AWS development stack; end-to-end multi-user validation remains open
 >
 > **Audience:** Portal, backend and security developer
 
@@ -39,15 +39,19 @@ cost for the small beta fleet; caching/scaling is deferred until measurements ex
 ## Controlled beta administration
 
 ONB-001.A intentionally provides the authorization substrate, not public claiming.
-Maintainers will create ACTIVE assignments through a reviewed administrative
-procedure after deployment. ONB-001.B adds invitation/claim lifecycle and portal UI.
+Maintainers create ACTIVE assignments through a reviewed administrative procedure.
+The initial migration assigned the two existing development vehicles to the sole
+existing confirmed Cognito subject. ONB-001.B adds invitation/claim lifecycle and
+portal UI.
 
 ## Deployment boundary
 
 The template has no wildcard CORS or localhost callback/logout defaults. Deployments
-must supply exact environment values. Local tests compile all inline Lambda code and
-exercise cross-user REST/WebSocket denial, expiry and revocation. AWS deployment and
-end-to-end Cognito/API validation remain explicit later gates.
+must supply exact environment values. The development deployment uses the exact
+`http://localhost:8080` origin and matching local callback/logout URLs. Local tests
+compile all inline Lambda code and exercise cross-user REST/WebSocket denial, expiry
+and revocation. Deployment and unauthenticated smoke checks passed; authenticated
+two-user/two-vehicle validation remains an explicit gate.
 
 ## Related documents
 

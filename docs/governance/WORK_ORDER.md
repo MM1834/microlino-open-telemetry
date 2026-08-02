@@ -70,8 +70,9 @@ as an Internet-facing extension of the firmware's local WebUI.
 - recovery, replacement, ownership transfer and revocation;
 - audit events and support-safe diagnostics.
 
-**Current status:** Authentication and telemetry APIs exist. Ownership enforcement,
-registration and claiming do not.
+**Current status:** Authentication, telemetry APIs and controlled ownership
+enforcement are deployed in development. Registration, claiming and authenticated
+two-user isolation evidence remain open.
 
 **Current workstream:** ONB-001 within SPR-0005.
 

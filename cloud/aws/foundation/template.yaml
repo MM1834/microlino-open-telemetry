@@ -203,10 +203,7 @@ Resources:
             - AttributeName: vehicleId
               KeyType: HASH
           Projection:
-            ProjectionType: INCLUDE
-            NonKeyAttributes:
-              - userSub
-              - expiresAt
+            ProjectionType: KEYS_ONLY
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
@@ -242,6 +239,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:Query
+                  - dynamodb:GetItem
                   - dynamodb:DeleteItem
                 Resource:
                   - !GetAtt LiveConnectionTable.Arn
@@ -325,10 +323,10 @@ Resources:
               result = connections.query(
                   IndexName="vehicleId-index",
                   KeyConditionExpression=Key("vehicleId").eq(vehicle_id),
-                  ProjectionExpression="connectionId,userSub,expiresAt"
+                  ProjectionExpression="connectionId"
               )
-              connection_items = result.get("Items", [])
-              if not connection_items:
+              connection_keys = result.get("Items", [])
+              if not connection_keys:
                   return {"sent": 0, "removed": 0}
 
               payload = json.dumps({
@@ -344,10 +342,14 @@ Resources:
               sent = 0
               removed = 0
               now = int(time.time())
-              for connection in connection_items:
-                  connection_id = connection.get("connectionId")
+              for connection_key in connection_keys:
+                  connection_id = connection_key.get("connectionId")
                   if not connection_id:
                       continue
+                  connection = connections.get_item(
+                      Key={"connectionId": connection_id},
+                      ConsistentRead=True
+                  ).get("Item", {})
                   user_sub = str(connection.get("userSub", "")).strip()
                   expires_at = int(connection.get("expiresAt", 0))
                   if not user_sub or expires_at <= now:

@@ -1,6 +1,6 @@
 # Cloud Risk and Gap Register
 
-> **Status:** Current code-review findings; deployed exposure unverified
+> **Status:** Current code and development-deployment findings
 >
 > **Audience:** Maintainer, security reviewer and onboarding architect
 
@@ -9,11 +9,11 @@ not a penetration test and does not assert that the current template is deployed
 
 | ID | Finding | Evidence | Consequence | Required next decision |
 |---|---|---|---|---|
-| CLOUD-001 | No deployed user-to-vehicle authorization | ONB-001.A implements local REST/WebSocket enforcement; deployment remains unchanged/unverified | Deployed authenticated users may still access other vehicles | Review, change set, deploy and execute negative tests |
+| CLOUD-001 | Multi-user isolation not yet proven end to end | ONB-001.A is deployed with controlled assignments; local negative tests pass, but only one confirmed Cognito identity exists | A deployment defect could remain undiscovered before mutually untrusted beta access | Create a second controlled identity and execute REST/WebSocket cross-user tests |
 | CLOUD-002 | WebSocket access token in query string | `$connect` identity source is `access_token`; dashboard adds token to URL | Token may appear in intermediary/access logs | Review transport pattern and logging/redaction |
-| CLOUD-003 | Deployed CORS value unknown | ONB-001.A removes permissive template default; deployed stack is unverified | Existing deployment may still allow broader origins | Supply exact origin and verify after deployment |
-| CLOUD-004 | Deployed state unknown | No DOC-001 AWS inventory performed | Documentation cannot establish real exposure or readiness | Execute approved read-only verification |
-| CLOUD-005 | Shared live authorizer/handler IAM role | ONB-001.A splits a log-only authorizer role locally; deployment unverified | Existing deployment may grant authorizer excess permissions | Confirm change set and deployed roles |
+| CLOUD-003 | Production portal origin not yet defined | Development CORS is deployed as exact `http://localhost:8080`; no hosted portal was found | A production deploy cannot be safely configured yet | Select hosting and supply its exact HTTPS origin/callback/logout URLs |
+| CLOUD-004 | Deployed state inventory was missing | Read-only inventory and ONB-001.A development deployment were completed 2026-08-02 | Future drift can make evidence stale | Repeat inventory at release gates |
+| CLOUD-005 | Shared live authorizer/handler IAM role | ONB-001.A deployed a separate log-only authorizer role | Original excess-permission finding is remediated in development | Verify effective IAM policy during post-deploy review |
 | CLOUD-006 | API Gateway access logging not declared | Stage resources lack access-log settings | Limited auditability; token logging behaviour unknown | Define privacy-safe access-log policy |
 | CLOUD-007 | No cloud history/retention model | DynamoDB stores latest topic state only | Portal history expectations may be misleading | Define later data lifecycle and privacy model |
 | CLOUD-008 | No user/device claim lifecycle | No claim records, transfer, replacement or revocation APIs | Beta onboarding cannot safely bind people and devices | ONB-001 lifecycle design |

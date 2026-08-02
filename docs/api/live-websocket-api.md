@@ -1,6 +1,6 @@
 # Live WebSocket API
 
-> **Status:** Implemented in CloudFormation and dashboard code; deployment not revalidated
+> **Status:** Deployed to the AWS development stack; multi-user runtime validation pending
 >
 > **Audience:** Portal developer, backend developer and administrator
 >
@@ -77,7 +77,7 @@ part of authorization.
 
 ## Deployment gate
 
-The local ONB-001.A implementation must be deployed and tested across reconnects,
+ONB-001.A is deployed. It must still be tested live across two users, reconnects,
 expiry, revocation and guessed vehicle IDs before multi-user beta use.
 
 ## Related documents

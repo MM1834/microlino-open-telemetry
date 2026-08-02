@@ -78,17 +78,21 @@ Implemented in the repository:
 - per-device AWS IoT credentials loaded from LittleFS;
 - shared AWS IoT firmware transport for both boards.
 
+Implemented in the AWS development stack, with full multi-user runtime validation pending:
+
+- server-side user-to-vehicle authorization for REST and WebSocket;
+
 Not implemented:
 
-- user-to-vehicle authorization;
 - user/device registration and claim flow;
 - ownership transfer and recovery;
 - automated device certificate provisioning or rotation;
 - cloud-managed OTA.
 
-Authentication therefore exists, but tenant isolation does not. At present, an
-authenticated portal user is not restricted to an assigned vehicle. The portal
-must not be opened to multiple untrusted beta users until this is corrected.
+Authentication and assignment enforcement now exist in development. Automated
+negative tests pass, but the live two-user/two-vehicle isolation test is still
+blocked by the absence of a second controlled Cognito identity. The portal must not
+be opened to mutually untrusted beta users until that test passes.
 
 ## Vehicle integration
 

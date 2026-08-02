@@ -75,6 +75,11 @@ class AuthorizationInvariantTests(unittest.TestCase):
         self.assertGreaterEqual(self.template.count("ACCESS_TABLE_NAME"), 4)
         self.assertIn("UserVehicleAccessTableName:", self.template)
 
+    def test_existing_connection_index_projection_is_not_mutated(self) -> None:
+        self.assertIn("ProjectionType: KEYS_ONLY", self.template)
+        self.assertIn('ProjectionExpression="connectionId"', self.template)
+        self.assertIn("connection = connections.get_item(", self.template)
+
     def test_deployment_origins_have_no_permissive_defaults(self) -> None:
         parameter_section = self.template.split("Conditions:", 1)[0]
         self.assertNotIn('Default: "*"', parameter_section)

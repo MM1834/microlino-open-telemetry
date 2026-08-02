@@ -152,7 +152,10 @@ class ConnectionTable:
         self.items.pop(Key["connectionId"], None)
 
     def query(self, **_kwargs):
-        return {"Items": list(self.items.values())}
+        return {"Items": [
+            {"connectionId": item["connectionId"]}
+            for item in self.items.values()
+        ]}
 
 
 def rest_event(path, subject=None, vehicle_id=None):

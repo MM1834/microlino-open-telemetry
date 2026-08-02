@@ -21,4 +21,6 @@ Expected MFA configuration: `OFF`.
 
 ## Responsibility boundary
 
-Cognito manages user identities and credentials. Vehicle ownership and fleet permissions are not stored in Cognito and will be implemented in `UserVehicleAccess` later.
+Cognito manages user identities and credentials. Vehicle ownership and fleet
+permissions are not stored in Cognito; the current development backend stores them
+in the separate `UserVehicleAccess` table.

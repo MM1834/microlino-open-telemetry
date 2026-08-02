@@ -1,6 +1,6 @@
 # ONB-001.A Authorization Validation Plan
 
-> **Status:** Active test plan; deployment not yet approved
+> **Status:** Development deployment complete; authenticated multi-user checks pending
 >
 > **Audience:** Backend developer, security reviewer and beta tester coordinator
 
@@ -26,21 +26,21 @@ in screenshots, terminal transcripts or committed fixtures.
 
 ## Pre-deploy gates
 
-- [ ] Template parses and CloudFormation validation succeeds locally/read-only.
-- [ ] Access table uses `userSub`/`vehicleId` keys and encryption.
-- [ ] REST role has no state-table `Scan` permission.
-- [ ] REST list derives assignments from validated JWT `sub`.
-- [ ] Snapshot checks ACTIVE assignment before reading vehicle state.
-- [ ] Missing subject, missing assignment and REVOKED assignment fail closed.
-- [ ] WebSocket authorizer passes validated `sub` and numeric token expiry.
-- [ ] Connection expiry never exceeds token expiry.
-- [ ] Subscribe validates ACTIVE assignment and prevents vehicle switching bypass.
-- [ ] Ping cannot extend authorization.
-- [ ] Fan-out removes/skips expired and no-longer-authorized connections.
-- [ ] CORS parameter for the target environment is an exact HTTPS origin.
-- [ ] Callback/logout URLs match the target portal environment.
-- [ ] IAM and logs contain no token or claim-proof exposure.
-- [ ] Change Set is reviewed before execution.
+- [x] Template parses and AWS CloudFormation validation succeeds.
+- [x] Access table uses `userSub`/`vehicleId` keys and encryption.
+- [x] REST role has no state-table `Scan` permission.
+- [x] REST list derives assignments from validated JWT `sub`.
+- [x] Snapshot checks ACTIVE assignment before reading vehicle state.
+- [x] Missing subject, missing assignment and REVOKED assignment fail closed locally.
+- [x] WebSocket authorizer passes validated `sub` and numeric token expiry.
+- [x] Connection expiry never exceeds token expiry.
+- [x] Subscribe validates ACTIVE assignment and prevents vehicle switching bypass.
+- [x] Ping cannot extend authorization.
+- [x] Fan-out removes/skips expired and no-longer-authorized connections.
+- [x] CORS is the exact approved development origin `http://localhost:8080`.
+- [x] Callback/logout URLs match the local development portal.
+- [x] Inspect deployed authorizer IAM and post-deploy logs for token-term exposure.
+- [x] Both Change Sets were reviewed before execution.
 
 ## Automated negative tests
 
@@ -88,3 +88,22 @@ and synthetic fixtures under maintainer supervision.
 
 Record each result as Pass, Fail or Not run. “Implemented in CloudFormation” is not
 deployment or runtime evidence. Any cross-user data disclosure blocks beta release.
+
+### Development deployment 2026-08-02
+
+| Check | Result | Evidence |
+|---|---|---|
+| Local runtime and structural suites | Pass | 16 tests |
+| AWS template validation | Pass | `eu-north-1` |
+| First Change Set | Fail safely | AWS rejected an attempted GSI projection change and rolled the stack back |
+| Corrected Change Set | Pass | `onb-001-a-20260802-2`; no deletes or replacements |
+| Stack completion | Pass | `mot-aws-3-1` reached `UPDATE_COMPLETE` |
+| Exact development CORS origin | Pass | `http://localhost:8080` |
+| Initial controlled assignments | Pass | `beta-01` and `pioneer`, ACTIVE/OWNER, sole existing confirmed subject |
+| Public health endpoint | Pass | HTTP 200 |
+| Protected endpoint without bearer token | Pass | HTTP 401 |
+| Authorizer least privilege | Pass | Basic Lambda logging policy only; no inline policies |
+| Post-deploy `access_token` log-term check | Pass | Zero hits in authorizer and live-handler logs |
+| Authenticated two-user/two-vehicle isolation | Not run | Second controlled Cognito identity not yet available |
+
+No email, token, password, certificate or private key is recorded in this evidence.
