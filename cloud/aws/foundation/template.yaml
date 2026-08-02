@@ -1290,19 +1290,19 @@ Outputs:
 
   CognitoHostedUiBaseUrl:
     Description: Base URL of the Cognito managed login and OAuth endpoints.
-    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}"
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
 
   CognitoAuthorizationEndpoint:
     Description: OAuth 2.0 authorization endpoint for browser login.
-    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/oauth2/authorize"
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/authorize"
 
   CognitoTokenEndpoint:
     Description: OAuth 2.0 token endpoint for authorization-code exchange.
-    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/oauth2/token"
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/token"
 
   CognitoLogoutEndpoint:
     Description: Cognito logout endpoint.
-    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}/logout"
+    Value: !Sub "https://${DashboardUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/logout"
 
   StackRegion:
     Value: !Ref AWS::Region

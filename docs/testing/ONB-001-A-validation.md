@@ -104,6 +104,7 @@ deployment or runtime evidence. Any cross-user data disclosure blocks beta relea
 | Protected endpoint without bearer token | Pass | HTTP 401 |
 | Authorizer least privilege | Pass | Basic Lambda logging policy only; no inline policies |
 | Post-deploy `access_token` log-term check | Pass | Zero hits in authorizer and live-handler logs |
+| Cognito managed-login endpoint | Failed, corrected | Initial output used `.amazonaws.com`; regression fix uses `.amazoncognito.com` |
 | Authenticated two-user/two-vehicle isolation | Not run | Second controlled Cognito identity not yet available |
 
 No email, token, password, certificate or private key is recorded in this evidence.

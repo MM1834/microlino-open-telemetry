@@ -85,6 +85,14 @@ class AuthorizationInvariantTests(unittest.TestCase):
         self.assertNotIn('Default: "*"', parameter_section)
         self.assertNotIn("Default: \"http://localhost", parameter_section)
 
+    def test_cognito_managed_login_uses_its_public_domain(self) -> None:
+        output_section = self.template.split("Outputs:", 1)[1]
+        self.assertGreaterEqual(output_section.count(".amazoncognito.com"), 4)
+        self.assertNotIn(
+            "DashboardUserPoolDomain}.auth.${AWS::Region}.${AWS::URLSuffix}",
+            output_section,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
