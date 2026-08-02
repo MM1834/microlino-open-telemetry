@@ -35,7 +35,7 @@ window.MOT_CONFIG = {
     authorizeEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/oauth2/authorize",
     tokenEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/oauth2/token",
     logoutEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/logout",
-    redirectUri: "https://YOUR_DASHBOARD_URL/",
+    redirectUri: "https://YOUR_DASHBOARD_URL/callback",
     scopes: ["openid", "email", "profile"]
   },
 
