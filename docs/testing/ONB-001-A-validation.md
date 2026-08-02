@@ -105,6 +105,10 @@ deployment or runtime evidence. Any cross-user data disclosure blocks beta relea
 | Authorizer least privilege | Pass | Basic Lambda logging policy only; no inline policies |
 | Post-deploy `access_token` log-term check | Pass | Zero hits in authorizer and live-handler logs |
 | Cognito managed-login endpoint | Failed, corrected | Initial output used `.amazonaws.com`; regression fix uses `.amazoncognito.com` |
-| Authenticated two-user/two-vehicle isolation | Not run | Second controlled Cognito identity not yet available |
+| User A login and vehicle list | Pass | Confirmed login; only `pioneer` visible |
+| User B invitation, password change and vehicle list | Pass | Confirmed login; only `beta-01` visible |
+| Cross-user list isolation | Pass | Each controlled user sees only their ACTIVE assignment |
+| Logout destination | Failed, corrected; retest pending | Portal reused `/callback`; dedicated registered `/` logout URI now receives HTTP 302 |
+| Guessed-ID REST/WebSocket isolation | Not run | Requires controlled in-session negative-test path |
 
 No email, token, password, certificate or private key is recorded in this evidence.

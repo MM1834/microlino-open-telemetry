@@ -197,11 +197,11 @@
       lastError = null;
       tokenStore.clear();
       clearTransaction();
-      if (!config.logoutEndpoint || !config.clientId || !config.redirectUri) return;
+      if (!config.logoutEndpoint || !config.clientId || !config.logoutUri) return;
       const url = new URL(config.logoutEndpoint);
       url.search = new URLSearchParams({
         client_id: config.clientId,
-        logout_uri: config.redirectUri
+        logout_uri: config.logoutUri
       }).toString();
       window.location.assign(url.toString());
     }

@@ -34,6 +34,14 @@ http://localhost:8080/callback
 http://localhost:8080/
 ```
 
+These values have different purposes in portal configuration:
+
+- `redirectUri` is the authorization-code callback and must use `/callback`;
+- `logoutUri` is the post-logout destination and must use `/`.
+
+Do not reuse `redirectUri` as `logout_uri`; Cognito rejects a logout destination
+that is not present verbatim in the app client's allowed sign-out URLs.
+
 Deployed environments must use exact HTTPS URLs. Cognito compares redirect URLs exactly, including scheme, host, port, path, and trailing slash.
 
 ## Verification
