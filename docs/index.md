@@ -8,10 +8,13 @@
 
 ## Beta users
 
-1. [Getting started](getting-started/overview.md)
-2. [Hardware overview](hardware/overview.md)
-3. [Local WebUI](webui/overview.md)
-4. [Troubleshooting](troubleshooting/overview.md)
+1. [ESP32-WROOM beta documentation (draft)](beta/README.md)
+2. [ESP32-WROOM beta guide (draft)](beta/esp32-wroom-guide.md)
+3. [Safe support data](beta/safe-diagnostic-data.md)
+4. [Getting started reference](getting-started/overview.md)
+5. [Hardware overview](hardware/overview.md)
+6. [Local WebUI](webui/overview.md)
+7. [Troubleshooting](troubleshooting/overview.md)
 
 Portal account and device-onboarding documentation will be added under `user/`
 when that workflow is implemented and validated.
@@ -26,6 +29,7 @@ when that workflow is implemented and validated.
 6. [Firmware](firmware/overview.md)
 7. [Firmware gap register](firmware/known-gaps.md)
 8. [Developer documentation](developer/README.md)
+9. [Beta provisioning and release gates](beta/README.md)
 
 ## Service operation
 

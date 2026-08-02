@@ -18,12 +18,17 @@
 | FW-010 | Board header contains provider-specific APN default | Swisscom APN is compiled as default for LilyGO | Make beta provisioning explicit and provider-safe |
 | FW-011 | Source comments contradict active LilyGO CAN code | Header calls CAN planned/disabled, while `main.cpp` initializes RX32/TX13 CAN | Correct code comments after hardware review |
 | FW-012 | Current-head validation absent | No DOC-001 builds or device tests performed | Separate approved build/hardware validation phase |
+| FW-013 | AWS readiness can be a false positive | ESP32 readiness marks AWS configured from the build flag, not successful credential loading or X.509 connection | Add explicit credential/connection states before relying on readiness |
+| FW-014 | Factory reset retains AWS identity | Reset clears Preferences/NVS but not LittleFS certificate/key files | Define secure deprovision, ownership transfer and certificate revocation |
+| FW-015 | Local OTA protection is configuration-sensitive | OTA routes are registered regardless of `otaEnabled`; an empty OTA password permits unauthenticated local upload | Require non-empty per-device password now; redesign authorization later |
+| FW-016 | System Health does not validate AWS transport | MQTT diagnostic uses legacy host credentials and may expose network/location fields | Add AWS-specific, privacy-safe connection diagnostics |
+| FW-017 | Two ESP32 version headers remain | Shared `common/system/version.h` declares the active SPR build while board-local `include/version.h` still says `1.0.3-hotfix` | Remove or clearly retire the unused version source after build verification |
 
 ## Beta blockers
 
-Before ESP32-WROOM beta handoff, FW-002, FW-004, FW-009 and FW-012 require an
-explicit review or bounded acceptance. LilyGO beta use additionally requires
-FW-005/FW-006 validation.
+Before ESP32-WROOM beta handoff, FW-002, FW-004, FW-009 and FW-012 through FW-016
+require an explicit review, correction or bounded acceptance. LilyGO beta use
+additionally requires FW-005/FW-006 validation.
 
 ## Related documents
 

@@ -43,6 +43,7 @@ The complete directory rules and source ownership are recorded in the
 | AWS implementation history | `aws/` | Historical index added; current architecture/API separated |
 | Authentication and AWS operations | `auth/`, `administrator/`, `security/` | As-is reference, risks and read-only verification established |
 | Hardware | `hardware/` | Current base; vehicle/CAN variants incomplete |
+| ESP32-WROOM beta/support | `beta/` | Source-based draft complete; build/device/AWS validation open |
 | LTE diagnostics | `developer/lte/` | Historical investigation knowledge |
 | Sprint records | `project/sprints/` | Historical |
 | Release/version notes | `release-notes/`, `releases/` | Historical |
@@ -61,7 +62,9 @@ The complete directory rules and source ownership are recorded in the
 
 ## Screenshot backlog
 
-Refresh screenshots only after validation of:
+The detailed capture matrix is in the
+[beta screenshot specification](beta/screenshot-specification.md). Refresh
+screenshots only after validation of:
 
 - ESP32-WROOM local WebUI with and without GPS;
 - LilyGO local WebUI over the supported WiFi path;

@@ -10,6 +10,7 @@ history for Microlino Open Telemetry.
 - [Active work](governance/WORK_ORDER.md)
 - [Architecture](architecture/README.md)
 - [Firmware overview](firmware/overview.md)
+- [ESP32-WROOM beta documentation](beta/README.md)
 - [AWS IoT roadmap](roadmap/aws-iot.md)
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Migration tracker](MIGRATION.md)
@@ -33,6 +34,7 @@ instructions unless revalidated.
 ## Main sections
 
 - `getting-started/` — installation and first use
+- `beta/` — draft WROOM handoff, provisioning, support and release gates
 - `architecture/` and `adr/` — system design and decisions
 - `firmware/`, `webui/`, `dashboard/` — component documentation
 - `aws/`, `auth/`, `security/` — cloud and identity

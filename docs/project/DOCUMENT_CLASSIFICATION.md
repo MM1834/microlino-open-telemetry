@@ -34,6 +34,7 @@ fragile 244-row copy of the filesystem while still giving every document a statu
 | `api/` | 4 | Unverified | Current contracts after code comparison |
 | `architecture/` | 11 | Mixed | Current architecture except named sprint record |
 | `assets/` | 2 Markdown | Current | Asset indexes; binary assets under `assets/images/` |
+| `beta/` | 7 | Mixed | Draft WROOM guide/checklists; safe-data handling baseline is current |
 | `auth/` | 7 | Historical | Increment-specific Cognito notes; current index replaces status claims |
 | `aws/` | 15 | Historical | AWS-1/AWS-2/AWS-3 delivery and validation evidence |
 | `configuration/` | 6 | Unverified | Current configuration guides pending endpoint/runtime validation |
@@ -139,7 +140,7 @@ An ADR's own declared status controls after DOC-001 resolves numbering. Until th
 | Firmware/hardware gaps | `firmware/known-gaps.md` | source/configuration findings |
 | Local WebUI | `webui/overview.md` plus feature pages | old screenshots/user guides |
 | Portal UI | `dashboard/overview.md` plus feature pages | dashboard sprint records |
-| Beta guide | `user-guide/` planned documents | getting-started and WebUI reference |
+| Beta guide and support baseline | `beta/` draft documents | getting-started, user-guide and WebUI reference |
 
 ## Chat-export reconciliation queue
 
