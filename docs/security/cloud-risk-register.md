@@ -22,13 +22,14 @@ not a penetration test and does not assert that the current template is deployed
 | CLOUD-011 | MFA disabled | Cognito template sets `MfaConfiguration: OFF` | Account protection relies on password/email recovery | Decide beta and production MFA policy |
 | CLOUD-012 | Refresh flow unused | Dashboard stores but does not use refresh token | Re-login after expiry; retained token adds limited benefit | Decide session lifecycle before onboarding release |
 | CLOUD-013 | DynamoDB recovery controls absent | No PITR/deletion protection declared | State loss/recovery behaviour undefined | Evaluate after data classification and beta needs |
+| CLOUD-014 | WROOM credential staging is not ignored | Upload tool copies four files into `firmware/esp32-wroom/data/aws`; `.gitignore` covers LilyGO staging but not the WROOM directory | A failed/interrupted or manually staged credential set could be accidentally committed | Add symmetric ignore rule before the next WROOM credential upload and verify with `git check-ignore` |
 
 ## Priority boundary
 
 CLOUD-001 is the blocker for multiple mutually untrusted beta users. CLOUD-002,
-CLOUD-003, CLOUD-004 and beta credential handling require review before a public or
-shared portal release. Other findings may be accepted temporarily with an explicit
-rationale and bounded beta scope.
+CLOUD-003, CLOUD-004, CLOUD-014 and beta credential handling require review before
+a public or shared portal release. Other findings may be accepted temporarily with
+an explicit rationale and bounded beta scope.
 
 ## Relationship to documentation
 

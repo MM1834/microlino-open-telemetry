@@ -1,5 +1,9 @@
 # Network
 
+> **Status:** Unverified local-WebUI reference; screenshot may be historical
+>
+> **Audience:** Beta user and support
+
 ![Network settings](../assets/images/webui/network.png)
 
 ![Network and MQTT configuration](../assets/images/webui/network-mqtt.png)

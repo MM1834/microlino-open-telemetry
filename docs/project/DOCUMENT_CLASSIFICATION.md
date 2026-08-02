@@ -72,7 +72,7 @@ decrease as exact duplicates become redirects or history indexes.
 | `README.md` | Current | Documentation landing page |
 | `index.md` | Current | Audience-based navigation |
 | `DOCUMENTATION_STANDARD.md` | Current | Documentation structure and style |
-| `MIGRATION.md` | Current | DOC-001 operational ledger |
+| `MIGRATION.md` | Current | DOC-001 baseline and deferred migration ledger |
 | `ARCHITECTURE.md` | Redirect | `architecture/README.md` |
 | `DASHBOARD.md` | Redirect | `dashboard/overview.md` and `webui/overview.md` |
 | `firmware.md` | Redirect | `firmware/overview.md` |
@@ -135,6 +135,7 @@ the collision without renaming files or inventing missing supersession rationale
 | Local WebUI | `webui/overview.md` plus feature pages | old screenshots/user guides |
 | Portal UI | `dashboard/overview.md` plus feature pages | dashboard sprint records |
 | Beta guide and support baseline | `beta/` draft documents | getting-started, user-guide and WebUI reference |
+| DOC-001 validation and handover | `project/DOC-001-VALIDATION.md` | checks and unresolved gates |
 
 ## Chat-export reconciliation queue
 

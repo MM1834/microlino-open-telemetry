@@ -1,6 +1,8 @@
 # LTE development
 
 > **Status:** Historical investigation collection; current LTE beta readiness is unverified.
+>
+> **Audience:** Firmware and hardware developer
 
 The LilyGO LTE path went through several implementations:
 

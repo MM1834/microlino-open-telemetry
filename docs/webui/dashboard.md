@@ -1,5 +1,9 @@
 # Dashboard
 
+> **Status:** Unverified local-WebUI reference; screenshot may be historical
+>
+> **Audience:** Beta user and support
+
 ![Dashboard and status](../assets/images/webui/dashboard-status.png)
 
 ## Purpose

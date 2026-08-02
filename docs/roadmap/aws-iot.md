@@ -1,5 +1,9 @@
 # AWS IoT roadmap
 
+> **Status:** Planned roadmap; checkboxes indicate repository work, not deployment
+>
+> **Audience:** Maintainer, cloud and firmware developer
+
 Checkboxes describe repository implementation, not independently verified deployed
 AWS state. See [Current Status](../governance/CURRENT_STATUS.md) for the validation
 boundary.

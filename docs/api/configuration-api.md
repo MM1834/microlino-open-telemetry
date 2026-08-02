@@ -1,5 +1,9 @@
 # Configuration API
 
+> **Status:** Current source-based contract; runtime unverified
+>
+> **Audience:** Firmware developer and integrator
+
 ## GET `/api/config`
 
 Returns the current configuration as JSON using schema version 1. This is an alias of the existing `/api/config/export` backup route.

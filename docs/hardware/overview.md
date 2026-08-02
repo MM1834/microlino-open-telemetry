@@ -1,5 +1,9 @@
 # Hardware overview
 
+> **Status:** Unverified overview; beta hardware requires checklist review
+>
+> **Audience:** Evaluator, beta provisioner and hardware maintainer
+
 Microlino Open Telemetry supports several ESP32-based hardware variants: a classic ESP32-WROOM setup, the compact WeAct Studio ESP32 CAN485 board, and the LTE-capable LilyGO T-A7670G.
 
 ![Installed ESP32 system](../assets/images/hardware/system-esp32-installed.png)

@@ -6,6 +6,8 @@
 
 **Status:** Active
 
+**Audience:** Maintainer and contributor
+
 **Governance Version:** 1.0
 
 **Maintainer:** Repository Maintainers

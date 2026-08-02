@@ -1,5 +1,9 @@
 # MQTT development
 
+> **Status:** Historical legacy-MQTT guidance; AWS is the current target
+>
+> **Audience:** Firmware and backend developer
+
 ## Diagnostic layers
 
 1. WiFi/LTE interface online.

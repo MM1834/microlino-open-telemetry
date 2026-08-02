@@ -1,5 +1,9 @@
 # MQTT and CAN
 
+> **Status:** Unverified legacy-MQTT/local-CAN reference; screenshot may be historical
+>
+> **Audience:** Developer and support
+
 ![MQTT and CAN](../assets/images/webui/mqtt-can.png)
 
 ## Purpose

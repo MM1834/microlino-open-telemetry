@@ -4,9 +4,11 @@
 
 **Status:** Active beta preparation
 
+**Audience:** Maintainer and contributor
+
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-07-31
+**Last reviewed:** 2026-08-02
 
 ## Purpose
 
@@ -113,10 +115,14 @@ revalidated before beta release.
 
 ## Documentation status
 
-Governance 1.0 is present on `develop`. The wider documentation still contains two
-generations plus historical sprint packages. Several status and roadmap pages are
-stale. Consolidation is active work; historical material should be retained as
-history rather than presented as current truth.
+DOC-001 completed a static, source-based documentation baseline on 2026-08-02.
+Current navigation, canonical topic ownership, beta/support drafts, ADR/history
+classification and the validation handover are present. Historical packages remain
+retained and visibly separated; ambiguous rationale and destructive relocation wait
+for ChatGPT Classic export reconciliation.
+
+This documentation completion is not runtime evidence. Builds, hardware, deployed
+AWS state, screenshots and beta release readiness remain to be validated.
 
 ## Security and local credentials
 
@@ -131,3 +137,4 @@ resources were not inspected during the takeover audit.
 - [WORK_ORDER.md](WORK_ORDER.md)
 - [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
 - [SELF_REVIEW.md](SELF_REVIEW.md)
+- [DOC-001 validation and handover](../project/DOC-001-VALIDATION.md)

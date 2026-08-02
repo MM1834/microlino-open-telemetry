@@ -54,8 +54,11 @@ Prototype options:
 
 For an end-user release, prefer protected device storage rather than shared credentials compiled into public firmware binaries.
 
-The current beta tooling uses ignored local directories and LittleFS staging. Git
-ignore is not encryption and is accepted only as a temporary provisioning workflow.
+The current beta tooling uses ignored source directories and temporary LittleFS
+staging. The LilyGO staging directory is explicitly ignored; static review found no
+equivalent WROOM `data/aws` rule. Add and verify that rule before the next WROOM
+credential upload. Git ignore is not encryption and is accepted only as a temporary
+provisioning workflow.
 
 ## Rotation and ownership transfer
 

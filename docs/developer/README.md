@@ -1,5 +1,9 @@
 # Developer documentation
 
+> **Status:** Current index; child documents may be historical or unverified
+>
+> **Audience:** Developer and maintainer
+
 This section preserves implementation history and diagnostic knowledge without placing experimental details in the end-user firmware guide.
 
 ## Sections

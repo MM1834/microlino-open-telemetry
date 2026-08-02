@@ -46,7 +46,8 @@ These pages require environment-specific revalidation before production use.
 
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Migration tracker](MIGRATION.md)
-- [Active documentation sprint DOC-001](project/sprints/DOC-001.md)
+- [Completed documentation sprint DOC-001](project/sprints/DOC-001.md)
+- [DOC-001 validation and handover](project/DOC-001-VALIDATION.md)
 - [Classification register](project/DOCUMENT_CLASSIFICATION.md)
 - [Architecture Decision Records](adr/README.md)
 - [Engineering history index](history/README.md)

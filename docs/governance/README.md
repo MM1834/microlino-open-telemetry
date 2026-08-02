@@ -1,5 +1,9 @@
 # Governance
 
+> **Status:** Current index
+>
+> **Audience:** Maintainer and contributor
+
 This directory contains the governance framework for the Microlino Open Telemetry (MOT) repository.
 
 The governance documents define how engineering knowledge is organized, preserved and maintained throughout the lifetime of the project.

@@ -4,23 +4,24 @@
 
 **Status:** Active
 
+**Audience:** Maintainer and contributor
+
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-07-31
+**Last reviewed:** 2026-08-02
 
 ## High priority
 
-### Consolidate repository documentation
+### Consolidate repository documentation — complete
 
 **Objective:** Establish one current documentation generation and preserve older
 material as explicitly historical evidence.
 
-**Active sprint:** [DOC-001 — Documentation Consolidation and Beta Baseline](../project/sprints/DOC-001.md)
+**Completed sprint:** [DOC-001 — Documentation Consolidation and Beta Baseline](../project/sprints/DOC-001.md)
 
-**Current status:** DOC-001 started on 2026-07-31 from `develop` commit `ee2c2b4`.
-Governance, the documentation standard, canonical navigation and the first system
-and AWS architecture pages are present. Inventory, current-reference consolidation,
-beta documentation and historical classification remain in progress.
+**Current status:** The static baseline, beta/support drafts, history/ADR
+classification and [validation handover](../project/DOC-001-VALIDATION.md) are
+complete. Runtime evidence and maintainer release approval remain separate gates.
 
 **Expected outcome:** Maintainers and beta users can distinguish current product
 behaviour, planned work and historical implementation records.

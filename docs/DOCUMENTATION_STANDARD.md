@@ -1,5 +1,9 @@
 # Documentation Standard
 
+> **Status:** Current
+>
+> **Audience:** Documentation maintainer and contributor
+
 ## Purpose
 
 MOT documentation uses one predictable structure so current instructions are not

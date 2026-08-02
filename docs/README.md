@@ -1,5 +1,9 @@
 # Documentation
 
+> **Status:** Current navigation
+>
+> **Audience:** All readers
+
 This directory contains current product documentation and retained engineering
 history for Microlino Open Telemetry.
 
@@ -17,6 +21,7 @@ history for Microlino Open Telemetry.
 - [Documentation classification](project/DOCUMENT_CLASSIFICATION.md)
 - [Architecture decisions](adr/README.md)
 - [Engineering history](history/README.md)
+- [DOC-001 validation and handover](project/DOC-001-VALIDATION.md)
 
 ## Documentation lifecycle
 

@@ -1,8 +1,10 @@
 # Documentation Migration
 
-> **Status:** Active
-
-> **Active sprint:** [DOC-001](project/sprints/DOC-001.md)
+> **Status:** Baseline complete; historical relocation and screenshot refresh deferred
+>
+> **Audience:** Documentation maintainer
+>
+> **Completed sprint:** [DOC-001](project/sprints/DOC-001.md)
 >
 > **Branch:** `codex/doc-001-documentation-baseline`
 
@@ -48,7 +50,7 @@ The complete directory rules and source ownership are recorded in the
 | Sprint records | `project/sprints/` | Historical |
 | Release/version notes | `release-notes/`, `releases/` | Historical |
 | Historical navigation | `history/README.md` | Current index; root packages remain in place |
-| Images | `assets/images/` | Canonical; duplicate tree being removed |
+| Images | `assets/images/` | Canonical; old `docs/images/` Markdown has no inbound links |
 
 ## Known duplicate generations
 
