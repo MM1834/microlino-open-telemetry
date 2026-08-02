@@ -48,6 +48,8 @@ These pages require environment-specific revalidation before production use.
 - [Migration tracker](MIGRATION.md)
 - [Active documentation sprint DOC-001](project/sprints/DOC-001.md)
 - [Classification register](project/DOCUMENT_CLASSIFICATION.md)
+- [Architecture Decision Records](adr/README.md)
+- [Engineering history index](history/README.md)
 - [Engineering backlog](governance/ENGINEERING_BACKLOG.md)
 
 Sprint documents, AWS delivery stages and release notes are retained as historical

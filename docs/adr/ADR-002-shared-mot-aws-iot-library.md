@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-16
 - **Decision owners:** MOT maintainers
+- **Audience:** Firmware maintainer
 - **Related:** ADR-001, ADR-004, ADR-006, ADR-007
 
 ## Context

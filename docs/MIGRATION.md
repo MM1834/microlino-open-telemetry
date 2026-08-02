@@ -35,7 +35,7 @@ The complete directory rules and source ownership are recorded in the
 | Topic | Canonical location | Migration state |
 |---|---|---|
 | Governance and current priorities | `governance/` | Current |
-| Architecture decisions | `adr/` | Needs numbering/status cleanup |
+| Architecture decisions | `adr/` | Collision classified; final numbering awaits reconciliation |
 | System architecture | `architecture/` | Active consolidation |
 | Firmware reference | `firmware/` | Source-based core consolidated; runtime unverified |
 | Local device UI | `webui/` | Structurally current; screenshots await revalidation |
@@ -47,6 +47,7 @@ The complete directory rules and source ownership are recorded in the
 | LTE diagnostics | `developer/lte/` | Historical investigation knowledge |
 | Sprint records | `project/sprints/` | Historical |
 | Release/version notes | `release-notes/`, `releases/` | Historical |
+| Historical navigation | `history/README.md` | Current index; root packages remain in place |
 | Images | `assets/images/` | Canonical; duplicate tree being removed |
 
 ## Known duplicate generations
@@ -59,6 +60,10 @@ The complete directory rules and source ownership are recorded in the
 - `aws/`, root sprint manifests and `project/sprints/` describe delivery stages,
   not the current service contract;
 - `releases/`, `release-notes/` and developer release notes overlap.
+
+DOC-001.5 keeps non-identical parallel release records but declares one detailed
+archive source. It also retains root manifests in place until inbound links and
+Chat-export evidence support a safe move.
 
 ## Screenshot backlog
 

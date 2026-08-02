@@ -1,8 +1,16 @@
 # ADR-0002: Use JSON Backup/Restore
 
+> **Classification:** Accepted; current local capability with security constraints
+>
+> **Audience:** Firmware maintainer and support
+
 ## Status
 
 Accepted
+
+Current export includes secrets. Apply the
+[safe diagnostic-data rules](../beta/safe-diagnostic-data.md); acceptance of the
+format is not approval to share an export through ordinary support channels.
 
 ## Context
 

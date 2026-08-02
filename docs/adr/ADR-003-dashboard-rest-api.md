@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-16
 - **Decision owners:** MOT maintainers
+- **Audience:** Portal and backend maintainer
 - **Related:** ADR-001, ADR-005, ADR-006, ADR-008
 
 ## Context

@@ -15,6 +15,8 @@ history for Microlino Open Telemetry.
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Migration tracker](MIGRATION.md)
 - [Documentation classification](project/DOCUMENT_CLASSIFICATION.md)
+- [Architecture decisions](adr/README.md)
+- [Engineering history](history/README.md)
 
 ## Documentation lifecycle
 
@@ -42,6 +44,7 @@ instructions unless revalidated.
 - `developer/`, `testing/` — engineering and validation
 - `reference/` — stable terminology and contracts
 - `release-notes/`, `releases/`, `project/sprints/`, `legacy/` — history
+- `history/` — current navigation to retained historical collections
 
 Each current topic should have one source of truth. Other documents should link to
 it instead of maintaining a second status description.

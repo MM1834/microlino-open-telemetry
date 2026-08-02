@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-16
 - **Decision owners:** MOT maintainers
+- **Audience:** Maintainer and documentation contributor
 
 ## Context
 

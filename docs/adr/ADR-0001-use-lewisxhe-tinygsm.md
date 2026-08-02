@@ -1,8 +1,15 @@
 # ADR-0001: Use LewisXhe TinyGSM for A7670G LTE
 
+> **Classification:** Accepted historical transport decision; legacy non-AWS path
+>
+> **Audience:** Firmware maintainer
+
 ## Status
 
 Accepted
+
+This acceptance applies to the earlier LilyGO MQTT-over-LTE implementation. It
+does not establish AWS IoT over LTE as implemented or validated.
 
 ## Context
 

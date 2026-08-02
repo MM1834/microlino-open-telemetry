@@ -46,6 +46,7 @@ fragile 244-row copy of the filesystem while still giving every document a statu
 | `governance/` | 7 | Current | Governance, status, work and engineering memory |
 | `gps/` | 2 | Historical | GPS sprint delivery evidence |
 | `hardware/` | 14 | Unverified | Current hardware reference pending maintainer/electrical review |
+| `history/` | 1 added by DOC-001.5 | Current | Navigation to retained historical evidence; no history moved yet |
 | `images/` | 10 Markdown | Historical | Old hardware-document generation; no canonical binary assets |
 | `legacy/` | 1 | Historical | Legacy index |
 | `project/` | 10 | Historical by default | Sprint records; DOC-001 and this register are active exceptions |
@@ -110,16 +111,9 @@ name are candidate current sources and remain Unverified until code comparison.
 
 ## ADR classification rule
 
-An ADR's own declared status controls after DOC-001 resolves numbering. Until then:
-
-- `ADR-000-documentation-principles.md` is current;
-- `ADR-0004-aws-iot-target-architecture.md` is the current AWS target decision;
-- `ADR-0004-http-api-jwt-authorizer.md` is an accepted implementation decision but
-  has a colliding number;
-- `ADR-001`, `ADR-002` and `ADR-003` are useful AWS delivery decisions requiring
-  explicit relationship/supersession review;
-- `ADR-Authentication-Strategy.md` requires status and numbering;
-- `CURRENT.md` and `LEGACY.md` are stale indexes pending DOC-001.5.
+The [ADR index](../adr/README.md) owns current classification. Filenames, not bare
+numbers, are stable identifiers because two generations overlap. DOC-001.5 records
+the collision without renaming files or inventing missing supersession rationale.
 
 ## Canonical topic ownership
 
@@ -145,10 +139,13 @@ An ADR's own declared status controls after DOC-001 resolves numbering. Until th
 ## Chat-export reconciliation queue
 
 - rationale and chronology behind duplicate ADR numbering;
+- whether the two short authentication notes contain rationale not preserved in Git;
+- intended targets of unresolved ADR-004 through ADR-008 references in ADR-001–003;
 - which historical AWS deployments and validation checklists were actually run;
 - final intended status of older LTE transport experiments;
 - hardware rationale for current CAN wiring and planned model variants;
 - which screenshots correspond to which firmware/dashboard revision;
+- whether root-level delivery packages have external links that block relocation;
 - any decisions made in chat but never promoted into repository ADRs.
 
 ## Related documents
