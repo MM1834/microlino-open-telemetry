@@ -29,7 +29,7 @@ fragile 244-row copy of the filesystem while still giving every document a statu
 | Path | Files at inventory | Default status | Canonical role/action |
 |---|---:|---|---|
 | `docs/*.md` | 9 | Mixed | Navigation and compatibility redirects only |
-| `administrator/` | 2 | Historical | Replace with current operator indexes/procedures |
+| `administrator/` | 2 at baseline | Mixed | Historical auth notes plus current AWS as-is/verification sources |
 | `adr/` | 12 | Mixed | Decision records; resolve numbering and supersession |
 | `api/` | 4 | Unverified | Current contracts after code comparison |
 | `architecture/` | 11 | Mixed | Current architecture except named sprint record |
@@ -53,7 +53,7 @@ fragile 244-row copy of the filesystem while still giving every document a statu
 | `release-notes/` | 1 | Historical | Version record |
 | `releases/` | 1 | Historical | Version record |
 | `roadmap/` | 2 | Planned | Links to governed work/backlog and AWS phases |
-| `security/` | 1 | Unverified | Current security requirements pending operational validation |
+| `security/` | 1 at baseline | Unverified | Current credential requirements and code-review risk register |
 | `testing/` | 4 | Historical | Prior test records; no current-head validation suite |
 | `troubleshooting/` | 1 | Unverified | Candidate current support reference |
 | `user/` | 1 | Historical | Stale API-access increment note; portal onboarding docs planned |
@@ -133,6 +133,8 @@ An ADR's own declared status controls after DOC-001 resolves numbering. Until th
 | Local configuration API | `api/configuration-api.md` | B.8 record, firmware WebUI code |
 | MQTT topics | `api/mqtt-topics.md` | firmware topic code, AWS-2.3 contract |
 | AWS credentials | `security/aws-iot-credentials.md` | provisioning scripts and AWS-1 records |
+| Declared AWS stack state | `administrator/aws/declared-stack-state.md` | CloudFormation and historical AWS records |
+| Cloud risks/gaps | `security/cloud-risk-register.md` | code/configuration findings |
 | Firmware | `firmware/overview.md` plus subsystem pages | developer investigations and release notes |
 | Local WebUI | `webui/overview.md` plus feature pages | old screenshots/user guides |
 | Portal UI | `dashboard/overview.md` plus feature pages | dashboard sprint records |

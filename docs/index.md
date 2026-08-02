@@ -28,10 +28,12 @@ when that workflow is implemented and validated.
 
 ## Service operation
 
+- [AWS as-is operations index](administrator/aws/README.md)
 - [Authentication documentation](auth/README.md)
 - [API reference](api/README.md)
 - [Protected API routes](administrator/authentication/protected-api-routes.md)
 - [AWS IoT credential handling](security/aws-iot-credentials.md)
+- [Cloud risk and gap register](security/cloud-risk-register.md)
 
 These pages require environment-specific revalidation before production use.
 

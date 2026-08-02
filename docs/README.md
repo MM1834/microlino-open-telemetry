@@ -36,6 +36,7 @@ instructions unless revalidated.
 - `architecture/` and `adr/` — system design and decisions
 - `firmware/`, `webui/`, `dashboard/` — component documentation
 - `aws/`, `auth/`, `security/` — cloud and identity
+- `administrator/` — code-based service state and approved operational procedures
 - `developer/`, `testing/` — engineering and validation
 - `reference/` — stable terminology and contracts
 - `release-notes/`, `releases/`, `project/sprints/`, `legacy/` — history

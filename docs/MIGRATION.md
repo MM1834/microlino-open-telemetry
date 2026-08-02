@@ -41,7 +41,7 @@ The complete directory rules and source ownership are recorded in the
 | Local device UI | `webui/` | Structurally current; screenshots await revalidation |
 | Hosted portal/dashboard | `dashboard/` and `user/` | Must be updated with onboarding work |
 | AWS implementation history | `aws/` | Historical index added; current architecture/API separated |
-| Authentication operations | `auth/`, `administrator/` | Historical increments indexed; current API/auth sources established |
+| Authentication and AWS operations | `auth/`, `administrator/`, `security/` | As-is reference, risks and read-only verification established |
 | Hardware | `hardware/` | Current base; vehicle/CAN variants incomplete |
 | LTE diagnostics | `developer/lte/` | Historical investigation knowledge |
 | Sprint records | `project/sprints/` | Historical |
