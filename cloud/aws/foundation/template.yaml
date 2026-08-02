@@ -22,10 +22,11 @@ Parameters:
 
   ApiAllowedOrigin:
     Type: String
-    Default: "*"
+    AllowedPattern: '^(https://[^*\s]+|http://localhost(:[0-9]+)?)$'
+    ConstraintDescription: Use one exact HTTPS origin or localhost for development.
     Description: >
-      CORS origin for the temporary unauthenticated beta API. Use the exact
-      Dashboard origin when known. Authentication is added in AWS-4.
+      Exact CORS origin for the authenticated portal, including scheme and host.
+      Wildcard origins are not permitted by the ONB-001 deployment process.
   
   ApiLogRetentionDays:
     Type: Number
@@ -48,14 +49,12 @@ Parameters:
 
   CognitoDashboardCallbackUrls:
     Type: CommaDelimitedList
-    Default: "http://localhost:8080/callback"
     Description: >
       Allowed OAuth callback URLs for the dashboard app client. Use HTTPS for
       deployed environments; localhost HTTP is reserved for local development.
 
   CognitoDashboardLogoutUrls:
     Type: CommaDelimitedList
-    Default: "http://localhost:8080/"
     Description: >
       Allowed post-logout redirect URLs for the dashboard app client.
 
@@ -162,6 +161,29 @@ Resources:
         - Key: environment
           Value: !Ref Environment
 
+  UserVehicleAccessTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-user-vehicle-access"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userSub
+          AttributeType: S
+        - AttributeName: vehicleId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userSub
+          KeyType: HASH
+        - AttributeName: vehicleId
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+
   LiveConnectionTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -181,7 +203,10 @@ Resources:
             - AttributeName: vehicleId
               KeyType: HASH
           Projection:
-            ProjectionType: KEYS_ONLY
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - userSub
+              - expiresAt
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
@@ -222,6 +247,9 @@ Resources:
                   - !GetAtt LiveConnectionTable.Arn
                   - !Sub "${LiveConnectionTable.Arn}/index/vehicleId-index"
               - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt UserVehicleAccessTable.Arn
+              - Effect: Allow
                 Action: [execute-api:ManageConnections]
                 Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
 
@@ -238,6 +266,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref VehicleStateTable
           CONNECTION_TABLE_NAME: !Ref LiveConnectionTable
+          ACCESS_TABLE_NAME: !Ref UserVehicleAccessTable
           WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
           WEBSOCKET_STAGE: "$default"
           VERBOSE_MESSAGE_LOGS: !Ref EnableVerboseMessageLogs
@@ -255,6 +284,7 @@ Resources:
           dynamodb = boto3.resource("dynamodb")
           table = dynamodb.Table(os.environ["TABLE_NAME"])
           connections = dynamodb.Table(os.environ["CONNECTION_TABLE_NAME"])
+          access = dynamodb.Table(os.environ["ACCESS_TABLE_NAME"])
           management = boto3.client(
               "apigatewaymanagementapi",
               endpoint_url=(
@@ -295,10 +325,10 @@ Resources:
               result = connections.query(
                   IndexName="vehicleId-index",
                   KeyConditionExpression=Key("vehicleId").eq(vehicle_id),
-                  ProjectionExpression="connectionId"
+                  ProjectionExpression="connectionId,userSub,expiresAt"
               )
-              connection_ids = [item.get("connectionId") for item in result.get("Items", [])]
-              if not connection_ids:
+              connection_items = result.get("Items", [])
+              if not connection_items:
                   return {"sent": 0, "removed": 0}
 
               payload = json.dumps({
@@ -313,8 +343,26 @@ Resources:
 
               sent = 0
               removed = 0
-              for connection_id in connection_ids:
+              now = int(time.time())
+              for connection in connection_items:
+                  connection_id = connection.get("connectionId")
                   if not connection_id:
+                      continue
+                  user_sub = str(connection.get("userSub", "")).strip()
+                  expires_at = int(connection.get("expiresAt", 0))
+                  if not user_sub or expires_at <= now:
+                      connections.delete_item(Key={"connectionId": connection_id})
+                      removed += 1
+                      continue
+                  assignment = access.get_item(
+                      Key={"userSub": user_sub, "vehicleId": vehicle_id},
+                      ConsistentRead=True,
+                      ProjectionExpression="#status",
+                      ExpressionAttributeNames={"#status": "status"}
+                  ).get("Item")
+                  if not assignment or assignment.get("status") != "ACTIVE":
+                      connections.delete_item(Key={"connectionId": connection_id})
+                      removed += 1
                       continue
                   try:
                       management.post_to_connection(ConnectionId=connection_id, Data=payload)
@@ -457,9 +505,12 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:Query
-                  - dynamodb:Scan
-                  - dynamodb:GetItem
                 Resource: !GetAtt VehicleStateTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:GetItem
+                Resource: !GetAtt UserVehicleAccessTable.Arn
       Tags:
         - Key: project
           Value: !Ref ProjectName
@@ -481,6 +532,7 @@ Resources:
           PROJECT_NAME: !Ref ProjectName
           ENVIRONMENT: !Ref Environment
           TABLE_NAME: !Ref VehicleStateTable
+          ACCESS_TABLE_NAME: !Ref UserVehicleAccessTable
       Code:
         ZipFile: |
           import json
@@ -496,6 +548,9 @@ Resources:
           TABLE_NAME = os.environ["TABLE_NAME"]
   
           table = boto3.resource("dynamodb").Table(TABLE_NAME)
+          access = boto3.resource("dynamodb").Table(
+              os.environ["ACCESS_TABLE_NAME"]
+          )
   
           def json_value(value):
               if isinstance(value, Decimal):
@@ -572,24 +627,44 @@ Resources:
                   "metadata": metadata
               }
   
-          def list_vehicles():
-              vehicle_ids = set()
+          def caller_sub(event):
+              claims = (
+                  event.get("requestContext", {})
+                  .get("authorizer", {})
+                  .get("jwt", {})
+                  .get("claims", {})
+              )
+              return str(claims.get("sub", "")).strip()
+
+          def has_active_access(user_sub, vehicle_id):
+              result = access.get_item(
+                  Key={"userSub": user_sub, "vehicleId": vehicle_id},
+                  ConsistentRead=True,
+                  ProjectionExpression="#status",
+                  ExpressionAttributeNames={"#status": "status"}
+              )
+              return result.get("Item", {}).get("status") == "ACTIVE"
+
+          def list_vehicle_ids(user_sub):
+              vehicle_ids = []
               last_evaluated_key = None
-  
+
               while True:
                   kwargs = {
-                      "ProjectionExpression": "vehicleId"
+                      "KeyConditionExpression": Key("userSub").eq(user_sub),
+                      "ProjectionExpression": "vehicleId,#status",
+                      "ExpressionAttributeNames": {"#status": "status"},
+                      "ConsistentRead": True
                   }
                   if last_evaluated_key:
                       kwargs["ExclusiveStartKey"] = (
                           last_evaluated_key
                       )
   
-                  result = table.scan(**kwargs)
+                  result = access.query(**kwargs)
                   for item in result.get("Items", []):
-                      vehicle_id = item.get("vehicleId")
-                      if vehicle_id:
-                          vehicle_ids.add(vehicle_id)
+                      if item.get("status") == "ACTIVE" and item.get("vehicleId"):
+                          vehicle_ids.append(item["vehicleId"])
   
                   last_evaluated_key = result.get(
                       "LastEvaluatedKey"
@@ -597,8 +672,11 @@ Resources:
                   if not last_evaluated_key:
                       break
   
+              return sorted(set(vehicle_ids))
+
+          def list_vehicles(user_sub):
               vehicles = []
-              for vehicle_id in sorted(vehicle_ids):
+              for vehicle_id in list_vehicle_ids(user_sub):
                   snapshot = load_vehicle(vehicle_id)
                   if snapshot:
                       vehicles.append({
@@ -631,9 +709,13 @@ Resources:
                       "environment": ENVIRONMENT,
                       "utc": int(time.time())
                   })
+
+              user_sub = caller_sub(event)
+              if not user_sub:
+                  return response(401, {"error": "unauthorized"})
   
               if method == "GET" and path == "/api/vehicles":
-                  vehicles = list_vehicles()
+                  vehicles = list_vehicles(user_sub)
                   return response(200, {
                       "count": len(vehicles),
                       "vehicles": vehicles
@@ -648,6 +730,11 @@ Resources:
                   if not vehicle_id:
                       return response(400, {
                           "error": "vehicle_id_missing"
+                      })
+
+                  if not has_active_access(user_sub, vehicle_id):
+                      return response(404, {
+                          "error": "vehicle_not_found"
                       })
   
                   snapshot = load_vehicle(vehicle_id)
@@ -797,8 +884,26 @@ Resources:
                 Resource: !GetAtt LiveConnectionTable.Arn
               - Effect: Allow
                 Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt UserVehicleAccessTable.Arn
+              - Effect: Allow
+                Action:
                   - execute-api:ManageConnections
                 Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
+
+  LiveAuthorizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-live-authorizer-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
   LiveAuthorizerFunction:
     Type: AWS::Lambda::Function
@@ -808,7 +913,7 @@ Resources:
       Handler: index.handler
       Timeout: 10
       MemorySize: 128
-      Role: !GetAtt LiveWebSocketRole.Arn
+      Role: !GetAtt LiveAuthorizerRole.Arn
       Environment:
         Variables:
           COGNITO_ISSUER: !Sub "https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${DashboardUserPool}"
@@ -924,7 +1029,8 @@ Resources:
                   claims = validate_access_token(token)
                   return policy(claims["sub"], "Allow", event["methodArn"], {
                       "sub": claims["sub"],
-                      "username": claims.get("username", "")
+                      "username": claims.get("username", ""),
+                      "exp": int(claims["exp"])
                   })
               except Exception as error:
                   print(json.dumps({"event": "live_authorizer_denied", "reason": str(error)}))
@@ -942,6 +1048,7 @@ Resources:
       Environment:
         Variables:
           CONNECTION_TABLE_NAME: !Ref LiveConnectionTable
+          ACCESS_TABLE_NAME: !Ref UserVehicleAccessTable
           WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
           WEBSOCKET_STAGE: "$default"
       Code:
@@ -952,6 +1059,7 @@ Resources:
           import boto3
 
           table = boto3.resource("dynamodb").Table(os.environ["CONNECTION_TABLE_NAME"])
+          access = boto3.resource("dynamodb").Table(os.environ["ACCESS_TABLE_NAME"])
           management = boto3.client(
               "apigatewaymanagementapi",
               endpoint_url=(
@@ -976,11 +1084,19 @@ Resources:
 
               if route == "$connect":
                   auth = request.get("authorizer") or {}
+                  user_sub = str(auth.get("sub", "")).strip()
+                  try:
+                      token_expires_at = int(auth.get("exp", 0))
+                  except (TypeError, ValueError):
+                      token_expires_at = 0
+                  now = int(time.time())
+                  if not user_sub or token_expires_at <= now:
+                      return response(401, {"error": "unauthorized"})
                   table.put_item(Item={
                       "connectionId": connection_id,
-                      "userSub": auth.get("sub", ""),
-                      "connectedAt": int(time.time()),
-                      "expiresAt": int(time.time()) + 86400
+                      "userSub": user_sub,
+                      "connectedAt": now,
+                      "expiresAt": token_expires_at
                   })
                   return response()
 
@@ -999,21 +1115,45 @@ Resources:
                   if not vehicle_id:
                       send(connection_id, {"type": "error", "error": "vehicle_id_missing"})
                       return response(400, {"error": "vehicle_id_missing"})
+                  connection = table.get_item(
+                      Key={"connectionId": connection_id},
+                      ConsistentRead=True
+                  ).get("Item")
+                  now = int(time.time())
+                  if not connection or int(connection.get("expiresAt", 0)) <= now:
+                      table.delete_item(Key={"connectionId": connection_id})
+                      send(connection_id, {"type": "error", "error": "unauthorized"})
+                      return response(401, {"error": "unauthorized"})
+                  assignment = access.get_item(
+                      Key={
+                          "userSub": connection.get("userSub", ""),
+                          "vehicleId": vehicle_id
+                      },
+                      ConsistentRead=True,
+                      ProjectionExpression="#status",
+                      ExpressionAttributeNames={"#status": "status"}
+                  ).get("Item")
+                  if not assignment or assignment.get("status") != "ACTIVE":
+                      send(connection_id, {"type": "error", "error": "vehicle_not_found"})
+                      return response(404, {"error": "vehicle_not_found"})
                   table.update_item(
                       Key={"connectionId": connection_id},
-                      UpdateExpression="SET vehicleId=:v, expiresAt=:e",
-                      ExpressionAttributeValues={":v": vehicle_id, ":e": int(time.time()) + 86400}
+                      UpdateExpression="SET vehicleId=:v",
+                      ExpressionAttributeValues={":v": vehicle_id}
                   )
                   send(connection_id, {"type": "subscribed", "vehicleId": vehicle_id})
                   return response()
 
               if route == "ping":
                   now = int(time.time())
-                  table.update_item(
+                  connection = table.get_item(
                       Key={"connectionId": connection_id},
-                      UpdateExpression="SET expiresAt=:e",
-                      ExpressionAttributeValues={":e": now + 86400}
-                  )
+                      ConsistentRead=True
+                  ).get("Item")
+                  if not connection or int(connection.get("expiresAt", 0)) <= now:
+                      table.delete_item(Key={"connectionId": connection_id})
+                      send(connection_id, {"type": "error", "error": "unauthorized"})
+                      return response(401, {"error": "unauthorized"})
                   send(connection_id, {"type": "pong", "serverTime": now})
                   return response()
 
@@ -1172,6 +1312,9 @@ Outputs:
     Value: !Ref VehicleStateTable
   VehicleStateTableArn:
     Value: !GetAtt VehicleStateTable.Arn
+  UserVehicleAccessTableName:
+    Description: Controlled user-to-vehicle assignment table for ONB-001.A.
+    Value: !Ref UserVehicleAccessTable
   StateIngestLogGroupName:
     Value: !Ref StateIngestLogGroup
 

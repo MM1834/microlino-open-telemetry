@@ -27,8 +27,8 @@ confirm API Gateway access-log redaction.
 
 ### `$connect`
 
-JWT-authorized. Stores connection ID, user subject, connection time and TTL in the
-live-connections table.
+JWT-authorized. Stores connection ID, user subject, connection time and token expiry
+in the live-connections table. Connection TTL never exceeds access-token expiry.
 
 ### `$disconnect`
 
@@ -42,15 +42,14 @@ Request:
 {"action":"subscribe","vehicleId":"pioneer"}
 ```
 
-Updates the connection with the requested `vehicleId` and returns a subscribed
-message.
-
-Current security limitation: the handler does not verify that the authenticated
-`userSub` may access the requested vehicle.
+Checks ACTIVE `UserVehicleAccess` for the stored subject before updating the
+connection with the requested `vehicleId`. Missing/inactive assignments receive a
+non-enumerating denial.
 
 ### `ping`
 
-Maintains heartbeat/TTL behaviour and returns a pong-style response.
+Returns a pong only while the connection token remains valid. Ping does not extend
+the stored authorization lifetime.
 
 ### `$default`
 
@@ -72,17 +71,18 @@ The state-ingestion Lambda queries connections by `vehicleId` and sends messages
 }
 ```
 
-The portal discards messages whose vehicle ID does not match its active selection.
-Client-side filtering is not authorization.
+Before sending, ingestion rechecks token expiry and ACTIVE assignment. Expired or
+revoked connection records are removed. Portal filtering remains UX only and is not
+part of authorization.
 
-## Required onboarding change
+## Deployment gate
 
-The backend must authorize `subscribe` against the same access model used by the
-Vehicle REST API. Authorization must remain valid across reconnects and vehicle
-switches, with negative tests for guessed vehicle IDs.
+The local ONB-001.A implementation must be deployed and tested across reconnects,
+expiry, revocation and guessed vehicle IDs before multi-user beta use.
 
 ## Related documents
 
 - [Vehicle REST API](vehicle-api.md)
 - [Authentication flow](../architecture/authentication-flow.md)
 - [AWS architecture](../architecture/aws-iot.md)
+- [Onboarding authorization](../architecture/onboarding-authorization.md)

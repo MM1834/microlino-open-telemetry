@@ -9,11 +9,11 @@ not a penetration test and does not assert that the current template is deployed
 
 | ID | Finding | Evidence | Consequence | Required next decision |
 |---|---|---|---|---|
-| CLOUD-001 | No user-to-vehicle authorization | REST Lambda scans/queries without Cognito `sub`; WebSocket accepts arbitrary `vehicleId` | Authenticated users may access other vehicles | ONB-001 access model and negative tests |
+| CLOUD-001 | No deployed user-to-vehicle authorization | ONB-001.A implements local REST/WebSocket enforcement; deployment remains unchanged/unverified | Deployed authenticated users may still access other vehicles | Review, change set, deploy and execute negative tests |
 | CLOUD-002 | WebSocket access token in query string | `$connect` identity source is `access_token`; dashboard adds token to URL | Token may appear in intermediary/access logs | Review transport pattern and logging/redaction |
-| CLOUD-003 | CORS default is `*` | `ApiAllowedOrigin` template default | Broader browser origins than intended if deployed unchanged | Verify deployed value; define environment-specific origin |
+| CLOUD-003 | Deployed CORS value unknown | ONB-001.A removes permissive template default; deployed stack is unverified | Existing deployment may still allow broader origins | Supply exact origin and verify after deployment |
 | CLOUD-004 | Deployed state unknown | No DOC-001 AWS inventory performed | Documentation cannot establish real exposure or readiness | Execute approved read-only verification |
-| CLOUD-005 | Shared live authorizer/handler IAM role | Both Lambdas use `LiveWebSocketRole` | Authorizer has permissions beyond apparent need | Split roles or formally accept after review |
+| CLOUD-005 | Shared live authorizer/handler IAM role | ONB-001.A splits a log-only authorizer role locally; deployment unverified | Existing deployment may grant authorizer excess permissions | Confirm change set and deployed roles |
 | CLOUD-006 | API Gateway access logging not declared | Stage resources lack access-log settings | Limited auditability; token logging behaviour unknown | Define privacy-safe access-log policy |
 | CLOUD-007 | No cloud history/retention model | DynamoDB stores latest topic state only | Portal history expectations may be misleading | Define later data lifecycle and privacy model |
 | CLOUD-008 | No user/device claim lifecycle | No claim records, transfer, replacement or revocation APIs | Beta onboarding cannot safely bind people and devices | ONB-001 lifecycle design |

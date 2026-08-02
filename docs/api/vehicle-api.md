@@ -8,11 +8,10 @@
 
 ## Trust boundary
 
-API Gateway validates a Cognito JWT before vehicle requests reach the Lambda. This
-is authentication only. The Lambda does not currently restrict results by Cognito
-`sub`, group or a user-to-vehicle access record.
-
-Do not use the current API for multiple mutually untrusted beta users.
+API Gateway validates a Cognito JWT before vehicle requests reach the Lambda.
+ONB-001.A additionally derives the Cognito `sub` in Lambda and checks server-side
+`UserVehicleAccess` assignments. This implementation is local and must not be
+treated as deployed until the change set and negative tests pass.
 
 ## Endpoints
 
@@ -23,19 +22,15 @@ not return vehicle or user data.
 
 ### `GET /api/vehicles`
 
-Requires a JWT accepted by `VehicleApiJwtAuthorizer`. Scans the vehicle-state table
-for distinct vehicle IDs and returns their online/last-seen summary.
-
-Current security limitation: every authenticated user receives every discovered
-vehicle.
+Requires a JWT accepted by `VehicleApiJwtAuthorizer`. Queries ACTIVE assignments
+for the authenticated subject, then returns summaries only for those vehicles. It
+does not scan the vehicle-state table.
 
 ### `GET /api/vehicles/{vehicleId}/snapshot`
 
-Requires a JWT. Queries the DynamoDB partition matching `vehicleId` and returns
-current values plus per-topic metadata.
-
-Current security limitation: knowledge of a vehicle ID plus any accepted user token
-is sufficient; ownership is not checked.
+Requires a JWT and ACTIVE assignment. The handler checks access before querying the
+DynamoDB state partition. Unknown, inactive and unassigned vehicle IDs share the
+same non-enumerating 404 response.
 
 ## Authentication
 
@@ -59,15 +54,15 @@ Authorization: Bearer <access-token>
 - unknown routes return HTTP 404;
 - API Gateway handles invalid/missing JWTs before Lambda.
 
-## Required onboarding change
+## Deployment gate
 
-ONB-001 must define a server-side access model and apply it to both list and
-snapshot operations. The client-selected `vehicleId` is never sufficient evidence
-of authorization.
+Run cross-user list/snapshot tests after deployment. The client-selected `vehicleId`
+is never sufficient evidence of authorization.
 
 ## Related documents
 
 - [Authentication architecture](../architecture/authentication.md)
 - [Live WebSocket API](live-websocket-api.md)
 - [AWS architecture](../architecture/aws-iot.md)
+- [Onboarding authorization](../architecture/onboarding-authorization.md)
 - [Historical AWS-3.3 record](../aws/AWS-3-3-vehicle-api.md)
