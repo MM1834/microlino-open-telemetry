@@ -6,7 +6,9 @@
 >
 > **Validation date:** 2026-08-02
 >
-> **Source baseline:** `15da2bd`; DOC-001.6 documentation-only normalization
+> **Validated commit:** `0230da1`
+>
+> **Source baseline before DOC-001.6:** `15da2bd`
 
 ## Outcome
 
@@ -19,13 +21,14 @@ hardware connection or portal-onboarding implementation by itself.
 | Check | Result | Evidence |
 |---|---|---|
 | Repository state before DOC-001.6 | Pass | Clean branch tracking its remote at `15da2bd` |
-| Markdown inventory | Observed | 423 Markdown files across repository and retained history |
+| Exact validation tree | Pass | Commit `0230da1` |
+| Markdown inventory | Observed | 424 Markdown files across repository and retained history |
 | Local Markdown links | Pass | 0 unresolved local targets |
-| Current navigation graph | Pass | 92 reachable pages; 0 missing Status/Audience after normalization |
+| Current navigation graph | Pass | 93 reachable pages; 0 missing Status/Audience after normalization |
 | Embedded images | Pass | 32 references; all resolve below `docs/assets/images/` |
 | Old `docs/images/` use | Pass with retained history | 10 historical Markdown files; 0 inbound Markdown links |
 | Secret-path tracking | Partial; new gap recorded | Only placeholders are tracked, but WROOM `data/aws` staging lacks an explicit ignore rule |
-| Whitespace/error check | Pending final commit | `git diff --check` is run before commit and repeated afterward |
+| Commit whitespace/error check | Pass | `git diff-tree --check 0230da1^ 0230da1` returned no findings |
 
 The checks are static filesystem and Git inspections. No dependency installation,
 build, upload, device command, network request or AWS action was performed.
@@ -42,9 +45,9 @@ build, upload, device command, network request or AWS action was performed.
 | Device identity and user authorization are separate | Pass | X.509 Thing identity is distinct from user-to-vehicle access |
 | Beta instructions protect secrets | Pass | Support rules prohibit requesting keys, tokens and unredacted exports |
 | Images use canonical asset tree | Pass | 32 of 32 embedded image references use canonical assets |
-| Internal Markdown links resolve | Pass | 0 broken local links across 423 Markdown files |
-| `git diff --check` | Pending final commit | Must pass again on the committed validation tree |
-| Validation is commit-specific | Pass after final record | Exact validated commit is appended after the first closeout commit |
+| Internal Markdown links resolve | Pass | 0 broken local links across 424 Markdown files |
+| `git diff --check` | Pass | Staged check and committed-tree check returned no findings |
+| Validation is commit-specific | Pass | Substantive closeout tree validated at `0230da1` |
 | Historical conflicts are queued | Pass | ADR, AWS, LTE, hardware and screenshot questions are recorded |
 
 ## Open implementation and release gates
