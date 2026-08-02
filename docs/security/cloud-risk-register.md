@@ -22,14 +22,16 @@ not a penetration test and does not assert that the current template is deployed
 | CLOUD-011 | MFA disabled | Cognito template sets `MfaConfiguration: OFF` | Account protection relies on password/email recovery | Decide beta and production MFA policy |
 | CLOUD-012 | Refresh flow unused | Dashboard stores but does not use refresh token | Re-login after expiry; retained token adds limited benefit | Decide session lifecycle before onboarding release |
 | CLOUD-013 | DynamoDB recovery controls absent | No PITR/deletion protection declared | State loss/recovery behaviour undefined | Evaluate after data classification and beta needs |
-| CLOUD-014 | WROOM credential staging is not ignored | Upload tool copies four files into `firmware/esp32-wroom/data/aws`; `.gitignore` covers LilyGO staging but not the WROOM directory | A failed/interrupted or manually staged credential set could be accidentally committed | Add symmetric ignore rule before the next WROOM credential upload and verify with `git check-ignore` |
+| CLOUD-014 | WROOM credential staging was not ignored | Upload tool copies four files into `firmware/esp32-wroom/data/aws`; SPR-0005.A added the missing rule | Accidental commit risk mitigated for known staging names | Resolved locally; retain `git check-ignore` release check |
+| CLOUD-015 | Shared credential uploader lacked WROOM assignment guards | Tool accepted mismatched `device.json.thingName` and arbitrary environment | Credentials could be uploaded to the wrong Thing/firmware target | Resolved locally with fail-closed validation and unit tests; no upload performed |
 
 ## Priority boundary
 
 CLOUD-001 is the blocker for multiple mutually untrusted beta users. CLOUD-002,
-CLOUD-003, CLOUD-004, CLOUD-014 and beta credential handling require review before
-a public or shared portal release. Other findings may be accepted temporarily with
-an explicit rationale and bounded beta scope.
+CLOUD-003, CLOUD-004 and beta credential handling require review before a public or
+shared portal release. CLOUD-014/CLOUD-015 are locally resolved but require review
+of the committed change before any credential upload. Other findings may be
+accepted temporarily with an explicit rationale and bounded beta scope.
 
 ## Relationship to documentation
 

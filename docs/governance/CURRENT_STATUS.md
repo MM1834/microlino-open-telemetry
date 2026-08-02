@@ -19,9 +19,9 @@ revision.
 
 ## Current product direction
 
-MOT is preparing a small ESP32-WROOM beta fleet. The immediate engineering focus
-is documentation consolidation, followed by secure user and device onboarding in
-the portal website. Onboarding is not planned for the firmware's local WebUI.
+MOT is preparing a small ESP32-WROOM beta fleet. The active engineering focus is
+SPR-0005: WROOM beta evidence and secure portal user/device onboarding proceed as
+parallel workstreams. Onboarding is not planned for the firmware's local WebUI.
 
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and

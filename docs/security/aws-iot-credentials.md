@@ -55,10 +55,10 @@ Prototype options:
 For an end-user release, prefer protected device storage rather than shared credentials compiled into public firmware binaries.
 
 The current beta tooling uses ignored source directories and temporary LittleFS
-staging. The LilyGO staging directory is explicitly ignored; static review found no
-equivalent WROOM `data/aws` rule. Add and verify that rule before the next WROOM
-credential upload. Git ignore is not encryption and is accepted only as a temporary
-provisioning workflow.
+staging. SPR-0005.A added symmetric WROOM and LilyGO staging rules and fail-closed
+Thing-name/environment validation to the shared uploader. Review the committed
+change and repeat `git check-ignore` before the next credential upload. Git ignore
+is not encryption and remains only a temporary provisioning control.
 
 ## Rotation and ownership transfer
 

@@ -12,6 +12,14 @@
 
 ## High priority
 
+### Execute SPR-0005 beta readiness and portal onboarding
+
+**Active sprint:** [SPR-0005 — ESP32-WROOM Beta Readiness and Portal Onboarding](../project/sprints/SPR-0005.md)
+
+**Execution model:** Credential safety and WROOM build/device evidence run in
+parallel with ONB-001 authorization/onboarding. Both lanes converge at the beta
+release gate; neither substitutes for the other.
+
 ### Consolidate repository documentation — complete
 
 **Objective:** Establish one current documentation generation and preserve older
@@ -42,6 +50,8 @@ runbook.
 **Expected outcome:** Individually identifiable devices can be provisioned,
 recovered and supported without sharing credentials.
 
+**Current workstream:** SPR-0005.A through SPR-0005.D.
+
 ### Implement portal user and device onboarding
 
 **Objective:** Add secure account onboarding, device claiming and per-user vehicle
@@ -62,6 +72,8 @@ as an Internet-facing extension of the firmware's local WebUI.
 
 **Current status:** Authentication and telemetry APIs exist. Ownership enforcement,
 registration and claiming do not.
+
+**Current workstream:** ONB-001 within SPR-0005.
 
 ## Medium priority
 

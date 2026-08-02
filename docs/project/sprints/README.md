@@ -4,7 +4,11 @@
 >
 > **Audience:** Maintainer and auditor
 
-## Active documentation work
+## Active implementation work
+
+- [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
+
+## Completed documentation work
 
 - [DOC-001 — Documentation consolidation and beta baseline](DOC-001.md)
 

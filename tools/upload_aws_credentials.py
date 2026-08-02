@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,32 @@ FILES = (
     "device-private-key.pem.key",
     "device.json",
 )
+
+AWS_ENVIRONMENTS = {
+    "esp32-wroom": "esp32dev-aws",
+    "lilygo-t-a7670": "T-A7670X-AWS",
+}
+
+
+def select_environment(firmware: str, requested: str | None) -> str:
+    expected = AWS_ENVIRONMENTS[firmware]
+    environment = requested or expected
+    if environment != expected:
+        raise ValueError(
+            f"Environment {environment!r} is not the AWS provisioning target "
+            f"for {firmware!r}; expected {expected!r}"
+        )
+    return environment
+
+
+def validate_device_metadata(source: Path, thing_name: str) -> None:
+    try:
+        metadata = json.loads((source / "device.json").read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("device.json is missing, unreadable or invalid") from exc
+
+    if metadata.get("thingName") != thing_name:
+        raise ValueError("device.json thingName does not match requested Thing")
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -32,18 +59,22 @@ def main() -> int:
     project = root / "firmware" / args.firmware
     destination = project / "data/aws"
 
-    env = args.environment
-    if not env:
-        env = (
-            "esp32dev-aws"
-            if args.firmware == "esp32-wroom"
-            else "T-A7670X-AWS"
-        )
+    try:
+        env = select_environment(args.firmware, args.environment)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
 
     missing = [name for name in FILES if not (source / name).is_file()]
     if missing:
         print("Missing credential files:", ", ".join(missing))
         return 1
+
+    try:
+        validate_device_metadata(source, args.thing_name)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
 
     destination.mkdir(parents=True, exist_ok=True)
 
