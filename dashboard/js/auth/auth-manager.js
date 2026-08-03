@@ -221,6 +221,13 @@
         }
         return session.accessToken;
       },
+      hasGroup(groupName) {
+        if (!session || tokenStore.isExpired(session)) return false;
+        const claims = decodeJwtPayload(session.accessToken) || {};
+        const value = claims['cognito:groups'];
+        const groups = Array.isArray(value) ? value : (value ? [value] : []);
+        return groups.map(String).includes(String(groupName));
+      },
       isAuthenticated() { return Boolean(session?.accessToken) && !tokenStore.isExpired(session); },
       isConfigured,
       getLastError() { return lastError; },

@@ -33,7 +33,7 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "dashboard/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260803-2", source)
+        self.assertIn("aws-backend-provider.js?v=20260803-3", source)
 
 
 class DashboardOnboardingTests(unittest.TestCase):
@@ -51,6 +51,18 @@ class DashboardOnboardingTests(unittest.TestCase):
     def test_example_has_separate_onboarding_api(self) -> None:
         source = CONFIG_EXAMPLE.read_text(encoding="utf-8")
         self.assertIn("onboardingApiBaseUrl:", source)
+
+    def test_admin_claim_ui_requires_token_group_and_backend(self) -> None:
+        auth = (ROOT / "dashboard/js/auth/auth-manager.js").read_text()
+        provider = (ROOT / "dashboard/js/providers/aws-backend-provider.js").read_text()
+        app = (ROOT / "dashboard/js/app.js").read_text()
+        html = (ROOT / "dashboard/index.html").read_text()
+        self.assertIn("hasGroup(groupName)", auth)
+        self.assertIn("auth.hasGroup?.('mot-beta-admins')", app)
+        self.assertIn("async issueClaim(vehicleId)", provider)
+        self.assertIn("'/api/onboarding/claims'", provider)
+        self.assertIn('id="onboarding-admin"', html)
+        self.assertIn('id="admin-claim-output"', html)
 
 
 if __name__ == "__main__":

@@ -82,6 +82,39 @@
     }
   }
 
+  function renderOnboardingAdmin(message = '') {
+    const panel = $('onboarding-admin');
+    if (!panel || !auth) return;
+    panel.hidden = !(auth.isAuthenticated() && auth.hasGroup?.('mot-beta-admins'));
+    const status = $('admin-claim-status');
+    if (status && message) status.textContent = message;
+  }
+
+  async function issueOnboardingClaim(event) {
+    event.preventDefault();
+    if (state.onboardingBusy || !state.dataProvider?.issueClaim) return;
+    const vehicleId = String($('admin-vehicle-id')?.value || '').trim();
+    const output = $('admin-claim-output');
+    state.onboardingBusy = true;
+    if (output) { output.hidden = true; output.textContent = ''; }
+    renderOnboardingAdmin('Claim wird erstellt…');
+    try {
+      const result = await state.dataProvider.issueClaim(vehicleId);
+      if (output) { output.textContent = result.claim || ''; output.hidden = false; }
+      renderOnboardingAdmin(`Claim für ${result.vehicleId} erstellt; gültig bis ${new Date(result.expiresAt * 1000).toLocaleString()}.`);
+    } catch (error) {
+      renderOnboardingAdmin(error?.message || 'Claim-Ausgabe fehlgeschlagen');
+    } finally {
+      state.onboardingBusy = false;
+    }
+  }
+
+  function clearIssuedClaim() {
+    const output = $('admin-claim-output');
+    if (output) { output.textContent = ''; output.hidden = true; }
+    renderOnboardingAdmin('Claim-Anzeige wurde geleert.');
+  }
+
   async function beginLogin() {
     if (!auth || state.authBusy) return;
     state.authBusy = true;
@@ -702,6 +735,8 @@ function startDataProvider() {
   $('auth-login')?.addEventListener('click', beginLogin);
   $('auth-logout')?.addEventListener('click', beginLogout);
   $('onboarding-form')?.addEventListener('submit', submitOnboarding);
+  $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
+  $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
   async function bootstrap() {
     initStatic();
     resetDashboardForVehicle(state.selectedVehicleId);
@@ -722,6 +757,7 @@ function startDataProvider() {
         setOnline(false, 'Anmeldung erforderlich');
         return;
       }
+      renderOnboardingAdmin();
     }
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();

@@ -108,6 +108,23 @@
         </form>
       </section>
 
+      <section id="onboarding-admin" class="card onboarding-card" hidden>
+        <div>
+          <h1>Beta-Onboarding verwalten</h1>
+          <p>Erstellt einen einmaligen Claim für eine kontrollierte Fahrzeug-ID. Der Code wird nur hier angezeigt.</p>
+        </div>
+        <form id="admin-claim-form" class="onboarding-form" autocomplete="off">
+          <label for="admin-vehicle-id">Fahrzeug-ID</label>
+          <div class="onboarding-input-row">
+            <input id="admin-vehicle-id" name="vehicleId" required pattern="[a-z0-9][a-z0-9-]{0,63}" autocomplete="off" />
+            <button class="auth-button" type="submit">Claim erstellen</button>
+          </div>
+          <code id="admin-claim-output" class="claim-output" hidden></code>
+          <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
+          <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
+        </form>
+      </section>
+
       <section id="overview" class="hero card">
         <div class="hero-image-wrap"><img id="hero-image" src="img/microlino.jpeg" alt="Microlino" /></div>
         <div class="hero-title"><h1 id="vehicle-name">Microlino Pioneer</h1><p>Dein Microlino. Immer im Blick.</p></div>
@@ -205,11 +222,11 @@
   <script src="config.js"></script>
   <script src="js/auth/pkce.js"></script>
   <script src="js/auth/token-store.js"></script>
-  <script src="js/auth/auth-manager.js"></script>
+  <script src="js/auth/auth-manager.js?v=20260803-1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260803-2"></script>
-  <script src="js/app.js?v=20260803-1"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260803-3"></script>
+  <script src="js/app.js?v=20260803-2"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js"></script>

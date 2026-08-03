@@ -195,6 +195,10 @@
         return result;
       },
 
+      async issueClaim(vehicleId) {
+        return post('/api/onboarding/claims', { vehicleId });
+      },
+
       stop() {
         stopped = true;
         callbacksRef = null;
