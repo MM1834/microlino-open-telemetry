@@ -1,6 +1,6 @@
 # ONB-001.A Authorization Validation Plan
 
-> **Status:** Development deployment complete; authenticated multi-user checks pending
+> **Status:** Complete for the controlled development authorization foundation
 >
 > **Audience:** Backend developer, security reviewer and beta tester coordinator
 
@@ -93,7 +93,7 @@ deployment or runtime evidence. Any cross-user data disclosure blocks beta relea
 
 | Check | Result | Evidence |
 |---|---|---|
-| Local runtime and structural suites | Pass | 16 tests |
+| Local runtime and structural suites | Pass | 22 tests at completion |
 | AWS template validation | Pass | `eu-north-1` |
 | First Change Set | Fail safely | AWS rejected an attempted GSI projection change and rolled the stack back |
 | Corrected Change Set | Pass | `onb-001-a-20260802-2`; no deletes or replacements |
@@ -111,9 +111,22 @@ deployment or runtime evidence. Any cross-user data disclosure blocks beta relea
 | Logout destination | Pass | Portal first reused `/callback`; then effective app-client drift omitted localhost. Dedicated `/` URI is registered, receives HTTP 302 and passed both controlled-user browser tests |
 | Session reload | Pass | Authenticated session survives a normal reload and retains the same single-vehicle scope |
 | Logout plus browser Back | Pass | Vehicle data is not restored; a new login is required |
-| Guessed-ID REST/WebSocket isolation | Not run | Requires controlled in-session negative-test path |
+| Cross-user guessed-ID REST isolation | Pass | Both deployed handler directions returned the same non-enumerating 404 `vehicle_not_found` |
+| Cross-user WebSocket isolation | Pass | Deployed handler rejected a controlled foreign vehicle connection with 401 and removed its record |
+| Expired WebSocket connection | Pass | Deployed handler rejected a controlled expired connection with 401 and removed its record |
 | Live assignment revocation: REST/list | Pass | Snapshot changed to HTTP 404 within the polling interval; reload showed no assigned vehicle |
 | Live assignment revocation: WebSocket | Pass after correction | Initial test remained visibly connected. Deployed handler heartbeat/fan-out now actively close revoked connections; real `pioneer` retest removed vehicle, CLOUD, LIVE, telemetry and OBD2 without reload |
 | Assignment restoration | Pass | Conditional `REVOKED` to `ACTIVE`; `pioneer`, CLOUD, LIVE, telemetry and OBD2 returned automatically without reload |
+| Empty/onboarding-required state | Pass | During controlled revoke, the authenticated portal showed no vehicle and disclosed no foreign ID |
+| Completion log privacy check | Pass | Zero `access_token` and test-email-domain term hits in relevant post-deployment Lambda logs |
 
 No email, token, password, certificate or private key is recorded in this evidence.
+
+## Completion decision
+
+ONB-001.A is accepted for the controlled development environment on 2026-08-03.
+It proves server-side assignment enforcement, two-user isolation, guessed-ID denial,
+bounded live revocation and expired-connection rejection. Public claiming,
+invitation administration, transfer/replacement, MFA, refresh-session policy,
+production hosting/CORS and device credential lifecycle remain outside this slice
+and continue in ONB-001.B or the security backlog.

@@ -71,8 +71,8 @@ as an Internet-facing extension of the firmware's local WebUI.
 - audit events and support-safe diagnostics.
 
 **Current status:** Authentication, telemetry APIs and controlled ownership
-enforcement are deployed in development. Registration, claiming and authenticated
-two-user isolation evidence remain open.
+enforcement are deployed and two-user validated in development. Registration,
+claiming, transfer/replacement and production release controls remain open.
 
 **Current workstream:** ONB-001 within SPR-0005.
 

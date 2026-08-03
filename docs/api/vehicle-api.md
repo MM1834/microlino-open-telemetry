@@ -1,6 +1,6 @@
 # Vehicle REST API
 
-> **Status:** Deployed to the AWS development stack; multi-user runtime validation pending
+> **Status:** Deployed and multi-user validated in the controlled AWS development stack
 >
 > **Audience:** Portal developer, backend developer and administrator
 >
@@ -10,8 +10,8 @@
 
 API Gateway validates a Cognito JWT before vehicle requests reach the Lambda.
 ONB-001.A additionally derives the Cognito `sub` in Lambda and checks server-side
-`UserVehicleAccess` assignments. The enforcement is deployed in development; live
-cross-user negative tests remain required before mutually untrusted beta use.
+`UserVehicleAccess` assignments. The development deployment passed symmetric
+cross-user list and guessed-ID negative tests.
 
 ## Endpoints
 

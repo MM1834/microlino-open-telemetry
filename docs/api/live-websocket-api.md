@@ -1,6 +1,6 @@
 # Live WebSocket API
 
-> **Status:** Deployed to the AWS development stack; multi-user runtime validation pending
+> **Status:** Deployed and multi-user validated in the controlled AWS development stack
 >
 > **Audience:** Portal developer, backend developer and administrator
 >
@@ -77,8 +77,8 @@ part of authorization.
 
 ## Deployment gate
 
-ONB-001.A is deployed. It must still be tested live across two users, reconnects,
-expiry, revocation and guessed vehicle IDs before multi-user beta use.
+ONB-001.A passed controlled two-user isolation, guessed vehicle, expiry and live
+revoke/restore tests. Production configuration must repeat the security gate.
 
 ## Related documents
 

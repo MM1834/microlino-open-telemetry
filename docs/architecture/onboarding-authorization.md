@@ -1,6 +1,6 @@
 # Portal Onboarding Authorization Foundation
 
-> **Status:** Deployed to the controlled AWS development stack; end-to-end multi-user validation remains open
+> **Status:** Deployed and end-to-end validated in the controlled AWS development stack
 >
 > **Audience:** Portal, backend and security developer
 
@@ -57,8 +57,9 @@ The template has no wildcard CORS or localhost callback/logout defaults. Deploym
 must supply exact environment values. The development deployment uses the exact
 `http://localhost:8080` origin and matching local callback/logout URLs. Local tests
 compile all inline Lambda code and exercise cross-user REST/WebSocket denial, expiry
-and revocation. Deployment and unauthenticated smoke checks passed; authenticated
-two-user/two-vehicle validation remains an explicit gate.
+and revocation. Deployment, smoke checks and authenticated two-user/two-vehicle
+validation passed in the controlled development stack. Production configuration
+must repeat the gate.
 
 ## Related documents
 

@@ -9,7 +9,7 @@ not a penetration test and does not assert that the current template is deployed
 
 | ID | Finding | Evidence | Consequence | Required next decision |
 |---|---|---|---|---|
-| CLOUD-001 | Multi-user isolation not yet proven end to end | ONB-001.A is deployed with controlled assignments; local negative tests pass, but only one confirmed Cognito identity exists | A deployment defect could remain undiscovered before mutually untrusted beta access | Create a second controlled identity and execute REST/WebSocket cross-user tests |
+| CLOUD-001 | Multi-user isolation was not proven end to end | Resolved in controlled development 2026-08-03: two confirmed identities, exclusive lists, symmetric guessed-ID denial, live revoke/restore and expiry rejection passed | Original cross-user disclosure blocker is removed for the tested stack | Retain regression gates and repeat against the production portal configuration |
 | CLOUD-002 | WebSocket access token in query string | `$connect` identity source is `access_token`; dashboard adds token to URL | Token may appear in intermediary/access logs | Review transport pattern and logging/redaction |
 | CLOUD-003 | Production portal origin not yet defined | Development CORS is deployed as exact `http://localhost:8080`; no hosted portal was found | A production deploy cannot be safely configured yet | Select hosting and supply its exact HTTPS origin/callback/logout URLs |
 | CLOUD-004 | Deployed state can drift from stack parameters | Read-only inventory and ONB-001.A deployment completed 2026-08-02; later logout testing found app-client URL drift despite stale CloudFormation parameter values | Parameter inspection alone can falsely indicate a safe effective configuration | Compare effective resources with parameters at release gates; localhost and both retained portal URLs were reconciled 2026-08-02 |
@@ -27,9 +27,9 @@ not a penetration test and does not assert that the current template is deployed
 
 ## Priority boundary
 
-CLOUD-001 is the blocker for multiple mutually untrusted beta users. CLOUD-002,
-CLOUD-003, CLOUD-004 and beta credential handling require review before a public or
-shared portal release. CLOUD-014/CLOUD-015 are locally resolved but require review
+CLOUD-001 is resolved for the controlled development stack. CLOUD-002, CLOUD-003,
+CLOUD-004 and beta credential handling require review before a public or shared
+portal release. CLOUD-014/CLOUD-015 are locally resolved but require review
 of the committed change before any credential upload. Other findings may be
 accepted temporarily with an explicit rationale and bounded beta scope.
 
