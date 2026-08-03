@@ -1,5 +1,5 @@
 // Public browser configuration for the controlled MOT beta portal.
-// Copy this file to config.js in the uploaded MOTbeta directory.
+// Copy this file to config.js in the uploaded motbeta directory.
 window.MOT_CONFIG = {
   dataSource: { type: "aws-backend" },
   mqtt: { topicPrefix: "mot", vehicleId: "pioneer" },
@@ -20,8 +20,8 @@ window.MOT_CONFIG = {
     authorizeEndpoint: "https://mot-dev-002581114110-eu-north-1.auth.eu-north-1.amazoncognito.com/oauth2/authorize",
     tokenEndpoint: "https://mot-dev-002581114110-eu-north-1.auth.eu-north-1.amazoncognito.com/oauth2/token",
     logoutEndpoint: "https://mot-dev-002581114110-eu-north-1.auth.eu-north-1.amazoncognito.com/logout",
-    redirectUri: "https://www.microlino-open-telemetry.ch/MOTbeta/callback/",
-    logoutUri: "https://www.microlino-open-telemetry.ch/MOTbeta/",
+    redirectUri: "https://www.microlino-open-telemetry.ch/motbeta/callback/",
+    logoutUri: "https://www.microlino-open-telemetry.ch/motbeta/",
     scopes: ["openid", "email", "profile"]
   },
   vehicle: {

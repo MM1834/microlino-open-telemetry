@@ -10,7 +10,7 @@
 - There is no `deploy` branch. A deployed environment must be recorded against an
   exact commit; deployment state is not inferred from a branch name.
 
-Portal paths such as `/MOTbeta/` identify hosted environments, not Git branches.
+Portal paths such as `/motbeta/` identify hosted environments, not Git branches.
 Pilot users are operationally supported early users, not a separate account type.
 
 ## Feature integration

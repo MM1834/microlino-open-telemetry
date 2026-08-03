@@ -24,11 +24,11 @@ class DashboardLogoutConfigurationTests(unittest.TestCase):
     def test_beta_config_uses_exact_hosted_paths(self) -> None:
         source = BETA_CONFIG_EXAMPLE.read_text(encoding="utf-8")
         self.assertIn(
-            'redirectUri: "https://www.microlino-open-telemetry.ch/MOTbeta/callback/"',
+            'redirectUri: "https://www.microlino-open-telemetry.ch/motbeta/callback/"',
             source,
         )
         self.assertIn(
-            'logoutUri: "https://www.microlino-open-telemetry.ch/MOTbeta/"',
+            'logoutUri: "https://www.microlino-open-telemetry.ch/motbeta/"',
             source,
         )
         self.assertNotIn("localhost", source)

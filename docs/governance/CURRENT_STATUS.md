@@ -84,7 +84,7 @@ Implemented and validated in the controlled AWS development stack:
 - server-side user-to-vehicle authorization for REST and WebSocket;
 - atomic, expiring single-use vehicle claim flow;
 - controlled administrator claim issuance;
-- hosted Cognito login/logout and per-user vehicle isolation at `/MOTbeta/`;
+- hosted Cognito login/logout and per-user vehicle isolation at `/motbeta/`;
 - exact HTTPS CORS for the canonical `www` portal origin.
 
 Not implemented:

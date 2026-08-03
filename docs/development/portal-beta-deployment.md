@@ -4,12 +4,12 @@ Status: AWS configuration deployed; portal upload pending
 
 The controlled beta portal is hosted separately from the existing dashboard:
 
-- portal: `https://www.microlino-open-telemetry.ch/MOTbeta/`
-- OAuth callback: `https://www.microlino-open-telemetry.ch/MOTbeta/callback/`
-- post-logout destination: `https://www.microlino-open-telemetry.ch/MOTbeta/`
+- portal: `https://www.microlino-open-telemetry.ch/motbeta/`
+- OAuth callback: `https://www.microlino-open-telemetry.ch/motbeta/callback/`
+- post-logout destination: `https://www.microlino-open-telemetry.ch/motbeta/`
 - exact API CORS origin: `https://www.microlino-open-telemetry.ch`
 
-The origin contains only scheme and host. URL paths such as `/MOTbeta/` do not
+The origin contains only scheme and host. URL paths such as `/motbeta/` do not
 belong in a CORS origin.
 
 ## Deployment boundary
@@ -21,12 +21,12 @@ manual operator action using FileZilla with FTP over TLS. The existing
 ## Prepare the local upload directory
 
 1. Make a local copy of the complete `dashboard/` directory.
-2. Name the copied directory `MOTbeta`.
+2. Name the copied directory `motbeta`.
 3. In that copy, replace `config.js` with the contents of
    `dashboard/config.beta.example.js`.
 4. Do not upload local backups, logs, credentials, `.env` files, or files from
    `secrets/`.
-5. Upload the contents to the web-server directory that maps to `/MOTbeta/`.
+5. Upload the contents to the web-server directory that maps to `/motbeta/`.
 
 The Cognito identifiers and API endpoints in the browser configuration are
 public application coordinates, not device or AWS credentials.
@@ -63,11 +63,11 @@ configuration is active.
 
 After upload and AWS configuration:
 
-1. Open `/MOTbeta/` in a private browser window.
+1. Open `/motbeta/` in a private browser window.
 2. Verify login and password flow with a beta account.
 3. Verify that the user sees only assigned vehicles.
 4. Verify admin claim controls are visible only to `mot-beta-admins`.
-5. Verify logout returns to `/MOTbeta/` without a Cognito error page.
+5. Verify logout returns to `/motbeta/` without a Cognito error page.
 6. Use browser Back after logout and verify that vehicle data is not restored.
 7. Verify onboarding claim issue and consumption with a controlled test
    assignment.
@@ -84,12 +84,12 @@ The hosted portal was tested through the canonical `www` URL with
 - portal loading and Cognito login passed;
 - only the assigned vehicle `beta-01` was visible;
 - vehicle data loaded as expected;
-- logout returned to `/MOTbeta/` without a Cognito error page;
+- logout returned to `/motbeta/` without a Cognito error page;
 - the signed-out portal did not expose the previous authenticated state.
 
 The non-`www` host currently serves the same files without redirecting to the
 canonical `www` host. Until a server-side redirect is configured, all portal
-links and tests must use `https://www.microlino-open-telemetry.ch/MOTbeta/`.
+links and tests must use `https://www.microlino-open-telemetry.ch/motbeta/`.
 
 ### Confirmed admin smoke test, 2026-08-03
 
@@ -102,7 +102,22 @@ The hosted portal was tested with the beta administrator
 - attempting to issue a claim for the actively assigned `beta-01` returned
   `Fahrzeug ist bereits zugewiesen oder nicht verfügbar`;
 - no claim was issued and the existing assignment remained protected;
-- logout returned to `/MOTbeta/` without an error page.
+- logout returned to `/motbeta/` without an error page.
 
 This confirms the hosted role separation, vehicle isolation, onboarding API
 connectivity, and active-assignment conflict guard.
+
+### Lowercase path migration, 2026-08-03
+
+The pilot path was migrated from `/MOTbeta/` to the hosting-compatible lowercase
+path `/motbeta/`. Change set `motbeta-lowercase-path-20260803` added the lowercase
+callback and logout URLs without replacing the Cognito app client. Hosted loading,
+login, logout and the non-`www` browser check passed, and the old uppercase server
+directory was removed after validation.
+
+An independent HTTP check still receives `200` directly from
+`https://microlino-open-telemetry.ch/motbeta/` rather than a server-side `301` to
+the canonical `www` host. Safari may visually hide `www` and may reuse cached/HSTS
+navigation, so its address-bar presentation is not redirect evidence. The Plesk
+preferred-domain setting remains a release gate until a fresh HTTP client observes
+the HTTPS non-`www` to `www` redirect.
