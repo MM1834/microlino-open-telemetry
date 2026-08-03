@@ -76,6 +76,20 @@ Production-host access logs must not retain OAuth `code`, `state`, or claim
 proof values. Verify query-string redaction and retention with the hosting
 provider before treating the beta portal as operational.
 
+### Confirmed hosting log exposure, 2026-08-03
+
+After controlled hosted login tests, the maintainer confirmed that both
+`access_ssl_log` and `proxy_access_ssl_log` contain the `/motbeta/callback/`
+query names `code` and `state`. No values were copied into project records.
+Successfully exchanged authorization codes are single use and PKCE-bound, but
+their presence in two access logs confirms CLOUD-017 rather than resolving it.
+
+The available hosting UI exposes log rotation but no callback-path exclusion or
+query-string redaction. Before external pilot accounts are admitted, obtain a
+provider-side logging change or record an explicit short-retention exception with
+restricted log access and a deletion schedule. Claim proofs remain prohibited in
+URLs and logs regardless of any OAuth exception.
+
 ### Confirmed end-user smoke test, 2026-08-03
 
 The hosted portal was tested through the canonical `www` URL with
