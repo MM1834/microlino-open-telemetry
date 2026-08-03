@@ -9,9 +9,9 @@ not a penetration test and does not assert that the current template is deployed
 
 | ID | Finding | Evidence | Consequence | Required next decision |
 |---|---|---|---|---|
-| CLOUD-001 | Multi-user isolation was not proven end to end | Resolved in controlled development 2026-08-03: two confirmed identities, exclusive lists, symmetric guessed-ID denial, live revoke/restore and expiry rejection passed | Original cross-user disclosure blocker is removed for the tested stack | Retain regression gates and repeat against the production portal configuration |
+| CLOUD-001 | Multi-user isolation was not proven end to end | Resolved in controlled development 2026-08-03 and repeated through the production `/dashboard/` portal on 2026-08-04 for both users and all three devices | Original cross-user disclosure blocker is removed for the tested stack | Retain regression gates for future authorization changes |
 | CLOUD-002 | WebSocket access token in query string | `$connect` identity source is `access_token`; dashboard adds token to URL | Token may appear in intermediary/access logs | Review transport pattern and logging/redaction |
-| CLOUD-003 | Production portal origin not yet defined | Resolved for the controlled portal on 2026-08-03: effective Cognito URLs and both API CORS configurations use the exact canonical `www` HTTPS host | Original undefined-origin blocker is removed; non-`www` still serves TLS content directly because available Domaincenter rules do not precede the Plesk vHost | Bounded pilot exception accepted 2026-08-03; publish only `www` links and revisit server-side canonicalization before general promotion |
+| CLOUD-003 | Production portal origin not yet defined | Resolved for the controlled portal on 2026-08-03: effective Cognito URLs and both API CORS configurations use the exact canonical `www` HTTPS host; `/dashboard/` production-path acceptance passed 2026-08-04 | Original undefined-origin blocker is removed; non-`www` still serves TLS content directly because available Domaincenter rules do not precede the Plesk vHost | Bounded pilot exception accepted 2026-08-03; publish only `www` links and revisit server-side canonicalization before broader public rollout |
 | CLOUD-004 | Deployed state can drift from stack parameters | Read-only inventory and ONB-001.A deployment completed 2026-08-02; later logout testing found app-client URL drift despite stale CloudFormation parameter values | Parameter inspection alone can falsely indicate a safe effective configuration | Compare effective resources with parameters at release gates; localhost and both retained portal URLs were reconciled 2026-08-02 |
 | CLOUD-005 | Shared live authorizer/handler IAM role | ONB-001.A deployed a separate log-only authorizer role | Original excess-permission finding is remediated in development | Verify effective IAM policy during post-deploy review |
 | CLOUD-006 | API Gateway access logging not declared | Stage resources lack access-log settings | Limited auditability; token logging behaviour unknown | Define privacy-safe access-log policy |
@@ -45,7 +45,8 @@ REL-001 pilot while the hosting provider request remains unanswered.
 The acceptance is limited to:
 
 - directly invited and supported pilot accounts; no public self-registration;
-- the `/motbeta/` portal and its Cognito Authorization Code + PKCE flow;
+- the `/dashboard/` pilot portal, the retained `/motbeta/` fallback and their
+  Cognito Authorization Code + PKCE flow;
 - no claim proof, token, password or device credential in application URLs;
 - access to hosting logs restricted to the maintainer's hosting account;
 - no copying of callback query values into tickets, screenshots, repository

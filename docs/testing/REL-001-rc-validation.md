@@ -37,14 +37,14 @@ previously separate `main` Governance-1.0 ancestry.
 - CLOUD-017 has an explicit invitation-only pilot acceptance and remains open for
   durable provider remediation before public rollout.
 
-## Remaining release operations
+## Completed release operations
 
-- create and push the annotated `rel-001-pilot.1` tag on the final release-closure
-  commit;
-- promote the validated portal from `/motbeta/` to `/dashboard/` only after a
-  complete FTPS backup and rollback check;
-- keep `/` as the project landing page and do not overwrite it during portal
-  promotion.
+- the annotated `rel-001-pilot.1` tag was created and pushed on the final
+  release-closure commit;
+- the validated portal package was promoted from `/motbeta/` to `/dashboard/` on
+  2026-08-04 after a complete FTPS backup;
+- `/` remained the project landing page and `/motbeta/` remained available as the
+  validated fallback.
 
 ## Final hosted smoke test
 
@@ -67,6 +67,17 @@ The maintainer approved proceeding to a reviewed `develop` to `main` promotion P
 This approval retains the bounded CLOUD-017 pilot acceptance and does not approve
 public self-registration or general public rollout.
 
+## Production-path hosted acceptance
+
+After PR #10 was merged to `develop` and PR #11 was merged to `main`, the
+maintainer uploaded the reviewed package to
+`https://www.microlino-open-telemetry.ch/dashboard/` using FileZilla with FTP over
+TLS. On 2026-08-04 the maintainer confirmed successful tests for both users and all
+three devices across the landing page at `/`, the production portal at
+`/dashboard/` and the retained fallback at `/motbeta/`. Login, assigned vehicle
+visibility, live/cloud state and logout behaved as expected. No rollback was
+required.
+
 ## Pilot support and device boundary
 
 The repository/hosting maintainer is the first-line support and escalation owner
@@ -81,9 +92,8 @@ an explicit user/vehicle assignment plan and a new handoff record.
 
 ## Manual portal rollback
 
-- keep the existing `/dashboard/` server directory untouched during the pilot;
-- before replacing hosted pilot files, download or rename the current `/motbeta/`
-  directory as a server-side/operator backup without committing its `config.js`;
+- before replacing hosted production files, download or rename the current
+  `/dashboard/` directory as an operator backup without committing its `config.js`;
 - if the new upload fails, restore that complete directory through FileZilla FTPS;
 - retain the currently registered Cognito callback/logout URL during rollback;
 - confirm login, assigned-vehicle isolation and logout after restoration;
