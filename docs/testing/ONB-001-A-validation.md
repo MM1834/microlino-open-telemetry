@@ -109,6 +109,8 @@ deployment or runtime evidence. Any cross-user data disclosure blocks beta relea
 | User B invitation, password change and vehicle list | Pass | Confirmed login; only `beta-01` visible |
 | Cross-user list isolation | Pass | Each controlled user sees only their ACTIVE assignment |
 | Logout destination | Pass | Portal first reused `/callback`; then effective app-client drift omitted localhost. Dedicated `/` URI is registered, receives HTTP 302 and passed both controlled-user browser tests |
+| Session reload | Pass | Authenticated session survives a normal reload and retains the same single-vehicle scope |
+| Logout plus browser Back | Pass | Vehicle data is not restored; a new login is required |
 | Guessed-ID REST/WebSocket isolation | Not run | Requires controlled in-session negative-test path |
 
 No email, token, password, certificate or private key is recorded in this evidence.

@@ -58,3 +58,4 @@ dashboard/**/*config*.bak
 dashboard/**/*config*.backup
 dashboard/**/*config*.copy
 dashboard/**/*config*~
+*.swp
