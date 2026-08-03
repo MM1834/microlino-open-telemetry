@@ -18,7 +18,7 @@ firmware's local WebUI.
 | Slice | Outcome | Status |
 |---|---|---|
 | ONB-001.B1 | Controlled invitation and administrator assignment | Implemented locally; apply validation pending |
-| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Deployed empty in development; functional claim validation pending |
+| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Functionally validated in controlled development |
 | ONB-001.B3 | Replacement, transfer, loss and recovery lifecycle | Design drafted; not implemented |
 
 Public self-registration, billing, fleet-wide administration, firmware-local
@@ -92,17 +92,18 @@ than adding another inline Lambda to `cloud/aws/foundation/template.yaml`.
 - [x] Claim consumption and assignment use one tested DynamoDB transaction locally.
 - [x] The separate B2 template passes AWS CloudFormation validation without creating resources.
 - [x] Empty B2 development stack passes IAM, CORS, TTL, encryption, throttling and anonymous-denial checks.
+- [x] Two-user portal issue/consume flow produces consistent claim, ownership, access and audit evidence.
 - [ ] Replacement/transfer/recovery never reuses or exposes device credentials.
-- [ ] Every production mutation produces privacy-safe audit evidence.
+- [ ] Every future B3 production mutation produces privacy-safe audit evidence.
+- [x] Every exercised B2 production mutation produced privacy-safe audit evidence.
 
-## Planned end-to-end beta validation
+## Controlled end-to-end beta validation
 
-After implementation, Change Set review and explicit approval for destructive cloud
-actions, use one controlled adapter currently assigned to `beta-01` as a clean
-onboarding case. Before removing anything, inventory and record the exact Cognito
-assignment, ownership, Thing, certificate, policy attachment and vehicle-state
-targets. Deletion or deactivation must be limited to those reviewed identifiers and
-must preserve unrelated users and the LilyGO path.
+The 2026-08-03 validation used the controlled adapter assigned to `beta-01` as a
+clean onboarding case after Change Set review and explicit approval. Before removing
+the ACTIVE assignment, the exact Cognito assignment, Thing, certificate association
+and vehicle state were inventoried. The test preserved unrelated users, the REVOKED
+history item, device credentials, telemetry and the LilyGO path.
 
 A second WROOM without GPS can validate multiple `vehicleId` assignments for one
 user. Claiming, list isolation, stale/offline state and lifecycle recovery do not
@@ -138,3 +139,4 @@ fleet lookup path.
 - [B2 claim data model](../../architecture/onboarding-claim-data-model.md)
 - [B3 device lifecycle](../../architecture/onboarding-device-lifecycle.md)
 - [B2 Change Set review](../../administrator/aws/onboarding-change-set-review.md)
+- [B2 functional validation](../../testing/ONB-001-B2-validation.md)
