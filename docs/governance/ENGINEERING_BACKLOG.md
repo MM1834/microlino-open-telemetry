@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-07-31
+**Last reviewed:** 2026-08-03
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -99,3 +99,10 @@ are reliable.
 - [CURRENT_STATUS.md](CURRENT_STATUS.md)
 - [WORK_ORDER.md](WORK_ORDER.md)
 - [SELF_REVIEW.md](SELF_REVIEW.md)
+## Cloud cost controls
+
+Grant a billing-only maintainer view or provide regular exported cost evidence,
+create a small AWS Budget alert, and measure MQTT publishes per device. CloudWatch
+observed roughly 2.78 million state-ingest Lambda invocations between 2026-07-01
+and 2026-08-04. Evaluate batching/coarser state envelopes before fleet growth; do
+not optimize the low-frequency onboarding claim path ahead of telemetry ingestion.

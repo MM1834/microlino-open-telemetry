@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://microlino-open-telemetry.example/schemas/onboarding-claim-v1.json",
+  "title": "MOT Onboarding Claim v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "claimId", "vehicleId", "proofHash", "proofSalt",
+    "status", "issuedAt", "expiresAt", "failedAttempts", "maxAttempts",
+    "issuedBySub"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "claimId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{22,64}$"},
+    "vehicleId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "proofHash": {"type": "string", "pattern": "^sha256:[A-Za-z0-9_-]{43}$"},
+    "proofSalt": {"type": "string", "pattern": "^[A-Za-z0-9_-]{22,64}$"},
+    "status": {"enum": ["ISSUED", "CONSUMED", "REVOKED", "EXPIRED"]},
+    "issuedAt": {"type": "integer", "minimum": 1},
+    "expiresAt": {"type": "integer", "minimum": 1},
+    "failedAttempts": {"type": "integer", "minimum": 0},
+    "maxAttempts": {"type": "integer", "minimum": 1, "maximum": 10},
+    "issuedBySub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "consumedAt": {"type": "integer", "minimum": 1},
+    "consumedBySub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "revokedAt": {"type": "integer", "minimum": 1},
+    "revocationReason": {
+      "enum": ["ADMIN_CANCELLED", "DEVICE_RETIRED", "ISSUED_IN_ERROR", "SECURITY_RESPONSE"]
+    },
+    "ttl": {"type": "integer", "minimum": 1}
+  }
+}

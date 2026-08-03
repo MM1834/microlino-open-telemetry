@@ -18,7 +18,7 @@ firmware's local WebUI.
 | Slice | Outcome | Status |
 |---|---|---|
 | ONB-001.B1 | Controlled invitation and administrator assignment | Implemented locally; apply validation pending |
-| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Planned |
+| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Data model drafted; not implemented |
 | ONB-001.B3 | Replacement, transfer, loss and recovery lifecycle | Planned |
 
 Public self-registration, billing, fleet-wide administration, firmware-local
@@ -108,3 +108,4 @@ than adding another inline Lambda to `cloud/aws/foundation/template.yaml`.
 - [Administrator assignments](../../auth/admin/user-vehicle-assignments.md)
 - [AWS IoT credentials](../../security/aws-iot-credentials.md)
 - [Cloud risk register](../../security/cloud-risk-register.md)
+- [B2 claim data model](../../architecture/onboarding-claim-data-model.md)
