@@ -53,7 +53,21 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "dashboard/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260803-3", source)
+        self.assertIn("aws-backend-provider.js?v=20260803-4", source)
+
+
+class DashboardFreshnessTests(unittest.TestCase):
+    def test_live_channel_is_distinct_from_obd2_value_freshness(self) -> None:
+        app = (ROOT / "dashboard/js/app.js").read_text()
+        html = (ROOT / "dashboard/index.html").read_text()
+        provider = (ROOT / "dashboard/js/providers/aws-backend-provider.js").read_text()
+        self.assertIn("Live-Kanal", html)
+        self.assertIn('id="soc-updated"', html)
+        self.assertIn("OBD2_FRESHNESS_KEYS", app)
+        self.assertIn("updateObd2Freshness()", app)
+        self.assertIn("snapshot.metadata?.[key]", provider)
+        self.assertIn("{ receivedAt: message.receivedAt }", provider)
+        self.assertIn("Stand: ${relativeTime(receivedAt)} · ${stateLabel}", app)
 
 
 class DashboardOnboardingTests(unittest.TestCase):

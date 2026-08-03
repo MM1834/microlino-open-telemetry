@@ -66,7 +66,11 @@
       const prefix = String(config.topicPrefix || 'mot').replace(/\/$/, '');
       Object.entries(snapshot.values || {}).forEach(([key, value]) => {
         const payload = typeof value === 'string' ? value : JSON.stringify(value);
-        callbacks.onMessage(`${prefix}/${vehicleId}/${key}`, payload);
+        callbacks.onMessage(
+          `${prefix}/${vehicleId}/${key}`,
+          payload,
+          snapshot.metadata?.[key] || null
+        );
       });
       callbacks.onSnapshot?.(snapshot);
     }
@@ -109,7 +113,11 @@
             const payload = typeof message.value === 'string'
               ? message.value
               : JSON.stringify(message.value);
-            callbacks.onMessage(`${prefix}/${vehicleId}/${topicSuffix}`, payload);
+            callbacks.onMessage(
+              `${prefix}/${vehicleId}/${topicSuffix}`,
+              payload,
+              { receivedAt: message.receivedAt }
+            );
             return;
           }
           callbacks.onLiveMessage?.(message);

@@ -184,6 +184,11 @@
       configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
       VEHICLE_ONLINE_MS
     );
+  const OBD2_FRESHNESS_KEYS = [
+    'display/soc',
+    'display/speed_kmh',
+    'display/odometer_km'
+  ];
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
@@ -292,13 +297,30 @@
     else if (stateName === 'connecting' || stateName === 'reconnecting') dot.classList.add('stale');
   }
 
-  function setVehicleLastSeen(value, source) {
-    const timestampMs = parseTimestampMs(value);
-    if (!timestampMs) return;
-
-    state.vehicleLastSeenMs = timestampMs;
-    state.vehicleLastSeenSource = source || '';
+  function updateObd2Freshness() {
+    let latest = 0;
+    let source = '';
+    OBD2_FRESHNESS_KEYS.forEach(key => {
+      const receivedAt = parseTimestampMs(state.metadata[key]?.receivedAt);
+      if (receivedAt > latest) {
+        latest = receivedAt;
+        source = key;
+      }
+    });
+    state.vehicleLastSeenMs = latest;
+    state.vehicleLastSeenSource = source;
     updateVehicleStatus();
+  }
+
+  function updateSocFreshness() {
+    const receivedAt = parseTimestampMs(state.metadata['display/soc']?.receivedAt);
+    if (!receivedAt) {
+      setText('soc-updated', 'Stand: unbekannt');
+      return;
+    }
+    const ageMs = Math.max(0, Date.now() - receivedAt);
+    const stateLabel = ageMs <= VEHICLE_ONLINE_MS ? 'aktuell' : 'veraltet';
+    setText('soc-updated', `Stand: ${relativeTime(receivedAt)} · ${stateLabel}`);
   }
 
   function updateDeviceInfo() {
@@ -402,6 +424,7 @@
     setText('date-now', d.toLocaleDateString(cfg.dashboard?.locale || 'de-CH'));
     setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
     updateVehicleStatus();
+    updateSocFreshness();
     if (state.values['location/latitude'] !== undefined && state.values['location/longitude'] !== undefined) {
       renderLocationStatus('mqtt');
     }
@@ -492,18 +515,17 @@
     const n = Number(s); if (s.trim() !== '' && Number.isFinite(n)) return n;
     try { return JSON.parse(s); } catch { return s; }
   }
-  function applyTopic(topic, payload) {
+  function applyTopic(topic, payload, metadata = null) {
     const base = baseTopic() + '/';
     const key = topic.startsWith(base) ? topic.slice(base.length) : topic;
     const val = parsePayload(payload);
     state.values[key] = val;
     state.lastMessage = Date.now();
-    if (
-      dataSourceCfg.type === 'legacy-mqtt' &&
-      (key.startsWith('location/') || key.startsWith('gps/'))
-    ) {
-      // A direct MQTT message is a real, newly received update. For AWS REST
-      // snapshots the authoritative timestamp comes from snapshot.metadata.
+    if (metadata?.receivedAt) {
+      state.metadata[key] = metadata;
+    } else if (dataSourceCfg.type === 'legacy-mqtt') {
+      // A direct legacy MQTT message is a newly received value. AWS REST and
+      // WebSocket updates carry their authoritative backend receivedAt value.
       state.metadata[key] = { receivedAt: Date.now() };
     }
     switch (key) {
@@ -528,12 +550,15 @@
         break;
       case 'system/last_seen_utc':
       case 'time/utc':
-        setVehicleLastSeen(val, key);
+        // Device heartbeat freshness belongs to the Cloud/device status. It must
+        // not make retained OBD2 values appear current.
         break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
       case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
       case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
     }
+    if (OBD2_FRESHNESS_KEYS.includes(key)) updateObd2Freshness();
+    if (key === 'display/soc') updateSocFreshness();
 
     window.MOTHistoryRecorder?.update(state.values, {
       vehicleId: state.selectedVehicleId || mqttCfg.vehicleId || 'pioneer'
@@ -723,7 +748,7 @@ function startDataProvider() {
       onConnection: (ok, detail) => setOnline(ok, detail),
       onLiveConnection: status => setLiveStatus(status),
       onLiveMessage: message => console.debug('MOT live control message:', message),
-      onMessage: (topic, payload) => applyTopic(topic, payload),
+      onMessage: (topic, payload, metadata) => applyTopic(topic, payload, metadata),
       onVehicles: vehicles => {
         const previous = state.selectedVehicleId;
         updateVehicleSelector(vehicles);
@@ -742,6 +767,8 @@ function startDataProvider() {
       onSnapshot: snapshot => {
         if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
         state.metadata = snapshot?.metadata || {};
+        updateObd2Freshness();
+        updateSocFreshness();
         updateCoords('mqtt');
       },
       onError: error => console.error('MOT data provider error:', error)
