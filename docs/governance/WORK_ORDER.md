@@ -8,17 +8,19 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-03
+**Last reviewed:** 2026-08-04
 
 ## High priority
 
-### Promote the hosted portal pilot — repository release complete
+### Promote the hosted portal pilot — complete
 
 **Release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
 
 **Current result:** The reviewed implementation and evidence are merged through
-`develop` into `main`. The remaining operation is the separately controlled hosted
-copy from `/motbeta/` to `/dashboard/`; `/` remains the landing page.
+`develop` into `main`. The controlled package was deployed to `/dashboard/` on
+2026-08-04 after backup of the previous directory. Both users and all three devices
+passed the hosted acceptance checks across `/`, `/dashboard/` and the retained
+`/motbeta/` fallback. `/` remains the landing page.
 
 **User terminology:** Early externally supported accounts are pilot users, not a
 separate permanent beta-user class. Their accounts and assignments may continue
