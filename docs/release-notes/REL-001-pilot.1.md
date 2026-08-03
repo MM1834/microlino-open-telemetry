@@ -1,6 +1,6 @@
-# REL-001 Portal Pilot Release Notes — Draft
+# REL-001 Portal Pilot.1 Release Notes
 
-> **Status:** Release candidate accepted; `main` promotion and tag pending
+> **Status:** Repository release promoted to `main`; annotated tag pending
 >
 > **Audience:** Pilot user, support and release reviewer
 
@@ -22,7 +22,9 @@
 - Device credentials are provisioned by the maintainer and are never given to a
   pilot user through the portal.
 - Local USB recovery remains the authoritative recovery path.
-- The pilot portal remains under `/motbeta/` until release promotion is approved.
+- The validated pilot portal remains under `/motbeta/`. The landing page remains at
+  `/`; controlled promotion of the portal to `/dashboard/` is the next hosting
+  operation and is not implied by the repository release.
 
 ## Known limitations
 

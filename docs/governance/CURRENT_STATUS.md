@@ -2,7 +2,7 @@
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Status:** Controlled portal pilot and release preparation
+**Status:** REL-001 repository pilot release; `/dashboard/` hosting promotion pending
 
 **Audience:** Maintainer and contributor
 
@@ -19,10 +19,11 @@ revision.
 
 ## Current product direction
 
-MOT is preparing a small ESP32-WROOM pilot fleet. The active engineering focus is
-SPR-0005 and REL-001: WROOM evidence, secure portal onboarding and release
-promotion proceed as coordinated workstreams. Onboarding is not planned for the
-firmware's local WebUI.
+MOT has promoted the reviewed REL-001 repository pilot through `develop` to
+`main`. WROOM evidence, secure portal onboarding and the LilyGO AWS/LTE functional
+path are included. The validated portal remains at `/motbeta/`; copying it to
+`/dashboard/` is a separate hosted operation, while `/` remains the project landing
+page. Onboarding is not planned for the firmware's local WebUI.
 
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
