@@ -118,6 +118,12 @@ directory was removed after validation.
 An independent HTTP check still receives `200` directly from
 `https://microlino-open-telemetry.ch/motbeta/` rather than a server-side `301` to
 the canonical `www` host. Safari may visually hide `www` and may reuse cached/HSTS
-navigation, so its address-bar presentation is not redirect evidence. The Plesk
-preferred-domain setting remains a release gate until a fresh HTTP client observes
-the HTTPS non-`www` to `www` redirect.
+navigation, so its address-bar presentation is not redirect evidence.
+
+The hosting subscription exposes neither Plesk's preferred-domain selector nor
+additional nginx directives. Hosttech Domaincenter contains explicit direct-301
+rules, but they do not precede the active Plesk HTTPS virtual host in an independent
+client test. The maintainer accepted this as a bounded pilot exception on
+2026-08-03: both names serve TLS, while all published links, Cognito callbacks and
+API CORS use `www`. Revisit canonical host enforcement before general public
+promotion or when the hosting plan changes.
