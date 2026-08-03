@@ -89,10 +89,10 @@ optional and reports it as not detected until checksum-valid NMEA data is receiv
 5. [x] Flash the exact reviewed AWS firmware and provision its individual AWS files.
 6. [x] Join the temporary first-setup AP in a controlled location.
 7. [x] Set WiFi plus a unique 12–63 character local admin password and reboot.
-8. [ ] Confirm the fallback AP is WPA2-protected and unauthenticated routes return
+8. [x] Confirm the fallback AP is WPA2-protected and unauthenticated routes return
    `401` or fail closed.
-9. [ ] Authenticated status passed. Secret-free export, reset denial and OTA
-   disabled state remain pending.
+9. [ ] Authenticated status, secret-free configuration display and OTA-disabled
+   state passed. Secret-free export and reset denial remain pending.
 10. [ ] Enable OTA temporarily and validate an authenticated same-origin update only
     if the release review accepts the 87.4% partition usage.
 11. [x] Validate AWS connection and telemetry before portal claim issuance.

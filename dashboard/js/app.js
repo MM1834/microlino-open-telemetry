@@ -21,7 +21,9 @@
     availableVehicles: [],
     selectedVehicleId: mqttCfg.vehicleId || 'pioneer',
     authBusy: false,
-    onboardingBusy: false
+    onboardingBusy: false,
+    onboardingRequired: false,
+    onboardingExpanded: false
   };
 
 
@@ -42,6 +44,7 @@
     if (message) status.textContent = message;
     else if (!auth.isConfigured()) status.textContent = 'Cognito nicht konfiguriert';
     else status.textContent = authenticated ? 'Angemeldet' : 'Nicht angemeldet';
+    renderOnboarding(state.onboardingRequired, '');
   }
 
   function renderOnboarding(required, message = '') {
@@ -49,13 +52,35 @@
     const form = $('onboarding-form');
     const input = $('onboarding-claim');
     const status = $('onboarding-status');
+    const addButton = $('vehicle-add');
+    const title = $('onboarding-title');
+    const description = $('onboarding-description');
     if (!panel) return;
-    panel.hidden = !required;
-    if (form) form.hidden = !required;
+    state.onboardingRequired = Boolean(required);
+    const authenticated = Boolean(auth?.isAuthenticated());
+    const canClaim = authenticated && Boolean(state.dataProvider?.claimVehicle);
+    const visible = canClaim && (state.onboardingRequired || state.onboardingExpanded);
+    panel.hidden = !visible;
+    if (form) form.hidden = !visible;
+    if (addButton) {
+      addButton.hidden = !canClaim || state.onboardingRequired;
+      addButton.textContent = state.onboardingExpanded ? 'Abbrechen' : 'Fahrzeug hinzufügen';
+    }
+    if (title) title.textContent = state.onboardingRequired ? 'Fahrzeug verbinden' : 'Weiteres Fahrzeug hinzufügen';
+    if (description) description.textContent = state.onboardingRequired
+      ? 'Deinem Konto ist noch kein Fahrzeug zugewiesen. Gib den einmaligen Claim-Code ein, den du mit deinem Adapter erhalten hast.'
+      : 'Gib den einmaligen Claim-Code des zusätzlichen Fahrzeugs ein. Bestehende Fahrzeuge bleiben zugewiesen.';
     if (input) input.disabled = state.onboardingBusy;
     const button = $('onboarding-submit');
     if (button) button.disabled = state.onboardingBusy;
     if (status) status.textContent = message;
+  }
+
+  function toggleOnboarding() {
+    if (state.onboardingRequired || !auth?.isAuthenticated()) return;
+    state.onboardingExpanded = !state.onboardingExpanded;
+    renderOnboarding(false, '');
+    if (state.onboardingExpanded) $('onboarding-claim')?.focus();
   }
 
   async function submitOnboarding(event) {
@@ -64,17 +89,19 @@
     const input = $('onboarding-claim');
     const claim = String(input?.value || '').trim();
     if (!claim) {
-      renderOnboarding(true, 'Bitte Claim-Code eingeben.');
+      renderOnboarding(state.onboardingRequired, 'Bitte Claim-Code eingeben.');
       return;
     }
     state.onboardingBusy = true;
-    renderOnboarding(true, 'Fahrzeug wird zugewiesen…');
+    renderOnboarding(state.onboardingRequired, 'Fahrzeug wird zugewiesen…');
     try {
       await state.dataProvider.claimVehicle(claim);
       if (input) input.value = '';
+      state.onboardingExpanded = false;
       renderOnboarding(false, 'Fahrzeug erfolgreich zugewiesen.');
     } catch (error) {
-      renderOnboarding(true, error?.message || 'Onboarding fehlgeschlagen');
+      state.onboardingExpanded = true;
+      renderOnboarding(state.onboardingRequired, error?.message || 'Onboarding fehlgeschlagen');
     } finally {
       state.onboardingBusy = false;
       const stillRequired = state.availableVehicles.length === 0;
@@ -734,6 +761,7 @@ function startDataProvider() {
   });
   $('auth-login')?.addEventListener('click', beginLogin);
   $('auth-logout')?.addEventListener('click', beginLogout);
+  $('vehicle-add')?.addEventListener('click', toggleOnboarding);
   $('onboarding-form')?.addEventListener('submit', submitOnboarding);
   $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
   $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);

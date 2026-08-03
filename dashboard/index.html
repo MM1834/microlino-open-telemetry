@@ -87,6 +87,7 @@
         <div id="auth-controls" class="auth-controls" hidden>
           <span id="auth-status" class="auth-status" aria-live="polite">Nicht angemeldet</span>
           <button id="auth-login" class="auth-button" type="button">Anmelden</button>
+          <button id="vehicle-add" class="auth-button" type="button" hidden>Fahrzeug hinzufügen</button>
           <button id="auth-logout" class="auth-button" type="button" hidden>Abmelden</button>
         </div>
         <span id="date-now" class="muted">--</span>
@@ -95,8 +96,8 @@
 
       <section id="onboarding-required" class="card onboarding-card" hidden>
         <div>
-          <h1>Fahrzeug verbinden</h1>
-          <p>Deinem Konto ist noch kein Fahrzeug zugewiesen. Gib den einmaligen Claim-Code ein, den du mit deinem Adapter erhalten hast.</p>
+          <h1 id="onboarding-title">Fahrzeug verbinden</h1>
+          <p id="onboarding-description">Deinem Konto ist noch kein Fahrzeug zugewiesen. Gib den einmaligen Claim-Code ein, den du mit deinem Adapter erhalten hast.</p>
         </div>
         <form id="onboarding-form" class="onboarding-form" autocomplete="off">
           <label for="onboarding-claim">Claim-Code</label>
@@ -226,7 +227,7 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260803-3"></script>
-  <script src="js/app.js?v=20260803-2"></script>
+  <script src="js/app.js?v=20260803-3"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js"></script>

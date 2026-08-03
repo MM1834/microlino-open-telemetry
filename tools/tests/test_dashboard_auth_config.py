@@ -68,6 +68,17 @@ class DashboardOnboardingTests(unittest.TestCase):
         self.assertIn('id="onboarding-form"', html)
         self.assertIn('type="password"', html)
 
+    def test_existing_account_can_expand_additional_vehicle_claim_form(self) -> None:
+        app = (ROOT / "dashboard/js/app.js").read_text()
+        html = (ROOT / "dashboard/index.html").read_text()
+        self.assertIn('id="vehicle-add"', html)
+        self.assertIn("state.onboardingExpanded", app)
+        self.assertIn("function toggleOnboarding()", app)
+        self.assertIn("Boolean(state.dataProvider?.claimVehicle)", app)
+        self.assertIn("Weiteres Fahrzeug hinzufügen", app)
+        self.assertIn("Bestehende Fahrzeuge bleiben zugewiesen", app)
+        self.assertIn("$('vehicle-add')?.addEventListener('click', toggleOnboarding)", app)
+
     def test_example_has_separate_onboarding_api(self) -> None:
         source = CONFIG_EXAMPLE.read_text(encoding="utf-8")
         self.assertIn("onboardingApiBaseUrl:", source)

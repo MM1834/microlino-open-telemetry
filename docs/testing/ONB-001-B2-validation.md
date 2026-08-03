@@ -32,6 +32,8 @@ telemetry-state record was changed.
 | User with no assignment sees the portal claim form | Passed |
 | Admin issues one claim for `beta-01` | Passed |
 | User consumes claim through the portal | Passed |
+| Existing user expands "Fahrzeug hinzufügen" and consumes a second vehicle claim | Passed with `beta-02`; existing `beta-01` assignment retained |
+| Vehicle selector exposes both assignments after claim refresh | Passed |
 | Existing telemetry appears again after atomic assignment | Passed |
 | Claim record is `CONSUMED` with zero failed attempts | Passed |
 | Canonical ownership is ACTIVE for the consuming Cognito subject | Passed |
@@ -46,11 +48,12 @@ two portal sessions and was not copied into this evidence.
 
 ## Effective state after validation
 
-- `info@muehlberg.ch` again owns and can view only `beta-01`;
+- `info@muehlberg.ch` owns and can select `beta-01` and `beta-02` after the
+  additional-vehicle claim flow;
 - `news@muehlberg.ch` retains its independent vehicle access and the controlled
   onboarding administrator role;
 - the earlier REVOKED `news`/`beta-01` access item remains historical evidence;
-- one consumed claim remains until DynamoDB TTL cleanup;
+- consumed claim records remain until DynamoDB TTL cleanup;
 - two privacy-safe onboarding audit events remain for 90 days;
 - device ingestion continues with the original Thing/certificate.
 
@@ -64,7 +67,7 @@ parameters from request logs; production hosting still requires verification.
 - prove replay denial through an automated deployed-API regression without exposing
   a real proof in test output;
 - decide whether the administrator role remains permanently assigned after beta;
-- configure and deploy the onboarding API URL for the external HTTPS portal origin;
+- retain regression coverage for both empty-account and additional-vehicle claim UI;
 - implement B3 replacement/transfer/recovery separately;
 - retain the exact-assignment inventory gate before any future destructive test.
 
