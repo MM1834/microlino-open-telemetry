@@ -48,8 +48,11 @@
         body: JSON.stringify(body)
       });
       if (!response.ok) {
+        const conflictMessage = path.endsWith('/claims')
+          ? 'Fahrzeug ist bereits zugewiesen oder nicht verfügbar'
+          : 'Claim ungültig oder nicht mehr verfügbar';
         const error = new Error(response.status === 409
-          ? 'Claim ungültig oder nicht mehr verfügbar'
+          ? conflictMessage
           : `Onboarding API HTTP ${response.status}`);
         error.status = response.status;
         if (response.status === 401) config.onUnauthorized?.(error);
