@@ -76,9 +76,9 @@ claiming, transfer/replacement and production release controls remain open.
 
 **Current workstream:** ONB-001 within SPR-0005.
 
-**Active slice:** ONB-001.B1 controlled invitation/assignment is implemented
-locally with a dry-run default. B2 claim and B3 lifecycle designs are drafted and
-under overall review; backend and portal claiming remain unimplemented.
+**Active slice:** ONB-001.B1 controlled invitation/assignment and the B2 claim
+backend/portal flow are implemented locally. B2 deployment validation, legacy
+ownership migration and B3 implementation remain open.
 
 ## Medium priority
 

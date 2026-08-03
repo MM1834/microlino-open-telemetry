@@ -59,3 +59,5 @@ dashboard/**/*config*.backup
 dashboard/**/*config*.copy
 dashboard/**/*config*~
 *.swp
+# Local packaged AWS artifacts
+build/aws/

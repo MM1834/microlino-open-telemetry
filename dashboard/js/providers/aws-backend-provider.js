@@ -9,6 +9,7 @@
     let pollInFlight = false;
 
     const baseUrl = () => String(config.apiBaseUrl || '').replace(/\/$/, '');
+    const onboardingBaseUrl = () => String(config.onboardingApiBaseUrl || '').replace(/\/$/, '');
     const interval = () => {
       const value = Number(config.pollingIntervalMs ?? 5000);
       return Number.isFinite(value) && value >= 1000 ? value : 5000;
@@ -32,6 +33,25 @@
         const error = new Error(`AWS API HTTP ${response.status}`);
         error.status = response.status;
         error.path = path;
+        if (response.status === 401) config.onUnauthorized?.(error);
+        throw error;
+      }
+      return response.json();
+    }
+
+    async function post(path, body) {
+      if (!onboardingBaseUrl()) throw new Error('Onboarding API URL fehlt');
+      const response = await fetch(`${onboardingBaseUrl()}${path}`, {
+        method: 'POST',
+        headers: { ...(await headers()), 'content-type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        const error = new Error(response.status === 409
+          ? 'Claim ungültig oder nicht mehr verfügbar'
+          : `Onboarding API HTTP ${response.status}`);
+        error.status = response.status;
         if (response.status === 401) config.onUnauthorized?.(error);
         throw error;
       }
@@ -111,10 +131,15 @@
           state: 'disabled',
           detail: 'Keine aktive Fahrzeugzuordnung'
         });
+        callbacks.onOnboardingRequired?.(true);
       } else if (!liveClient) {
+        callbacks.onOnboardingRequired?.(false);
         startLive(callbacks);
       } else if (activeVehicleId !== previousVehicleId) {
+        callbacks.onOnboardingRequired?.(false);
         liveClient.subscribe(activeVehicleId);
+      } else {
+        callbacks.onOnboardingRequired?.(false);
       }
       return Boolean(activeVehicleId);
     }
@@ -163,6 +188,13 @@
 
       getSelectedVehicleId() { return activeVehicleId; },
 
+      async claimVehicle(claim) {
+        if (!callbacksRef) throw new Error('Dashboard ist noch nicht bereit');
+        const result = await post('/api/onboarding/claim', { claim });
+        await refresh(callbacksRef);
+        return result;
+      },
+
       stop() {
         stopped = true;
         callbacksRef = null;
@@ -177,6 +209,7 @@
         return {
           type: 'aws-backend',
           apiBaseUrl: baseUrl(),
+          onboardingApiBaseUrl: onboardingBaseUrl(),
           websocketUrl: String(config.websocketUrl || ''),
           vehicleId: activeVehicleId,
           pollingIntervalMs: interval(),

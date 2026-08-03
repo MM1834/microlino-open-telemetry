@@ -33,7 +33,24 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "dashboard/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260803-1", source)
+        self.assertIn("aws-backend-provider.js?v=20260803-2", source)
+
+
+class DashboardOnboardingTests(unittest.TestCase):
+    def test_empty_assignment_exposes_claim_form(self) -> None:
+        provider = (ROOT / "dashboard/js/providers/aws-backend-provider.js").read_text()
+        app = (ROOT / "dashboard/js/app.js").read_text()
+        html = (ROOT / "dashboard/index.html").read_text()
+        self.assertIn("callbacks.onOnboardingRequired?.(true)", provider)
+        self.assertIn("async claimVehicle(claim)", provider)
+        self.assertIn("'/api/onboarding/claim'", provider)
+        self.assertIn("onOnboardingRequired: required => renderOnboarding(required)", app)
+        self.assertIn('id="onboarding-form"', html)
+        self.assertIn('type="password"', html)
+
+    def test_example_has_separate_onboarding_api(self) -> None:
+        source = CONFIG_EXAMPLE.read_text(encoding="utf-8")
+        self.assertIn("onboardingApiBaseUrl:", source)
 
 
 if __name__ == "__main__":

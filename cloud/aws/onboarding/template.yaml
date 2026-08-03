@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: MOT ONB-001.B2 isolated claim backend.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: mot
+  Environment:
+    Type: String
+    Default: dev
+  ApiAllowedOrigin:
+    Type: String
+    AllowedPattern: '^(https://[^*\s]+|http://localhost(:[0-9]+)?)$'
+  CognitoIssuerUrl:
+    Type: String
+  CognitoUserPoolId:
+    Type: String
+  CognitoUserPoolClientId:
+    Type: String
+  VehicleStateTableName:
+    Type: String
+  UserVehicleAccessTableName:
+    Type: String
+  ArtifactBucket:
+    Type: String
+  ArtifactKey:
+    Type: String
+  AdminGroupName:
+    Type: String
+    Default: mot-beta-admins
+  ClaimTtlSeconds:
+    Type: Number
+    Default: 86400
+    MinValue: 900
+    MaxValue: 604800
+  MaxClaimAttempts:
+    Type: Number
+    Default: 5
+    MinValue: 1
+    MaxValue: 10
+  AuditRetentionDays:
+    Type: Number
+    AllowedValues: [30, 90, 180, 365]
+    Description: Explicit privacy and support retention decision for onboarding audit events.
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14, 30]
+
+Resources:
+  OnboardingAdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: !Ref AdminGroupName
+      Description: Maintainers allowed to issue controlled beta claims.
+      UserPoolId: !Ref CognitoUserPoolId
+  ClaimsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-onboarding-claims"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{AttributeName: claimId, AttributeType: S}]
+      KeySchema: [{AttributeName: claimId, KeyType: HASH}]
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+  VehicleOwnershipTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-vehicle-ownership"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{AttributeName: vehicleId, AttributeType: S}]
+      KeySchema: [{AttributeName: vehicleId, KeyType: HASH}]
+      SSESpecification: {SSEEnabled: true}
+  AuditTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-onboarding-audit"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: entityId, AttributeType: S}
+        - {AttributeName: eventKey, AttributeType: S}
+      KeySchema:
+        - {AttributeName: entityId, KeyType: HASH}
+        - {AttributeName: eventKey, KeyType: RANGE}
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+  OnboardingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: onboarding-data
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                  - dynamodb:PutItem
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt ClaimsTable.Arn
+                  - !GetAtt VehicleOwnershipTable.Arn
+                  - !GetAtt AuditTable.Arn
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${VehicleStateTableName}"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserVehicleAccessTableName}"
+              - Effect: Allow
+                Action: dynamodb:TransactWriteItems
+                Resource:
+                  - !GetAtt ClaimsTable.Arn
+                  - !GetAtt VehicleOwnershipTable.Arn
+                  - !GetAtt AuditTable.Arn
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserVehicleAccessTableName}"
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${OnboardingLogGroup.Arn}:*"
+  OnboardingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-onboarding"
+      Runtime: python3.13
+      Handler: handler.handler
+      Role: !GetAtt OnboardingRole.Arn
+      Timeout: 10
+      MemorySize: 192
+      Code: {S3Bucket: !Ref ArtifactBucket, S3Key: !Ref ArtifactKey}
+      Environment:
+        Variables:
+          CLAIMS_TABLE: !Ref ClaimsTable
+          OWNERSHIP_TABLE: !Ref VehicleOwnershipTable
+          ACCESS_TABLE: !Ref UserVehicleAccessTableName
+          AUDIT_TABLE: !Ref AuditTable
+          STATE_TABLE: !Ref VehicleStateTableName
+          ADMIN_GROUP: !Ref AdminGroupName
+          CLAIM_TTL_SECONDS: !Ref ClaimTtlSeconds
+          MAX_ATTEMPTS: !Ref MaxClaimAttempts
+          AUDIT_RETENTION_DAYS: !Ref AuditRetentionDays
+  OnboardingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-${Environment}-onboarding"
+      RetentionInDays: !Ref LogRetentionDays
+  OnboardingApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-onboarding"
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref ApiAllowedOrigin
+        AllowMethods: [POST, OPTIONS]
+        AllowHeaders: [authorization, content-type]
+        MaxAge: 300
+  JwtAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref OnboardingApi
+      AuthorizerType: JWT
+      IdentitySource: ["$request.header.Authorization"]
+      Name: cognito-jwt
+      JwtConfiguration:
+        Audience: [!Ref CognitoUserPoolClientId]
+        Issuer: !Ref CognitoIssuerUrl
+  OnboardingIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref OnboardingApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt OnboardingFunction.Arn
+      PayloadFormatVersion: "2.0"
+  IssueClaimRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/onboarding/claims"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  ConsumeClaimRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/onboarding/claim"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref OnboardingApi
+      StageName: "$default"
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 5
+        ThrottlingRateLimit: 2
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnboardingFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${OnboardingApi}/*"
+
+Outputs:
+  OnboardingApiUrl:
+    Value: !GetAtt OnboardingApi.ApiEndpoint
+  ClaimsTableName:
+    Value: !Ref ClaimsTable
+  VehicleOwnershipTableName:
+    Value: !Ref VehicleOwnershipTable
+  AuditTableName:
+    Value: !Ref AuditTable

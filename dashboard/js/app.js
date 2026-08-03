@@ -20,7 +20,8 @@
     vehicleLastSeenSource: '',
     availableVehicles: [],
     selectedVehicleId: mqttCfg.vehicleId || 'pioneer',
-    authBusy: false
+    authBusy: false,
+    onboardingBusy: false
   };
 
 
@@ -41,6 +42,44 @@
     if (message) status.textContent = message;
     else if (!auth.isConfigured()) status.textContent = 'Cognito nicht konfiguriert';
     else status.textContent = authenticated ? 'Angemeldet' : 'Nicht angemeldet';
+  }
+
+  function renderOnboarding(required, message = '') {
+    const panel = $('onboarding-required');
+    const form = $('onboarding-form');
+    const input = $('onboarding-claim');
+    const status = $('onboarding-status');
+    if (!panel) return;
+    panel.hidden = !required;
+    if (form) form.hidden = !required;
+    if (input) input.disabled = state.onboardingBusy;
+    const button = $('onboarding-submit');
+    if (button) button.disabled = state.onboardingBusy;
+    if (status) status.textContent = message;
+  }
+
+  async function submitOnboarding(event) {
+    event.preventDefault();
+    if (state.onboardingBusy || !state.dataProvider?.claimVehicle) return;
+    const input = $('onboarding-claim');
+    const claim = String(input?.value || '').trim();
+    if (!claim) {
+      renderOnboarding(true, 'Bitte Claim-Code eingeben.');
+      return;
+    }
+    state.onboardingBusy = true;
+    renderOnboarding(true, 'Fahrzeug wird zugewiesen…');
+    try {
+      await state.dataProvider.claimVehicle(claim);
+      if (input) input.value = '';
+      renderOnboarding(false, 'Fahrzeug erfolgreich zugewiesen.');
+    } catch (error) {
+      renderOnboarding(true, error?.message || 'Onboarding fehlgeschlagen');
+    } finally {
+      state.onboardingBusy = false;
+      const stillRequired = state.availableVehicles.length === 0;
+      renderOnboarding(stillRequired, stillRequired ? $('onboarding-status')?.textContent || '' : '');
+    }
   }
 
   async function beginLogin() {
@@ -639,6 +678,7 @@ function startDataProvider() {
           }
         }
       },
+      onOnboardingRequired: required => renderOnboarding(required),
       onSnapshot: snapshot => {
         if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
         state.metadata = snapshot?.metadata || {};
@@ -661,6 +701,7 @@ function startDataProvider() {
   });
   $('auth-login')?.addEventListener('click', beginLogin);
   $('auth-logout')?.addEventListener('click', beginLogout);
+  $('onboarding-form')?.addEventListener('submit', submitOnboarding);
   async function bootstrap() {
     initStatic();
     resetDashboardForVehicle(state.selectedVehicleId);
@@ -696,4 +737,3 @@ function startDataProvider() {
 window.addEventListener('DOMContentLoaded', () => {
   window.MOTHistoryChart?.init();
 });
-

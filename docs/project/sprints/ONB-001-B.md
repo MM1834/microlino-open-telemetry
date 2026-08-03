@@ -18,7 +18,7 @@ firmware's local WebUI.
 | Slice | Outcome | Status |
 |---|---|---|
 | ONB-001.B1 | Controlled invitation and administrator assignment | Implemented locally; apply validation pending |
-| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Data model drafted; not implemented |
+| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Implemented locally; deployment validation pending |
 | ONB-001.B3 | Replacement, transfer, loss and recovery lifecycle | Design drafted; not implemented |
 
 Public self-registration, billing, fleet-wide administration, firmware-local
@@ -87,9 +87,9 @@ than adding another inline Lambda to `cloud/aws/foundation/template.yaml`.
 - [x] B1 dry-run makes no cloud mutation and produces no sensitive output.
 - [x] B1 invite/assign is locally tested as idempotent and fail-closed on conflict/revocation.
 - [x] Invitation success plus assignment failure is safely resumable in an isolated test.
-- [ ] A user with no assignment sees the onboarding-required portal state.
-- [ ] B2 claim proof is expiring, single use, rate limited and stored only as a hash.
-- [ ] Claim consumption and assignment are atomic.
+- [x] A user with no assignment enters the onboarding-required portal state in local tests.
+- [x] B2 claim proof is expiring, single use, rate limited and stored only as a hash in the local implementation.
+- [x] Claim consumption and assignment use one tested DynamoDB transaction locally.
 - [ ] Replacement/transfer/recovery never reuses or exposes device credentials.
 - [ ] Every production mutation produces privacy-safe audit evidence.
 
@@ -111,6 +111,12 @@ vehicle's operational adapter.
 The validation sequence must separately approve account/assignment removal, IoT
 certificate deactivation, credential provisioning and firmware upload. A clean
 portal claim does not itself authorize any of those device operations.
+
+Before the B2 stack accepts general claims, migrate retained B1 ACTIVE assignments
+into canonical `VehicleOwnership` records. Until that reviewed migration exists,
+claim issuance scans the small beta access table and fails closed for any existing
+ACTIVE assignment or incomplete scan. This compatibility guard is not the long-term
+fleet lookup path.
 
 ## Stop gates
 

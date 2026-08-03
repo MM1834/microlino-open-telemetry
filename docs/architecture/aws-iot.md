@@ -94,7 +94,7 @@ server-side vehicle access enforcement remain distinct controls.
 
 ## Not currently implemented
 
-- account invitation/device-claim backend;
+- deployed account invitation/device-claim backend (B1/B2 exist locally only);
 - cloud telemetry history service;
 - Device Shadow integration;
 - Fleet Provisioning and certificate rotation;

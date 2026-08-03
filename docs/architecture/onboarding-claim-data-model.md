@@ -1,6 +1,6 @@
 # Onboarding Claim Data Model
 
-> **Status:** Planned design for ONB-001.B2 — not implemented
+> **Status:** Implemented locally for ONB-001.B2 — not deployed
 >
 > **Audience:** Backend developer, security reviewer and beta administrator
 >
@@ -129,6 +129,12 @@ The current B1 CLI assignment path remains available for the small controlled be
 It does not pretend to be atomic ownership claiming and must not run concurrently
 for the same vehicle.
 
+Existing B1 ACTIVE assignments must be migrated conditionally into
+`VehicleOwnership` before general B2 use. During the small beta transition, claim
+issuance additionally scans `UserVehicleAccess` and fails closed on an existing
+ACTIVE assignment or incomplete scan. This guard prevents a claim from being issued
+for a legacy-owned identity; it is removed only after migration is verified.
+
 ## Adapter replacement and reset boundary
 
 B2 claims ownership of a portal vehicle identity; it does not provision or move an
@@ -156,7 +162,8 @@ B2 uses a separate `cloud/aws/onboarding/` stack and packaged Lambda code. It ma
 consume foundation outputs/parameters but must not add another inline Lambda to the
 foundation template.
 
-No stack, table, secret, claim or API route is created by this design step.
+The separate template, packaged handler and portal claim form are implemented
+locally. No stack, table, group, secret, claim or API route has been created in AWS.
 
 ## Related documents
 
