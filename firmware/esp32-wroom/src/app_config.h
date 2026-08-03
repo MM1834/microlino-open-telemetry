@@ -37,6 +37,7 @@ struct AppConfig {
     bool mqttEnabled() const;
     bool awsEnabled() const;
     bool abrpEnabled() const;
+    bool localAdminConfigured() const;
     String mqttClientId() const;
 };
 
@@ -54,3 +55,5 @@ public:
 
 extern AppConfig config;
 extern AppConfigurationManager appConfigManager;
+
+bool isValidLocalAdminPassword(const String& password);

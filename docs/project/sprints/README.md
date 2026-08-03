@@ -7,6 +7,7 @@
 ## Active implementation work
 
 - [REL-001 — Portal pilot release readiness](REL-001.md)
+- [FW-SEC-001 — Local firmware administration hardening](FW-SEC-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
 

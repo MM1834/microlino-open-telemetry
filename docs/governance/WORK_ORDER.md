@@ -24,6 +24,15 @@ portal release through `main`.
 separate permanent beta-user class. Their accounts and assignments may continue
 unchanged into the regular release.
 
+### Harden local firmware administration — active
+
+**Active security sprint:** [FW-SEC-001 — Local Firmware Administration Hardening](../project/sprints/FW-SEC-001.md)
+
+**Objective:** Require a unique local device password, protect recovery AP and
+sensitive WebUI/OTA operations, and close secret-echo paths before hardware is
+issued to external pilot users. ESP32-WROOM is implemented and hardware-validated
+first; LilyGO follows under the same contract.
+
 ### Execute SPR-0005 beta readiness and portal onboarding
 
 **Active sprint:** [SPR-0005 — ESP32-WROOM Beta Readiness and Portal Onboarding](../project/sprints/SPR-0005.md)
