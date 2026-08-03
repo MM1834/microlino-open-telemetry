@@ -7,10 +7,10 @@
 | ID | Finding | Evidence/impact | Next decision or validation |
 |---|---|---|---|
 | FW-001 | Too many maintained-looking PlatformIO environments | AWS, pre-AWS and GPS-test environments expose implementation history as product variants | Simplify after DOC-001; preserve one line per board |
-| FW-002 | Open local AP and unauthenticated WebUI | WROOM remediation is implemented and build-tested in FW-SEC-001: controlled first setup only, then WPA2 plus authenticated WebUI/API. LilyGO remains open and unremediated | Hardware-validate WROOM; port and validate the same boundary on LilyGO before external handoff |
+| FW-002 | Open local AP and unauthenticated WebUI | Resolved for operational WROOM and LilyGO use in FW-SEC-001: controlled first setup only, then WPA2 plus authenticated WebUI/API; physically validated 2026-08-03 | Retain provisioning checks and never hand off a device in first-setup state |
 | FW-003 | Standard-CAN profile is empty | Registered profile deliberately decodes nothing | Obtain official identifiers/scaling before other models |
 | FW-004 | ESP32 wiring was wrong in prior docs | Source declares RX27/TX26, old page showed LilyGO RX32/TX13 | Physically review every beta harness |
-| FW-005 | LilyGO AWS transport is WiFi-only | AWS branch gates shared client on `WiFi.status()` | Keep hotspot path for now; design LTE/TLS separately |
+| FW-005 | LilyGO AWS transport was WiFi-only | Resolved functionally 2026-08-03 with WiFi-priority and A7670 LTE/TLS fallback through the hosted portal | Run extended soak, weak-signal, power and recovery qualification; keep ABRP WiFi-only |
 | FW-006 | Legacy LTE MQTT path remains experimental | Non-AWS branch selects LTE client, with extensive historical fixes/traces | Revalidate bidirectional MQTT, reconnect, watchdog and power |
 | FW-007 | Local route parity differs by board | OTA paths, status/diagnostics and form-save routes differ | Do not promise a single identical local API |
 | FW-008 | MQTT payloads differ by transport | Legacy booleans `1/0`, AWS booleans `true/false`; Lily legacy topic set differs | Normalize or version contract in later implementation |
@@ -20,7 +20,7 @@
 | FW-012 | Current-head validation absent | No DOC-001 builds or device tests performed | Separate approved build/hardware validation phase |
 | FW-013 | AWS readiness can be a false positive | ESP32 readiness marks AWS configured from the build flag, not successful credential loading or X.509 connection | Add explicit credential/connection states before relying on readiness |
 | FW-014 | Factory reset retains AWS identity | Reset clears Preferences/NVS but not LittleFS certificate/key files | Define secure deprovision, ownership transfer and certificate revocation |
-| FW-015 | Local OTA protection is configuration-sensitive | WROOM now denies OTA unless explicitly enabled, locally authenticated and same-origin; LilyGO still permits upload when its OTA password is empty | Hardware-validate WROOM and port fail-closed behaviour to LilyGO |
+| FW-015 | Local OTA protection is configuration-sensitive | Both boards deny OTA unless explicitly enabled, locally authenticated and same-origin; the hardened LilyGO migration forces OTA off once | Keep OTA disabled at handoff and retain USB recovery |
 | FW-016 | System Health does not validate AWS transport | MQTT diagnostic uses legacy host credentials and may expose network/location fields | Add AWS-specific, privacy-safe connection diagnostics |
 | FW-017 | Two ESP32 version headers remain | Shared `common/system/version.h` declares the active SPR build while board-local `include/version.h` still says `1.0.3-hotfix` | Remove or clearly retire the unused version source after build verification |
 | FW-018 | Clean WROOM AWS builds are not bit-identical | Two successful `esp32dev-aws` builds at `5758191` produced different SHA-256 hashes; build date/time is compiled into metadata | Isolate nondeterministic inputs or adopt a controlled stored-artifact model |

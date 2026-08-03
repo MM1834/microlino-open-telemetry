@@ -1,6 +1,6 @@
 # Beta portal deployment
 
-Status: AWS configuration deployed; portal upload pending
+Status: Hosted pilot deployed and functionally validated
 
 The controlled beta portal is hosted separately from the existing dashboard:
 

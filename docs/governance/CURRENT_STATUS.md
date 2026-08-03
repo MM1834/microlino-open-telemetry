@@ -41,10 +41,13 @@ future fleet functions.
 ### LilyGO T-A7670G
 
 - Shares the telemetry and AWS IoT architecture with ESP32-WROOM.
-- WiFi operation is the currently dependable path.
-- LTE/GPRS code exists, but the complete mobile MQTT/TLS path is not yet accepted
-  as beta-ready.
+- WiFi remains the preferred transport and LTE/GPRS is the automatic fallback.
+- AWS IoT X.509 over the A7670 TLS client was physically validated through the
+  hosted portal on 2026-08-03 with WiFi unavailable.
 - External L76K GPS support exists.
+- The operational setup AP uses the local administrator password, all operational
+  WebUI/API routes require authentication and local OTA defaults to disabled.
+- ABRP remains WiFi-only and was disabled for the validated AWS/LTE configuration.
 
 ## Firmware structure
 
@@ -92,6 +95,7 @@ Not implemented:
 - ownership transfer and recovery;
 - automated device certificate provisioning or rotation;
 - cloud-managed OTA.
+- public account self-registration.
 
 Authentication, assignment enforcement and controlled claiming now exist in the
 development AWS account and hosted pilot portal. Two controlled users passed
@@ -116,10 +120,15 @@ No choice is currently approved.
 
 ## Validation status
 
-Portal authorization and ONB-001.B2 have current local, deployed-stack and hosted
-browser evidence dated 2026-08-03. Firmware build and physical-device readiness
-remain separate gates. A fresh, previously unassigned ESP32 onboarding is required
-before the first regular portal release.
+Portal authorization and ONB-001.B2 have local, deployed-stack and hosted browser
+evidence dated 2026-08-03. A previously unassigned no-GPS WROOM was erased,
+provisioned with a unique AWS identity, claimed as `beta-02` by an existing user
+and validated through the hosted portal. WROOM local security and AWS operation
+were physically checked. On 2026-08-03 the LilyGO AWS build was hardened, flashed
+without erasing its device identity, connected through LTE/TLS with WiFi absent and
+delivered live CAN/GPS telemetry to the portal. Release-candidate evidence still
+requires the exact final documentation commit, full tests and recorded artifact
+hashes.
 
 ## Documentation status
 

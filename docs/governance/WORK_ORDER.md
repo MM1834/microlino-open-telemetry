@@ -16,9 +16,9 @@
 
 **Active release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
 
-**Objective:** Close the hosted release gates, validate one fresh ESP32 claim,
-merge the reviewed implementation into `develop`, and prepare the first regular
-portal release through `main`.
+**Objective:** Close the remaining hosted release gates, consolidate the completed
+fresh-device and LilyGO LTE evidence, merge the reviewed implementation into
+`develop`, and prepare the first regular portal release through `main`.
 
 **User terminology:** Early externally supported accounts are pilot users, not a
 separate permanent beta-user class. Their accounts and assignments may continue
@@ -30,8 +30,8 @@ unchanged into the regular release.
 
 **Objective:** Require a unique local device password, protect recovery AP and
 sensitive WebUI/OTA operations, and close secret-echo paths before hardware is
-issued to external pilot users. ESP32-WROOM is implemented and hardware-validated
-first; LilyGO follows under the same contract.
+issued to external pilot users. ESP32-WROOM and LilyGO now implement and physically
+pass the same local-administration boundary.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 
@@ -111,11 +111,12 @@ Maintain one firmware line per board. Retire the GPS test environment and stop
 treating pre-AWS environments as separate product firmware generations. Preserve
 AWS IoT as a normal configurable feature while keeping local standalone operation.
 
-### Stabilize LilyGO LTE/GPRS
+### Qualify LilyGO LTE/GPRS beyond the functional pilot path
 
-Bring the LilyGO mobile transport to the same operational standard as its WiFi
-path. Validate modem ownership, TLS, time, reconnect/backoff, watchdog behaviour,
-power conditions and long-running telemetry before declaring it beta-ready.
+AWS IoT X.509 over LTE/TLS, WiFi preference/fallback and live CAN-to-portal data
+are functionally validated. Continue with long-running soak, weak-signal, modem
+recovery, watchdog and power-condition testing before declaring the path generally
+production-ready. ABRP remains WiFi-only.
 
 ### Revalidate the current repository revision
 

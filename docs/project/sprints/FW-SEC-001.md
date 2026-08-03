@@ -1,6 +1,6 @@
 # FW-SEC-001 — Local Firmware Administration Hardening
 
-> **Status:** Active — ESP32-WROOM implementation first
+> **Status:** Implemented and physically validated on WROOM and LilyGO
 >
 > **Audience:** Firmware maintainer, device provisioner and pilot support
 >
@@ -53,11 +53,13 @@ Once a valid password is stored:
 - factory reset returns to the controlled first-setup state;
 - normal station-mode operation does not keep an AP active.
 
-## LilyGO follow-up
+## LilyGO boundary
 
-The same contract applies. In addition, the LilyGO setup AP must be disabled after
-successful WiFi connection and must never remain open during normal operation.
-LTE stabilization is outside this sprint.
+The same authentication, secret-handling and OTA contract applies. The LilyGO
+retains its recovery AP during normal WiFi/LTE operation because it is the local
+support path when no station network is reachable, but that operational AP is
+WPA2-protected with the unique local administrator password. Only the controlled
+first-setup state may be open.
 
 ## Acceptance gates
 
@@ -69,8 +71,8 @@ LTE stabilization is outside this sprint.
 - [x] Blank secret fields preserve stored values.
 - [x] Non-secret configuration export remains available only after authentication.
 - [x] ESP32-WROOM AWS environment builds successfully.
-- [ ] Clean-flash first setup and authenticated fallback recovery pass on hardware.
-- [ ] Equivalent LilyGO gates pass before a LilyGO is issued externally.
+- [x] Clean-flash first setup and authenticated fallback recovery pass on WROOM hardware.
+- [x] Equivalent LilyGO authentication/AP/OTA gates pass on hardware.
 
 ## Stop conditions
 

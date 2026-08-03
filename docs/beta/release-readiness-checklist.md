@@ -1,4 +1,4 @@
-# ESP32-WROOM Beta Release-readiness Checklist
+# MOT Pilot Release-readiness Checklist
 
 > **Status:** Draft; no release is currently approved
 >
@@ -20,7 +20,8 @@
 - [ ] CORS and WebSocket token/log handling are reviewed.
 - [ ] Every device has a unique certificate and revocation owner.
 - [ ] OTA password is non-empty and uniquely handled.
-- [ ] Open local AP/WebUI risk is accepted with clear tester instructions.
+- [ ] Local AP/WebUI authentication is verified on every handed-off device; any
+  first-setup open-AP window is controlled by the provisioner.
 - [ ] Support collection and backups are redacted/private.
 
 ## Support and recovery
@@ -28,7 +29,8 @@
 - [ ] First-line support owner and escalation path are assigned.
 - [ ] Device replacement and certificate revocation responsibilities are assigned.
 - [ ] Known-good USB recovery artifact/process exists for maintainers.
-- [ ] Local OTA failure does not leave the tester without an escalation path.
+- [ ] Local OTA is disabled by default for handoff or enabled only temporarily by
+  the provisioner; USB recovery remains available.
 - [ ] Factory reset limitations are explained.
 
 ## Documentation
@@ -38,6 +40,8 @@
 - [ ] Device label/variant matches the handoff record.
 - [ ] Known limitations are acknowledged by the tester.
 - [ ] Portal onboarding documentation matches implemented authorization.
+- [ ] WROOM and LilyGO limitations are stated separately, including ABRP remaining
+  WiFi-only on LilyGO.
 
 ## Decision
 

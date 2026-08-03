@@ -1,6 +1,6 @@
 # Hardware Comparison
 
-> **Status:** Source-based capability comparison; hardware validation pending
+> **Status:** Capability comparison with bounded WROOM/LilyGO field evidence
 >
 > **Audience:** Maintainer and hardware reviewer
 
@@ -11,10 +11,10 @@
 | CAN transceiver | External | Integrated on board | External SN65HVD230 plan |
 | Source pins | RX27/TX26 | Hardware-specific mapping must be confirmed | RX32/TX13 |
 | WiFi | Present | Expected, unverified | Present |
-| LTE/GPRS | No | No | Modem/network code present; beta readiness unverified |
+| LTE/GPRS | No | No | AWS IoT LTE/TLS functionally validated; extended qualification open |
 | GPS | Optional UART | Optional subject to pins | External L76K |
-| AWS IoT | WiFi AWS environment | Not independently defined | AWS environment uses WiFi only |
-| Local WebUI/OTA | Present | Expected, unverified | Present |
+| AWS IoT | WiFi AWS environment | Not independently defined | WiFi-preferred with LTE/TLS fallback |
+| Local WebUI/OTA | Authenticated; OTA opt-in | Expected, unverified | Authenticated; OTA opt-in |
 
 The ESP32-WROOM is the intended first beta platform, with or without GPS. This does
 not certify a particular enclosure, transceiver module or vehicle connector.

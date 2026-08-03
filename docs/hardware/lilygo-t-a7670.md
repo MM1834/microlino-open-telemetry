@@ -1,6 +1,6 @@
 # LilyGO T-A7670G
 
-> **Status:** Source-declared board assembly; current hardware behaviour unverified
+> **Status:** Source-declared assembly with current functional field evidence
 >
 > **Audience:** Hardware reviewer and firmware developer
 
@@ -31,15 +31,16 @@ or connector pinout. Review the exact assembly before vehicle connection.
 
 ## Transport status
 
-- WiFi network and local AP code are present.
-- AWS IoT build code uses WiFi only.
-- Modem registration/GPRS and LTE client code are present.
+- WiFi is preferred; the operational local AP is WPA2-protected with the local
+  administrator password.
+- The AWS IoT build falls back to the modem TLS client when WiFi is unavailable.
+- Modem registration/GPRS and LTE client code are present and functionally tested.
 - Legacy MQTT contains an LTE fallback candidate.
-- Current LTE MQTT/TLS stability is unverified and not beta-ready by documentation.
+- AWS IoT X.509 over LTE/TLS and live CAN/GPS delivery to the hosted portal passed
+  on 2026-08-03. Long-duration, weak-signal and adverse-power qualification remain
+  open.
 
-The dependable field path reported by the maintainer is currently a vehicle/phone
-WiFi hotspot. This operational observation still requires a recorded current-head
-test before being called validated.
+ABRP remains WiFi-only and is not part of the validated LTE path.
 
 ## Related documents
 

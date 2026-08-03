@@ -1,6 +1,6 @@
 # Firmware Overview
 
-> **Status:** Confirmed in source structure; build and hardware behaviour unverified
+> **Status:** Source-confirmed with bounded WROOM/LilyGO hardware validation
 >
 > **Audience:** Developer, maintainer and beta-support author
 >
@@ -25,7 +25,7 @@ third application target in the repository.
 | `esp32dev-aws` | ESP32-WROOM with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant |
 | `esp32dev-gps-test` | Standalone GPS diagnostic main | Retired product variant; historical test utility |
 | `lilygo-t-a7670` | LilyGO with legacy WiFi/LTE MQTT path | Legacy build structure |
-| `T-A7670X-AWS` | LilyGO with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant; AWS transport is WiFi-only |
+| `T-A7670X-AWS` | LilyGO with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant; WiFi-preferred AWS with LTE/TLS fallback |
 
 The target maintenance model is one firmware line per board, with AWS IoT and GPS
 as capabilities rather than generations. PlatformIO has not yet been simplified;
@@ -70,30 +70,31 @@ been built or tested on hardware.
 | TWAI receive at 500 kbit/s | Present, RX 27/TX 26 | Present, RX 32/TX 13 |
 | Display-CAN decoder | Shared, implemented | Shared, implemented |
 | Standard-CAN decoder | Shared empty template | Shared empty template |
-| WiFi and open fallback/setup AP | Present | Present |
-| Local WebUI/config/readiness | Present | Present |
-| Local browser OTA | Present | Present |
+| WiFi and protected operational setup AP | Present | Present |
+| Authenticated local WebUI/config/readiness | Present | Present |
+| Local browser OTA | Present; disabled by default | Present; disabled by default |
 | Optional GPS | UART RX 16/TX 17 | L76K UART RX 22/TX 21 |
-| AWS IoT X.509 | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi only |
+| AWS IoT X.509 | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi preferred with LTE/TLS fallback |
 | Legacy MQTT | WiFi | WiFi with LTE candidate/fallback path |
-| LTE/GPRS | Not applicable | Modem/network code present; beta readiness unverified |
-| ABRP | Present | Present; transport status requires validation |
+| LTE/GPRS | Not applicable | AWS IoT path functionally field-validated |
+| ABRP | Present | Present over WiFi only |
 
 ## Security boundary
 
-The firmware local WebUI and APIs have no application authentication in current
-source. Both network implementations start an open AP (`WiFi.softAP` without a
-password). The local interface must not be exposed to the public Internet. Beta
-provisioning and support procedures must account for physical proximity and local
-network access until a separate device-local security decision is implemented.
+The firmware local WebUI and APIs require the configured local administrator
+password in operational state. Both board families use that password for the
+operational setup AP and local OTA is disabled by default. A device without a valid
+administrator password exposes a bounded open first-setup AP so the provisioner can
+establish the boundary. The local interface must not be exposed to the public
+Internet.
 
 Portal accounts and device ownership do not belong in this local WebUI.
 
 ## Validation boundary
 
-DOC-001 has not compiled these environments or tested CAN, GPS, WiFi, LTE, MQTT,
-AWS, OTA or WebUI on hardware. Historical tests remain history until repeated
-against an exact current commit.
+Current WROOM and LilyGO AWS builds, local-security behaviour and bounded physical
+paths have validation records under `docs/testing/`. Exact release artifacts,
+hashes and extended LilyGO qualification remain separate release gates.
 
 ## Related documents
 

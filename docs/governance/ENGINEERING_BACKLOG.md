@@ -47,6 +47,30 @@ Measure normal post-loop-fix telemetry volume before selecting limits. The unusu
 high June/July invocation sample may include a resolved publish loop and must not be
 used alone as the steady-state fleet forecast.
 
+## Charging and SOC notifications
+
+Add optional user notifications for charging milestones, initially by email and
+later by web push or an application channel. Pilot examples include notifying the
+driver when a configured SOC threshold is reached so a charging break can end, or
+when an intended 80% charge limit has been reached.
+
+The first implementation should consume normalized cloud state rather than add
+firmware-specific notification logic. It must include:
+
+- per-user and per-vehicle opt-in with a configurable SOC threshold;
+- rising-threshold detection rather than one notification per telemetry update;
+- at most one notification per threshold and charging session, with hysteresis or
+  equivalent deduplication;
+- delayed/missing telemetry handling and an explicit statement that this is an
+  informational notification, not a vehicle charge-control function;
+- privacy-safe delivery logs, unsubscribe controls and a bounded retention period;
+- publish, Lambda and delivery-volume metrics with a small cost budget.
+
+Email is the preferred pilot channel because it does not require an application or
+browser push subscription. Provider choice, verified sender/domain handling and
+production deliverability remain design decisions. Push is a later channel, not a
+release dependency.
+
 ## Portal roles and vehicle sharing
 
 After basic ownership enforcement, evaluate support/operator roles, multiple users
@@ -104,9 +128,10 @@ directories.
 
 ## Future transports and integrations
 
-Reassess Device Shadows, ABRP over LTE, notification processing and other external
-services only after the beta identity, authorization and connectivity foundations
-are reliable.
+Reassess Device Shadows, ABRP over the shared LilyGO LTE/TLS transport and other
+external services only after the beta identity, authorization and connectivity
+foundations are reliable. SOC notification processing is tracked separately above
+because it is a plausible bounded pilot feature.
 
 ## Related documents
 

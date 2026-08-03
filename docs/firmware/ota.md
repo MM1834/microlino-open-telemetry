@@ -2,9 +2,9 @@
 
 For ESP32-WROOM under FW-SEC-001, OTA is available only when it is explicitly
 enabled and the request passes the device's local administrator authentication and
-same-origin check. Missing or invalid local credentials fail closed. LilyGO has not
-yet received this hardening and must not be issued externally with an empty OTA
-password.
+same-origin check. Missing or invalid local credentials fail closed. LilyGO now
+implements and physically passes the same boundary; its hardened migration forces
+OTA off until a provisioner explicitly enables it again.
 
 ## Recommended procedure
 
