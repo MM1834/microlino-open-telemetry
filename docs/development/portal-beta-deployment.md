@@ -1,6 +1,8 @@
 # Beta portal deployment
 
-Status: Hosted pilot deployed and functionally validated
+> **Status:** Historical hosted-pilot procedure; deployment was validated
+>
+> **Audience:** Portal operator and release auditor
 
 The controlled beta portal is hosted separately from the existing dashboard:
 

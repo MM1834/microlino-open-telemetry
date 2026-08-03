@@ -207,13 +207,11 @@ New maintainers are encouraged to explore the repository in the following order:
 
 After completing these documents, the repository structure and engineering philosophy should be understandable before exploring the implementation.
 
-Current beta work should then be approached in this order:
-
-1. consolidate documentation and revalidate the current revision;
-2. secure portal user-to-vehicle authorization and onboarding;
-3. prepare individually provisioned ESP32-WROOM beta devices and support material;
-4. stabilize LilyGO LTE/GPRS;
-5. expand vehicle decoders after the CAN hardware strategy is approved.
+Current follow-up work should then be selected from `WORK_ORDER` and approached
+through the task-oriented [documentation map](../DOCUMENT_MAP.md). REL-001 and the
+documentation baseline are complete; remaining work includes beta support
+readiness, lifecycle recovery, firmware-environment simplification and extended
+LilyGO qualification.
 
 ---
 

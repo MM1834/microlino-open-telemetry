@@ -1,5 +1,9 @@
 # Build
 
+> **Status:** Unverified legacy build procedure
+>
+> **Audience:** Firmware developer and maintainer
+
 ## LilyGO
 
 ```bash

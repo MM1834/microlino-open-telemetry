@@ -1,6 +1,8 @@
 # Release process
 
 > **Status:** Current release workflow
+>
+> **Audience:** Release maintainer
 
 ## Branch and environment model
 

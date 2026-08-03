@@ -130,17 +130,18 @@ provisioned with a unique AWS identity, claimed as `beta-02` by an existing user
 and validated through the hosted portal. WROOM local security and AWS operation
 were physically checked. On 2026-08-03 the LilyGO AWS build was hardened, flashed
 without erasing its device identity, connected through LTE/TLS with WiFi absent and
-delivered live CAN/GPS telemetry to the portal. Release-candidate evidence still
-requires the exact final documentation commit, full tests and recorded artifact
-hashes.
+delivered live CAN/GPS telemetry to the portal. REL-001 repository tests, firmware
+compile gates, Git review gates and hosted acceptance are recorded in the release
+validation evidence.
 
 ## Documentation status
 
 DOC-001 completed a static, source-based documentation baseline on 2026-08-02.
 Current navigation, canonical topic ownership, beta/support drafts, ADR/history
-classification and the validation handover are present. Historical packages remain
-retained and visibly separated; ambiguous rationale and destructive relocation wait
-for ChatGPT Classic export reconciliation.
+classification and the validation handover are present. Historical root packages
+are retained under `docs/archive/` and visibly separated from current guidance.
+Ambiguous rationale and destructive consolidation beyond fully preserved
+duplicates still wait for ChatGPT Classic export reconciliation.
 
 This documentation completion is not runtime evidence. Builds, hardware, deployed
 AWS state, screenshots and beta release readiness remain to be validated.

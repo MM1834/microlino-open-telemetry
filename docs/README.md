@@ -17,10 +17,12 @@ history for Microlino Open Telemetry.
 - [ESP32-WROOM beta documentation](beta/README.md)
 - [AWS IoT roadmap](roadmap/aws-iot.md)
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
+- [Task-oriented documentation map](DOCUMENT_MAP.md)
 - [Migration tracker](MIGRATION.md)
 - [Documentation classification](project/DOCUMENT_CLASSIFICATION.md)
 - [Architecture decisions](adr/README.md)
 - [Engineering history](history/README.md)
+- [Documentation archive](archive/README.md)
 - [DOC-001 validation and handover](project/DOC-001-VALIDATION.md)
 
 ## Documentation lifecycle
@@ -46,10 +48,11 @@ instructions unless revalidated.
 - `firmware/`, `webui/`, `dashboard/` — component documentation
 - `aws/`, `auth/`, `security/` — cloud and identity
 - `administrator/` — code-based service state and approved operational procedures
-- `developer/`, `testing/` — engineering and validation
+- `developer/`, `development/`, `testing/` — engineering, procedures and validation
 - `reference/` — stable terminology and contracts
-- `release-notes/`, `releases/`, `project/sprints/`, `legacy/` — history
+- `release-notes/`, completed `project/sprints/`, `legacy/` — retained history
 - `history/` — current navigation to retained historical collections
+- `archive/` — consolidated historical packages; excluded from normal work
 
 Each current topic should have one source of truth. Other documents should link to
 it instead of maintaining a second status description.

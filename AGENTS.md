@@ -29,6 +29,10 @@ Ignore generated and local-only content, including:
 Do not inspect large images unless the task specifically concerns
 hardware identification, documentation imagery, branding, or layout.
 
+Treat `docs/archive/` as audit-only. Do not search or read it during normal
+implementation, review or documentation work unless an authoritative document
+references a specific archived record or the task explicitly concerns history.
+
 For documentation work, inspect firmware and dashboard sources only
 when needed to verify a technical statement or cross-reference.
 
@@ -41,3 +45,10 @@ Before broad repository analysis:
 3. Inspect only the project areas relevant to that work package.
 4. Preserve consistency across authoritative documents.
 5. Run applicable validation and report the resulting repository state.
+
+## Task routing
+
+Use `docs/DOCUMENT_MAP.md` to select the smallest relevant context set. After the
+governance documents, read one relevant area index before opening detail pages.
+Do not recursively read an entire documentation or source tree when the map and
+local references identify narrower evidence.

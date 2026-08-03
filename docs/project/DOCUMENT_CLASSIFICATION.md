@@ -34,26 +34,27 @@ fragile 244-row copy of the filesystem while still giving every document a statu
 | `api/` | 4 | Unverified | Current contracts after code comparison |
 | `architecture/` | 11 | Mixed | Current architecture except named sprint record |
 | `assets/` | 2 Markdown | Current | Asset indexes; binary assets under `assets/images/` |
+| `archive/` | Added after baseline | Historical | Consolidated root delivery packages; excluded from normal work |
 | `beta/` | 7 | Mixed | Draft WROOM guide/checklists; safe-data handling baseline is current |
 | `auth/` | 7 | Historical | Increment-specific Cognito notes; current index replaces status claims |
 | `aws/` | 15 | Historical | AWS-1/AWS-2/AWS-3 delivery and validation evidence |
 | `configuration/` | 6 | Unverified | Current configuration guides pending endpoint/runtime validation |
 | `dashboard/` | 8 | Unverified | Current hosted UI feature reference; screenshots await revalidation |
-| `developer/` | 41 | Mixed | Current developer indexes plus preserved investigations/history |
-| `development/` | 2 | Unverified | Build/release procedures pending execution |
-| `firmware/` | 43 | Mixed | Current subsystem pages plus version/fix history |
+| `developer/` | 41 at baseline | Current | Current engineering guides; historical investigations moved to archive |
+| `development/` | 2 at baseline | Mixed | Current build, release, deployment and versioning procedures |
+| `firmware/` | 43 at baseline | Mixed | Current subsystem pages; proven historical duplicates removed |
 | `getting-started/` | 5 | Unverified | Candidate beta-user instructions pending device validation |
 | `governance/` | 7 | Current | Governance, status, work and engineering memory |
 | `gps/` | 2 | Historical | GPS sprint delivery evidence |
 | `hardware/` | 14 | Unverified | Current hardware reference pending maintainer/electrical review |
-| `history/` | 1 added by DOC-001.5 | Current | Navigation to retained historical evidence; no history moved yet |
-| `images/` | 10 Markdown | Historical | Old hardware-document generation; no canonical binary assets |
+| `history/` | 1 added by DOC-001.5 | Current | Navigation to retained historical evidence and `archive/` |
+| `images/` | 10 Markdown at baseline | Removed | Obsolete stubs removed after zero-inbound-link verification |
 | `legacy/` | 1 | Historical | Legacy index |
 | `project/` | 10 | Historical by default | Sprint records; DOC-001 and this register are active exceptions |
 | `reference/` | 5 | Current | Stable introduction, principles and terminology |
-| `release/` | 2 | Mixed | Release process/current preparation; requires revision review |
+| `release/` | 2 at baseline | Removed | Current versioning moved to `development/`; checklist archived |
 | `release-notes/` | 1 | Historical | Version record |
-| `releases/` | 1 | Historical | Version record |
+| `releases/` | 1 at baseline | Removed | Parallel summary removed; detailed note retained in `release-notes/` |
 | `roadmap/` | 2 | Planned | Links to governed work/backlog and AWS phases |
 | `security/` | 1 at baseline | Unverified | Current credential requirements and code-review risk register |
 | `testing/` | 4 | Historical | Prior test records; no current-head validation suite |
@@ -64,6 +65,11 @@ fragile 244-row copy of the filesystem while still giving every document a statu
 
 The inventory contains 244 Markdown files. Counts are a migration baseline and may
 decrease as exact duplicates become redirects or history indexes.
+
+After this baseline, historical root packages were moved without content changes
+into `docs/archive/`. Two byte-identical redundant copies were removed after hash
+and `cmp` verification; their canonical copies remain in the active or retained
+history trees.
 
 ## Root exceptions
 
@@ -103,11 +109,11 @@ The following filename patterns are Historical regardless of directory:
 - `*-fix.md`, `*-cleanup.md`, `*-trace.md`, `*-debug.md`;
 - `lilygo-lte-stack-v*.md`, `lilygo-lte-at-stack-v*.md`;
 - transport experiment/migration pages describing TinyGSM or LewisXhe increments;
-- all files under `developer/release-notes/`.
+- all files under `archive/developer-history/release-notes/`.
 
-Directory `README.md` files are current indexes when they explicitly warn that
-their children may be historical. Subsystem pages without a delivery/fix/version
-name are candidate current sources and remain Unverified until code comparison.
+Historical developer collections are indexed under `archive/developer-history/`.
+Subsystem pages without a delivery/fix/version name are candidate current sources
+and remain Unverified until code comparison.
 
 ## ADR classification rule
 

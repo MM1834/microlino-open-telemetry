@@ -17,4 +17,4 @@ History controls include:
 - JSON export
 - Clear local history
 
-See [`docs/dashboard/history.md`](docs/dashboard/history.md).
+See [`docs/dashboard/history.md`](../../dashboard/history.md).

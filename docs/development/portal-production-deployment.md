@@ -1,5 +1,9 @@
 # Portal Production Deployment
 
+> **Status:** Current REL-001 deployment and rollback record
+>
+> **Audience:** Portal operator and release auditor
+
 ## Scope
 
 The production portal is hosted at:

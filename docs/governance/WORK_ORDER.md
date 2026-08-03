@@ -12,20 +12,6 @@
 
 ## High priority
 
-### Promote the hosted portal pilot — complete
-
-**Release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
-
-**Current result:** The reviewed implementation and evidence are merged through
-`develop` into `main`. The controlled package was deployed to `/dashboard/` on
-2026-08-04 after backup of the previous directory. Both users and all three devices
-passed the hosted acceptance checks across `/`, `/dashboard/` and the retained
-`/motbeta/` fallback. `/` remains the landing page.
-
-**User terminology:** Early externally supported accounts are pilot users, not a
-separate permanent beta-user class. Their accounts and assignments may continue
-unchanged into the regular release.
-
 ### Harden local firmware administration — active
 
 **Active security sprint:** [FW-SEC-001 — Local Firmware Administration Hardening](../project/sprints/FW-SEC-001.md)
@@ -42,23 +28,6 @@ pass the same local-administration boundary.
 **Execution model:** Credential safety and WROOM build/device evidence run in
 parallel with ONB-001 authorization/onboarding. Both lanes converge at the beta
 release gate; neither substitutes for the other.
-
-### Consolidate repository documentation — complete
-
-**Objective:** Establish one current documentation generation and preserve older
-material as explicitly historical evidence.
-
-**Completed sprint:** [DOC-001 — Documentation Consolidation and Beta Baseline](../project/sprints/DOC-001.md)
-
-**Current status:** The static baseline, beta/support drafts, history/ADR
-classification and [validation handover](../project/DOC-001-VALIDATION.md) are
-complete. Runtime evidence and maintainer release approval remain separate gates.
-
-**Expected outcome:** Maintainers and beta users can distinguish current product
-behaviour, planned work and historical implementation records.
-
-**Review boundary:** Historically ambiguous decisions and validation claims are
-preserved for reconciliation with the future ChatGPT Classic export.
 
 ### Prepare the ESP32-WROOM beta release
 
@@ -125,6 +94,13 @@ production-ready. ABRP remains WiFi-only.
 Run controlled offline builds first, followed by isolated static/backend tests,
 read-only AWS inventory and explicitly approved hardware tests. Record evidence
 against the exact commit and environment.
+
+## Completed reference
+
+- [REL-001 portal pilot release](../project/sprints/REL-001.md) is complete; its
+  release notes, validation evidence and risk decisions remain authoritative.
+- [DOC-001 documentation baseline](../project/sprints/DOC-001.md) is complete;
+  historical material is separated from current guidance.
 
 ## Completion policy
 

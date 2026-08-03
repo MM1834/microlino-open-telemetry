@@ -1,6 +1,6 @@
 # Documentation Migration
 
-> **Status:** Baseline complete; historical relocation and screenshot refresh deferred
+> **Status:** Structural consolidation complete; screenshot refresh remains open
 >
 > **Audience:** Documentation maintainer
 >
@@ -27,8 +27,8 @@ The complete directory rules and source ownership are recorded in the
 1. Compare a document with current code and configuration.
 2. Move durable current knowledge into its canonical page.
 3. Add a status banner and links to retained historical material.
-4. Move sprint, patch and release narration under `history/` in a later mechanical
-   pass after inbound links are mapped.
+4. Keep sprint, patch and release narration under `archive/` after mapping inbound
+   links; exclude that tree from normal current-documentation work.
 5. Delete only exact duplicates, generated metadata or content fully preserved by
    Git history and an approved canonical replacement.
 
@@ -38,7 +38,7 @@ The complete directory rules and source ownership are recorded in the
 |---|---|---|
 | Governance and current priorities | `governance/` | Current |
 | Architecture decisions | `adr/` | Collision classified; final numbering awaits reconciliation |
-| System architecture | `architecture/` | Active consolidation |
+| System architecture | `architecture/` | Current structure established |
 | Firmware reference | `firmware/` | Source-based core consolidated; runtime unverified |
 | Local device UI | `webui/` | Structurally current; screenshots await revalidation |
 | Hosted portal/dashboard | `dashboard/` and `user/` | Must be updated with onboarding work |
@@ -46,26 +46,29 @@ The complete directory rules and source ownership are recorded in the
 | Authentication and AWS operations | `auth/`, `administrator/`, `security/` | As-is reference, risks and read-only verification established |
 | Hardware | `hardware/` | Current base; vehicle/CAN variants incomplete |
 | ESP32-WROOM beta/support | `beta/` | Source-based draft complete; build/device/AWS validation open |
-| LTE diagnostics | `developer/lte/` | Historical investigation knowledge |
+| LTE diagnostics | `archive/developer-history/lte/` | Historical investigation knowledge archived |
 | Sprint records | `project/sprints/` | Historical |
-| Release/version notes | `release-notes/`, `releases/` | Historical |
-| Historical navigation | `history/README.md` | Current index; root packages remain in place |
-| Images | `assets/images/` | Canonical; old `docs/images/` Markdown has no inbound links |
+| Release process and versioning | `development/` | Current procedures |
+| Release notes | `release-notes/` | REL-001 plus retained historical notes |
+| Historical navigation | `history/README.md`, `archive/README.md` | Root packages archived by coherent collection |
+| Images | `assets/images/` | Canonical; obsolete `docs/images/` Markdown removed |
 
-## Known duplicate generations
+## Resolved duplicate generations
 
-- top-level `ARCHITECTURE.md`, `DASHBOARD.md`, `firmware.md` and `developer.md`
-  overlap with directory-based documentation;
-- `docs/images/` duplicates many canonical files in `docs/assets/images/`;
-- `firmware/` and `developer/` contain parallel copies of LTE, CAN, MQTT and
-  operations notes;
-- `aws/`, root sprint manifests and `project/sprints/` describe delivery stages,
-  not the current service contract;
-- `releases/`, `release-notes/` and developer release notes overlap.
+- old `docs/images/` Markdown stubs were removed after confirming canonical assets
+  and zero inbound links;
+- historical LTE, CAN, MQTT, operations and firmware release notes were moved from
+  `developer/` to `archive/developer-history/`;
+- corresponding unlabelled `firmware/` copies were removed only when their full
+  body was preserved under a historical banner;
+- `release/` and `releases/` were consolidated into current `development/`
+  procedures, canonical `release-notes/` and the archive;
+- historical root packages were grouped under `archive/`.
 
-DOC-001.5 keeps non-identical parallel release records but declares one detailed
-archive source. It also retains root manifests in place until inbound links and
-Chat-export evidence support a safe move.
+DOC-001.5 kept non-identical parallel release records and retained root manifests
+until inbound links were mapped. The later mechanical consolidation moved those
+packages into `docs/archive/`; ambiguous records remain preserved there pending
+Chat-export reconciliation.
 
 ## Screenshot backlog
 

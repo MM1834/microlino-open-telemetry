@@ -1,3 +1,0 @@
-# OBD
-
-TODO: Pinout ergänzen.

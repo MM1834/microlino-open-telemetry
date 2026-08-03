@@ -1,5 +1,9 @@
 # Coding Style
 
+> **Status:** Current
+>
+> **Audience:** Developer and contributor
+
 ## Firmware
 - Keep hardware-specific code in board/platform directories.
 - Keep common telemetry and decoder logic reusable.

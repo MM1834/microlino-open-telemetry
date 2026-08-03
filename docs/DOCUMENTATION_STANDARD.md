@@ -27,15 +27,16 @@ standard.
 | `adr/` | Accepted and superseded architecture decisions |
 | `security/` | Trust boundaries, credentials and security procedures |
 | `administrator/` | Production/beta service operation |
-| `developer/` | Current engineering guides and preserved diagnostics |
+| `developer/` | Current engineering guides |
+| `development/` | Current build, release and deployment procedures |
 | `testing/` | Repeatable validation plans and evidence |
-| `release/` | Current release process and preparation |
 | `history/` | Superseded sprint, patch, validation and release records |
+| `archive/` | Retained historical packages excluded from normal work |
 | `assets/images/` | Canonical image and diagram assets |
 
-Until migration is complete, `aws/`, `gps/`, `project/sprints/`, `releases/`,
-`release-notes/`, `legacy/` and version-specific developer notes are historical
-sources even when they have not yet moved under `history/`.
+`aws/`, `gps/`, completed `project/sprints/`, older `release-notes/` and `legacy/`
+remain historical sources outside the consolidated archive where stable inbound
+links or audit value justify their current paths.
 
 ## Required page header
 

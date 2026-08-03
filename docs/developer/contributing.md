@@ -1,5 +1,9 @@
 # Contributing
 
+> **Status:** Current
+>
+> **Audience:** Developer and contributor
+
 Contributions are welcome.
 
 ## Guidelines

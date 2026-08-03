@@ -10,18 +10,20 @@ page explicitly revalidates them against an exact commit and environment.
 
 ## Repository history collections
 
+- [Consolidated documentation archive](../archive/README.md)
 - [AWS delivery increments](../aws/README.md)
 - [Authentication increments](../auth/README.md)
 - [Sprint records](../project/sprints/README.md)
-- [Release and versioning index](../release/README.md)
+- [Current release process](../development/release-process.md)
+- [Firmware versioning](../development/firmware-versioning.md)
 - [Release-note archive](../release-notes/README.md)
-- [Firmware release-note archive](../developer/release-notes/README.md)
+- [Firmware development history](../archive/developer-history/)
 - [Legacy documentation](../legacy/README.md)
 
-## Root-level delivery packages
+## Archived root-level delivery packages
 
-The repository root still contains historical manifests, changelogs, validation
-records and release notes with names such as:
+Historical root manifests, changelogs, validation records and release notes have
+been grouped under `docs/archive/` in collections such as:
 
 ```text
 AWS-*
@@ -32,7 +34,6 @@ GITHUB_RELEASE_NOTES*
 RELEASE_CHECKLIST_*
 ```
 
-They remain in place during DOC-001 to preserve links and audit context. Their
-presence is not evidence that a validation command ran successfully or that its
-described AWS state still exists. Moving them requires an inbound-link map and,
-where rationale is unclear, Chat-export reconciliation.
+Their preservation is not evidence that a validation command ran successfully or
+that its described AWS state still exists. The archive preserves their content
+and Git traceability while keeping them outside normal current-documentation work.

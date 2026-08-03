@@ -1,17 +1,20 @@
-# Developer documentation
+# Developer Documentation
 
-> **Status:** Current index; child documents may be historical or unverified
+> **Status:** Current index
 >
 > **Audience:** Developer and maintainer
 
-This section preserves implementation history and diagnostic knowledge without placing experimental details in the end-user firmware guide.
+This section contains current contributor-facing guidance. Historical firmware
+investigations and diagnostic increments are preserved separately in the archive.
 
-## Sections
+## Current sections
 
-- [LTE development](lte/README.md)
-- [MQTT development](mqtt/README.md)
-- [CAN development](can/README.md)
-- [Operations and diagnostics](operations/README.md)
-- [Historic release notes](release-notes/README.md)
+- [Coding style](coding-style.md)
+- [Contributing](contributing.md)
+- [AWS architecture](../architecture/aws-iot.md)
+- [Build procedure](../development/build.md)
+- [Release process](../development/release-process.md)
+- [Firmware versioning](../development/firmware-versioning.md)
 
-Documents under this section may describe superseded implementations. Read their status banner before applying code or assumptions to the current firmware.
+Historical LTE, MQTT, CAN, diagnostics and firmware release notes are indexed in
+the [developer-history archive](../archive/developer-history/).
