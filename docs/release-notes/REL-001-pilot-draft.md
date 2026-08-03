@@ -1,6 +1,6 @@
 # REL-001 Portal Pilot Release Notes — Draft
 
-> **Status:** Draft; release not yet approved
+> **Status:** Release candidate accepted; `main` promotion and tag pending
 >
 > **Audience:** Pilot user, support and release reviewer
 

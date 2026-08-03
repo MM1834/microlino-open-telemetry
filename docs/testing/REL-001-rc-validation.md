@@ -1,6 +1,6 @@
 # REL-001 Release-candidate Validation
 
-> **Result:** Internal release-candidate gates passed
+> **Result:** Release candidate accepted for `develop` to `main` promotion review
 >
 > **Date:** 2026-08-03
 >
@@ -39,10 +39,30 @@ previously separate `main` Governance-1.0 ancestry.
 
 ## Remaining release operations
 
-- perform the final hosted `/motbeta/` smoke test against the intended portal files;
 - review the `develop` to `main` promotion PR;
 - do not delete or overwrite `/dashboard/` during pilot promotion;
-- create a release tag only after the hosted smoke test and maintainer approval.
+- create a release tag only after the reviewed promotion PR is merged to `main`.
+
+## Final hosted smoke test
+
+The maintainer repeated the canonical hosted test at
+`https://www.microlino-open-telemetry.ch/motbeta/` on 2026-08-03 after the feature,
+history-reconciliation and RC-evidence merges into `develop`.
+
+| Check | Result |
+|---|---:|
+| Normal-user login | Passed |
+| Normal user sees only `beta-01` and `beta-02` | Passed |
+| Vehicle switching and telemetry freshness | Passed |
+| Logout and browser-Back do not restore vehicle data | Passed |
+| Administrator login | Passed |
+| Administrator sees only `pioneer` and the admin controls | Passed |
+| Claim issuance for an already assigned vehicle fails closed | Passed |
+| Administrator logout | Passed |
+
+The maintainer approved proceeding to a reviewed `develop` to `main` promotion PR.
+This approval retains the bounded CLOUD-017 pilot acceptance and does not approve
+public self-registration or general public rollout.
 
 ## Pilot support and device boundary
 
