@@ -1,6 +1,6 @@
 # REL-001 Release-candidate Validation
 
-> **Result:** Release candidate accepted for `develop` to `main` promotion review
+> **Result:** Repository release accepted and promoted to `main`
 >
 > **Date:** 2026-08-03
 >
@@ -39,9 +39,12 @@ previously separate `main` Governance-1.0 ancestry.
 
 ## Remaining release operations
 
-- review the `develop` to `main` promotion PR;
-- do not delete or overwrite `/dashboard/` during pilot promotion;
-- create a release tag only after the reviewed promotion PR is merged to `main`.
+- create and push the annotated `rel-001-pilot.1` tag on the final release-closure
+  commit;
+- promote the validated portal from `/motbeta/` to `/dashboard/` only after a
+  complete FTPS backup and rollback check;
+- keep `/` as the project landing page and do not overwrite it during portal
+  promotion.
 
 ## Final hosted smoke test
 
@@ -90,4 +93,4 @@ an explicit user/vehicle assignment plan and a new handoff record.
 
 - [REL-001](../project/sprints/REL-001.md)
 - [Device field validation](SPR-0005-device-field-validation.md)
-- [Pilot release-note draft](../release-notes/REL-001-pilot-draft.md)
+- [Pilot.1 release notes](../release-notes/REL-001-pilot.1.md)

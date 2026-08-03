@@ -4,8 +4,8 @@
 >
 > **Audience:** Maintainer and auditor
 
-- [REL-001 portal pilot draft](REL-001-pilot-draft.md) — current release candidate
-  scope and known limitations
+- [REL-001 portal pilot.1](REL-001-pilot.1.md) — current repository release scope
+  and known limitations
 - [v1.1.0 LilyGO stability release](v1.1.0-lilygo-stability.md) — canonical detailed
   historical note
 - [Short v1.1.0 summary](../releases/v1.1.0-lilygo-stability.md) — retained compact
