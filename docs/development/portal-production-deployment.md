@@ -67,6 +67,15 @@ Because the hosting provider has not yet confirmed OAuth-query redaction, do not
 copy authorization query values from access logs into tickets or project files.
 The bounded acceptance in the cloud risk register continues to apply.
 
+## Deployment Record
+
+The maintainer deployed the reviewed package to `/dashboard/` using FileZilla with
+FTP over TLS on 2026-08-04 after backing up the previous server directory. Hosted
+acceptance passed for both users and all three devices. The landing page at `/`,
+the production portal at `/dashboard/` and the fallback portal at `/motbeta/` all
+behaved as expected. Login, per-user vehicle visibility, live/cloud state and
+logout passed; no rollback was required.
+
 ## Rollback
 
 If a release-blocking failure occurs, restore the complete downloaded

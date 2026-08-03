@@ -1,6 +1,6 @@
 # REL-001 Portal Pilot.1 Release Notes
 
-> **Status:** Repository release promoted to `main`; annotated tag pending
+> **Status:** Released to `main` and deployed at `/dashboard/`
 >
 > **Audience:** Pilot user, support and release reviewer
 
@@ -22,9 +22,8 @@
 - Device credentials are provisioned by the maintainer and are never given to a
   pilot user through the portal.
 - Local USB recovery remains the authoritative recovery path.
-- The validated pilot portal remains under `/motbeta/`. The landing page remains at
-  `/`; controlled promotion of the portal to `/dashboard/` is the next hosting
-  operation and is not implied by the repository release.
+- The accepted pilot portal is available at `/dashboard/`. The landing page remains
+  at `/`, and `/motbeta/` remains available as a controlled fallback.
 
 ## Known limitations
 
@@ -51,9 +50,11 @@
 - LilyGO connected to AWS IoT over LTE/TLS with WiFi absent and delivered live
   vehicle telemetry to the portal;
 - repository tests and both AWS firmware builds passed before this draft update.
+- production-path acceptance passed on 2026-08-04 for both users and all three
+  devices across `/`, `/dashboard/` and `/motbeta/`.
 
-## Release decision still required
+## Continuing release boundary
 
-The final release record must name the exact commit, artifact hashes, approved
-device list, support owner and rollback procedure. CLOUD-017 must be reviewed again
-before public self-registration or a general public release.
+The release record names the exact repository revision, approved device list,
+support owner and rollback procedure. CLOUD-017 must be reviewed again before
+public self-registration or a general public release.

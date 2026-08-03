@@ -2,13 +2,13 @@
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Status:** REL-001 repository pilot release; `/dashboard/` hosting promotion pending
+**Status:** REL-001 pilot release deployed at `/dashboard/`
 
 **Audience:** Maintainer and contributor
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-03
+**Last reviewed:** 2026-08-04
 
 ## Purpose
 
@@ -21,9 +21,11 @@ revision.
 
 MOT has promoted the reviewed REL-001 repository pilot through `develop` to
 `main`. WROOM evidence, secure portal onboarding and the LilyGO AWS/LTE functional
-path are included. The validated portal remains at `/motbeta/`; copying it to
-`/dashboard/` is a separate hosted operation, while `/` remains the project landing
-page. Onboarding is not planned for the firmware's local WebUI.
+path are included. On 2026-08-04 the reviewed portal package was deployed to
+`/dashboard/` after backup of the previous directory. The landing page at `/` and
+the validated fallback portal at `/motbeta/` remain available. Hosted acceptance
+passed for both users and all three devices. Onboarding is not planned for the
+firmware's local WebUI.
 
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
@@ -88,7 +90,8 @@ Implemented and validated in the controlled AWS development stack:
 - server-side user-to-vehicle authorization for REST and WebSocket;
 - atomic, expiring single-use vehicle claim flow;
 - controlled administrator claim issuance;
-- hosted Cognito login/logout and per-user vehicle isolation at `/motbeta/`;
+- hosted Cognito login/logout and per-user vehicle isolation at `/dashboard/` and
+  the retained `/motbeta/` fallback;
 - exact HTTPS CORS for the canonical `www` portal origin.
 
 Not implemented:
