@@ -113,7 +113,7 @@ deployment or runtime evidence. Any cross-user data disclosure blocks beta relea
 | Logout plus browser Back | Pass | Vehicle data is not restored; a new login is required |
 | Guessed-ID REST/WebSocket isolation | Not run | Requires controlled in-session negative-test path |
 | Live assignment revocation: REST/list | Pass | Snapshot changed to HTTP 404 within the polling interval; reload showed no assigned vehicle |
-| Live assignment revocation: WebSocket | Fail in deployed revision; local correction pending deployment | Connection remained visibly connected after revoke. Local handler heartbeat/fan-out now actively close revoked connections; portal periodically resynchronizes assignments |
-| Assignment restoration | Pass | Conditional `REVOKED` to `ACTIVE`; `beta-01` became available and connected again after reload |
+| Live assignment revocation: WebSocket | Pass after correction | Initial test remained visibly connected. Deployed handler heartbeat/fan-out now actively close revoked connections; real `pioneer` retest removed vehicle, CLOUD, LIVE, telemetry and OBD2 without reload |
+| Assignment restoration | Pass | Conditional `REVOKED` to `ACTIVE`; `pioneer`, CLOUD, LIVE, telemetry and OBD2 returned automatically without reload |
 
 No email, token, password, certificate or private key is recorded in this evidence.
