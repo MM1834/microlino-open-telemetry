@@ -63,7 +63,8 @@ device replacement or general LilyGO production readiness.
 - the observed LTE test is functional evidence, not a long-duration soak or power
   qualification;
 - ABRP does not yet use the shared LTE/TLS transport;
-- OAuth callback query parameters remain present in hosted access logs;
+- OAuth callback query parameters remain present in hosted access logs and are
+  covered only by the bounded REL-001 pilot acceptance;
 - device replacement, loss, certificate rotation and ownership transfer remain
   controlled maintainer workflows or unimplemented B3 scope.
 

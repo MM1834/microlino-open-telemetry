@@ -25,16 +25,41 @@ not a penetration test and does not assert that the current template is deployed
 | CLOUD-014 | WROOM credential staging was not ignored | Upload tool copies four files into `firmware/esp32-wroom/data/aws`; SPR-0005.A added the missing rule | Accidental commit risk mitigated for known staging names | Resolved locally; retain `git check-ignore` release check |
 | CLOUD-015 | Shared credential uploader lacked WROOM assignment guards | Tool accepted mismatched `device.json.thingName` and arbitrary environment | Credentials could be uploaded to the wrong Thing/firmware target | Resolved locally with fail-closed validation and unit tests; no upload performed |
 | CLOUD-016 | Telemetry request amplification and billing visibility | CloudWatch recorded about 2.78 million state-ingest Lambda invocations from 2026-07-01 through 2026-08-04; current IAM user cannot read Cost Explorer | Per-topic IoT Rule, Lambda, DynamoDB and live fan-out operations may produce low but non-zero recurring cost and scale linearly with publish frequency | Enable billing visibility/budget alert; measure per-device publishes and evaluate batching before fleet growth |
-| CLOUD-017 | OAuth callback query parameters in web access logs | Confirmed 2026-08-03 in both hosted `access_ssl_log` and `proxy_access_ssl_log` for `/motbeta/callback/`; no values were copied into project records. The redacting local server already avoids the same local exposure | One-time PKCE-bound authorization artifacts are duplicated in hosting logs even after successful exchange | Request provider-side query redaction or callback exclusion; otherwise require explicit restricted-access, short-retention acceptance before external pilot users |
+| CLOUD-017 | OAuth callback query parameters in web access logs | Confirmed 2026-08-03 in both hosted `access_ssl_log` and `proxy_access_ssl_log` for `/motbeta/callback/`; no values were copied into project records. The redacting local server already avoids the same local exposure | One-time PKCE-bound authorization artifacts are duplicated in hosting logs even after successful exchange | Bounded pilot acceptance recorded below; provider-side query redaction or callback exclusion remains the required durable remediation |
 
 ## Priority boundary
 
 CLOUD-001 and the original CLOUD-003 origin blocker are resolved for the controlled
-portal. CLOUD-002, CLOUD-017, canonical host routing and pilot credential handling
-require review before a general release. CLOUD-014/CLOUD-015 are locally resolved
+portal. CLOUD-002, canonical host routing and pilot credential handling require
+review before a general release. CLOUD-017 is accepted only for the bounded pilot
+defined below. CLOUD-014/CLOUD-015 are locally resolved
 but require review of the committed change before any credential upload. Other
 findings may be accepted temporarily with an explicit rationale and bounded pilot
 scope.
+
+## CLOUD-017 bounded pilot acceptance
+
+On 2026-08-03 the maintainer explicitly accepted CLOUD-017 for the controlled
+REL-001 pilot while the hosting provider request remains unanswered.
+
+The acceptance is limited to:
+
+- directly invited and supported pilot accounts; no public self-registration;
+- the `/motbeta/` portal and its Cognito Authorization Code + PKCE flow;
+- no claim proof, token, password or device credential in application URLs;
+- access to hosting logs restricted to the maintainer's hosting account;
+- no copying of callback query values into tickets, screenshots, repository
+  records or support bundles;
+- the shortest practical hosting-log rotation and deletion available to the
+  maintainer;
+- renewed review when the provider responds, before public self-registration,
+  before materially expanding the pilot group, or before calling the portal a
+  general public release.
+
+The rationale is that the exposed authorization code is one-time, short-lived and
+PKCE-bound, while account creation and pilot support remain controlled. This lowers
+but does not remove the consequence of log access. The acceptance does not resolve
+CLOUD-017 and must not be carried silently into a public rollout.
 
 ## Relationship to documentation
 

@@ -36,8 +36,8 @@
 - notification on charging/SOC thresholds is planned, not included;
 - public account self-registration is deferred;
 - OAuth callback `code` and `state` query parameters are currently retained in two
-  restricted hosting access logs; provider remediation or an explicit bounded
-  pilot acceptance is required before external pilot admission.
+  restricted hosting access logs. The maintainer accepted this only for the
+  invitation-only REL-001 pilot while provider remediation remains pending.
 
 ## Validation summary
 
@@ -53,4 +53,5 @@
 ## Release decision still required
 
 The final release record must name the exact commit, artifact hashes, approved
-device list, support owner, hosting-log decision and rollback procedure.
+device list, support owner and rollback procedure. CLOUD-017 must be reviewed again
+before public self-registration or a general public release.

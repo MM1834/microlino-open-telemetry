@@ -90,6 +90,17 @@ provider-side logging change or record an explicit short-retention exception wit
 restricted log access and a deletion schedule. Claim proofs remain prohibited in
 URLs and logs regardless of any OAuth exception.
 
+### Bounded pilot acceptance, 2026-08-03
+
+While the provider request is unanswered, the maintainer accepted the confirmed
+OAuth callback logging for the controlled REL-001 pilot only. Accounts remain
+invitation-only and directly supported; log access remains restricted to the
+hosting account; callback values are not copied into project/support records; and
+the shortest practical log rotation/deletion is used. The decision must be
+reviewed when the provider responds and cannot be inherited by public
+self-registration or a general public release. See CLOUD-017 in the cloud risk
+register for the complete boundary.
+
 ### Confirmed end-user smoke test, 2026-08-03
 
 The hosted portal was tested through the canonical `www` URL with
