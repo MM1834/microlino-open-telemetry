@@ -136,3 +136,4 @@ fleet lookup path.
 - [Cloud risk register](../../security/cloud-risk-register.md)
 - [B2 claim data model](../../architecture/onboarding-claim-data-model.md)
 - [B3 device lifecycle](../../architecture/onboarding-device-lifecycle.md)
+- [B2 Change Set review](../../administrator/aws/onboarding-change-set-review.md)
