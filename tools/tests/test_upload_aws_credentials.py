@@ -10,7 +10,11 @@ import unittest
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS_DIR))
 
-from upload_aws_credentials import select_environment, validate_device_metadata
+from upload_aws_credentials import (
+    select_environment,
+    validate_device_metadata,
+    validate_upload_port,
+)
 
 
 class EnvironmentValidationTests(unittest.TestCase):
@@ -53,6 +57,19 @@ class MetadataValidationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_device_metadata(source, "mot-test-device")
 
+
+class UploadPortValidationTests(unittest.TestCase):
+    def test_accepts_explicit_macos_serial_port(self) -> None:
+        self.assertEqual(
+            validate_upload_port("/dev/cu.usbserial-0001"),
+            "/dev/cu.usbserial-0001",
+        )
+
+    def test_rejects_implicit_or_non_serial_target(self) -> None:
+        for value in ("", "auto", "/dev/null", "usbserial-0001"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    validate_upload_port(value)
 
 if __name__ == "__main__":
     unittest.main()

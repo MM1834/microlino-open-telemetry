@@ -41,6 +41,13 @@ def validate_device_metadata(source: Path, thing_name: str) -> None:
     if metadata.get("thingName") != thing_name:
         raise ValueError("device.json thingName does not match requested Thing")
 
+
+def validate_upload_port(value: str) -> str:
+    port = value.strip()
+    if not port.startswith(("/dev/cu.", "/dev/tty.")):
+        raise ValueError("upload port must be an explicit macOS serial device")
+    return port
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("thing_name")
@@ -52,6 +59,11 @@ def main() -> int:
         "--environment",
         default=None
     )
+    parser.add_argument(
+        "--upload-port",
+        required=True,
+        help="Exact serial device, for example /dev/cu.usbserial-0001",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -61,6 +73,7 @@ def main() -> int:
 
     try:
         env = select_environment(args.firmware, args.environment)
+        upload_port = validate_upload_port(args.upload_port)
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 2
@@ -83,7 +96,10 @@ def main() -> int:
             shutil.copy2(source / name, destination / name)
 
         subprocess.run(
-            ["pio", "run", "-e", env, "-t", "uploadfs"],
+            [
+                "pio", "run", "-e", env, "-t", "uploadfs",
+                "--upload-port", upload_port,
+            ],
             cwd=project,
             check=True
         )
