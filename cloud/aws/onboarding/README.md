@@ -2,6 +2,10 @@
 
 > **Status:** Implemented locally for B2 — no onboarding stack is deployed
 
+AWS CloudFormation `validate-template` accepted `template.yaml` in `eu-north-1`
+on 2026-08-03. The result requires `CAPABILITY_IAM` because the stack declares a
+dedicated Lambda role. Validation created no Change Set or resource.
+
 This directory owns the future ONB-001.B2 claim and B3 lifecycle packaged backend
 boundary. It is separate from `cloud/aws/foundation/template.yaml`, which is at the
 CloudFormation inline template-size limit.

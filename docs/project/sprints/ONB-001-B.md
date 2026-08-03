@@ -18,7 +18,7 @@ firmware's local WebUI.
 | Slice | Outcome | Status |
 |---|---|---|
 | ONB-001.B1 | Controlled invitation and administrator assignment | Implemented locally; apply validation pending |
-| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Implemented locally; deployment validation pending |
+| ONB-001.B2 | Expiring single-use claim proof and portal claim flow | Implemented locally; AWS template validation passed |
 | ONB-001.B3 | Replacement, transfer, loss and recovery lifecycle | Design drafted; not implemented |
 
 Public self-registration, billing, fleet-wide administration, firmware-local
@@ -90,6 +90,7 @@ than adding another inline Lambda to `cloud/aws/foundation/template.yaml`.
 - [x] A user with no assignment enters the onboarding-required portal state in local tests.
 - [x] B2 claim proof is expiring, single use, rate limited and stored only as a hash in the local implementation.
 - [x] Claim consumption and assignment use one tested DynamoDB transaction locally.
+- [x] The separate B2 template passes AWS CloudFormation validation without creating resources.
 - [ ] Replacement/transfer/recovery never reuses or exposes device credentials.
 - [ ] Every production mutation produces privacy-safe audit evidence.
 
