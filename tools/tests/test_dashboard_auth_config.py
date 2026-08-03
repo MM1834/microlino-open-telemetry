@@ -31,6 +31,10 @@ class DashboardRevocationTests(unittest.TestCase):
         self.assertIn("Keine aktive Fahrzeugzuordnung", source)
         self.assertIn("window.setInterval(() => refresh(callbacks)", source)
 
+    def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
+        source = (ROOT / "dashboard/index.html").read_text(encoding="utf-8")
+        self.assertIn("aws-backend-provider.js?v=20260803-1", source)
+
 
 if __name__ == "__main__":
     unittest.main()
