@@ -292,6 +292,13 @@ Resources:
           )
           verbose = os.environ.get("VERBOSE_MESSAGE_LOGS", "false").lower() == "true"
 
+          def disconnect(cid):
+              connections.delete_item(Key={"connectionId": cid})
+              try:
+                  management.delete_connection(ConnectionId=cid)
+              except ClientError:
+                  pass
+
           def decode_payload(encoded):
               raw = base64.b64decode(encoded or "")
               try:
@@ -353,7 +360,7 @@ Resources:
                   user_sub = str(connection.get("userSub", "")).strip()
                   expires_at = int(connection.get("expiresAt", 0))
                   if not user_sub or expires_at <= now:
-                      connections.delete_item(Key={"connectionId": connection_id})
+                      disconnect(connection_id)
                       removed += 1
                       continue
                   assignment = access.get_item(
@@ -363,7 +370,7 @@ Resources:
                       ExpressionAttributeNames={"#status": "status"}
                   ).get("Item")
                   if not assignment or assignment.get("status") != "ACTIVE":
-                      connections.delete_item(Key={"connectionId": connection_id})
+                      disconnect(connection_id)
                       removed += 1
                       continue
                   try:
@@ -1059,6 +1066,7 @@ Resources:
           import os
           import time
           import boto3
+          from botocore.exceptions import ClientError
 
           table = boto3.resource("dynamodb").Table(os.environ["CONNECTION_TABLE_NAME"])
           access = boto3.resource("dynamodb").Table(os.environ["ACCESS_TABLE_NAME"])
@@ -1078,6 +1086,13 @@ Resources:
                   ConnectionId=connection_id,
                   Data=json.dumps(body, separators=(",", ":")).encode("utf-8")
               )
+
+          def disconnect(cid):
+              table.delete_item(Key={"connectionId": cid})
+              try:
+                  management.delete_connection(ConnectionId=cid)
+              except ClientError:
+                  pass
 
           def handler(event, context):
               request = event.get("requestContext", {})
@@ -1123,18 +1138,15 @@ Resources:
                   ).get("Item")
                   now = int(time.time())
                   if not connection or int(connection.get("expiresAt", 0)) <= now:
-                      table.delete_item(Key={"connectionId": connection_id})
-                      send(connection_id, {"type": "error", "error": "unauthorized"})
+                      disconnect(connection_id)
                       return response(401, {"error": "unauthorized"})
                   assignment = access.get_item(
                       Key={
                           "userSub": connection.get("userSub", ""),
                           "vehicleId": vehicle_id
                       },
-                      ConsistentRead=True,
-                      ProjectionExpression="#status",
-                      ExpressionAttributeNames={"#status": "status"}
-                  ).get("Item")
+                          ConsistentRead=True
+                      ).get("Item")
                   if not assignment or assignment.get("status") != "ACTIVE":
                       send(connection_id, {"type": "error", "error": "vehicle_not_found"})
                       return response(404, {"error": "vehicle_not_found"})
@@ -1153,9 +1165,22 @@ Resources:
                       ConsistentRead=True
                   ).get("Item")
                   if not connection or int(connection.get("expiresAt", 0)) <= now:
-                      table.delete_item(Key={"connectionId": connection_id})
-                      send(connection_id, {"type": "error", "error": "unauthorized"})
+                      disconnect(connection_id)
                       return response(401, {"error": "unauthorized"})
+                  vehicle_id = str(connection.get("vehicleId", "")).strip()
+                  if vehicle_id:
+                      assignment = access.get_item(
+                          Key={
+                              "userSub": connection.get("userSub", ""),
+                              "vehicleId": vehicle_id
+                          },
+                          ConsistentRead=True,
+                          ProjectionExpression="#status",
+                          ExpressionAttributeNames={"#status": "status"}
+                      ).get("Item")
+                      if not assignment or assignment.get("status") != "ACTIVE":
+                          disconnect(connection_id)
+                          return response(401, {"error": "unauthorized"})
                   send(connection_id, {"type": "pong", "serverTime": now})
                   return response()
 

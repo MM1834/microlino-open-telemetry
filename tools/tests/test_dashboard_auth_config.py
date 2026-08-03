@@ -20,5 +20,17 @@ class DashboardLogoutConfigurationTests(unittest.TestCase):
         self.assertIn('logoutUri: "https://YOUR_DASHBOARD_URL/"', source)
 
 
+class DashboardRevocationTests(unittest.TestCase):
+    def test_provider_resynchronizes_assignments_and_stops_live_connection(self) -> None:
+        source = (ROOT / "dashboard/js/providers/aws-backend-provider.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("async function syncVehicles(callbacks)", source)
+        self.assertIn("if (!exists) activeVehicleId = vehicles[0]?.vehicleId || null", source)
+        self.assertIn("liveClient?.stop()", source)
+        self.assertIn("Keine aktive Fahrzeugzuordnung", source)
+        self.assertIn("window.setInterval(() => refresh(callbacks)", source)
+
+
 if __name__ == "__main__":
     unittest.main()

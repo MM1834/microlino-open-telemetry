@@ -70,6 +70,7 @@ class AuthorizationInvariantTests(unittest.TestCase):
         self.assertNotIn("int(time.time()) + 86400", self.template)
         self.assertIn("assignment.get(\"status\") != \"ACTIVE\"", self.template)
         self.assertIn("expires_at <= now", self.template)
+        self.assertGreaterEqual(self.template.count("management.delete_connection"), 2)
 
     def test_access_table_is_available_to_all_enforcement_paths(self) -> None:
         self.assertGreaterEqual(self.template.count("ACCESS_TABLE_NAME"), 4)

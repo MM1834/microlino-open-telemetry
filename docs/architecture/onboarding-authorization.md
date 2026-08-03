@@ -36,6 +36,12 @@ Telemetry fan-out rechecks token expiry and current assignment. Expired or revok
 connections are deleted before data is sent. This favours correctness over read
 cost for the small beta fleet; caching/scaling is deferred until measurements exist.
 
+The 2026-08-03 live revocation test confirmed REST denial but found that merely
+deleting a connection record leaves the browser socket visibly connected. A local
+follow-up closes the API Gateway connection during heartbeat/fan-out revocation and
+has the portal periodically resynchronize its assignment list. Deployment and live
+retest remain required before this behaviour is accepted.
+
 ## Controlled beta administration
 
 ONB-001.A intentionally provides the authorization substrate, not public claiming.

@@ -49,7 +49,7 @@
     }
 
     async function poll(callbacks) {
-      if (stopped || pollInFlight || document.hidden) return;
+      if (stopped || pollInFlight || document.hidden || !activeVehicleId) return;
       pollInFlight = true;
       const requestedVehicleId = activeVehicleId;
       try {
@@ -68,6 +68,7 @@
     }
 
     function startLive(callbacks) {
+      if (!activeVehicleId || liveClient) return;
       if (!window.MOTLive?.createWebSocketClient) {
         callbacks.onLiveConnection?.({ state: 'disabled', detail: 'WebSocket Client fehlt' });
         return;
@@ -95,6 +96,40 @@
       liveClient.start(activeVehicleId);
     }
 
+    async function syncVehicles(callbacks) {
+      const result = await get('/api/vehicles');
+      const vehicles = Array.isArray(result) ? result : (result.vehicles || []);
+      const previousVehicleId = activeVehicleId;
+      const exists = vehicles.some(v => v.vehicleId === activeVehicleId);
+      if (!exists) activeVehicleId = vehicles[0]?.vehicleId || null;
+      callbacks.onVehicles?.(vehicles);
+
+      if (!activeVehicleId) {
+        liveClient?.stop();
+        liveClient = null;
+        callbacks.onLiveConnection?.({
+          state: 'disabled',
+          detail: 'Keine aktive Fahrzeugzuordnung'
+        });
+      } else if (!liveClient) {
+        startLive(callbacks);
+      } else if (activeVehicleId !== previousVehicleId) {
+        liveClient.subscribe(activeVehicleId);
+      }
+      return Boolean(activeVehicleId);
+    }
+
+    async function refresh(callbacks) {
+      if (stopped || document.hidden) return;
+      try {
+        const hasVehicle = await syncVehicles(callbacks);
+        if (hasVehicle) await poll(callbacks);
+      } catch (error) {
+        callbacks.onConnection(false, error.message || 'AWS API Fehler');
+        callbacks.onError(error);
+      }
+    }
+
     function handleVisibilityChange() {
       if (!document.hidden && callbacksRef && !stopped) poll(callbacksRef);
     }
@@ -111,15 +146,9 @@
         }
 
         try {
-          const result = await get('/api/vehicles');
-          const vehicles = Array.isArray(result) ? result : (result.vehicles || []);
-          const exists = vehicles.some(v => v.vehicleId === activeVehicleId);
-          if (!exists && vehicles.length) activeVehicleId = vehicles[0].vehicleId;
-          callbacks.onVehicles?.(vehicles);
-          await poll(callbacks);
-          timer = window.setInterval(() => poll(callbacks), interval());
+          await refresh(callbacks);
+          timer = window.setInterval(() => refresh(callbacks), interval());
           document.addEventListener('visibilitychange', handleVisibilityChange);
-          startLive(callbacks);
         } catch (error) {
           callbacks.onConnection(false, error.message || 'AWS API Fehler');
           callbacks.onError(error);

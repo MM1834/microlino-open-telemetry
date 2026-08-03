@@ -45,9 +45,13 @@ class FakeClientError(Exception):
 class FakeManagement:
     def __init__(self):
         self.posts = []
+        self.deletes = []
 
     def post_to_connection(self, **kwargs):
         self.posts.append(kwargs)
+
+    def delete_connection(self, **kwargs):
+        self.deletes.append(kwargs["ConnectionId"])
 
 
 class FakeBoto3(types.ModuleType):
@@ -249,6 +253,19 @@ class LiveAuthorizationTests(unittest.TestCase):
         self.assertEqual([], self.connections.updates)
         self.assertEqual(1100, self.connections.items["c1"]["expiresAt"])
 
+    def test_ping_disconnects_revoked_subscription(self):
+        self.connections.items["c1"] = {
+            "connectionId": "c1", "userSub": "user-a",
+            "vehicleId": "beta", "expiresAt": 1100
+        }
+        result = self.module.handler({
+            "requestContext": {"routeKey": "ping", "connectionId": "c1"},
+            "body": "{}",
+        }, None)
+        self.assertEqual(401, result["statusCode"])
+        self.assertNotIn("c1", self.connections.items)
+        self.assertEqual(["c1"], self.management.deletes)
+
 
 class IngestAuthorizationTests(unittest.TestCase):
     def test_fanout_drops_expired_and_revoked_connections(self):
@@ -278,6 +295,7 @@ class IngestAuthorizationTests(unittest.TestCase):
         )
         self.assertEqual({"sent": 1, "removed": 2}, result)
         self.assertEqual(["active"], [post["ConnectionId"] for post in management.posts])
+        self.assertEqual(["expired", "revoked"], management.deletes)
 
 
 class TemplateStructureTests(unittest.TestCase):
