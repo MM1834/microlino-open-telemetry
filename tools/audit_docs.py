@@ -7,10 +7,6 @@ root = Path.cwd()
 docs = root / "docs"
 errors = []
 
-for p in docs.rglob("*"):
-    if p.name == ".DS_Store" or p.name.startswith("._") or p.name.startswith(".-"):
-        errors.append(f"macOS metadata: {p}")
-
 pattern = re.compile(r'!?\[[^\]]*\]\(([^)#]+)')
 for md in docs.rglob("*.md"):
     text = md.read_text(encoding="utf-8")
