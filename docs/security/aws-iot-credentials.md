@@ -62,7 +62,7 @@ is not encryption and remains only a temporary provisioning control.
 
 ## Rotation and ownership transfer
 
-The future lifecycle must define:
+ONB-001.B3 defines the planned lifecycle contract:
 
 - certificate replacement,
 - deactivation/revocation,
@@ -71,3 +71,7 @@ The future lifecycle must define:
 - ownership transfer.
 
 Factory Reset must not silently create a second unmanaged cloud identity.
+Adapter replacement retains the portal `vehicleId` by default but always uses a
+new device certificate. Ownership transfer rotates credentials before reassignment;
+private keys are never transferred or reused. See
+[the B3 lifecycle design](../architecture/onboarding-device-lifecycle.md).

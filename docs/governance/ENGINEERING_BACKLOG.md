@@ -33,6 +33,20 @@ Define durable cloud history storage, retention periods, export, deletion and co
 controls. Browser-local history and the current DynamoDB state snapshot are not a
 complete fleet history service.
 
+Use modular service levels rather than treating every signal as equally live or
+historical:
+
+- reliable SOC and charging/not-charging state form the low-cost product core;
+- battery diagnostics are the primary candidate for bounded history;
+- GPS and live position remain optional because most owners know where the vehicle
+  is and location data adds privacy, storage and update-frequency costs;
+- each optional module needs an explicit update cadence, retention period and cost
+  budget before fleet rollout.
+
+Measure normal post-loop-fix telemetry volume before selecting limits. The unusually
+high June/July invocation sample may include a resolved publish loop and must not be
+used alone as the steady-state fleet forecast.
+
 ## Portal roles and vehicle sharing
 
 After basic ownership enforcement, evaluate support/operator roles, multiple users
