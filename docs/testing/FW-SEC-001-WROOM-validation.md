@@ -2,7 +2,7 @@
 
 > **Status:** Code/build passed; hardware validation pending
 >
-> **Revision:** uncommitted FW-SEC-001 working tree, 2026-08-03
+> **Revision:** `91045ec`, 2026-08-03
 
 ## Automated evidence
 
