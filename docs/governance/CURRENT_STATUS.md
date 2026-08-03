@@ -2,13 +2,13 @@
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Status:** Active beta preparation
+**Status:** Controlled portal pilot and release preparation
 
 **Audience:** Maintainer and contributor
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-02
+**Last reviewed:** 2026-08-03
 
 ## Purpose
 
@@ -19,9 +19,10 @@ revision.
 
 ## Current product direction
 
-MOT is preparing a small ESP32-WROOM beta fleet. The active engineering focus is
-SPR-0005: WROOM beta evidence and secure portal user/device onboarding proceed as
-parallel workstreams. Onboarding is not planned for the firmware's local WebUI.
+MOT is preparing a small ESP32-WROOM pilot fleet. The active engineering focus is
+SPR-0005 and REL-001: WROOM evidence, secure portal onboarding and release
+promotion proceed as coordinated workstreams. Onboarding is not planned for the
+firmware's local WebUI.
 
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
@@ -81,18 +82,22 @@ Implemented in the repository:
 Implemented and validated in the controlled AWS development stack:
 
 - server-side user-to-vehicle authorization for REST and WebSocket;
+- atomic, expiring single-use vehicle claim flow;
+- controlled administrator claim issuance;
+- hosted Cognito login/logout and per-user vehicle isolation at `/MOTbeta/`;
+- exact HTTPS CORS for the canonical `www` portal origin.
 
 Not implemented:
 
-- user/device registration and claim flow;
 - ownership transfer and recovery;
 - automated device certificate provisioning or rotation;
 - cloud-managed OTA.
 
-Authentication and assignment enforcement now exist in development. Two controlled
-users passed exclusive-list, symmetric guessed-ID, live revoke/restore and expired
-connection tests. Production hosting, self-service onboarding and the remaining
-release/security gates are separate follow-up work.
+Authentication, assignment enforcement and controlled claiming now exist in the
+development AWS account and hosted pilot portal. Two controlled users passed
+exclusive-list, symmetric guessed-ID, live revoke/restore, expired-connection and
+hosted role-separation tests. Public self-registration, lifecycle recovery and the
+remaining release/security gates are separate follow-up work.
 
 ## Vehicle integration
 
@@ -111,11 +116,10 @@ No choice is currently approved.
 
 ## Validation status
 
-The repository contains extensive historical validation notes and local ignored
-PlatformIO build artifacts. During the 2026-07-31 Codex takeover audit, no build,
-hardware test, deployment or cloud inspection was performed. Current head builds,
-deployed AWS state and physical-device behaviour therefore remain to be
-revalidated before beta release.
+Portal authorization and ONB-001.B2 have current local, deployed-stack and hosted
+browser evidence dated 2026-08-03. Firmware build and physical-device readiness
+remain separate gates. A fresh, previously unassigned ESP32 onboarding is required
+before the first regular portal release.
 
 ## Documentation status
 

@@ -11,12 +11,12 @@ not a penetration test and does not assert that the current template is deployed
 |---|---|---|---|---|
 | CLOUD-001 | Multi-user isolation was not proven end to end | Resolved in controlled development 2026-08-03: two confirmed identities, exclusive lists, symmetric guessed-ID denial, live revoke/restore and expiry rejection passed | Original cross-user disclosure blocker is removed for the tested stack | Retain regression gates and repeat against the production portal configuration |
 | CLOUD-002 | WebSocket access token in query string | `$connect` identity source is `access_token`; dashboard adds token to URL | Token may appear in intermediary/access logs | Review transport pattern and logging/redaction |
-| CLOUD-003 | Production portal origin not yet defined | Development CORS is deployed as exact `http://localhost:8080`; no hosted portal was found | A production deploy cannot be safely configured yet | Select hosting and supply its exact HTTPS origin/callback/logout URLs |
+| CLOUD-003 | Production portal origin not yet defined | Resolved for the controlled portal on 2026-08-03: effective Cognito URLs and both API CORS configurations use the exact canonical `www` HTTPS host | Original undefined-origin blocker is removed; non-`www` currently serves content without redirecting | Configure a canonical non-`www` to `www` redirect or record a bounded pilot exception |
 | CLOUD-004 | Deployed state can drift from stack parameters | Read-only inventory and ONB-001.A deployment completed 2026-08-02; later logout testing found app-client URL drift despite stale CloudFormation parameter values | Parameter inspection alone can falsely indicate a safe effective configuration | Compare effective resources with parameters at release gates; localhost and both retained portal URLs were reconciled 2026-08-02 |
 | CLOUD-005 | Shared live authorizer/handler IAM role | ONB-001.A deployed a separate log-only authorizer role | Original excess-permission finding is remediated in development | Verify effective IAM policy during post-deploy review |
 | CLOUD-006 | API Gateway access logging not declared | Stage resources lack access-log settings | Limited auditability; token logging behaviour unknown | Define privacy-safe access-log policy |
 | CLOUD-007 | No cloud history/retention model | DynamoDB stores latest topic state only | Portal history expectations may be misleading | Define later data lifecycle and privacy model |
-| CLOUD-008 | User/device claim lifecycle is not deployed | ONB-001.B1 admin workflow and the B2 claim backend/portal are implemented locally; B3 replacement/transfer remains design-only | Controlled beta assignment exists, but portal claiming and lifecycle recovery are not yet effective in AWS | Validate/package B2, migrate retained B1 ownership, review a Change Set and credential delivery; implement B3 separately |
+| CLOUD-008 | User/device claim lifecycle is incomplete | ONB-001.B2 claim issuance and atomic consumption are deployed and hosted-portal validated; B3 replacement/transfer remains design-only | New controlled claims work, but lifecycle recovery still requires maintainer handling | Keep B3 outside the first bounded release and implement it before claiming automated replacement/recovery support |
 | CLOUD-009 | Temporary credential workflow | Ignored local folders and LittleFS staging | Local theft/misrouting risk; manual lifecycle burden | Beta provisioning controls, later protected workflow |
 | CLOUD-010 | Inline backend code in one template | Lambda code embedded in CloudFormation | Testing, review and packaging become harder as onboarding grows | Decide extraction boundary during ONB-001 |
 | CLOUD-011 | MFA disabled | Cognito template sets `MfaConfiguration: OFF` | Account protection relies on password/email recovery | Decide beta and production MFA policy |
@@ -29,11 +29,12 @@ not a penetration test and does not assert that the current template is deployed
 
 ## Priority boundary
 
-CLOUD-001 is resolved for the controlled development stack. CLOUD-002, CLOUD-003,
-CLOUD-004 and beta credential handling require review before a public or shared
-portal release. CLOUD-014/CLOUD-015 are locally resolved but require review
-of the committed change before any credential upload. Other findings may be
-accepted temporarily with an explicit rationale and bounded beta scope.
+CLOUD-001 and the original CLOUD-003 origin blocker are resolved for the controlled
+portal. CLOUD-002, CLOUD-017, canonical host routing and pilot credential handling
+require review before a general release. CLOUD-014/CLOUD-015 are locally resolved
+but require review of the committed change before any credential upload. Other
+findings may be accepted temporarily with an explicit rationale and bounded pilot
+scope.
 
 ## Relationship to documentation
 

@@ -8,9 +8,21 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-02
+**Last reviewed:** 2026-08-03
 
 ## High priority
+
+### Promote the hosted portal pilot — active
+
+**Active release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
+
+**Objective:** Close the hosted release gates, validate one fresh ESP32 claim,
+merge the reviewed implementation into `develop`, and prepare the first regular
+portal release through `main`.
+
+**User terminology:** Early externally supported accounts are pilot users, not a
+separate permanent beta-user class. Their accounts and assignments may continue
+unchanged into the regular release.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 
@@ -70,15 +82,17 @@ as an Internet-facing extension of the firmware's local WebUI.
 - recovery, replacement, ownership transfer and revocation;
 - audit events and support-safe diagnostics.
 
-**Current status:** Authentication, telemetry APIs and controlled ownership
-enforcement are deployed and two-user validated in development. Registration,
-claiming, transfer/replacement and production release controls remain open.
+**Current status:** Authentication, telemetry APIs, controlled ownership and the
+B2 claim flow are deployed and two-user validated through the hosted pilot portal.
+Transfer/replacement, public registration and production release controls remain
+open.
 
 **Current workstream:** ONB-001 within SPR-0005.
 
-**Active slice:** ONB-001.B1 controlled invitation/assignment and the B2 claim
-backend/portal flow are implemented locally. B2 deployment validation, legacy
-ownership migration and B3 implementation remain open.
+**Active slice:** ONB-001.B2 is deployed and functionally validated. B3 lifecycle
+implementation remains open and is explicitly outside REL-001. Retained legacy
+ownership still uses the bounded compatibility guard until a reviewed migration
+is required by fleet growth.
 
 ## Medium priority
 
