@@ -25,4 +25,6 @@ protection is added later” are historical and no longer describe current code.
 ## Missing authorization boundary
 
 Cognito authenticates a person. It does not assign that person to a vehicle.
-User-to-vehicle access enforcement, device claiming and onboarding remain planned.
+User-to-vehicle enforcement is deployed and validated. ONB-001.B1 provides a local
+guarded administrator invitation/assignment workflow. Portal claim proofs, device
+claiming, transfer and recovery remain planned.

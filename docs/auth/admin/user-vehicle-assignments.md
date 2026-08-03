@@ -43,6 +43,23 @@ aws dynamodb query \
 
 ## Create an assignment
 
+For ONB-001.B1, prefer the guarded workflow tool. Without `--apply` it performs
+only inventory and conflict checks:
+
+```bash
+python3 tools/aws/admin_onboard_beta_user.py \
+  --email <BETA_USER_EMAIL> \
+  --vehicle-id <VEHICLE_ID>
+```
+
+Review its privacy-safe plan result. Add `--apply` only under an approved beta
+onboarding operation. The tool invites a missing Cognito user, rejects another
+ACTIVE owner, refuses implicit reactivation of REVOKED access and conditionally
+creates an ACTIVE/OWNER assignment. Cognito success followed by assignment failure
+is intentionally recoverable by rerunning after review.
+
+The lower-level command below remains the manual recovery/reference procedure.
+
 Create only if the composite key does not already exist. Replace every placeholder
 locally and review the final command before execution:
 
@@ -79,4 +96,5 @@ this operation.
 - [User-pool operations](user-pool-operations.md)
 - [Authorization foundation](../../architecture/onboarding-authorization.md)
 - [ONB-001.A validation](../../testing/ONB-001-A-validation.md)
+- [ONB-001.B controlled onboarding](../../project/sprints/ONB-001-B.md)
 - [Live WebSocket API](../../api/live-websocket-api.md)

@@ -7,6 +7,7 @@
 ## Active implementation work
 
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
+- [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
 
 ## Completed documentation work
 
