@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+  <title>MOT Anmeldung</title>
+</head>
+<body>
+  <p>Anmeldung wird abgeschlossen …</p>
+  <script>
+    const portalPath = window.location.pathname.replace(
+      /\/callback(?:\/index\.html)?\/?$/,
+      '/'
+    );
+    window.location.replace(portalPath + window.location.search + window.location.hash);
+  </script>
+</body>
+</html>

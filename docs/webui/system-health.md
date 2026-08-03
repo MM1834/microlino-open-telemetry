@@ -1,5 +1,9 @@
 # System health
 
+> **Status:** Unverified local-WebUI reference; MQTT result is not AWS proof
+>
+> **Audience:** Beta support and firmware developer
+
 ![System health](../assets/images/webui/system-health.png)
 
 ## Purpose

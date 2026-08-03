@@ -1,5 +1,9 @@
 # Backup JSON
 
+> **Status:** Current source-based format summary; runtime unverified
+>
+> **Audience:** Firmware developer and support
+
 Example:
 
 ```json

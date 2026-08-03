@@ -10,6 +10,18 @@
 AppConfig config;
 AppConfigurationManager appConfigManager;
 
+bool isValidLocalAdminPassword(const String& value)
+{
+    String password = value;
+    password.trim();
+    if (password.length() < 12 || password.length() > 63) return false;
+    for (size_t i = 0; i < password.length(); ++i) {
+        const uint8_t character = static_cast<uint8_t>(password[i]);
+        if (character < 32 || character > 126) return false;
+    }
+    return true;
+}
+
 namespace {
 Preferences prefs;
 constexpr char PREFERENCES_NAMESPACE[] = "mot";
@@ -136,6 +148,11 @@ bool AppConfig::abrpEnabled() const
     return abrpServiceEnabled && !key.isEmpty() && !token.isEmpty();
 }
 
+bool AppConfig::localAdminConfigured() const
+{
+    return isValidLocalAdminPassword(otaPassword);
+}
+
 String AppConfig::mqttClientId() const
 {
     String id = ConfigurationManager::normalizeIdentifier(deviceName, motHostname());
@@ -168,8 +185,10 @@ String AppConfigurationManager::exportJson(bool includeSecrets) const
     if (includeSecrets) doc[ConfigKeys::MQTT_PASS] = config.mqttPass;
     doc[ConfigKeys::PUBLISH_INTERVAL_MS] = config.publishIntervalMs;
 
-    doc[ConfigKeys::ABRP_API_KEY] = config.abrpApiKey;
-    if (includeSecrets) doc[ConfigKeys::ABRP_USER_TOKEN] = config.abrpUserToken;
+    if (includeSecrets) {
+        doc[ConfigKeys::ABRP_API_KEY] = config.abrpApiKey;
+        doc[ConfigKeys::ABRP_USER_TOKEN] = config.abrpUserToken;
+    }
 
     doc[ConfigKeys::CAN1_PROFILE] = static_cast<int>(config.can1Profile);
     doc[ConfigKeys::CAN2_PROFILE] = static_cast<int>(config.can2Profile);
@@ -239,6 +258,12 @@ bool AppConfigurationManager::importJson(const String& json, String& error)
     if (!doc[ConfigKeys::ONBOARDING_COMPLETE].isNull()) config.onboardingComplete = doc[ConfigKeys::ONBOARDING_COMPLETE].as<bool>();
     if (!doc[ConfigKeys::OTA_ENABLED].isNull()) config.otaEnabled = doc[ConfigKeys::OTA_ENABLED].as<bool>();
     setStringIfPresent(doc, ConfigKeys::OTA_PASSWORD, config.otaPassword);
+
+    if (!config.localAdminConfigured()) {
+        config = previous;
+        error = "local admin password must be 12-63 characters";
+        return false;
+    }
 
     normalize();
     const ConfigurationValidationResult validation = validate();

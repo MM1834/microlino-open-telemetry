@@ -1,5 +1,7 @@
 # AWS-3.2 validation checklist
 
+> **Status:** Historical validation record; not evidence for the current commit or AWS account.
+
 - [ ] CloudFormation reaches `UPDATE_COMPLETE`
 - [ ] DynamoDB table exists
 - [ ] `status/online` item appears

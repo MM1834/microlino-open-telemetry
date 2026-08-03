@@ -1,6 +1,10 @@
 # AWS IoT credential handling
 
-> 🔒 **Security:** Device private keys are production secrets.
+> **Status:** Current security requirement; operational process not revalidated
+>
+> **Audience:** Device provisioner, administrator and security reviewer
+
+Device private keys are production secrets.
 
 ## Files per manually provisioned beta device
 
@@ -12,6 +16,10 @@ thing metadata
 ```
 
 Only the Amazon root CA is public.
+
+The current firmware expects `device.json` metadata containing endpoint, port,
+Thing name, vehicle ID and topic prefix, plus the CA, device certificate and
+private key in LittleFS.
 
 ## Repository rules
 
@@ -46,9 +54,15 @@ Prototype options:
 
 For an end-user release, prefer protected device storage rather than shared credentials compiled into public firmware binaries.
 
+The current beta tooling uses ignored source directories and temporary LittleFS
+staging. SPR-0005.A added symmetric WROOM and LilyGO staging rules and fail-closed
+Thing-name/environment validation to the shared uploader. Review the committed
+change and repeat `git check-ignore` before the next credential upload. Git ignore
+is not encryption and remains only a temporary provisioning control.
+
 ## Rotation and ownership transfer
 
-The future lifecycle must define:
+ONB-001.B3 defines the planned lifecycle contract:
 
 - certificate replacement,
 - deactivation/revocation,
@@ -57,3 +71,7 @@ The future lifecycle must define:
 - ownership transfer.
 
 Factory Reset must not silently create a second unmanaged cloud identity.
+Adapter replacement retains the portal `vehicleId` by default but always uses a
+new device certificate. Ownership transfer rotates credentials before reassignment;
+private keys are never transferred or reused. See
+[the B3 lifecycle design](../architecture/onboarding-device-lifecycle.md).

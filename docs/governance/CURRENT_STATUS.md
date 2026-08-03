@@ -2,11 +2,13 @@
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Status:** Active beta preparation
+**Status:** Controlled portal pilot and release preparation
+
+**Audience:** Maintainer and contributor
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-07-31
+**Last reviewed:** 2026-08-03
 
 ## Purpose
 
@@ -17,9 +19,10 @@ revision.
 
 ## Current product direction
 
-MOT is preparing a small ESP32-WROOM beta fleet. The immediate engineering focus
-is documentation consolidation, followed by secure user and device onboarding in
-the portal website. Onboarding is not planned for the firmware's local WebUI.
+MOT is preparing a small ESP32-WROOM pilot fleet. The active engineering focus is
+SPR-0005 and REL-001: WROOM evidence, secure portal onboarding and release
+promotion proceed as coordinated workstreams. Onboarding is not planned for the
+firmware's local WebUI.
 
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
@@ -38,10 +41,13 @@ future fleet functions.
 ### LilyGO T-A7670G
 
 - Shares the telemetry and AWS IoT architecture with ESP32-WROOM.
-- WiFi operation is the currently dependable path.
-- LTE/GPRS code exists, but the complete mobile MQTT/TLS path is not yet accepted
-  as beta-ready.
+- WiFi remains the preferred transport and LTE/GPRS is the automatic fallback.
+- AWS IoT X.509 over the A7670 TLS client was physically validated through the
+  hosted portal on 2026-08-03 with WiFi unavailable.
 - External L76K GPS support exists.
+- The operational setup AP uses the local administrator password, all operational
+  WebUI/API routes require authentication and local OTA defaults to disabled.
+- ABRP remains WiFi-only and was disabled for the validated AWS/LTE configuration.
 
 ## Firmware structure
 
@@ -76,17 +82,26 @@ Implemented in the repository:
 - per-device AWS IoT credentials loaded from LittleFS;
 - shared AWS IoT firmware transport for both boards.
 
+Implemented and validated in the controlled AWS development stack:
+
+- server-side user-to-vehicle authorization for REST and WebSocket;
+- atomic, expiring single-use vehicle claim flow;
+- controlled administrator claim issuance;
+- hosted Cognito login/logout and per-user vehicle isolation at `/motbeta/`;
+- exact HTTPS CORS for the canonical `www` portal origin.
+
 Not implemented:
 
-- user-to-vehicle authorization;
-- user/device registration and claim flow;
 - ownership transfer and recovery;
 - automated device certificate provisioning or rotation;
 - cloud-managed OTA.
+- public account self-registration.
 
-Authentication therefore exists, but tenant isolation does not. At present, an
-authenticated portal user is not restricted to an assigned vehicle. The portal
-must not be opened to multiple untrusted beta users until this is corrected.
+Authentication, assignment enforcement and controlled claiming now exist in the
+development AWS account and hosted pilot portal. Two controlled users passed
+exclusive-list, symmetric guessed-ID, live revoke/restore, expired-connection and
+hosted role-separation tests. Public self-registration, lifecycle recovery and the
+remaining release/security gates are separate follow-up work.
 
 ## Vehicle integration
 
@@ -105,18 +120,26 @@ No choice is currently approved.
 
 ## Validation status
 
-The repository contains extensive historical validation notes and local ignored
-PlatformIO build artifacts. During the 2026-07-31 Codex takeover audit, no build,
-hardware test, deployment or cloud inspection was performed. Current head builds,
-deployed AWS state and physical-device behaviour therefore remain to be
-revalidated before beta release.
+Portal authorization and ONB-001.B2 have local, deployed-stack and hosted browser
+evidence dated 2026-08-03. A previously unassigned no-GPS WROOM was erased,
+provisioned with a unique AWS identity, claimed as `beta-02` by an existing user
+and validated through the hosted portal. WROOM local security and AWS operation
+were physically checked. On 2026-08-03 the LilyGO AWS build was hardened, flashed
+without erasing its device identity, connected through LTE/TLS with WiFi absent and
+delivered live CAN/GPS telemetry to the portal. Release-candidate evidence still
+requires the exact final documentation commit, full tests and recorded artifact
+hashes.
 
 ## Documentation status
 
-Governance 1.0 is present on `develop`. The wider documentation still contains two
-generations plus historical sprint packages. Several status and roadmap pages are
-stale. Consolidation is active work; historical material should be retained as
-history rather than presented as current truth.
+DOC-001 completed a static, source-based documentation baseline on 2026-08-02.
+Current navigation, canonical topic ownership, beta/support drafts, ADR/history
+classification and the validation handover are present. Historical packages remain
+retained and visibly separated; ambiguous rationale and destructive relocation wait
+for ChatGPT Classic export reconciliation.
+
+This documentation completion is not runtime evidence. Builds, hardware, deployed
+AWS state, screenshots and beta release readiness remain to be validated.
 
 ## Security and local credentials
 
@@ -131,3 +154,4 @@ resources were not inspected during the takeover audit.
 - [WORK_ORDER.md](WORK_ORDER.md)
 - [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
 - [SELF_REVIEW.md](SELF_REVIEW.md)
+- [DOC-001 validation and handover](../project/DOC-001-VALIDATION.md)

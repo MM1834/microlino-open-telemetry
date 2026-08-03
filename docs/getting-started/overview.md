@@ -1,5 +1,13 @@
 # Getting started
 
+> **Status:** Unverified legacy-oriented overview; use the beta guide for WROOM handoff
+>
+> **Audience:** Evaluator and beta provisioner
+
+For the intended AWS beta, begin with the
+[ESP32-WROOM beta guide](../beta/esp32-wroom-guide.md). The flow below predates the
+current provisioning and release gates.
+
 ## Choose your hardware
 
 | Goal | Recommended hardware |

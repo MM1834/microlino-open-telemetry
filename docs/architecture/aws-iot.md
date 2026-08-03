@@ -4,7 +4,7 @@
 >
 > **Audience:** Developer, administrator and security reviewer
 >
-> **Last verified:** 2026-07-31 against code and CloudFormation; deployed state unknown
+> **Last verified:** 2026-08-03 against code and the AWS development stack
 
 ## Implemented data path
 
@@ -14,10 +14,12 @@ flowchart LR
     IoT -->|"mot/# rule"| Ingest["State ingestion Lambda"]
     Ingest --> State["DynamoDB vehicle-state"]
     Ingest --> Connections["DynamoDB live-connections"]
+    Ingest --> Access["DynamoDB user-vehicle-access"]
     Ingest -->|"post_to_connection"| WSS["WebSocket API"]
 
     Portal["Static portal"] -->|"Bearer access token"| HTTP["HTTP Vehicle API\nJWT authorizer"]
     HTTP --> VehicleApi["Vehicle API Lambda"] --> State
+    VehicleApi --> Access
     Portal -->|"access_token on WSS connect"| Authorizer["WebSocket JWT authorizer"]
     Authorizer --> WSS
 ```
@@ -31,11 +33,12 @@ The browser never receives device certificates or private keys.
 | Device | AWS IoT Thing name + X.509 certificate | Authenticate one physical device to AWS IoT |
 | Vehicle | `vehicleId` in topic and DynamoDB partition key | Group telemetry for a vehicle |
 | User | Cognito `sub` in access token | Authenticate a portal user |
-| Ownership/access | Not implemented | Decide which user may access which vehicle |
+| Ownership/access | `UserVehicleAccess` keyed by Cognito `sub` + `vehicleId` | Authorize portal REST/WebSocket access |
 
-The missing ownership/access relationship is a release blocker for an untrusted
-multi-user beta. A valid Cognito token currently permits listing and subscribing to
-vehicles without a per-user assignment check.
+The ownership/access relationship is deployed in development and defaults to deny.
+ONB-001.A validated isolation with two controlled Cognito identities, including
+guessed-ID denial and live revocation/recovery. Production configuration and the
+controlled claim lifecycle remain release gates.
 
 ## Required onboarding boundary
 
@@ -51,14 +54,16 @@ sequenceDiagram
     Admin->>Backend: Invite user and register provisionable device
     User->>Portal: Sign in through Cognito
     User->>Portal: Enter/scan one-time claim proof
-    Portal->>Backend: Claim device with user token and proof
-    Backend->>Backend: Atomically bind user, vehicle and device
+    Portal->>Backend: Claim vehicle identity with user token and proof
+    Backend->>Backend: Atomically bind user and vehicleId
     Backend-->>Portal: Return only authorized vehicle
     Device->>IoT: Continue telemetry with device certificate
 ```
 
-This is the intended boundary, not yet an implemented API contract. Claim proofs,
-expiry, retry limits, replacement and recovery still require a reviewed design.
+This is the reviewed B2/B3 boundary, not yet an implemented API contract. The
+physical `deviceId`, Thing and certificate are inventory/provisioning identities;
+they are not added to the B2 DynamoDB claim transaction. Replacement and transfer
+use the separate, resumable B3 lifecycle.
 
 ## Device credentials
 
@@ -89,8 +94,7 @@ server-side vehicle access enforcement remain distinct controls.
 
 ## Not currently implemented
 
-- user-to-vehicle access table and enforcement;
-- account invitation/device-claim backend;
+- deployed account invitation/device-claim backend (B1/B2 exist locally only);
 - cloud telemetry history service;
 - Device Shadow integration;
 - Fleet Provisioning and certificate rotation;

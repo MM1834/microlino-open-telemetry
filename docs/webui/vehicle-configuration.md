@@ -1,5 +1,9 @@
 # Vehicle configuration
 
+> **Status:** Unverified local-WebUI reference; screenshot may be historical
+>
+> **Audience:** Beta provisioner and support
+
 ![Vehicle configuration](../assets/images/webui/vehicle-configuration.png)
 
 ## Purpose

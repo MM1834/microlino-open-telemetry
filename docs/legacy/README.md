@@ -1,5 +1,9 @@
 # Legacy Documentation
 
+> **Status:** Historical collection policy
+>
+> **Audience:** Documentation maintainer and auditor
+
 Legacy documents are preserved to retain project history and Git blame.
 
 Rules:

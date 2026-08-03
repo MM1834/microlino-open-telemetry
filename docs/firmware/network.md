@@ -1,52 +1,42 @@
-# Network management
+# Network Management
 
-## Interfaces
+> **Status:** Source-confirmed paths; runtime and failover unverified
+>
+> **Audience:** Firmware developer and beta-support author
 
-The firmware can expose or use these interfaces:
+## Common local network behaviour
 
-- Local setup access point.
-- WiFi station connection.
-- LTE packet-data connection on LilyGO.
+Both targets start a setup/fallback access point without a password and can attempt
+a configured WiFi station connection. The AP provides local setup/recovery but is
+not an authenticated security boundary.
 
-## Priority
+## ESP32-WROOM
 
-The intended LilyGO priority is:
+The network manager selects WiFi station mode when connected and otherwise reports
+the fallback AP address/mode. AWS IoT and legacy MQTT both depend on WiFi/network
+online state.
 
-1. Use configured WiFi when connected.
-2. Use LTE when WiFi is unavailable and GPRS/PDP is ready.
-3. Keep the setup AP available during development and recovery.
+## LilyGO
 
-```mermaid
-flowchart TD
-    Start --> WiFi{WiFi connected?}
-    WiFi -->|Yes| UseWiFi[Use WiFi transport]
-    WiFi -->|No| LTE{LilyGO GPRS connected?}
-    LTE -->|Yes| UseLTE[Use LTE transport]
-    LTE -->|No| AP[AP-only / retry]
-```
+The network/modem source includes WiFi and LTE/GPRS state. Transport behaviour is
+build-path specific:
 
-## Documented retry behavior
+- AWS IoT: WiFi connectivity is passed to the shared AWS client;
+- legacy MQTT: chooses WiFi first and LTE when WiFi is unavailable and GPRS is up.
 
-Earlier failover work documented:
+Historical retry intervals and successful modem-layer experiments are not a public
+guarantee for the current commit.
 
-- WiFi loss grace: 20 seconds.
-- WiFi retry while on LTE: 60 seconds.
-- LTE retry while unavailable: 15 seconds.
+## Security and support
 
-These values should be verified against the current source before being treated as a public API guarantee.
+- do not expose the AP/WebUI to the Internet;
+- treat configuration export as potentially secret;
+- avoid collecting WiFi SSIDs/passwords in public support logs;
+- validate AP naming, reconnect and recovery on beta hardware before publishing a
+  user procedure.
 
-## Access point
+## Related documents
 
-The AP provides a recovery path when station credentials are invalid or unavailable. Security hardening for the AP and local WebUI is planned for a dedicated security sprint.
-
-## LTE status
-
-Validated at the modem/network layer:
-
-- modem initialization,
-- SIM/network registration,
-- GPRS/PDP attachment,
-- provider-assigned IP,
-- DNS and TCP opening.
-
-MQTT receive/CONNACK handling over LTE remains experimental.
+- [Firmware overview](overview.md)
+- [LTE status](lte.md)
+- [Local device API](../api/local-device-api.md)

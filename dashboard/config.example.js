@@ -14,6 +14,7 @@ window.MOT_CONFIG = {
   // to AWS IoT Core with device credentials.
   awsBackend: {
     apiBaseUrl: "https://YOUR_API_ID.execute-api.eu-north-1.amazonaws.com",
+    onboardingApiBaseUrl: "https://YOUR_ONBOARDING_API_ID.execute-api.eu-north-1.amazonaws.com",
     websocketUrl: "wss://YOUR_WEBSOCKET_API_ID.execute-api.eu-north-1.amazonaws.com/$default",
 
     // REST remains the data source in Phase 4A. WebSocket carries connection,
@@ -35,7 +36,8 @@ window.MOT_CONFIG = {
     authorizeEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/oauth2/authorize",
     tokenEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/oauth2/token",
     logoutEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/logout",
-    redirectUri: "https://YOUR_DASHBOARD_URL/",
+    redirectUri: "https://YOUR_DASHBOARD_URL/callback",
+    logoutUri: "https://YOUR_DASHBOARD_URL/",
     scopes: ["openid", "email", "profile"]
   },
 

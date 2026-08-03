@@ -8,8 +8,8 @@ architecture discussions.
 | Term | Meaning |
 |---|---|
 | **MOT** | Microlino Open Telemetry. The complete project and platform. |
-| **Vehicle** | A logical Microlino identity represented by `vehicleId`. It is the primary application entity. |
-| **Vehicle ID** | Stable routing and storage identifier such as `pioneer` or `beta-01`. Used in MQTT topics and API paths. |
+| **Vehicle** | A logical portal/telemetry identity represented by `vehicleId`. In the current beta, different ESP32-WROOM, LilyGO or later adapter paths may be treated as separate vehicle entries even when exercised on the same physical Microlino. |
+| **Vehicle ID** | Stable routing, storage and authorization identifier such as `pioneer` or `beta-01`. Used in MQTT topics and API paths. Retaining or replacing it during an adapter replacement is an explicit lifecycle decision. |
 | **Device** | A physical telemetry adapter, for example one ESP32-WROOM or LilyGO board installed in a vehicle. |
 | **Device ID** | Firmware-visible hardware identity, typically derived from board-specific identifiers. |
 | **AWS IoT Thing** | AWS registry resource representing one physical device. |
@@ -62,5 +62,7 @@ These concepts must not be used interchangeably:
 user != vehicle != device != AWS IoT Thing
 ```
 
-A future user may access multiple vehicles. A vehicle may receive a
-replacement device. Each device retains its own cloud identity.
+A user may access multiple vehicles. The current model may map one adapter to one
+vehicle entry. If an adapter is replaced, the lifecycle explicitly decides whether
+the existing `vehicleId` is transferred or a new one is created; every physical
+device retains its own cloud identity.

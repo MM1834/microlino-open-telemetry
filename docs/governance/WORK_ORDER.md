@@ -4,23 +4,59 @@
 
 **Status:** Active
 
+**Audience:** Maintainer and contributor
+
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-07-31
+**Last reviewed:** 2026-08-03
 
 ## High priority
 
-### Consolidate repository documentation
+### Promote the hosted portal pilot — active
+
+**Active release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
+
+**Objective:** Close the remaining hosted release gates, consolidate the completed
+fresh-device and LilyGO LTE evidence, merge the reviewed implementation into
+`develop`, and prepare the first regular portal release through `main`.
+
+**User terminology:** Early externally supported accounts are pilot users, not a
+separate permanent beta-user class. Their accounts and assignments may continue
+unchanged into the regular release.
+
+### Harden local firmware administration — active
+
+**Active security sprint:** [FW-SEC-001 — Local Firmware Administration Hardening](../project/sprints/FW-SEC-001.md)
+
+**Objective:** Require a unique local device password, protect recovery AP and
+sensitive WebUI/OTA operations, and close secret-echo paths before hardware is
+issued to external pilot users. ESP32-WROOM and LilyGO now implement and physically
+pass the same local-administration boundary.
+
+### Execute SPR-0005 beta readiness and portal onboarding
+
+**Active sprint:** [SPR-0005 — ESP32-WROOM Beta Readiness and Portal Onboarding](../project/sprints/SPR-0005.md)
+
+**Execution model:** Credential safety and WROOM build/device evidence run in
+parallel with ONB-001 authorization/onboarding. Both lanes converge at the beta
+release gate; neither substitutes for the other.
+
+### Consolidate repository documentation — complete
 
 **Objective:** Establish one current documentation generation and preserve older
 material as explicitly historical evidence.
 
-**Current status:** In progress. Governance has been restored to `develop` and the
-takeover audit identified stale roadmaps, sprint status pages and contradictory AWS
-descriptions.
+**Completed sprint:** [DOC-001 — Documentation Consolidation and Beta Baseline](../project/sprints/DOC-001.md)
+
+**Current status:** The static baseline, beta/support drafts, history/ADR
+classification and [validation handover](../project/DOC-001-VALIDATION.md) are
+complete. Runtime evidence and maintainer release approval remain separate gates.
 
 **Expected outcome:** Maintainers and beta users can distinguish current product
 behaviour, planned work and historical implementation records.
+
+**Review boundary:** Historically ambiguous decisions and validation claims are
+preserved for reconciliation with the future ChatGPT Classic export.
 
 ### Prepare the ESP32-WROOM beta release
 
@@ -34,6 +70,8 @@ runbook.
 
 **Expected outcome:** Individually identifiable devices can be provisioned,
 recovered and supported without sharing credentials.
+
+**Current workstream:** SPR-0005.A through SPR-0005.D.
 
 ### Implement portal user and device onboarding
 
@@ -53,8 +91,17 @@ as an Internet-facing extension of the firmware's local WebUI.
 - recovery, replacement, ownership transfer and revocation;
 - audit events and support-safe diagnostics.
 
-**Current status:** Authentication and telemetry APIs exist. Ownership enforcement,
-registration and claiming do not.
+**Current status:** Authentication, telemetry APIs, controlled ownership and the
+B2 claim flow are deployed and two-user validated through the hosted pilot portal.
+Transfer/replacement, public registration and production release controls remain
+open.
+
+**Current workstream:** ONB-001 within SPR-0005.
+
+**Active slice:** ONB-001.B2 is deployed and functionally validated. B3 lifecycle
+implementation remains open and is explicitly outside REL-001. Retained legacy
+ownership still uses the bounded compatibility guard until a reviewed migration
+is required by fleet growth.
 
 ## Medium priority
 
@@ -64,11 +111,12 @@ Maintain one firmware line per board. Retire the GPS test environment and stop
 treating pre-AWS environments as separate product firmware generations. Preserve
 AWS IoT as a normal configurable feature while keeping local standalone operation.
 
-### Stabilize LilyGO LTE/GPRS
+### Qualify LilyGO LTE/GPRS beyond the functional pilot path
 
-Bring the LilyGO mobile transport to the same operational standard as its WiFi
-path. Validate modem ownership, TLS, time, reconnect/backoff, watchdog behaviour,
-power conditions and long-running telemetry before declaring it beta-ready.
+AWS IoT X.509 over LTE/TLS, WiFi preference/fallback and live CAN-to-portal data
+are functionally validated. Continue with long-running soak, weak-signal, modem
+recovery, watchdog and power-condition testing before declaring the path generally
+production-ready. ABRP remains WiFi-only.
 
 ### Revalidate the current repository revision
 

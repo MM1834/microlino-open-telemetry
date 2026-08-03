@@ -1,5 +1,7 @@
 # AWS-3.1 — Cloud Foundation
 
+> **Status:** Historical delivery record; deployed infrastructure is unverified.
+
 AWS-3.1 creates:
 
 ```text

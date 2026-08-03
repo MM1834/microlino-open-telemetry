@@ -1,5 +1,9 @@
 # Live status
 
+> **Status:** Unverified local-WebUI reference; screenshot may be historical
+>
+> **Audience:** Beta user, support and integrator
+
 ![Live status](../assets/images/webui/status-live-status.png)
 
 ## Purpose

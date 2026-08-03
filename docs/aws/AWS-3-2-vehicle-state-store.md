@@ -1,5 +1,7 @@
 # AWS-3.2 — Multi-vehicle current-state store
 
+> **Status:** Historical delivery record; use current architecture and CloudFormation for present behaviour.
+
 AWS-3.2 updates the existing `mot-aws-3-1` stack:
 
 ```text

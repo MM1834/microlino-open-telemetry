@@ -1,5 +1,9 @@
 # Authentication Flow
 
+> **Status:** Current source-based flow; deployed integration unverified
+>
+> **Audience:** Portal, backend and security developer
+
 ```text
 Browser Dashboard
     |

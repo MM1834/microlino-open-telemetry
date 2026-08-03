@@ -1,5 +1,7 @@
 # Cognito managed-login domain
 
+> **Status:** Historical implementation increment; the dashboard PKCE flow and API authorization now exist in code.
+
 ## Purpose
 
 `DashboardUserPoolDomain` exposes the Cognito OAuth 2.0 endpoints required by the browser dashboard. It is attached to the existing `DashboardUserPool`; it does not replace or modify the user pool or its app client.

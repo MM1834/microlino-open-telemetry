@@ -1,5 +1,9 @@
 # WebUI overview
 
+> **Status:** Source feature overview; screenshots and runtime unverified
+>
+> **Audience:** Beta user, support and firmware developer
+
 The local WebUI is the primary service and configuration interface of the MOT firmware. It is available through the device access point or through the configured WiFi network.
 
 ![WebUI dashboard](../assets/images/webui/dashboard-status.png)
@@ -42,4 +46,7 @@ flowchart TD
 
 ## Access point note
 
-The device can expose a local setup AP. During development it may remain active even while WiFi is connected. A future security sprint will make AP protection and WebUI authentication configurable.
+Both current network implementations start the local AP without a password. The
+WebUI and local APIs have no application login. Treat access as local/physical and
+never expose it directly to the public Internet. Screenshot and workflow details
+must be refreshed after beta firmware validation.

@@ -1,37 +1,37 @@
 # GPS
 
-The LilyGO firmware uses an external L76K GPS receiver and TinyGPSPlus-style parsing.
+> **Status:** Source-confirmed optional capability; hardware behaviour unverified
+>
+> **Audience:** Firmware developer, hardware reviewer and beta-support author
 
-## Pins
+Both targets use the shared `MotGps` NMEA parser. Detection and valid fix are
+different states: a receiver is detected after valid NMEA input, while coordinates
+are published only with a valid location fix.
 
-| Function | GPIO |
-|---|---:|
-| GPS RX | 22 |
-| GPS TX | 21 |
-| PPS | 23 |
-| WAKEUP | 19 |
+| Target | RX | TX | Baud | Hardware intent |
+|---|---:|---:|---:|---|
+| ESP32-WROOM | 16 | 17 | 9600 | Optional external GPS |
+| LilyGO | 22 | 21 | 9600 | External L76K; PPS 23, wakeup 19 |
 
-## Telemetry behavior
+GPS is optional in the shared readiness model and does not block basic readiness.
+ESP32-WROOM beta devices may therefore be delivered with or without GPS using the
+same intended firmware line.
 
-GPS is independent from vehicle CAN. Location and system topics can therefore be tested without connecting the device to OBD/CAN.
+Location MQTT topics are emitted only while the current fix is valid. Retained AWS
+coordinates may remain as last-known values when a fix disappears; consumers use
+receive metadata/freshness rather than presence alone.
 
-The firmware should only publish latitude/longitude when the GPS fix is valid.
+## Validation needs
 
-## Time
+- no-receiver detection timeout/state;
+- receiver present without fix;
+- first fix and loss/recovery;
+- coordinate, speed, satellite, HDOP and age accuracy;
+- ESP32 with/without GPS beta UI;
+- LilyGO GPS interaction with modem and power conditions.
 
-ABRP requires a valid Unix timestamp. Earlier ABRP work used NTP after WiFi connection and withheld ABRP sends until time passed a validity threshold.
+## Related documents
 
-The current LilyGO GPS status also exposes UTC derived from GPS when available. The final time-source policy should be documented after the ABRP/LTE work is completed.
-
-## Status fields
-
-Typical fields include:
-
-- receiver seen,
-- fix valid,
-- location age,
-- satellite count,
-- HDOP,
-- latitude/longitude,
-- speed,
-- UTC.
+- [MQTT topics](../api/mqtt-topics.md)
+- [ESP32-WROOM](../hardware/esp32-wroom.md)
+- [LilyGO](../hardware/lilygo-t-a7670.md)

@@ -59,7 +59,7 @@
           <div class="connection-item">
             <span id="live-dot" class="dot"></span>
             <div class="connection-copy">
-              <span class="connection-label">Live</span>
+              <span class="connection-label">Live-Kanal</span>
               <strong id="live-status">Nicht verbunden</strong>
               <span id="live-detail" class="connection-detail">WebSocket wartet</span>
             </div>
@@ -87,17 +87,50 @@
         <div id="auth-controls" class="auth-controls" hidden>
           <span id="auth-status" class="auth-status" aria-live="polite">Nicht angemeldet</span>
           <button id="auth-login" class="auth-button" type="button">Anmelden</button>
+          <button id="vehicle-add" class="auth-button" type="button" hidden>Fahrzeug hinzufügen</button>
           <button id="auth-logout" class="auth-button" type="button" hidden>Abmelden</button>
         </div>
         <span id="date-now" class="muted">--</span>
         <span id="time-now">--</span>
       </header>
 
+      <section id="onboarding-required" class="card onboarding-card" hidden>
+        <div>
+          <h1 id="onboarding-title">Fahrzeug verbinden</h1>
+          <p id="onboarding-description">Deinem Konto ist noch kein Fahrzeug zugewiesen. Gib den einmaligen Claim-Code ein, den du mit deinem Adapter erhalten hast.</p>
+        </div>
+        <form id="onboarding-form" class="onboarding-form" autocomplete="off">
+          <label for="onboarding-claim">Claim-Code</label>
+          <div class="onboarding-input-row">
+            <input id="onboarding-claim" name="claim" type="password" required spellcheck="false" autocapitalize="none" autocomplete="off" />
+            <button id="onboarding-submit" class="auth-button" type="submit">Fahrzeug verbinden</button>
+          </div>
+          <span id="onboarding-status" class="connection-detail" aria-live="polite"></span>
+        </form>
+      </section>
+
+      <section id="onboarding-admin" class="card onboarding-card" hidden>
+        <div>
+          <h1>Beta-Onboarding verwalten</h1>
+          <p>Erstellt einen einmaligen Claim für eine kontrollierte Fahrzeug-ID. Der Code wird nur hier angezeigt.</p>
+        </div>
+        <form id="admin-claim-form" class="onboarding-form" autocomplete="off">
+          <label for="admin-vehicle-id">Fahrzeug-ID</label>
+          <div class="onboarding-input-row">
+            <input id="admin-vehicle-id" name="vehicleId" required pattern="[a-z0-9][a-z0-9-]{0,63}" autocomplete="off" />
+            <button class="auth-button" type="submit">Claim erstellen</button>
+          </div>
+          <code id="admin-claim-output" class="claim-output" hidden></code>
+          <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
+          <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
+        </form>
+      </section>
+
       <section id="overview" class="hero card">
         <div class="hero-image-wrap"><img id="hero-image" src="img/microlino.jpeg" alt="Microlino" /></div>
         <div class="hero-title"><h1 id="vehicle-name">Microlino Pioneer</h1><p>Dein Microlino. Immer im Blick.</p></div>
         <div class="hero-metrics">
-          <div class="metric-card soc-card"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong></div>
+          <div class="metric-card soc-card"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="soc-updated" class="muted">Stand: --</small></div>
           <div class="metric-card"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
           <div class="metric-card"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><p>Ladestatus</p></div>
           <div class="metric-card"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Laufleistung</p></div>
@@ -190,11 +223,11 @@
   <script src="config.js"></script>
   <script src="js/auth/pkce.js"></script>
   <script src="js/auth/token-store.js"></script>
-  <script src="js/auth/auth-manager.js"></script>
+  <script src="js/auth/auth-manager.js?v=20260803-1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260803-4"></script>
+  <script src="js/app.js?v=20260803-4"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js"></script>

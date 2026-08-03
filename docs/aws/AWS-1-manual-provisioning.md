@@ -1,5 +1,7 @@
 # AWS-1: Manual AWS IoT bootstrap
 
+> **Status:** Historical delivery procedure; current deployment state is unverified.
+
 This package prepares one manually provisioned beta device.
 
 ## Recommended first device
@@ -45,8 +47,12 @@ git check-ignore -v secrets/aws-iot/test/private.key
 ## Create the first Thing
 
 ```bash
-./tools/bootstrap_aws_iot_thing.sh   eu-central-1   mot-esp32-f924f0   pioneer
+./tools/bootstrap_aws_iot_thing.sh   eu-central-1   mot-esp32-f924f0   pioneer   esp32-wroom
 ```
+
+The optional fourth argument records the hardware family in the Thing attributes.
+Use `lilygo-t-a7670` for LilyGO devices. Omitting it preserves the historical
+`esp32-wroom` default.
 
 The command creates:
 

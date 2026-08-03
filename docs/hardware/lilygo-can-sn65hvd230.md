@@ -1,5 +1,9 @@
 # LilyGO CAN via SN65HVD230
 
+> **Status:** Unverified wiring reference; physical review required
+>
+> **Audience:** Hardware and firmware maintainer
+
 Pin plan:
 
 ```text

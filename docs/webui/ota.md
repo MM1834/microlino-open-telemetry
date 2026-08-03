@@ -1,5 +1,9 @@
 # OTA and ABRP
 
+> **Status:** Unverified local-WebUI reference; use beta security gates before OTA
+>
+> **Audience:** Beta provisioner and support
+
 ![OTA and ABRP settings](../assets/images/webui/abrp-ota.png)
 
 ## Purpose

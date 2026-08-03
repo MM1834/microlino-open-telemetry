@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://microlino-open-telemetry.example/schemas/vehicle-ownership-v1.json",
+  "title": "MOT Vehicle Ownership v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "vehicleId", "ownerUserSub", "status", "createdAt",
+    "updatedAt", "version", "sourceClaimId"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "vehicleId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "ownerUserSub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "status": {"enum": ["ACTIVE", "TRANSFER_PENDING", "REVOKED", "RETIRED"]},
+    "createdAt": {"type": "integer", "minimum": 1},
+    "updatedAt": {"type": "integer", "minimum": 1},
+    "version": {"type": "integer", "minimum": 1},
+    "sourceClaimId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{22,64}$"}
+  }
+}

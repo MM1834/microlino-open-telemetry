@@ -1,5 +1,7 @@
 # AWS-2.3 dashboard data provider
 
+> **Status:** Historical delivery record; use the current portal architecture and API reference.
+
 ## Goal
 
 Separate dashboard rendering from the source of telemetry.

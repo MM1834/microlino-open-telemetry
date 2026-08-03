@@ -4,9 +4,11 @@
 
 **Status:** Active
 
+**Audience:** Maintainer and contributor
+
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-07-31
+**Last reviewed:** 2026-08-03
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -30,6 +32,44 @@ multiple deployed devices.
 Define durable cloud history storage, retention periods, export, deletion and cost
 controls. Browser-local history and the current DynamoDB state snapshot are not a
 complete fleet history service.
+
+Use modular service levels rather than treating every signal as equally live or
+historical:
+
+- reliable SOC and charging/not-charging state form the low-cost product core;
+- battery diagnostics are the primary candidate for bounded history;
+- GPS and live position remain optional because most owners know where the vehicle
+  is and location data adds privacy, storage and update-frequency costs;
+- each optional module needs an explicit update cadence, retention period and cost
+  budget before fleet rollout.
+
+Measure normal post-loop-fix telemetry volume before selecting limits. The unusually
+high June/July invocation sample may include a resolved publish loop and must not be
+used alone as the steady-state fleet forecast.
+
+## Charging and SOC notifications
+
+Add optional user notifications for charging milestones, initially by email and
+later by web push or an application channel. Pilot examples include notifying the
+driver when a configured SOC threshold is reached so a charging break can end, or
+when an intended 80% charge limit has been reached.
+
+The first implementation should consume normalized cloud state rather than add
+firmware-specific notification logic. It must include:
+
+- per-user and per-vehicle opt-in with a configurable SOC threshold;
+- rising-threshold detection rather than one notification per telemetry update;
+- at most one notification per threshold and charging session, with hysteresis or
+  equivalent deduplication;
+- delayed/missing telemetry handling and an explicit statement that this is an
+  informational notification, not a vehicle charge-control function;
+- privacy-safe delivery logs, unsubscribe controls and a bounded retention period;
+- publish, Lambda and delivery-volume metrics with a small cost budget.
+
+Email is the preferred pilot channel because it does not require an application or
+browser push subscription. Provider choice, verified sender/domain handling and
+production deliverability remain design decisions. Push is a later channel, not a
+release dependency.
 
 ## Portal roles and vehicle sharing
 
@@ -88,12 +128,20 @@ directories.
 
 ## Future transports and integrations
 
-Reassess Device Shadows, ABRP over LTE, notification processing and other external
-services only after the beta identity, authorization and connectivity foundations
-are reliable.
+Reassess Device Shadows, ABRP over the shared LilyGO LTE/TLS transport and other
+external services only after the beta identity, authorization and connectivity
+foundations are reliable. SOC notification processing is tracked separately above
+because it is a plausible bounded pilot feature.
 
 ## Related documents
 
 - [CURRENT_STATUS.md](CURRENT_STATUS.md)
 - [WORK_ORDER.md](WORK_ORDER.md)
 - [SELF_REVIEW.md](SELF_REVIEW.md)
+## Cloud cost controls
+
+Grant a billing-only maintainer view or provide regular exported cost evidence,
+create a small AWS Budget alert, and measure MQTT publishes per device. CloudWatch
+observed roughly 2.78 million state-ingest Lambda invocations between 2026-07-01
+and 2026-08-04. Evaluate batching/coarser state envelopes before fleet growth; do
+not optimize the low-frequency onboarding claim path ahead of telemetry ingestion.

@@ -25,6 +25,11 @@ String lilygoLteRxDebugJson();
 Client* lilygoTinyGsmClient();
 void lilygoTinyGsmMaintain();
 Client* lilygoTinyGsmSecureClient();
+bool lilygoConfigureAwsTlsClient(
+    const String& rootCa,
+    const String& certificate,
+    const String& privateKey
+);
 String lilygoTinyGsmTraceJson();
 void lilygoTinyGsmTraceClear();
 

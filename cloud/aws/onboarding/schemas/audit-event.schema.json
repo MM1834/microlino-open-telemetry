@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://microlino-open-telemetry.example/schemas/onboarding-audit-event-v1.json",
+  "title": "MOT Onboarding Audit Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "entityId", "eventKey", "eventType", "occurredAt",
+    "actorType", "result"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "entityId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "eventKey": {"type": "string", "pattern": "^[0-9]{10}#[A-Za-z0-9_-]{22,64}$"},
+    "eventType": {
+      "enum": [
+        "CLAIM_ISSUED", "CLAIM_FAILED", "CLAIM_CONSUMED", "CLAIM_REVOKED",
+        "OWNERSHIP_CREATED", "OWNERSHIP_TRANSFERRED", "OWNERSHIP_REVOKED",
+        "ADAPTER_REPLACEMENT_STARTED", "ADAPTER_REPLACED", "ADAPTER_REPORTED_LOST",
+        "ADAPTER_RECOVERED", "IDENTITY_RETIRED", "LIFECYCLE_OPERATION_FAILED"
+      ]
+    },
+    "occurredAt": {"type": "integer", "minimum": 1},
+    "actorType": {"enum": ["USER", "ADMIN", "SYSTEM"]},
+    "actorSub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "vehicleId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "claimId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{22,64}$"},
+    "result": {"enum": ["SUCCEEDED", "DENIED", "FAILED"]},
+    "reasonCode": {
+      "enum": [
+        "INVALID_OR_UNAVAILABLE", "ATTEMPT_LIMIT", "OWNERSHIP_CONFLICT",
+        "ADMIN_CANCELLED", "SECURITY_RESPONSE", "INTERNAL_ERROR", "DEFECT",
+        "LOST", "STOLEN", "OWNER_CHANGE", "RESET_RECOVERY", "END_OF_LIFE",
+        "EFFECTIVE_STATE_MISMATCH"
+      ]
+    },
+    "ttl": {"type": "integer", "minimum": 1}
+  }
+}

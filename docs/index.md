@@ -8,10 +8,13 @@
 
 ## Beta users
 
-1. [Getting started](getting-started/overview.md)
-2. [Hardware overview](hardware/overview.md)
-3. [Local WebUI](webui/overview.md)
-4. [Troubleshooting](troubleshooting/overview.md)
+1. [ESP32-WROOM beta documentation (draft)](beta/README.md)
+2. [ESP32-WROOM beta guide (draft)](beta/esp32-wroom-guide.md)
+3. [Safe support data](beta/safe-diagnostic-data.md)
+4. [Getting started reference](getting-started/overview.md)
+5. [Hardware overview](hardware/overview.md)
+6. [Local WebUI](webui/overview.md)
+7. [Troubleshooting](troubleshooting/overview.md)
 
 Portal account and device-onboarding documentation will be added under `user/`
 when that workflow is implemented and validated.
@@ -24,13 +27,18 @@ when that workflow is implemented and validated.
 4. [Architecture](architecture/README.md)
 5. [Architecture decisions](adr/README.md)
 6. [Firmware](firmware/overview.md)
-7. [Developer documentation](developer/README.md)
+7. [Firmware gap register](firmware/known-gaps.md)
+8. [Developer documentation](developer/README.md)
+9. [Beta provisioning and release gates](beta/README.md)
 
 ## Service operation
 
-- [Authentication administration](auth/admin/user-pool-operations.md)
+- [AWS as-is operations index](administrator/aws/README.md)
+- [Authentication documentation](auth/README.md)
+- [API reference](api/README.md)
 - [Protected API routes](administrator/authentication/protected-api-routes.md)
 - [AWS IoT credential handling](security/aws-iot-credentials.md)
+- [Cloud risk and gap register](security/cloud-risk-register.md)
 
 These pages require environment-specific revalidation before production use.
 
@@ -38,6 +46,11 @@ These pages require environment-specific revalidation before production use.
 
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Migration tracker](MIGRATION.md)
+- [Completed documentation sprint DOC-001](project/sprints/DOC-001.md)
+- [DOC-001 validation and handover](project/DOC-001-VALIDATION.md)
+- [Classification register](project/DOCUMENT_CLASSIFICATION.md)
+- [Architecture Decision Records](adr/README.md)
+- [Engineering history index](history/README.md)
 - [Engineering backlog](governance/ENGINEERING_BACKLOG.md)
 
 Sprint documents, AWS delivery stages and release notes are retained as historical

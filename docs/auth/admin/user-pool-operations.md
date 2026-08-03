@@ -1,5 +1,7 @@
 # Cognito User Pool – administrator guide
 
+> **Status:** Historical increment procedure; do not use its capability status as current state.
+
 ## Current capability
 
 After SPR-0004B.1.1, the user directory exists, but there is no dashboard app client or login page. Do not create production users yet. A test user may be created only after SPR-0004B.1.2 provides an app client and the authentication flow can be tested.
@@ -19,4 +21,6 @@ Expected MFA configuration: `OFF`.
 
 ## Responsibility boundary
 
-Cognito manages user identities and credentials. Vehicle ownership and fleet permissions are not stored in Cognito and will be implemented in `UserVehicleAccess` later.
+Cognito manages user identities and credentials. Vehicle ownership and fleet
+permissions are not stored in Cognito; the current development backend stores them
+in the separate `UserVehicleAccess` table.

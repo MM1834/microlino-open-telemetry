@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-16
 - **Decision owners:** MOT maintainers
+- **Audience:** Maintainer, firmware, cloud and portal developer
 - **Related:** ADR-003, ADR-004, ADR-005, ADR-006
 
 ## Context

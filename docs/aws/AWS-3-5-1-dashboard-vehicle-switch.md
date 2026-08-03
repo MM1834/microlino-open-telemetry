@@ -1,5 +1,7 @@
 # AWS-3.5.1 — Dashboard vehicle switching
 
+> **Status:** Historical delivery record; vehicle selection is not vehicle authorization.
+
 Fixes vehicle-specific state handling:
 
 - topic parsing uses the selected vehicle, not the configured default,
