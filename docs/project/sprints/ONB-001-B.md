@@ -86,12 +86,31 @@ than adding another inline Lambda to `cloud/aws/foundation/template.yaml`.
 
 - [x] B1 dry-run makes no cloud mutation and produces no sensitive output.
 - [x] B1 invite/assign is locally tested as idempotent and fail-closed on conflict/revocation.
-- [ ] Invitation success plus assignment failure is safely resumable.
+- [x] Invitation success plus assignment failure is safely resumable in an isolated test.
 - [ ] A user with no assignment sees the onboarding-required portal state.
 - [ ] B2 claim proof is expiring, single use, rate limited and stored only as a hash.
 - [ ] Claim consumption and assignment are atomic.
 - [ ] Replacement/transfer/recovery never reuses or exposes device credentials.
 - [ ] Every production mutation produces privacy-safe audit evidence.
+
+## Planned end-to-end beta validation
+
+After implementation, Change Set review and explicit approval for destructive cloud
+actions, use one controlled adapter currently assigned to `beta-01` as a clean
+onboarding case. Before removing anything, inventory and record the exact Cognito
+assignment, ownership, Thing, certificate, policy attachment and vehicle-state
+targets. Deletion or deactivation must be limited to those reviewed identifiers and
+must preserve unrelated users and the LilyGO path.
+
+A second WROOM without GPS can validate multiple `vehicleId` assignments for one
+user. Claiming, list isolation, stale/offline state and lifecycle recovery do not
+require live CAN data. Tests that assert changing SOC/charging telemetry require one
+selected adapter to be connected to the Microlino; normally the LilyGO may remain the
+vehicle's operational adapter.
+
+The validation sequence must separately approve account/assignment removal, IoT
+certificate deactivation, credential provisioning and firmware upload. A clean
+portal claim does not itself authorize any of those device operations.
 
 ## Stop gates
 

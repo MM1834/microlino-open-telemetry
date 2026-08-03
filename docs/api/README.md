@@ -9,8 +9,10 @@
 - [Vehicle REST API](vehicle-api.md)
 - [Live WebSocket API](live-websocket-api.md)
 
-These APIs require Cognito authentication for vehicle data, but per-user vehicle
-authorization is not implemented.
+These APIs require Cognito authentication and enforce per-user vehicle access in
+the validated development stack. ONB-001.A proved two-user REST/WebSocket isolation,
+guessed-ID denial and live revocation/recovery. Production configuration and the
+ONB-001.B claim lifecycle remain release gates.
 
 ## Device-local APIs
 

@@ -4,7 +4,7 @@
 >
 > **Audience:** Developer, administrator and security reviewer
 >
-> **Last verified:** 2026-08-02 against code and the AWS development stack
+> **Last verified:** 2026-08-03 against code and the AWS development stack
 
 ## Implemented data path
 
@@ -36,8 +36,9 @@ The browser never receives device certificates or private keys.
 | Ownership/access | `UserVehicleAccess` keyed by Cognito `sub` + `vehicleId` | Authorize portal REST/WebSocket access |
 
 The ownership/access relationship is deployed in development and defaults to deny.
-The remaining release blocker for an untrusted multi-user beta is live isolation
-evidence using at least two controlled Cognito identities.
+ONB-001.A validated isolation with two controlled Cognito identities, including
+guessed-ID denial and live revocation/recovery. Production configuration and the
+controlled claim lifecycle remain release gates.
 
 ## Required onboarding boundary
 
@@ -53,14 +54,16 @@ sequenceDiagram
     Admin->>Backend: Invite user and register provisionable device
     User->>Portal: Sign in through Cognito
     User->>Portal: Enter/scan one-time claim proof
-    Portal->>Backend: Claim device with user token and proof
-    Backend->>Backend: Atomically bind user, vehicle and device
+    Portal->>Backend: Claim vehicle identity with user token and proof
+    Backend->>Backend: Atomically bind user and vehicleId
     Backend-->>Portal: Return only authorized vehicle
     Device->>IoT: Continue telemetry with device certificate
 ```
 
-This is the intended boundary, not yet an implemented API contract. Claim proofs,
-expiry, retry limits, replacement and recovery still require a reviewed design.
+This is the reviewed B2/B3 boundary, not yet an implemented API contract. The
+physical `deviceId`, Thing and certificate are inventory/provisioning identities;
+they are not added to the B2 DynamoDB claim transaction. Replacement and transfer
+use the separate, resumable B3 lifecycle.
 
 ## Device credentials
 
@@ -91,7 +94,6 @@ server-side vehicle access enforcement remain distinct controls.
 
 ## Not currently implemented
 
-- user-to-vehicle access table and enforcement;
 - account invitation/device-claim backend;
 - cloud telemetry history service;
 - Device Shadow integration;

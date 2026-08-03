@@ -53,9 +53,12 @@ stateDiagram-v2
     CANCELLED --> [*]
 ```
 
-`operationId` is the idempotency key. A retry resumes the recorded operation; it
-must not create another Thing, certificate, ownership or access record. State changes
-use optimistic `version` conditions and append privacy-safe audit events.
+`operationId` is the idempotency key. A retry resumes from the recorded checkpoint
+and must not create another ownership or access record. AWS IoT certificate creation
+cannot be made atomic with its checkpoint write: after an ambiguous failure the
+operator reconciles certificate IDs and permits at most one ACTIVE replacement.
+Other candidates are deactivated before the operation continues. State changes use
+optimistic `version` conditions and append privacy-safe audit events.
 
 ## Workflow matrix
 
@@ -84,16 +87,18 @@ fail-closed orchestration sequence:
 3. move the operation conditionally to `IN_PROGRESS`;
 4. for loss or transfer, deactivate the old certificate before granting or restoring
    access to a replacement;
-5. create a new certificate exactly once and deliver it only through the controlled
-   provisioning workflow, never through the user portal;
-6. verify the replacement Thing/policy/vehicle binding;
+5. record the provisioning checkpoint and create a new certificate; persist its
+   non-secret certificate ID, and reconcile/deactivate duplicates after an ambiguous
+   response so at most one replacement remains ACTIVE;
+6. deliver credentials only through the controlled provisioning workflow, never
+   through the user portal, then verify the Thing/policy/vehicle binding;
 7. atomically update ownership/access/inventory projections and append audit evidence;
 8. mark the operation `COMPLETED` only after effective-state verification.
 
-An interrupted operation stays visible as `IN_PROGRESS` or `FAILED`. It is not rolled
-forward by creating another unmanaged certificate. Compensating actions deactivate
-newly created but unassigned certificates and preserve enough non-secret identifiers
-for reconciliation.
+An interrupted operation stays visible as `IN_PROGRESS` or `FAILED`. Its `phase`,
+Thing names and certificate IDs provide reconciliation checkpoints. It is not rolled
+forward until effective AWS state has been inspected. Compensating actions deactivate
+newly created but unassigned certificates and preserve non-secret identifiers.
 
 ## Ownership transfer
 
@@ -128,7 +133,8 @@ private keys or direct certificate operations.
 - loss deactivates the effective certificate before recovery can complete;
 - factory reset cannot create a second unmanaged Thing or owner;
 - transfer revokes old REST/live access atomically with new ownership;
-- retries are idempotent and interrupted operations are reconcilable;
+- DynamoDB retries are idempotent and interrupted AWS operations are reconcilable;
+- at most one replacement certificate is ACTIVE after reconciliation;
 - every mutation has privacy-safe audit evidence and effective-state verification;
 - no lifecycle route or cloud resource is deployed by this design step.
 

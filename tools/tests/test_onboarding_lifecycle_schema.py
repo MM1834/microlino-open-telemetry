@@ -20,6 +20,7 @@ class OnboardingLifecycleSchemaTest(unittest.TestCase):
         self.assertEqual(1, self.props["schemaVersion"]["const"])
         self.assertIn("operationId", self.schema["required"])
         self.assertIn("version", self.schema["required"])
+        self.assertIn("phase", self.schema["required"])
 
     def test_all_lifecycle_operations_are_explicit(self):
         self.assertEqual(
@@ -39,9 +40,23 @@ class OnboardingLifecycleSchemaTest(unittest.TestCase):
     def test_transfer_and_replacement_identifiers_are_separate(self):
         for name in (
             "currentDeviceId", "replacementDeviceId", "currentThingName",
-            "replacementThingName", "sourceOwnerSub", "targetOwnerSub",
+            "replacementThingName", "currentCertificateId",
+            "replacementCertificateId", "sourceOwnerSub", "targetOwnerSub",
         ):
             self.assertIn(name, self.props)
+
+    def test_cross_service_reconciliation_has_checkpoints(self):
+        phases = set(self.props["phase"]["enum"])
+        self.assertTrue(
+            {
+                "PROVISIONING_STARTED", "NEW_CREDENTIAL_RECORDED",
+                "DOMAIN_STATE_COMMITTED", "EFFECTIVE_STATE_VERIFIED",
+            } <= phases
+        )
+        self.assertEqual(
+            "^[A-Fa-f0-9]{64}$",
+            self.props["replacementCertificateId"]["pattern"],
+        )
 
     def test_lifecycle_mutations_have_structured_audit_events(self):
         events = set(self.audit["properties"]["eventType"]["enum"])

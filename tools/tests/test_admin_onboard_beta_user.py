@@ -14,13 +14,14 @@ SPEC.loader.exec_module(MODULE)
 class FakeAws:
     def __init__(
         self, *, user=None, owners=None, existing=None, vehicle=True,
-        incomplete_scan=False,
+        incomplete_scan=False, put_failures=0,
     ):
         self.user = user
         self.owners = owners or set()
         self.existing = existing
         self.vehicle = vehicle
         self.incomplete_scan = incomplete_scan
+        self.put_failures = put_failures
         self.calls = []
 
     def run(self, args):
@@ -44,8 +45,12 @@ class FakeAws:
         if (service, operation) == ("dynamodb", "get-item"):
             return {"Item": self.existing} if self.existing else {}
         if (service, operation) == ("cognito-idp", "admin-create-user"):
-            return {"User": {"Attributes": [{"Name": "sub", "Value": "new-sub"}]}}
+            self.user = {"Attributes": [{"Name": "sub", "Value": "new-sub"}]}
+            return {"User": self.user}
         if (service, operation) == ("dynamodb", "put-item"):
+            if self.put_failures:
+                self.put_failures -= 1
+                raise MODULE.OnboardingError("simulated assignment failure")
             return {}
         raise AssertionError(args)
 
@@ -82,6 +87,20 @@ class ControlledOnboardingTests(unittest.TestCase):
         result = MODULE.onboard(args(apply=True), aws)
         self.assertEqual("already-active", result["assignment"])
         self.assertFalse(any(call[:2] == ["dynamodb", "put-item"] for call in aws.calls))
+
+    def test_invitation_assignment_failure_is_resumable(self):
+        aws = FakeAws(put_failures=1)
+        with self.assertRaisesRegex(MODULE.OnboardingError, "assignment failure"):
+            MODULE.onboard(args(apply=True), aws)
+
+        result = MODULE.onboard(args(apply=True), aws)
+        self.assertEqual("existing", result["user"])
+        self.assertEqual("created-active-owner", result["assignment"])
+        create_calls = [
+            call for call in aws.calls
+            if call[:2] == ["cognito-idp", "admin-create-user"]
+        ]
+        self.assertEqual(1, len(create_calls))
 
     def test_other_active_owner_fails_closed(self):
         aws = FakeAws(owners={"other-user"})

@@ -132,9 +132,10 @@ for the same vehicle.
 ## Adapter replacement and reset boundary
 
 B2 claims ownership of a portal vehicle identity; it does not provision or move an
-AWS IoT certificate. B3 decides whether replacement retains the `vehicleId` or
-creates a new one and separately revokes/replaces the Thing certificate. Defect,
-loss and factory reset never authorize a new owner or cloud identity by themselves.
+AWS IoT certificate. B3 retains the `vehicleId` by default during replacement while
+creating a new `deviceId`, Thing and certificate; intentional parallel beta units
+may instead keep separate portal identities. Defect, loss and factory reset never
+authorize a new owner or cloud identity by themselves.
 
 ## Cost boundary
 
