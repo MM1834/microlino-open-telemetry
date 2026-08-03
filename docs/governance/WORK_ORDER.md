@@ -12,13 +12,13 @@
 
 ## High priority
 
-### Promote the hosted portal pilot — active
+### Promote the hosted portal pilot — repository release complete
 
-**Active release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
+**Release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
 
-**Objective:** Close the remaining hosted release gates, consolidate the completed
-fresh-device and LilyGO LTE evidence, merge the reviewed implementation into
-`develop`, and prepare the first regular portal release through `main`.
+**Current result:** The reviewed implementation and evidence are merged through
+`develop` into `main`. The remaining operation is the separately controlled hosted
+copy from `/motbeta/` to `/dashboard/`; `/` remains the landing page.
 
 **User terminology:** Early externally supported accounts are pilot users, not a
 separate permanent beta-user class. Their accounts and assignments may continue
