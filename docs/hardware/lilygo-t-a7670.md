@@ -1,6 +1,8 @@
 # LilyGO T-A7670G
 
-The LilyGO T-A7670G is the mobile MOT platform with ESP32, SIMCom A7670G LTE modem and external L76K GPS.
+> **Status:** Source-declared assembly with current functional field evidence
+>
+> **Audience:** Hardware reviewer and firmware developer
 
 ![LilyGO board top](../assets/images/hardware/lilygo-t-a7670-board-top.png)
 
@@ -8,36 +10,40 @@ The LilyGO T-A7670G is the mobile MOT platform with ESP32, SIMCom A7670G LTE mod
 
 ![LilyGO with L76K GPS](../assets/images/hardware/lilygo-t-a7670-board-top-incl-l76k-gps-module.png)
 
-## Current status
+The board header identifies the T-A7670G R2/T-A7670X-GPS V1.1 assembly with an
+ESP32-WROVER, SIMCom A7670G-LLSE modem and external L76K GPS.
 
-| Function | Status |
-|---|---:|
-| Local WebUI/AP | Working |
-| WiFi MQTT | Working |
-| GPS | Working |
-| CAN diagnostics | Working |
-| Backup/Restore | Working |
-| OTA | Working |
-| LTE registration/GPRS | Working |
-| LTE MQTT | Experimental |
-| ABRP over LTE HTTPS | Deferred |
-
-## Pin usage
+## Declared pin usage
 
 | Function | GPIO | Notes |
 |---|---:|---|
-| Modem RX | 27 | ESP32 RX from modem |
-| Modem TX | 26 | ESP32 TX to modem |
-| Modem PWR | 4 | Power key |
-| Board POWER_ON | 12 | Board power enable |
-| Modem RST | 5 | Reset |
-| Modem DTR | 25 | DTR |
-| Modem RI | 33 | Ring indicator |
-| GPS RX | 22 | L76K GPS |
-| GPS TX | 21 | L76K GPS |
-| CAN RX | 32 | SN65HVD230 |
-| CAN TX | 13 | SN65HVD230 |
+| Modem RX/TX | 27/26 | ESP32 UART relative to modem |
+| Modem power/PWRKEY | 4 | Board-specific control |
+| Board power enable | 12 | `BOARD_POWER_ON_PIN` |
+| Modem reset | 5 | Reset control |
+| Modem DTR/RI | 25/33 | GPIO33 therefore avoided for CAN TX |
+| GPS RX/TX | 22/21 | 9600 baud |
+| GPS PPS/wakeup | 23/19 | Source-declared |
+| CAN RX/TX | 32/13 | External transceiver plan |
 
-## LTE note
+Pin declarations do not certify wiring, voltage levels, termination, power supply
+or connector pinout. Review the exact assembly before vehicle connection.
 
-The modem can register, attach to GPRS and open TCP connections. MQTT over LTE is still marked experimental because the broker sees a connection while the firmware times out waiting for MQTT CONNACK. WiFi via phone hotspot is currently the recommended field-test path.
+## Transport status
+
+- WiFi is preferred; the operational local AP is WPA2-protected with the local
+  administrator password.
+- The AWS IoT build falls back to the modem TLS client when WiFi is unavailable.
+- Modem registration/GPRS and LTE client code are present and functionally tested.
+- Legacy MQTT contains an LTE fallback candidate.
+- AWS IoT X.509 over LTE/TLS and live CAN/GPS delivery to the hosted portal passed
+  on 2026-08-03. Long-duration, weak-signal and adverse-power qualification remain
+  open.
+
+ABRP remains WiFi-only and is not part of the validated LTE path.
+
+## Related documents
+
+- [LTE firmware status](../firmware/lte.md)
+- [LilyGO CAN wiring plan](lilygo-can-sn65hvd230.md)
+- [Hardware comparison](comparison.md)

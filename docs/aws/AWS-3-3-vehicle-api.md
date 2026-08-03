@@ -1,5 +1,9 @@
 # AWS-3.3 — Read-only vehicle API
 
+> **Status:** Historical delivery record; use `docs/api/vehicle-api.md` for the current contract.
+>
+> **Audience:** Maintainer and auditor
+
 AWS-3.3 updates the existing CloudFormation stack with:
 
 ```text

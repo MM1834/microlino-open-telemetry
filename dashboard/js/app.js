@@ -20,7 +20,10 @@
     vehicleLastSeenSource: '',
     availableVehicles: [],
     selectedVehicleId: mqttCfg.vehicleId || 'pioneer',
-    authBusy: false
+    authBusy: false,
+    onboardingBusy: false,
+    onboardingRequired: false,
+    onboardingExpanded: false
   };
 
 
@@ -41,6 +44,102 @@
     if (message) status.textContent = message;
     else if (!auth.isConfigured()) status.textContent = 'Cognito nicht konfiguriert';
     else status.textContent = authenticated ? 'Angemeldet' : 'Nicht angemeldet';
+    renderOnboarding(state.onboardingRequired, '');
+  }
+
+  function renderOnboarding(required, message = '') {
+    const panel = $('onboarding-required');
+    const form = $('onboarding-form');
+    const input = $('onboarding-claim');
+    const status = $('onboarding-status');
+    const addButton = $('vehicle-add');
+    const title = $('onboarding-title');
+    const description = $('onboarding-description');
+    if (!panel) return;
+    state.onboardingRequired = Boolean(required);
+    const authenticated = Boolean(auth?.isAuthenticated());
+    const canClaim = authenticated && Boolean(state.dataProvider?.claimVehicle);
+    const visible = canClaim && (state.onboardingRequired || state.onboardingExpanded);
+    panel.hidden = !visible;
+    if (form) form.hidden = !visible;
+    if (addButton) {
+      addButton.hidden = !canClaim || state.onboardingRequired;
+      addButton.textContent = state.onboardingExpanded ? 'Abbrechen' : 'Fahrzeug hinzufügen';
+    }
+    if (title) title.textContent = state.onboardingRequired ? 'Fahrzeug verbinden' : 'Weiteres Fahrzeug hinzufügen';
+    if (description) description.textContent = state.onboardingRequired
+      ? 'Deinem Konto ist noch kein Fahrzeug zugewiesen. Gib den einmaligen Claim-Code ein, den du mit deinem Adapter erhalten hast.'
+      : 'Gib den einmaligen Claim-Code des zusätzlichen Fahrzeugs ein. Bestehende Fahrzeuge bleiben zugewiesen.';
+    if (input) input.disabled = state.onboardingBusy;
+    const button = $('onboarding-submit');
+    if (button) button.disabled = state.onboardingBusy;
+    if (status) status.textContent = message;
+  }
+
+  function toggleOnboarding() {
+    if (state.onboardingRequired || !auth?.isAuthenticated()) return;
+    state.onboardingExpanded = !state.onboardingExpanded;
+    renderOnboarding(false, '');
+    if (state.onboardingExpanded) $('onboarding-claim')?.focus();
+  }
+
+  async function submitOnboarding(event) {
+    event.preventDefault();
+    if (state.onboardingBusy || !state.dataProvider?.claimVehicle) return;
+    const input = $('onboarding-claim');
+    const claim = String(input?.value || '').trim();
+    if (!claim) {
+      renderOnboarding(state.onboardingRequired, 'Bitte Claim-Code eingeben.');
+      return;
+    }
+    state.onboardingBusy = true;
+    renderOnboarding(state.onboardingRequired, 'Fahrzeug wird zugewiesen…');
+    try {
+      await state.dataProvider.claimVehicle(claim);
+      if (input) input.value = '';
+      state.onboardingExpanded = false;
+      renderOnboarding(false, 'Fahrzeug erfolgreich zugewiesen.');
+    } catch (error) {
+      state.onboardingExpanded = true;
+      renderOnboarding(state.onboardingRequired, error?.message || 'Onboarding fehlgeschlagen');
+    } finally {
+      state.onboardingBusy = false;
+      const stillRequired = state.availableVehicles.length === 0;
+      renderOnboarding(stillRequired, stillRequired ? $('onboarding-status')?.textContent || '' : '');
+    }
+  }
+
+  function renderOnboardingAdmin(message = '') {
+    const panel = $('onboarding-admin');
+    if (!panel || !auth) return;
+    panel.hidden = !(auth.isAuthenticated() && auth.hasGroup?.('mot-beta-admins'));
+    const status = $('admin-claim-status');
+    if (status && message) status.textContent = message;
+  }
+
+  async function issueOnboardingClaim(event) {
+    event.preventDefault();
+    if (state.onboardingBusy || !state.dataProvider?.issueClaim) return;
+    const vehicleId = String($('admin-vehicle-id')?.value || '').trim();
+    const output = $('admin-claim-output');
+    state.onboardingBusy = true;
+    if (output) { output.hidden = true; output.textContent = ''; }
+    renderOnboardingAdmin('Claim wird erstellt…');
+    try {
+      const result = await state.dataProvider.issueClaim(vehicleId);
+      if (output) { output.textContent = result.claim || ''; output.hidden = false; }
+      renderOnboardingAdmin(`Claim für ${result.vehicleId} erstellt; gültig bis ${new Date(result.expiresAt * 1000).toLocaleString()}.`);
+    } catch (error) {
+      renderOnboardingAdmin(error?.message || 'Claim-Ausgabe fehlgeschlagen');
+    } finally {
+      state.onboardingBusy = false;
+    }
+  }
+
+  function clearIssuedClaim() {
+    const output = $('admin-claim-output');
+    if (output) { output.textContent = ''; output.hidden = true; }
+    renderOnboardingAdmin('Claim-Anzeige wurde geleert.');
   }
 
   async function beginLogin() {
@@ -85,6 +184,11 @@
       configuredSeconds(dashboardCfg.vehicleStaleSeconds, 600) * 1000,
       VEHICLE_ONLINE_MS
     );
+  const OBD2_FRESHNESS_KEYS = [
+    'display/soc',
+    'display/speed_kmh',
+    'display/odometer_km'
+  ];
 
   function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
@@ -193,13 +297,30 @@
     else if (stateName === 'connecting' || stateName === 'reconnecting') dot.classList.add('stale');
   }
 
-  function setVehicleLastSeen(value, source) {
-    const timestampMs = parseTimestampMs(value);
-    if (!timestampMs) return;
-
-    state.vehicleLastSeenMs = timestampMs;
-    state.vehicleLastSeenSource = source || '';
+  function updateObd2Freshness() {
+    let latest = 0;
+    let source = '';
+    OBD2_FRESHNESS_KEYS.forEach(key => {
+      const receivedAt = parseTimestampMs(state.metadata[key]?.receivedAt);
+      if (receivedAt > latest) {
+        latest = receivedAt;
+        source = key;
+      }
+    });
+    state.vehicleLastSeenMs = latest;
+    state.vehicleLastSeenSource = source;
     updateVehicleStatus();
+  }
+
+  function updateSocFreshness() {
+    const receivedAt = parseTimestampMs(state.metadata['display/soc']?.receivedAt);
+    if (!receivedAt) {
+      setText('soc-updated', 'Stand: unbekannt');
+      return;
+    }
+    const ageMs = Math.max(0, Date.now() - receivedAt);
+    const stateLabel = ageMs <= VEHICLE_ONLINE_MS ? 'aktuell' : 'veraltet';
+    setText('soc-updated', `Stand: ${relativeTime(receivedAt)} · ${stateLabel}`);
   }
 
   function updateDeviceInfo() {
@@ -303,6 +424,7 @@
     setText('date-now', d.toLocaleDateString(cfg.dashboard?.locale || 'de-CH'));
     setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
     updateVehicleStatus();
+    updateSocFreshness();
     if (state.values['location/latitude'] !== undefined && state.values['location/longitude'] !== undefined) {
       renderLocationStatus('mqtt');
     }
@@ -393,18 +515,17 @@
     const n = Number(s); if (s.trim() !== '' && Number.isFinite(n)) return n;
     try { return JSON.parse(s); } catch { return s; }
   }
-  function applyTopic(topic, payload) {
+  function applyTopic(topic, payload, metadata = null) {
     const base = baseTopic() + '/';
     const key = topic.startsWith(base) ? topic.slice(base.length) : topic;
     const val = parsePayload(payload);
     state.values[key] = val;
     state.lastMessage = Date.now();
-    if (
-      dataSourceCfg.type === 'legacy-mqtt' &&
-      (key.startsWith('location/') || key.startsWith('gps/'))
-    ) {
-      // A direct MQTT message is a real, newly received update. For AWS REST
-      // snapshots the authoritative timestamp comes from snapshot.metadata.
+    if (metadata?.receivedAt) {
+      state.metadata[key] = metadata;
+    } else if (dataSourceCfg.type === 'legacy-mqtt') {
+      // A direct legacy MQTT message is a newly received value. AWS REST and
+      // WebSocket updates carry their authoritative backend receivedAt value.
       state.metadata[key] = { receivedAt: Date.now() };
     }
     switch (key) {
@@ -429,12 +550,15 @@
         break;
       case 'system/last_seen_utc':
       case 'time/utc':
-        setVehicleLastSeen(val, key);
+        // Device heartbeat freshness belongs to the Cloud/device status. It must
+        // not make retained OBD2 values appear current.
         break;
       case 'system/uptime': case 'system/uptime_sec': setText('uptime', uptime(val)); break;
       case 'location/latitude': case 'location/lat': case 'gps/latitude': case 'gps/lat': updateCoords('mqtt'); break;
       case 'location/longitude': case 'location/lon': case 'gps/longitude': case 'gps/lon': updateCoords('mqtt'); break;
     }
+    if (OBD2_FRESHNESS_KEYS.includes(key)) updateObd2Freshness();
+    if (key === 'display/soc') updateSocFreshness();
 
     window.MOTHistoryRecorder?.update(state.values, {
       vehicleId: state.selectedVehicleId || mqttCfg.vehicleId || 'pioneer'
@@ -624,7 +748,7 @@ function startDataProvider() {
       onConnection: (ok, detail) => setOnline(ok, detail),
       onLiveConnection: status => setLiveStatus(status),
       onLiveMessage: message => console.debug('MOT live control message:', message),
-      onMessage: (topic, payload) => applyTopic(topic, payload),
+      onMessage: (topic, payload, metadata) => applyTopic(topic, payload, metadata),
       onVehicles: vehicles => {
         const previous = state.selectedVehicleId;
         updateVehicleSelector(vehicles);
@@ -639,9 +763,12 @@ function startDataProvider() {
           }
         }
       },
+      onOnboardingRequired: required => renderOnboarding(required),
       onSnapshot: snapshot => {
         if (snapshot?.vehicleId) state.selectedVehicleId = snapshot.vehicleId;
         state.metadata = snapshot?.metadata || {};
+        updateObd2Freshness();
+        updateSocFreshness();
         updateCoords('mqtt');
       },
       onError: error => console.error('MOT data provider error:', error)
@@ -661,6 +788,10 @@ function startDataProvider() {
   });
   $('auth-login')?.addEventListener('click', beginLogin);
   $('auth-logout')?.addEventListener('click', beginLogout);
+  $('vehicle-add')?.addEventListener('click', toggleOnboarding);
+  $('onboarding-form')?.addEventListener('submit', submitOnboarding);
+  $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
+  $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
   async function bootstrap() {
     initStatic();
     resetDashboardForVehicle(state.selectedVehicleId);
@@ -681,6 +812,7 @@ function startDataProvider() {
         setOnline(false, 'Anmeldung erforderlich');
         return;
       }
+      renderOnboardingAdmin();
     }
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();
@@ -696,4 +828,3 @@ function startDataProvider() {
 window.addEventListener('DOMContentLoaded', () => {
   window.MOTHistoryChart?.init();
 });
-

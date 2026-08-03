@@ -1,5 +1,12 @@
 # Troubleshooting
 
+> **Status:** Unverified legacy troubleshooting summary
+>
+> **Audience:** Beta support and firmware developer
+
+For ESP32-WROOM beta support, use the current draft
+[support runbook](../beta/support-runbook.md) first.
+
 ## MQTT rc=-2
 
 Connection failed before MQTT session.

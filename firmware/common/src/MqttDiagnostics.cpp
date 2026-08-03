@@ -9,8 +9,11 @@ MqttDiagResult MqttDiagnostics::test(
   uint32_t tcpTimeoutMs
 ) {
   MqttDiagResult r;
+  r.mode = "LEGACY_MQTT";
   r.host = host;
   r.port = port;
+  r.enabled = !host.isEmpty() && port > 0;
+  r.configured = r.enabled;
   r.wifiConnected = WiFi.status() == WL_CONNECTED;
   const uint32_t started = millis();
   String cleanHost = host;
@@ -115,6 +118,9 @@ static String esc(const String& s) {
 
 String MqttDiagnostics::toJson(const MqttDiagResult& r) {
   String json = "{";
+  json += "\"mode\":\"" + esc(r.mode) + "\",";
+  json += "\"enabled\":" + boolJson(r.enabled) + ",";
+  json += "\"configured\":" + boolJson(r.configured) + ",";
   json += "\"host\":\"" + esc(r.host) + "\",";
   json += "\"port\":" + String(r.port) + ",";
   json += "\"resolvedIp\":\"" + esc(r.resolvedIp) + "\",";

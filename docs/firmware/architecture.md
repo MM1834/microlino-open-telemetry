@@ -1,76 +1,72 @@
-# Firmware architecture
+# Firmware Architecture
 
-## Boot sequence
+> **Status:** Confirmed from current source; runtime unverified
+>
+> **Audience:** Firmware developer and maintainer
+
+## ESP32-WROOM startup order
 
 ```mermaid
-flowchart TD
-    Boot[ESP32 boot] --> Config[Load Preferences]
-    Config --> Modem[Initialize modem on LilyGO]
-    Modem --> GPS[Initialize GPS]
-    GPS --> CAN[Initialize TWAI/CAN]
-    CAN --> AP[Start local access point]
-    AP --> Network[Try configured WiFi, then LTE]
-    Network --> MQTT[Initialize MQTT]
-    MQTT --> Services[ABRP and optional services]
-    Services --> WebUI[Start WebUI and REST API]
-    WebUI --> Ready[Runtime loop ready]
+flowchart LR
+    Boot --> Telemetry --> Config --> Network --> MQTT --> ABRP --> WebUI --> CAN --> GPS --> Ready
 ```
 
-The exact order differs slightly between platforms, but configuration, communications and local recovery access are initialized before normal telemetry publishing.
+## LilyGO startup order
 
-## Runtime components
+```mermaid
+flowchart LR
+    Boot --> Telemetry --> Config --> Modem --> GPS --> CAN --> Network --> MQTT --> ABRP --> WebUI --> Ready
+```
+
+The sequence follows each target's `main.cpp`. Network modules start a local AP and
+attempt configured connectivity within their own setup logic.
+
+## Runtime loops
+
+ESP32-WROOM processes CAN, GPS, MQTT, WebUI and ABRP, updates system telemetry each
+second and publishes according to the configured interval.
+
+LilyGO processes modem, network, GPS, MQTT, ABRP, WebUI and CAN on every loop,
+updates system telemetry each second and yields with a short delay.
+
+## Shared data path
 
 ```mermaid
 flowchart TB
-    subgraph Inputs
-      CAN[CAN frames]
-      GPS[GPS NMEA]
-      Config[Stored configuration]
-    end
-
-    subgraph Core
-      Decoder[Decoder engine]
-      Telemetry[Telemetry state]
-      Network[Network manager]
-    end
-
-    subgraph Outputs
-      MQTT[MQTT]
-      API[REST API]
-      UI[WebUI]
-      ABRP[ABRP]
-    end
-
-    CAN --> Decoder --> Telemetry
-    GPS --> Telemetry
-    Config --> Network
-    Config --> MQTT
-    Telemetry --> MQTT
-    Telemetry --> API
-    Telemetry --> UI
-    Telemetry --> ABRP
-    Network --> MQTT
-    Network --> API
+    CAN["Raw CAN frames"] --> Engine["Decoder engine"]
+    Profile["Configured CAN profile"] --> Engine
+    Engine --> Telemetry["Shared telemetry state"]
+    GPS["MotGps state"] --> Telemetry
+    Telemetry --> Json["JSON endpoints"]
+    Telemetry --> MQTT["Legacy MQTT / AWS IoT"]
+    Telemetry --> ABRP["Optional ABRP"]
+    Config["Preferences / JSON import"] --> Runtime["Runtime services"]
+    Runtime --> Json
+    Runtime --> MQTT
+    Runtime --> ABRP
 ```
 
-## Shared telemetry model
+## Decoder profiles
 
-Hardware-specific modules should not publish directly from raw input. They first update the shared telemetry model. This keeps MQTT, WebUI and future integrations independent from board-specific CAN or GPS implementations.
+| Profile | Key | Implemented | Behaviour |
+|---|---|---:|---|
+| Display CAN | `display-can` | Yes | Decodes standard 11-bit frames `0x602`, `0x603`, `0x604` |
+| Standard CAN | `standard-can` | No | Intentionally empty pending official identifiers/scaling |
+| Disabled | `disabled` | Yes | Receives but does not decode frames |
 
-Typical groups are:
-
-- `display`
-- `charging`
-- `location`
-- `system`
+The Display-CAN decoder derives SOC, speed, odometer, estimated range, charging
+power/state and plugged state. Charging threshold and scaling comments show that
+some values still require real-vehicle calibration; code presence is not signal
+validation for other vehicle models.
 
 ## Platform separation
 
-Shared definitions live under `firmware/common/`. Board-specific implementations live under:
+Common modules define telemetry contracts and reusable logic. Board-specific code
+owns pins, modem/network behaviour, route registration and setup sequencing. The
+two WebUI implementations expose overlapping but non-identical local APIs.
 
-```text
-firmware/esp32-wroom/
-firmware/lilygo-t-a7670/
-```
+## Related documents
 
-This separation allows the decoder and topic model to remain common while network, modem, GPS and WebUI details can differ.
+- [Firmware overview](overview.md)
+- [CAN and decoder pipeline](can.md)
+- [Local device API](../api/local-device-api.md)

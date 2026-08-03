@@ -1,5 +1,9 @@
 # Telemetry Data Flow
 
+> **Status:** Current source-based overview; runtime validation pending
+>
+> **Audience:** Firmware, backend and portal developer
+
 ```text
 Microlino Display CAN
   -> ESP32 TWAI

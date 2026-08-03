@@ -4,10 +4,11 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  ./tools/bootstrap_aws_iot_thing.sh <region> <thing-name> <vehicle-id>
+  ./tools/bootstrap_aws_iot_thing.sh <region> <thing-name> <vehicle-id> [board-type]
 
 Example:
-  ./tools/bootstrap_aws_iot_thing.sh eu-central-1 mot-esp32-f924f0 pioneer
+  ./tools/bootstrap_aws_iot_thing.sh eu-central-1 mot-esp32-f924f0 pioneer esp32-wroom
+  ./tools/bootstrap_aws_iot_thing.sh eu-north-1 mot-lilygo-fe8ce0 pioneer lilygo-t-a7670
 
 Requirements:
   - AWS CLI v2 configured with an IAM identity allowed to manage AWS IoT
@@ -26,7 +27,7 @@ Important:
 EOF
 }
 
-if [[ $# -ne 3 ]]; then
+if [[ $# -lt 3 || $# -gt 4 ]]; then
   usage
   exit 2
 fi
@@ -34,6 +35,7 @@ fi
 REGION="$1"
 THING_NAME="$2"
 VEHICLE_ID="$3"
+BOARD_TYPE="${4:-esp32-wroom}"
 POLICY_NAME="${THING_NAME}-policy"
 OUT_DIR="secrets/aws-iot/${THING_NAME}"
 
@@ -51,6 +53,11 @@ if [[ ! "$VEHICLE_ID" =~ ^[A-Za-z0-9_-]+$ ]]; then
   exit 1
 fi
 
+if [[ "$BOARD_TYPE" != "esp32-wroom" && "$BOARD_TYPE" != "lilygo-t-a7670" ]]; then
+  echo "Invalid board type: $BOARD_TYPE"
+  exit 1
+fi
+
 mkdir -p "$OUT_DIR"
 chmod 700 "$OUT_DIR"
 
@@ -65,12 +72,13 @@ echo "AWS account : $ACCOUNT_ID"
 echo "AWS region  : $REGION"
 echo "Thing       : $THING_NAME"
 echo "Vehicle ID  : $VEHICLE_ID"
+echo "Board type  : $BOARD_TYPE"
 echo "IoT endpoint: $ENDPOINT"
 
 aws iot create-thing \
   --region "$REGION" \
   --thing-name "$THING_NAME" \
-  --attribute-payload "attributes={vehicleId=${VEHICLE_ID},boardType=esp32-wroom}" \
+  --attribute-payload "attributes={vehicleId=${VEHICLE_ID},boardType=${BOARD_TYPE}}" \
   >/dev/null
 
 CERT_JSON="$OUT_DIR/certificate.json"

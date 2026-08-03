@@ -1,21 +1,7 @@
-# LilyGO Web UI
+# LilyGO Local WebUI
 
-Screenshot placeholders:
+> **Status:** Planned guide; WiFi path must be revalidated before screenshots.
 
-```text
-docs/images/lilygo/
-```
-
-Recommended screenshots:
-
-- Main status
-- Network status
-- LTE modem status
-- L76K GPS status
-- CAN input
-- Decoded telemetry
-- MQTT status
-- ABRP status
-- Config page
-- Backup / Restore
-- OTA
+Current subsystem documentation is under [local WebUI](../webui/overview.md) and
+[LTE](../webui/lte.md). The future guide must distinguish dependable WiFi operation
+from the LTE/GPRS work still under validation.

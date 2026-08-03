@@ -1,5 +1,7 @@
 # Legacy ADR Set
 
-Historic ADRs document earlier architectural decisions and development stages.
+> **Status:** Redirect
 
-They remain part of the repository for historical traceability.
+Historical and retained decisions are classified in the
+[Architecture Decision Record index](README.md). “Legacy” does not mean invalid:
+some older-numbered records still describe an implemented local capability.

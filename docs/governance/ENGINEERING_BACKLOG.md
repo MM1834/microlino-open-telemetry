@@ -1,139 +1,147 @@
-# ENGINEERING_BACKLOG
+# Engineering Backlog
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Document Type:** Governance
-
 **Status:** Active
+
+**Audience:** Maintainer and contributor
 
 **Governance Version:** 1.0
 
-**Maintainer:** Repository Maintainers
+**Last reviewed:** 2026-08-03
 
----
+This backlog contains relevant work that is not part of the immediate active
+delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
 
-# Purpose
+## Cloud-managed firmware updates
 
-This document preserves engineering opportunities that are intentionally deferred but remain relevant to the long-term evolution of the Microlino Open Telemetry (MOT) repository.
+Evaluate OTA distribution through the portal or AWS after beta onboarding is
+stable. The firmware already supports local WebUI OTA, but remote OTA additionally
+requires signed artifacts, integrity verification, rollout controls, rollback,
+device status reporting and recovery procedures. AWS IoT Jobs is a candidate, not
+an approved implementation.
 
-Its purpose is to capture engineering topics with strategic value without creating implementation commitments. The Engineering Backlog represents future engineering opportunities rather than planned work.
+## AWS IoT fleet operations
 
----
+Design fleet provisioning, certificate rotation, revocation, device replacement
+and ownership transfer. Continue to prohibit a shared operational certificate for
+multiple deployed devices.
 
-# Scope
+## Telemetry history and retention
 
-The Engineering Backlog records engineering topics that:
+Define durable cloud history storage, retention periods, export, deletion and cost
+controls. Browser-local history and the current DynamoDB state snapshot are not a
+complete fleet history service.
 
-- provide long-term technical value
-- are intentionally deferred
-- require additional validation or research
-- may influence future repository architecture
-- should remain visible to future maintainers
+Use modular service levels rather than treating every signal as equally live or
+historical:
 
-The document intentionally excludes active engineering work, implementation tasks, bug tracking and release planning.
+- reliable SOC and charging/not-charging state form the low-cost product core;
+- battery diagnostics are the primary candidate for bounded history;
+- GPS and live position remain optional because most owners know where the vehicle
+  is and location data adds privacy, storage and update-frequency costs;
+- each optional module needs an explicit update cadence, retention period and cost
+  budget before fleet rollout.
 
----
+Measure normal post-loop-fix telemetry volume before selecting limits. The unusually
+high June/July invocation sample may include a resolved publish loop and must not be
+used alone as the steady-state fleet forecast.
 
-# Guiding Principle
+## Charging and SOC notifications
 
-The Engineering Backlog exists to preserve engineering opportunities without creating implementation pressure.
+Add optional user notifications for charging milestones, initially by email and
+later by web push or an application channel. Pilot examples include notifying the
+driver when a configured SOC threshold is reached so a charging break can end, or
+when an intended 80% charge limit has been reached.
 
-A topic may remain in this document indefinitely if there is no compelling reason to implement it.
+The first implementation should consume normalized cloud state rather than add
+firmware-specific notification logic. It must include:
 
-Deferred does not mean forgotten.
+- per-user and per-vehicle opt-in with a configurable SOC threshold;
+- rising-threshold detection rather than one notification per telemetry update;
+- at most one notification per threshold and charging session, with hysteresis or
+  equivalent deduplication;
+- delayed/missing telemetry handling and an explicit statement that this is an
+  informational notification, not a vehicle charge-control function;
+- privacy-safe delivery logs, unsubscribe controls and a bounded retention period;
+- publish, Lambda and delivery-volume metrics with a small cost budget.
 
----
+Email is the preferred pilot channel because it does not require an application or
+browser push subscription. Provider choice, verified sender/domain handling and
+production deliverability remain design decisions. Push is a later channel, not a
+release dependency.
 
-# Entry Criteria
+## Portal roles and vehicle sharing
 
-An entry should only be created when it represents a meaningful engineering opportunity.
+After basic ownership enforcement, evaluate support/operator roles, multiple users
+per vehicle, temporary sharing and least-privilege support access. Avoid encoding
+vehicle ownership solely in Cognito attributes.
 
-Typical examples include:
+## Authentication session lifecycle
 
-- architectural improvements
-- platform evolution
-- maintainability improvements
-- technology evaluations
-- engineering research
-- future abstraction opportunities
+Add a reviewed refresh-token and reauthentication strategy. The current portal
+clears expired sessions and requires a new login.
 
-The backlog should remain intentionally selective.
+## Additional Microlino model decoders
 
----
+Extend OBD/CAN decoding to additional vehicle models after obtaining verified
+traces and choosing the required hardware interface. Preserve passive monitoring
+and record signal confidence.
 
-# Recommended Entry Structure
+Hardware options requiring evaluation:
 
-Each entry should provide sufficient context for future evaluation.
+- rewire pins 1 and 9 of the current module to standard CAN;
+- add another CAN transceiver/interface;
+- use an ESP32-C6 generation board for the affected hardware variant.
 
-## Title
+The decision must consider electrical safety, isolation, connector compatibility,
+available CAN controllers, firmware portability and support burden.
 
-A concise description of the engineering opportunity.
+## Decoder profiles and compatibility data
 
-## Motivation
+Create a versioned vehicle-profile model with traceable signal evidence, firmware
+compatibility and safe fallback behaviour for unknown models.
 
-Why is this topic relevant?
+## Beta support tooling
 
-## Current Decision
+Evaluate privacy-conscious support bundles, device health summaries and audit-safe
+diagnostics. Support tooling must redact WiFi passwords, tokens, certificates and
+private keys by default.
 
-Why is implementation intentionally deferred?
+## Automated verification
 
-## Expected Benefit
+Introduce CI for documentation links, configuration/schema tests, firmware compile
+checks and isolated tests for inline backend handlers. Hardware-in-the-loop tests
+may be added later where they provide repeatable value.
 
-What long-term value could be achieved?
+## Cloud infrastructure modularization
 
-## Dependencies
+Consider extracting inline Lambda code from the monolithic CloudFormation template
+when the backend begins changing frequently. Keep infrastructure and deployable
+code versioned together.
 
-Which technical, architectural or project conditions should exist before the topic is reconsidered?
+## Local credential protection
 
----
+Move beyond ignore-only storage toward an explicit encrypted or OS-protected local
+workflow once beta onboarding no longer depends on the temporary credential
+directories.
 
-# Maintenance
+## Future transports and integrations
 
-Engineering Backlog entries should be reviewed periodically.
+Reassess Device Shadows, ABRP over the shared LilyGO LTE/TLS transport and other
+external services only after the beta identity, authorization and connectivity
+foundations are reliable. SOC notification processing is tracked separately above
+because it is a plausible bounded pilot feature.
 
-Possible outcomes include:
+## Related documents
 
-- remain deferred
-- move to WORK_ORDER
-- remove because no longer relevant
+- [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- [WORK_ORDER.md](WORK_ORDER.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)
+## Cloud cost controls
 
-Removing an entry is acceptable when the original engineering motivation no longer exists.
-
----
-
-# What Does Not Belong Here
-
-The following information shall not be recorded in the Engineering Backlog:
-
-- active implementation work
-- sprint planning
-- release planning
-- bug reports
-- feature requests
-- implementation notes
-- temporary ideas
-
-These topics belong elsewhere within the repository.
-
----
-
-# Relationship to Other Documents
-
-PROJECT_CONSTITUTION defines how engineering decisions are governed.
-
-CURRENT_STATUS describes what currently exists.
-
-WORK_ORDER defines engineering work that is actively being performed.
-
-SELF_REVIEW preserves engineering knowledge gained through implementation.
-
-ENGINEERING_BACKLOG preserves engineering opportunities before implementation begins.
-
----
-
-# Related Documents
-
-- PROJECT_CONSTITUTION.md
-- CURRENT_STATUS.md
-- WORK_ORDER.md
-- SELF_REVIEW.md
+Grant a billing-only maintainer view or provide regular exported cost evidence,
+create a small AWS Budget alert, and measure MQTT publishes per device. CloudWatch
+observed roughly 2.78 million state-ingest Lambda invocations between 2026-07-01
+and 2026-08-04. Evaluate batching/coarser state envelopes before fleet growth; do
+not optimize the low-frequency onboarding claim path ahead of telemetry ingestion.

@@ -1,5 +1,9 @@
 # LTE development
 
+> **Status:** Historical investigation collection; current LTE beta readiness is unverified.
+>
+> **Audience:** Firmware and hardware developer
+
 The LilyGO LTE path went through several implementations:
 
 1. custom SIMCom AT socket functions,
@@ -8,7 +12,10 @@ The LilyGO LTE path went through several implementations:
 4. LewisXhe TinyGSM A76XX transport,
 5. direct/native client and task/concurrency experiments.
 
-The current direction is to use the tested LewisXhe A76XX support while keeping modem ownership and network retry behavior serialized.
+The current LilyGO source still depends on the LewisXhe TinyGSM repository, but
+DOC-001 has not rebuilt or hardware-tested the path. AWS IoT firmware currently
+uses WiFi only; LTE transport code is confined to the legacy MQTT branch and
+diagnostic/network components.
 
 ## Important findings
 

@@ -1,5 +1,7 @@
 # Cognito domain operations
 
+> **Status:** Historical deployment-increment procedure; revalidate against the current stack before use.
+
 ## Deployment verification
 
 After deployment, confirm that the stack is `UPDATE_COMPLETE` and that `DashboardUserPoolDomain` is `CREATE_COMPLETE`.

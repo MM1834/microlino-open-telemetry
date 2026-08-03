@@ -1,10 +1,13 @@
-# Sprint Status
+# Historical Sprint Status
 
-- Current sprint: SPR-0004B.4A Rev.1 — WebSocket JWT Authorizer Stabilization
-- Branch: develop
-- Base commit: 4b486a9
-- Base working tree: SPR-0004B.4A integrated but not committed
-- CloudFormation stack: mot-aws-3-1
-- Dashboard phase: 4A live connection control, REST telemetry polling
-- Status after patch: ready for deployment and validation
-- Next planned sprint: SPR-0004B.4B — Live Telemetry Fan-Out
+This file described the repository at SPR-0004B.4A and is retained only as a
+historical pointer. It is not the current project status.
+
+Use:
+
+- `docs/governance/CURRENT_STATUS.md` for the current validated state;
+- `docs/governance/WORK_ORDER.md` for active work;
+- `docs/governance/ENGINEERING_BACKLOG.md` for deferred work.
+
+The SPR-0004B.4A implementation was followed by live telemetry fan-out,
+configuration consolidation, portal preparation and beta release engineering.

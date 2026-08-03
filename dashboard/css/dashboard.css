@@ -103,6 +103,8 @@
 
 /* SPR-0004B.3 Phase 2 authentication controls */
 .auth-controls { display:flex; align-items:center; gap:.55rem; }
+.onboarding-card{padding:24px;display:grid;grid-template-columns:minmax(240px,1fr) minmax(300px,1fr);gap:28px;align-items:center}.onboarding-card[hidden]{display:none}.onboarding-card h1{margin:0 0 8px}.onboarding-card p{margin:0;color:var(--muted)}.onboarding-form{display:flex;flex-direction:column;gap:8px}.onboarding-input-row{display:flex;gap:10px}.onboarding-input-row input{min-width:0;flex:1;border:1px solid var(--line);border-radius:9px;padding:11px;color:var(--text);background:var(--panel)}@media (max-width:900px){.onboarding-card{grid-template-columns:1fr}.onboarding-input-row{flex-direction:column}}
+.claim-output{display:block;white-space:normal;overflow-wrap:anywhere;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}.claim-output[hidden]{display:none}
 .auth-status { font-size:.78rem; color:var(--muted, #9fb0c3); white-space:nowrap; }
 .auth-button { border:1px solid rgba(255,255,255,.18); border-radius:.55rem; padding:.45rem .7rem; background:rgba(255,255,255,.08); color:inherit; cursor:pointer; }
 .auth-button:hover:not(:disabled) { background:rgba(255,255,255,.14); }

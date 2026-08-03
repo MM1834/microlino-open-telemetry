@@ -6,6 +6,9 @@
 #include <PubSubClient.h>
 
 struct MqttDiagResult {
+  String mode = "LEGACY_MQTT";
+  bool enabled = false;
+  bool configured = false;
   String host;
   uint16_t port = 1883;
   String resolvedIp;

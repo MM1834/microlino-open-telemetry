@@ -1,17 +1,13 @@
 # Reference Documentation
 
-This directory describes the **current** supported MOT platform.
+> **Status:** Current foundational reference
 
-Reading order:
+This directory retains stable project vocabulary and design principles:
 
-1. Introduction
-2. Design Principles
-3. Terminology
-4. Hardware
-5. Firmware
-6. Cloud
-7. Dashboard
-8. API
-9. Security
-10. Development
-11. Roadmap
+1. [Introduction](01-introduction.md)
+2. [Design principles](02-design-principles.md)
+3. [Terminology](03-terminology.md)
+
+Component reference now lives in the audience-specific directories linked from
+[the documentation index](../index.md). The old assumption that all current
+documentation belongs under `reference/` has been retired.

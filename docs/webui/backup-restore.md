@@ -1,5 +1,9 @@
 # Backup, Restore and Factory Reset
 
+> **Status:** Unverified local-WebUI reference; screenshot may be historical
+>
+> **Audience:** Beta user and support
+
 ![Backup, restore and factory reset](../assets/images/webui/backup-restore-factory-reset.png)
 
 ## Purpose

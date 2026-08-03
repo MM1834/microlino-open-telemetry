@@ -1,5 +1,9 @@
 # Hardware overview
 
+> **Status:** Bounded WROOM/LilyGO field evidence; pilot handoff still requires checklist review
+>
+> **Audience:** Evaluator, beta provisioner and hardware maintainer
+
 Microlino Open Telemetry supports several ESP32-based hardware variants: a classic ESP32-WROOM setup, the compact WeAct Studio ESP32 CAN485 board, and the LTE-capable LilyGO T-A7670G.
 
 ![Installed ESP32 system](../assets/images/hardware/system-esp32-installed.png)
@@ -10,7 +14,7 @@ Microlino Open Telemetry supports several ESP32-based hardware variants: a class
 |---|---:|---:|---:|---:|---|
 | ESP32-WROOM + SN65HVD230 | Yes | Yes | No | Optional | Development, garage and WiFi telemetry |
 | WeAct Studio ESP32 CAN485 | Yes | Yes | No | Optional | Compact WiFi CAN telemetry |
-| LilyGO T-A7670G | Yes | Yes | Experimental | L76K | Mobile telemetry and LTE development |
+| LilyGO T-A7670G | Yes | Yes | Functional pilot path | L76K | Mobile AWS telemetry; extended qualification open |
 
 ## Which hardware should I choose?
 
@@ -19,7 +23,7 @@ Microlino Open Telemetry supports several ESP32-based hardware variants: a class
 | Lowest cost and easiest debugging | ESP32-WROOM + SN65HVD230 |
 | Compact CAN hardware | WeAct Studio ESP32 CAN485 |
 | Telemetry while driving without hotspot | LilyGO T-A7670G |
-| Best current field-test stability | WiFi or phone hotspot path |
+| Best current field-test stability | WROOM WiFi or LilyGO WiFi-preferred/LTE-fallback AWS path |
 | LTE development | LilyGO T-A7670G |
 
 ## High-level architecture
@@ -41,6 +45,6 @@ flowchart LR
 |---|---:|---|
 | ESP32-WROOM + SN65HVD230 | Verified | Reference WiFi/CAN baseline |
 | WeAct Studio ESP32 CAN485 | Compatible | Same CAN GPIO mapping |
-| LilyGO T-A7670G + L76K | In progress | WiFi verified; LTE MQTT remains experimental |
+| LilyGO T-A7670G + L76K | Pilot candidate | AWS IoT LTE/TLS and live CAN/GPS portal path validated; soak/power tests open |
 | L76K GPS | Verified | Valid GPS fix and location telemetry |
 | Microlino Pioneer | Verified | Project vehicle for field tests |

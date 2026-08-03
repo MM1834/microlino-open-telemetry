@@ -3,6 +3,7 @@
 - **Status:** Accepted for implementation
 - **Date:** 2026-07-15
 - **Decision owners:** Microlino Open Telemetry maintainers
+- **Audience:** Maintainer, firmware, cloud and portal developer
 - **Scope:** Device-to-cloud communication, identity, authorization, WebApp access and future fleet operations
 
 ## Context

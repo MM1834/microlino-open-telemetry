@@ -48,6 +48,63 @@ static MotAwsCredentials awsCredentials;
 static MotAwsIotClient awsClient;
 static bool ntpSyncRequested = false;
 
+enum class AwsTransport { NONE, WIFI, LTE };
+static AwsTransport activeAwsTransport = AwsTransport::NONE;
+static bool lteTlsConfigured = false;
+
+static const char* awsTransportName(AwsTransport transport)
+{
+    switch (transport) {
+        case AwsTransport::WIFI: return "WiFi";
+        case AwsTransport::LTE: return "LTE";
+        default: return "None";
+    }
+}
+
+static AwsTransport wantedAwsTransport()
+{
+    if (WiFi.status() == WL_CONNECTED) return AwsTransport::WIFI;
+    if (lilygoGprsConnected()) return AwsTransport::LTE;
+    return AwsTransport::NONE;
+}
+
+static bool selectAwsTransport()
+{
+    const AwsTransport wanted = wantedAwsTransport();
+    if (wanted == activeAwsTransport) return wanted != AwsTransport::NONE;
+
+    awsClient.disconnect();
+    activeAwsTransport = AwsTransport::NONE;
+
+    if (wanted == AwsTransport::WIFI) {
+        if (!awsClient.begin(awsCredentials)) return false;
+        activeAwsTransport = wanted;
+        Serial.println("AWS IoT: transport selected WiFi");
+        return true;
+    }
+
+    if (wanted == AwsTransport::LTE) {
+        if (!lteTlsConfigured) {
+            lteTlsConfigured = lilygoConfigureAwsTlsClient(
+                awsCredentials.rootCa,
+                awsCredentials.certificate,
+                awsCredentials.privateKey
+            );
+        }
+        Client* secureClient = lilygoTinyGsmSecureClient();
+        if (!lteTlsConfigured || !secureClient ||
+            !awsClient.begin(awsCredentials, *secureClient)) {
+            Serial.println("AWS IoT: LTE TLS transport setup failed");
+            return false;
+        }
+        activeAwsTransport = wanted;
+        Serial.println("AWS IoT: transport selected LTE/TLS");
+        return true;
+    }
+
+    return false;
+}
+
 static void requestUtcSyncIfPossible()
 {
     if (ntpSyncRequested || WiFi.status() != WL_CONNECTED) return;
@@ -64,7 +121,7 @@ static MotAwsRuntime awsRuntime()
     runtime.deviceName = lilygoDeviceName();
     runtime.firmwareVersion = telemetry.system.firmwareVersion;
     runtime.networkMode = lilygoNetworkModeName();
-    runtime.transport = "WiFi";
+    runtime.transport = awsTransportName(activeAwsTransport);
     runtime.ipAddress = lilygoNetworkIp();
     runtime.wifiRssi =
         WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
@@ -83,16 +140,8 @@ void setupLilygoMqtt()
         return;
     }
 
-    if (!awsClient.begin(awsCredentials)) {
-        Serial.printf(
-            "AWS IoT: initialization failed: %s\n",
-            awsClient.status().message.c_str()
-        );
-        return;
-    }
-
     Serial.printf(
-        "AWS IoT: shared transport enabled endpoint=%s port=%u "
+        "AWS IoT: WiFi-priority LTE/TLS fallback enabled endpoint=%s port=%u "
         "clientId=%s vehicle=%s credentials=LittleFS\n",
         awsCredentials.endpoint.c_str(),
         awsCredentials.port,
@@ -105,10 +154,13 @@ void lilygoMqttLoop()
 {
     if (!config.awsServiceEnabled) return;
     requestUtcSyncIfPossible();
+    lilygoTinyGsmMaintain();
+
+    const bool transportAvailable = selectAwsTransport();
 
     awsClient.loop(
         awsRuntime(),
-        WiFi.status() == WL_CONNECTED
+        transportAvailable
     );
 
     if (!awsClient.connected()) return;
@@ -222,7 +274,7 @@ void publishLilygoTelemetry()
     );
     awsClient.publish(
         "system/mqtt_transport",
-        "WiFi",
+        awsTransportName(activeAwsTransport),
         true
     );
     awsClient.publishInt(
@@ -247,10 +299,12 @@ String lilygoMqttStatusJson()
         String(awsClient.enabled() ? "true" : "false") + ",";
     json += "\"connected\":" +
         String(awsClient.connected() ? "true" : "false") + ",";
-    json += "\"transport\":\"WiFi\",";
+    json += "\"transport\":\"" +
+        String(awsTransportName(activeAwsTransport)) + "\",";
     json += "\"transportAvailable\":" +
-        String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
-    json += "\"wantedTransport\":\"WiFi\",";
+        String(activeAwsTransport != AwsTransport::NONE ? "true" : "false") + ",";
+    json += "\"wantedTransport\":\"" +
+        String(awsTransportName(wantedAwsTransport())) + "\",";
     json += "\"mode\":\"AWS_IOT_X509_SHARED\",";
     json += "\"host\":\"" + esc(awsCredentials.endpoint) + "\",";
     json += "\"port\":" + String(awsCredentials.port) + ",";
@@ -290,10 +344,12 @@ String lilygoMqttDebugJson()
         String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
     json += "\"networkMode\":\"" +
         esc(lilygoNetworkModeName()) + "\",";
-    json += "\"wantedTransport\":\"WiFi\",";
-    json += "\"activeTransport\":\"WiFi\",";
+    json += "\"wantedTransport\":\"" +
+        String(awsTransportName(wantedAwsTransport())) + "\",";
+    json += "\"activeTransport\":\"" +
+        String(awsTransportName(activeAwsTransport)) + "\",";
     json += "\"transportAvailable\":" +
-        String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
+        String(activeAwsTransport != AwsTransport::NONE ? "true" : "false") + ",";
     json += "\"mqttMode\":\"AWS_IOT_X509_SHARED\",";
     json += "\"mqttHost\":\"" +
         esc(awsCredentials.endpoint) + "\",";

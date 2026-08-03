@@ -20,13 +20,16 @@ struct LilygoConfig {
     String deviceName;
     String vehicleId = "pioneer";
     String mqttPrefix = "mot";
-    bool otaEnabled = true;
+    bool otaEnabled = false;
     String otaPassword;
     bool abrpEnabled = false;
     DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN;
     bool onboardingComplete = false;
     String abrpApiKey;
     String abrpUserToken;
+
+    bool localAdminConfigured() const;
+    static bool validLocalAdminPassword(const String& password);
 };
 
 class LilygoConfigurationManager final : public ConfigurationManager {

@@ -1,5 +1,9 @@
 # CAN Profile Framework
 
+> **Status:** Current source-based architecture; hardware validation pending
+>
+> **Audience:** Firmware developer and vehicle-decoder contributor
+
 ## Purpose
 
 The CAN profile framework separates physical CAN reception from vehicle-specific decoding. Firmware selects one profile, while telemetry, MQTT, AWS and the dashboard continue to consume the same canonical telemetry model.

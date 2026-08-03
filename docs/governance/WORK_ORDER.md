@@ -1,145 +1,138 @@
-# WORK_ORDER
+# Work Order
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Document Type:** Governance
-
 **Status:** Active
+
+**Audience:** Maintainer and contributor
 
 **Governance Version:** 1.0
 
-**Maintainer:** Repository Maintainers
+**Last reviewed:** 2026-08-03
 
----
+## High priority
 
-# Purpose
+### Promote the hosted portal pilot — active
 
-This document defines the engineering work that is currently planned or actively being performed within the Microlino Open Telemetry (MOT) repository.
+**Active release sprint:** [REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md)
 
-Its purpose is to provide maintainers with a clear view of current priorities, ongoing implementation efforts and the next engineering objectives.
+**Objective:** Close the remaining hosted release gates, consolidate the completed
+fresh-device and LilyGO LTE evidence, merge the reviewed implementation into
+`develop`, and prepare the first regular portal release through `main`.
 
-Unlike the Engineering Backlog, this document represents work that is expected to progress in the foreseeable future.
+**User terminology:** Early externally supported accounts are pilot users, not a
+separate permanent beta-user class. Their accounts and assignments may continue
+unchanged into the regular release.
 
----
+### Harden local firmware administration — active
 
-# Scope
+**Active security sprint:** [FW-SEC-001 — Local Firmware Administration Hardening](../project/sprints/FW-SEC-001.md)
 
-WORK_ORDER contains engineering activities that are currently relevant for repository development.
+**Objective:** Require a unique local device password, protect recovery AP and
+sensitive WebUI/OTA operations, and close secret-echo paths before hardware is
+issued to external pilot users. ESP32-WROOM and LilyGO now implement and physically
+pass the same local-administration boundary.
 
-Typical topics include:
+### Execute SPR-0005 beta readiness and portal onboarding
 
-- active implementation work
-- planned engineering tasks
-- current development priorities
-- validation activities
-- documentation work
-- repository maintenance
+**Active sprint:** [SPR-0005 — ESP32-WROOM Beta Readiness and Portal Onboarding](../project/sprints/SPR-0005.md)
 
-Completed work should be removed or reflected in CURRENT_STATUS where appropriate.
+**Execution model:** Credential safety and WROOM build/device evidence run in
+parallel with ONB-001 authorization/onboarding. Both lanes converge at the beta
+release gate; neither substitutes for the other.
 
----
+### Consolidate repository documentation — complete
 
-# Guiding Principle
+**Objective:** Establish one current documentation generation and preserve older
+material as explicitly historical evidence.
 
-Only engineering work that is expected to receive active attention should appear in this document.
+**Completed sprint:** [DOC-001 — Documentation Consolidation and Beta Baseline](../project/sprints/DOC-001.md)
 
-WORK_ORDER represents the current engineering focus of the repository rather than a complete history of development.
+**Current status:** The static baseline, beta/support drafts, history/ADR
+classification and [validation handover](../project/DOC-001-VALIDATION.md) are
+complete. Runtime evidence and maintainer release approval remain separate gates.
 
----
+**Expected outcome:** Maintainers and beta users can distinguish current product
+behaviour, planned work and historical implementation records.
 
-# Priority Categories
+**Review boundary:** Historically ambiguous decisions and validation claims are
+preserved for reconciliation with the future ChatGPT Classic export.
 
-Engineering work may be grouped into practical priority categories.
+### Prepare the ESP32-WROOM beta release
 
-## High Priority
+**Objective:** Deliver a small number of ESP32-WROOM devices, with or without GPS,
+to beta testers with the essential setup, diagnostics, recovery and support
+documentation.
 
-Work currently receiving active engineering effort.
+**Dependencies:** Reproducible firmware builds, supported firmware-environment
+definition, device provisioning procedure, security review and a beta support
+runbook.
 
-## Medium Priority
+**Expected outcome:** Individually identifiable devices can be provisioned,
+recovered and supported without sharing credentials.
 
-Important work planned after current activities.
+**Current workstream:** SPR-0005.A through SPR-0005.D.
 
-## Low Priority
+### Implement portal user and device onboarding
 
-Useful work without immediate implementation priority.
+**Objective:** Add secure account onboarding, device claiming and per-user vehicle
+authorization to the portal website and backend.
 
-Priorities should remain simple and should support engineering planning rather than formal project management.
+**Scope boundary:** This is a portal/backend capability. It must not be implemented
+as an Internet-facing extension of the firmware's local WebUI.
 
----
+**Required design work:**
 
-# Recommended Entry Structure
+- canonical identity model for user, vehicle, device, Thing and certificate;
+- server-side `UserVehicleAccess` or equivalent authorization store;
+- authorization on REST list/snapshot routes and WebSocket subscriptions;
+- invitation or controlled beta account creation;
+- one-time device claim/bootstrap mechanism;
+- recovery, replacement, ownership transfer and revocation;
+- audit events and support-safe diagnostics.
 
-Each work item should provide enough information for maintainers to understand its purpose.
+**Current status:** Authentication, telemetry APIs, controlled ownership and the
+B2 claim flow are deployed and two-user validated through the hosted pilot portal.
+Transfer/replacement, public registration and production release controls remain
+open.
 
-## Title
+**Current workstream:** ONB-001 within SPR-0005.
 
-A concise description of the work item.
+**Active slice:** ONB-001.B2 is deployed and functionally validated. B3 lifecycle
+implementation remains open and is explicitly outside REL-001. Retained legacy
+ownership still uses the bounded compatibility guard until a reviewed migration
+is required by fleet growth.
 
-## Objective
+## Medium priority
 
-What should be achieved?
+### Simplify maintained firmware environments
 
-## Current Status
+Maintain one firmware line per board. Retire the GPS test environment and stop
+treating pre-AWS environments as separate product firmware generations. Preserve
+AWS IoT as a normal configurable feature while keeping local standalone operation.
 
-Current implementation progress.
+### Qualify LilyGO LTE/GPRS beyond the functional pilot path
 
-## Dependencies
+AWS IoT X.509 over LTE/TLS, WiFi preference/fallback and live CAN-to-portal data
+are functionally validated. Continue with long-running soak, weak-signal, modem
+recovery, watchdog and power-condition testing before declaring the path generally
+production-ready. ABRP remains WiFi-only.
 
-Technical or organizational prerequisites.
+### Revalidate the current repository revision
 
-## Expected Outcome
+Run controlled offline builds first, followed by isolated static/backend tests,
+read-only AWS inventory and explicitly approved hardware tests. Record evidence
+against the exact commit and environment.
 
-What will be available after completion?
+## Completion policy
 
----
+Work only moves to `CURRENT_STATUS` when it is present in the current code and has
+appropriate validation evidence. Deferred opportunities move to
+`ENGINEERING_BACKLOG`; historical implementation detail belongs under legacy or
+release documentation.
 
-# Maintenance
+## Related documents
 
-WORK_ORDER should be reviewed regularly.
-
-Possible outcomes include:
-
-- continue active work
-- reprioritize
-- move completed work to CURRENT_STATUS
-- move deferred work to ENGINEERING_BACKLOG
-
-The document should always reflect the repository's current engineering priorities.
-
----
-
-# What Does Not Belong Here
-
-The following information should not be recorded in WORK_ORDER:
-
-- completed work
-- engineering history
-- long-term research ideas
-- architectural governance
-- implementation experience
-- bug tracking details
-
-Those topics belong in other repository documents.
-
----
-
-# Relationship to Other Documents
-
-PROJECT_CONSTITUTION defines repository governance.
-
-CURRENT_STATUS describes the validated state of the repository.
-
-ENGINEERING_BACKLOG preserves engineering opportunities that are intentionally deferred.
-
-SELF_REVIEW preserves engineering knowledge gained during implementation.
-
-WORK_ORDER represents the engineering work that is currently planned or in progress.
-
----
-
-# Related Documents
-
-- PROJECT_CONSTITUTION.md
-- CURRENT_STATUS.md
-- ENGINEERING_BACKLOG.md
-- SELF_REVIEW.md
+- [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)

@@ -1,5 +1,9 @@
 # Network
 
+> **Status:** Behaviour validated; screenshots may be historical
+>
+> **Audience:** Beta user and support
+
 ![Network settings](../assets/images/webui/network.png)
 
 ![Network and MQTT configuration](../assets/images/webui/network-mqtt.png)
@@ -19,7 +23,8 @@ flowchart LR
 
 ## WiFi
 
-WiFi is currently the most stable path for field tests. A phone hotspot works well for mobile testing.
+WiFi is the preferred path when available. A phone hotspot remains useful during
+setup and diagnostics.
 
 Typical values:
 
@@ -32,7 +37,10 @@ Typical values:
 
 ## LTE
 
-LTE is available on the LilyGO T-A7670G firmware path. Network registration and PDP/GPRS are working, while MQTT over LTE is currently experimental.
+LTE is available on the LilyGO T-A7670G AWS firmware path. Network registration,
+PDP/GPRS, device-certificate TLS and AWS IoT telemetry were functionally validated
+with WiFi absent. Extended soak, weak-signal and power testing remain open. ABRP is
+not transported over LTE.
 
 ## MQTT
 
@@ -40,10 +48,12 @@ The broker host, port, username and password are configured here or on the MQTT-
 
 ## Best practices
 
-- Test WiFi/hotspot first.
-- Verify MQTT over WiFi before debugging LTE.
+- Test WiFi/hotspot first during provisioning.
+- For a controlled LTE fallback test, disable WiFi and verify that the reported
+  active AWS transport changes to `LTE`.
 - Export a backup after network configuration.
-- Keep AP access available during development in case WiFi credentials are wrong.
+- Configure the local administrator password before handoff; the operational AP
+  uses it as its WPA2 password.
 
 ## Related pages
 

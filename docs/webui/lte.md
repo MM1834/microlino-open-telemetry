@@ -1,5 +1,9 @@
 # LTE
 
+> **Status:** Unverified LilyGO reference; screenshot and runtime claims are historical
+>
+> **Audience:** Developer and support
+
 ![LTE status](../assets/images/webui/lte.png)
 
 ![LTE modem details](../assets/images/webui/lte-modem.png)

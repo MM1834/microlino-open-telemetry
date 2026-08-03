@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Client.h>
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 
@@ -51,6 +52,7 @@ public:
     MotAwsIotClient();
 
     bool begin(const MotAwsCredentials& credentials);
+    bool begin(const MotAwsCredentials& credentials, Client& transportClient);
     void loop(const MotAwsRuntime& runtime, bool networkOnline);
     void disconnect();
 
@@ -100,6 +102,7 @@ private:
     bool previousConnected_ = false;
 
     bool timeValid() const;
+    bool configure(const MotAwsCredentials& credentials, Client& transportClient);
     bool connect();
     void publishBirth();
     void publishHeartbeat(bool force);

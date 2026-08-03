@@ -1,134 +1,110 @@
-# AWS IoT architecture
+# AWS IoT and Portal Architecture
 
-> 🧪 **Status:** Target architecture. The first implementation uses ESP32-WROOM over WiFi. LilyGO LTE is deliberately excluded from the first cloud test.
+> **Status:** Partially implemented
+>
+> **Audience:** Developer, administrator and security reviewer
+>
+> **Last verified:** 2026-08-03 against code and the AWS development stack
 
-## Overview
+## Implemented data path
 
 ```mermaid
 flowchart LR
-    subgraph Devices
-      ESP[ESP32-WROOM]
-      LILY[LilyGO T-A7670]
-    end
+    Device["MOT device"] -->|"MQTT/TLS 8883\nunique X.509 certificate"| IoT["AWS IoT Core"]
+    IoT -->|"mot/# rule"| Ingest["State ingestion Lambda"]
+    Ingest --> State["DynamoDB vehicle-state"]
+    Ingest --> Connections["DynamoDB live-connections"]
+    Ingest --> Access["DynamoDB user-vehicle-access"]
+    Ingest -->|"post_to_connection"| WSS["WebSocket API"]
 
-    ESP -->|WiFi + MQTT/TLS + X.509| IOT[AWS IoT Core]
-    LILY -.->|WiFi first, LTE later| IOT
-
-    IOT --> RULES[IoT Rules Engine]
-    IOT --> SHADOW[Device Shadows]
-    IOT -.-> JOBS[AWS IoT Jobs later]
-
-    RULES --> STORE[Telemetry and history storage]
-    STORE --> API[Application backend API]
-    SHADOW --> API
-
-    USER[Browser / Mobile WebApp] -->|Login + HTTPS/WSS| API
-    IDP[User identity / Cognito] --> API
+    Portal["Static portal"] -->|"Bearer access token"| HTTP["HTTP Vehicle API\nJWT authorizer"]
+    HTTP --> VehicleApi["Vehicle API Lambda"] --> State
+    VehicleApi --> Access
+    Portal -->|"access_token on WSS connect"| Authorizer["WebSocket JWT authorizer"]
+    Authorizer --> WSS
 ```
 
-## Trust boundaries
+The browser never receives device certificates or private keys.
 
-```mermaid
-flowchart TD
-    DEVICE[Physical MOT device]
-    CERT[Unique device certificate/private key]
-    IOT[AWS IoT Core]
-    BACKEND[Application backend]
-    USER[Authenticated user]
+## Identity domains
 
-    CERT --> DEVICE
-    DEVICE -->|mutual TLS| IOT
-    IOT --> BACKEND
-    USER -->|user authentication| BACKEND
-```
+| Identity | Current representation | Purpose |
+|---|---|---|
+| Device | AWS IoT Thing name + X.509 certificate | Authenticate one physical device to AWS IoT |
+| Vehicle | `vehicleId` in topic and DynamoDB partition key | Group telemetry for a vehicle |
+| User | Cognito `sub` in access token | Authenticate a portal user |
+| Ownership/access | `UserVehicleAccess` keyed by Cognito `sub` + `vehicleId` | Authorize portal REST/WebSocket access |
 
-The device certificate authenticates a physical device. It does not authenticate a human user. The application backend maps users to vehicles and enforces authorization.
+The ownership/access relationship is deployed in development and defaults to deny.
+ONB-001.A validated isolation with two controlled Cognito identities, including
+guessed-ID denial and live revocation/recovery. Production configuration and the
+controlled claim lifecycle remain release gates.
 
-## Device identity
-
-Recommended Thing name:
-
-```text
-mot-<board>-<device-suffix>
-```
-
-Examples:
-
-```text
-mot-esp32-f924f0
-mot-lilygo-fe8ce0
-```
-
-The MQTT client ID should exactly match the Thing name.
-
-## Topic permissions
-
-Initial compatibility namespace:
-
-```text
-mot/<vehicleId>/#
-```
-
-Target policy behavior:
-
-```text
-device may connect only as its Thing name
-device may publish only to its telemetry/status namespace
-device may subscribe/receive only from its commands/configuration namespace
-```
-
-Future namespace:
-
-```text
-mot/v1/<thingName>/telemetry/#
-mot/v1/<thingName>/status/#
-mot/v1/<thingName>/commands/#
-mot/v1/<thingName>/configuration/#
-```
-
-## WebApp architecture
+## Required onboarding boundary
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant WebApp
-    participant Identity as Identity Provider
-    participant API as MOT Backend API
-    participant Store as Telemetry Store
+    participant Admin as Beta administrator
+    participant User as Beta user
+    participant Portal
+    participant Backend
+    participant Device
+    participant IoT as AWS IoT
 
-    User->>WebApp: Open application
-    WebApp->>Identity: Authenticate
-    Identity-->>WebApp: User token
-    WebApp->>API: Request authorized vehicles
-    API-->>WebApp: Vehicle list
-    WebApp->>API: Request/subscribe to telemetry
-    API->>Store: Read authorized vehicle data
-    Store-->>API: Telemetry
-    API-->>WebApp: Live/history data
+    Admin->>Backend: Invite user and register provisionable device
+    User->>Portal: Sign in through Cognito
+    User->>Portal: Enter/scan one-time claim proof
+    Portal->>Backend: Claim vehicle identity with user token and proof
+    Backend->>Backend: Atomically bind user and vehicleId
+    Backend-->>Portal: Return only authorized vehicle
+    Device->>IoT: Continue telemetry with device certificate
 ```
 
-## Device Shadow use
+This is the reviewed B2/B3 boundary, not yet an implemented API contract. The
+physical `deviceId`, Thing and certificate are inventory/provisioning identities;
+they are not added to the B2 DynamoDB claim transaction. Replacement and transfer
+use the separate, resumable B3 lifecycle.
 
-| Shadow | Purpose |
-|---|---|
-| `status` | firmware, network mode, last seen, summary state |
-| `configuration` | reporting intervals and future remote settings |
-| `ota` | desired and reported firmware version |
+## Device credentials
 
-## Failure modes
+Each beta device must have its own:
 
-| Failure | Expected behavior |
-|---|---|
-| WiFi unavailable | Local AP/WebUI remains available |
-| AWS unavailable | Device retries with backoff; local functions remain available |
-| Certificate revoked | Only that device loses cloud access |
-| Invalid UTC | TLS connection withheld |
-| Backend unavailable | Device can still publish to AWS IoT Core |
-| WebApp offline | Device operation is unaffected |
+- AWS IoT Thing;
+- certificate and private key;
+- least-privilege IoT policy;
+- Thing name used as MQTT client ID;
+- explicit vehicle association.
 
-## See also
+Current firmware loads the AWS endpoint, Thing name, vehicle ID, root CA,
+certificate and private key from LittleFS. Local credential folders are temporary
+operator inputs and are ignored by Git.
 
-- [ADR-0004](../adr/ADR-0004-aws-iot-target-architecture.md)
-- [Firmware MQTT](../firmware/mqtt.md)
-- [Firmware network](../firmware/network.md)
-- [AWS credential handling](../security/aws-iot-credentials.md)
+## Current topic namespace
+
+```text
+mot/<vehicleId>/display/...
+mot/<vehicleId>/charging/...
+mot/<vehicleId>/location/...
+mot/<vehicleId>/system/...
+mot/<vehicleId>/status/...
+```
+
+The current IoT Rule consumes `mot/#`. Per-device IoT policy enforcement and
+server-side vehicle access enforcement remain distinct controls.
+
+## Not currently implemented
+
+- deployed account invitation/device-claim backend (B1/B2 exist locally only);
+- cloud telemetry history service;
+- Device Shadow integration;
+- Fleet Provisioning and certificate rotation;
+- remote OTA/AWS IoT Jobs;
+- ownership transfer and self-service recovery.
+
+## Related documents
+
+- [AWS IoT target ADR](../adr/ADR-0004-aws-iot-target-architecture.md)
+- [Authentication](authentication.md)
+- [Credential handling](../security/aws-iot-credentials.md)
+- [Active work](../governance/WORK_ORDER.md)
+- [AWS roadmap](../roadmap/aws-iot.md)

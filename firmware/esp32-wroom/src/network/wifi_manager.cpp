@@ -16,7 +16,14 @@ static void startFallbackAp()
     Serial.printf("Starting fallback AP: %s\n", ssid.c_str());
 
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssid.c_str());
+    if (config.localAdminConfigured()) {
+        WiFi.softAP(ssid.c_str(), config.otaPassword.c_str());
+        Serial.println("Fallback AP security: WPA2 enabled");
+    } else {
+        // The open AP is permitted only for controlled first provisioning.
+        WiFi.softAP(ssid.c_str());
+        Serial.println("Fallback AP security: FIRST SETUP ONLY (open)");
+    }
 
     currentState = NetworkState::FALLBACK_AP;
     telemetry.system.networkMode = networkModeName();

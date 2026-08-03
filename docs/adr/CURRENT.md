@@ -1,5 +1,7 @@
 # Current ADR Set
 
-The current architecture is primarily defined by ADR-000 through ADR-003.
+> **Status:** Redirect
 
-Future ADRs should continue the new numbering sequence.
+The maintained decision classification is the
+[Architecture Decision Record index](README.md). Use the full filename identifier
+because the repository contains overlapping ADR number generations.

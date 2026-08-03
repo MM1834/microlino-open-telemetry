@@ -23,6 +23,32 @@
 static WebServer server(80);
 static bool rebootPending = false;
 static unsigned long rebootAtMs = 0;
+static bool otaUploadAllowed = false;
+
+static bool requireAdmin()
+{
+    if (!config.localAdminConfigured()) {
+        server.send(503, "text/plain", "Local admin setup required at /config");
+        return false;
+    }
+    if (!server.authenticate("admin", config.otaPassword.c_str())) {
+        server.requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
+static bool requireSameOrigin()
+{
+    const String host = server.hostHeader();
+    const String origin = server.header("Origin");
+    const String referer = server.header("Referer");
+    if (origin == "http://" + host || origin == "https://" + host ||
+        referer.startsWith("http://" + host + "/") ||
+        referer.startsWith("https://" + host + "/")) return true;
+    server.send(403, "text/plain", "Same-origin request required");
+    return false;
+}
 
 static String requestedReturnUrl()
 {
@@ -98,7 +124,7 @@ static void handleRoot()
     s += "<div class='card'><h2>CAN Input</h2><button onclick='loadCan()'>Refresh</button><pre id='can'>Loading...</pre><p><a href='/api/lilygo/can/frames'>Latest frames JSON</a></p></div>";
     s += "<div class='card'><h2>Decoded Telemetry</h2><button onclick='loadTelemetry()'>Refresh</button><pre id='telemetry'>Loading...</pre></div>";
 
-    s += "<div class='card'><h2>MQTT WiFi</h2>";
+    s += "<div class='card'><h2>Telemetry Transport (AWS IoT / Legacy MQTT)</h2>";
     s += "<button onclick='loadMqtt()'>Refresh</button>";
     s += "<pre id='mqtt'>Loading...</pre></div>";
 
@@ -146,19 +172,20 @@ static void handleConfig()
     s += "<p class='muted'>Each service is optional. GPS and CAN data are shared telemetry sources.</p></div>";
 
     s += "<label>WiFi SSID</label><input name='wifiSsid' value='" + config.wifiSsid + "'>";
-    s += "<label>WiFi Password</label><input name='wifiPass' type='password' value='" + config.wifiPass + "'>";
+    s += "<label>WiFi Password</label><input name='wifiPass' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
 
     s += "<label>LTE APN</label><input name='lteApn' value='" + config.lteApn + "'>";
 
     s += "<label>MQTT Host</label><input name='mqttHost' value='" + config.mqttHost + "'>";
     s += "<label>MQTT Port</label><input name='mqttPort' value='" + String(config.mqttPort) + "'>";
-    s += "<label>MQTT User</label><input name='mqttUser' value='" + config.mqttUser + "'>";
-    s += "<label>MQTT Password</label><input name='mqttPass' type='password' value='" + config.mqttPass + "'>";
+    s += "<label>MQTT User</label><input name='mqttUser' autocomplete='off' placeholder='Leave blank to keep stored value'>";
+    s += "<label>MQTT Password</label><input name='mqttPass' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
 
-    s += "<label>OTA Password</label><input name='otaPassword' type='password' value='" + config.otaPassword + "'>";
+    s += "<label>Local admin password</label><input name='otaPassword' type='password' minlength='12' maxlength='63' autocomplete='new-password' placeholder='12-63 characters; blank keeps stored value'>";
+    s += "<label style='display:block;margin-bottom:16px'><input type='checkbox' style='width:auto' name='otaEnabled' value='1'" + String(config.otaEnabled ? " checked" : "") + "> Enable local OTA temporarily</label>";
 
-    s += "<label>ABRP API Key</label><input name='abrpApiKey' type='password' value='" + config.abrpApiKey + "'>";
-    s += "<label>ABRP User Token</label><input name='abrpUserToken' type='password' value='" + config.abrpUserToken + "'>";
+    s += "<label>ABRP API Key</label><input name='abrpApiKey' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
+    s += "<label>ABRP User Token</label><input name='abrpUserToken' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
 
     s += "<button type='submit'>Save & reboot</button></form>";
 
@@ -189,13 +216,16 @@ static void handleConfig()
 
 static void handleConfigSave()
 {
+    if (config.localAdminConfigured() && !requireAdmin()) return;
+    if (!requireSameOrigin()) return;
+    const LilygoConfig previous = config;
     config.deviceName = server.arg("deviceName");
     config.vehicleId = server.arg("vehicleId");
     config.mqttPrefix = server.arg("mqttPrefix");
     config.canProfile = decoderProfileNormalize(server.arg("canProfile").toInt());
 
     config.wifiSsid = server.arg("wifiSsid");
-    config.wifiPass = server.arg("wifiPass");
+    if (!server.arg("wifiPass").isEmpty()) config.wifiPass = server.arg("wifiPass");
 
     config.lteApn = server.arg("lteApn");
 
@@ -204,17 +234,25 @@ static void handleConfigSave()
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = (uint16_t)server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;
-    config.mqttUser = server.arg("mqttUser");
-    config.mqttPass = server.arg("mqttPass");
+    if (!server.arg("mqttUser").isEmpty()) config.mqttUser = server.arg("mqttUser");
+    if (!server.arg("mqttPass").isEmpty()) config.mqttPass = server.arg("mqttPass");
 
-    config.otaPassword = server.arg("otaPassword");
+    if (!server.arg("otaPassword").isEmpty()) config.otaPassword = server.arg("otaPassword");
+    config.otaEnabled = server.hasArg("otaEnabled");
 
     config.abrpEnabled =
         server.arg("abrpEnabled") == "1" ||
         server.arg("abrpEnabled") == "true" ||
         server.arg("abrpEnabled") == "on";
-    config.abrpApiKey = server.arg("abrpApiKey");
-    config.abrpUserToken = server.arg("abrpUserToken");
+    if (!server.arg("abrpApiKey").isEmpty()) config.abrpApiKey = server.arg("abrpApiKey");
+    if (!server.arg("abrpUserToken").isEmpty()) config.abrpUserToken = server.arg("abrpUserToken");
+
+    const ConfigurationValidationResult validation = lilygoConfigManager.validate();
+    if (!validation.valid) {
+        config = previous;
+        server.send(400, "text/plain", validation.error);
+        return;
+    }
 
     lilygoConfigManager.save();
 
@@ -275,7 +313,7 @@ static void handleFactoryReset()
 static void handleConfigExport()
 {
     server.sendHeader("Content-Disposition", "attachment; filename=mot-lilygo-config.json");
-    server.send(200, "application/json", lilygoConfigManager.exportJson(true));
+    server.send(200, "application/json", lilygoConfigManager.exportJson(false));
 }
 
 static void handleReadiness()
@@ -412,23 +450,16 @@ static void handleGps()
     server.send(200, "application/json", l76kGpsStatusJson());
 }
 
-static bool otaAllowed()
-{
-    String pass = config.otaPassword;
-    pass.trim();
-
-    if (pass.isEmpty()) return true;
-
-    return server.hasArg("password") && server.arg("password") == pass;
-}
-
 static void handleOtaPage()
 {
+    if (!config.otaEnabled || !requireAdmin()) {
+        if (!config.otaEnabled) server.send(403, "text/plain", "OTA disabled");
+        return;
+    }
     String s = pageHeader("MOT LilyGO OTA");
 
     s += "<h1>OTA Update</h1>";
     s += "<form method='POST' action='/ota/update' enctype='multipart/form-data'>";
-    s += "<label>Password</label><input name='password' type='password'>";
     s += "<input type='file' name='firmware'>";
     s += "<button type='submit'>Upload firmware</button></form>";
     s += "<p><a href='/'>Back</a></p></body></html>";
@@ -438,12 +469,13 @@ static void handleOtaPage()
 
 static void handleOtaDone()
 {
-    if (!otaAllowed()) {
-        server.send(403, "text/plain", "OTA not allowed");
+    if (!otaUploadAllowed) {
+        server.send(401, "text/plain", "OTA not authorized");
         return;
     }
 
     bool ok = !Update.hasError();
+    otaUploadAllowed = false;
 
     server.send(ok ? 200 : 500, "text/plain", ok ? "OTA OK. Rebooting." : "OTA failed.");
 
@@ -455,16 +487,21 @@ static void handleOtaDone()
 
 static void handleOtaUpload()
 {
-    if (!otaAllowed()) return;
-
     HTTPUpload& upload = server.upload();
 
     if (upload.status == UPLOAD_FILE_START) {
-        Update.begin(UPDATE_SIZE_UNKNOWN);
+        otaUploadAllowed = config.otaEnabled && requireAdmin() && requireSameOrigin();
+        if (!otaUploadAllowed) return;
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_WRITE) {
-        Update.write(upload.buf, upload.currentSize);
+        if (!otaUploadAllowed) return;
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_END) {
-        Update.end(true);
+        if (!otaUploadAllowed) return;
+        if (!Update.end(true)) Update.printError(Serial);
+    } else if (upload.status == UPLOAD_FILE_ABORTED) {
+        Update.abort();
+        otaUploadAllowed = false;
     }
 }
 
@@ -516,7 +553,7 @@ static void handleWizard()
         case 6:
             html += "<h2>Validation</h2><p>Read the live LilyGO diagnostics before completing onboarding.</p>";
             html += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
-            html += "<script>async function getj(u){const r=await fetch(u);return await r.json()}async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const n=await getj('/api/lilygo/network'),m=await getj('/api/lilygo/modem'),g=await getj('/api/lilygo/gps'),c=await getj('/api/lilygo/can'),q=await getj('/api/lilygo/mqtt');o.textContent=`Network:\n${JSON.stringify(n,null,2)}\n\nModem:\n${JSON.stringify(m,null,2)}\n\nGPS:\n${JSON.stringify(g,null,2)}\n\nCAN:\n${JSON.stringify(c,null,2)}\n\nMQTT:\n${JSON.stringify(q,null,2)}`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            html += "<script>async function getj(u){const r=await fetch(u);return await r.json()}async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const n=await getj('/api/lilygo/network'),m=await getj('/api/lilygo/modem'),g=await getj('/api/lilygo/gps'),c=await getj('/api/lilygo/can'),q=await getj('/api/lilygo/mqtt');o.textContent=`Network:\n${JSON.stringify(n,null,2)}\n\nModem:\n${JSON.stringify(m,null,2)}\n\nGPS:\n${JSON.stringify(g,null,2)}\n\nCAN:\n${JSON.stringify(c,null,2)}\n\nTelemetry transport:\n${JSON.stringify(q,null,2)}`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
             html += "<p><a href='/?skip=1&return=/wizard?step=6'>Open full status</a></p>";
             break;
         default:
@@ -559,40 +596,50 @@ static void handleOnboardingRestart()
 
 void setupLilygoWeb()
 {
-    server.on("/", HTTP_GET, []() { if (config.onboardingComplete || server.hasArg("skip")) handleRoot(); else handleWizard(); });
-    server.on("/wizard", HTTP_GET, handleWizard);
-    server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
-    server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
-    server.on("/api/onboarding/restart", HTTP_POST, handleOnboardingRestart);
-    server.on("/config", HTTP_GET, handleConfig);
+    const char* headerKeys[] = {"Origin", "Referer"};
+    server.collectHeaders(headerKeys, 2);
+
+    server.on("/", HTTP_GET, []() {
+        if (!config.localAdminConfigured()) return handleConfig();
+        if (!requireAdmin()) return;
+        if (config.onboardingComplete || server.hasArg("skip")) handleRoot();
+        else handleWizard();
+    });
+    server.on("/wizard", HTTP_GET, []() { if (requireAdmin()) handleWizard(); });
+    server.on("/api/onboarding", HTTP_GET, []() { if (requireAdmin()) handleOnboardingStatus(); });
+    server.on("/api/onboarding/complete", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleOnboardingComplete(); });
+    server.on("/api/onboarding/restart", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleOnboardingRestart(); });
+    server.on("/config", HTTP_GET, []() {
+        if (!config.localAdminConfigured() || requireAdmin()) handleConfig();
+    });
     server.on("/config/save", HTTP_POST, handleConfigSave);
-    server.on("/config/import", HTTP_POST, handleConfigImport);
-    server.on("/factory-reset", HTTP_POST, handleFactoryReset);
+    server.on("/config/import", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleConfigImport(); });
+    server.on("/factory-reset", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleFactoryReset(); });
 
-    server.on("/api/config", HTTP_GET, handleConfigExport);
-    server.on("/api/config", HTTP_POST, handleApiConfigImport);
-    server.on("/api/config/export", HTTP_GET, handleConfigExport);
-    server.on("/api/config/import", HTTP_POST, handleApiConfigImport);
-    server.on("/api/readiness", HTTP_GET, handleReadiness);
-    server.on("/api/status", HTTP_GET, handleStatusJson);
+    server.on("/api/config", HTTP_GET, []() { if (requireAdmin()) handleConfigExport(); });
+    server.on("/api/config", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleApiConfigImport(); });
+    server.on("/api/config/export", HTTP_GET, []() { if (requireAdmin()) handleConfigExport(); });
+    server.on("/api/config/import", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleApiConfigImport(); });
+    server.on("/api/readiness", HTTP_GET, []() { if (requireAdmin()) handleReadiness(); });
+    server.on("/api/status", HTTP_GET, []() { if (requireAdmin()) handleStatusJson(); });
 
-    server.on("/api/lilygo/network", HTTP_GET, handleNetwork);
-    server.on("/api/lilygo/lte/debug", HTTP_GET, handleLteDebug);
-    server.on("/api/lilygo/lte/rx-debug", HTTP_GET, handleLteRxDebug);
-    server.on("/api/lilygo/lte/tcp-test", HTTP_GET, handleLteTcpTest);
-    server.on("/api/lilygo/lte/tcp-test", HTTP_POST, handleLteTcpTest);
-    server.on("/api/lilygo/abrp", HTTP_GET, handleAbrp);
-    server.on("/api/lilygo/abrp/test", HTTP_POST, handleAbrpTest);
-    server.on("/api/lilygo/mqtt", HTTP_GET, handleMqtt);
-    server.on("/api/lilygo/lte/mqtt-trace", HTTP_GET, handleLteMqttTrace);
-    server.on("/api/lilygo/lte/mqtt-trace/clear", HTTP_POST, handleLteMqttTraceClear);
-    server.on("/api/lilygo/mqtt/debug", HTTP_GET, handleMqttDebug);
-    server.on("/api/telemetry", HTTP_GET, handleTelemetry);
-    server.on("/api/lilygo/modem", HTTP_GET, handleModem);
-    server.on("/api/lilygo/can", HTTP_GET, handleCan);
-    server.on("/api/lilygo/can/frames", HTTP_GET, handleCanFrames);
-    server.on("/api/lilygo/gps", HTTP_GET, handleGps);
-    server.on("/api/lilygo/gnss", HTTP_GET, handleGps);
+    server.on("/api/lilygo/network", HTTP_GET, []() { if (requireAdmin()) handleNetwork(); });
+    server.on("/api/lilygo/lte/debug", HTTP_GET, []() { if (requireAdmin()) handleLteDebug(); });
+    server.on("/api/lilygo/lte/rx-debug", HTTP_GET, []() { if (requireAdmin()) handleLteRxDebug(); });
+    server.on("/api/lilygo/lte/tcp-test", HTTP_GET, []() { if (requireAdmin()) handleLteTcpTest(); });
+    server.on("/api/lilygo/lte/tcp-test", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleLteTcpTest(); });
+    server.on("/api/lilygo/abrp", HTTP_GET, []() { if (requireAdmin()) handleAbrp(); });
+    server.on("/api/lilygo/abrp/test", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleAbrpTest(); });
+    server.on("/api/lilygo/mqtt", HTTP_GET, []() { if (requireAdmin()) handleMqtt(); });
+    server.on("/api/lilygo/lte/mqtt-trace", HTTP_GET, []() { if (requireAdmin()) handleLteMqttTrace(); });
+    server.on("/api/lilygo/lte/mqtt-trace/clear", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleLteMqttTraceClear(); });
+    server.on("/api/lilygo/mqtt/debug", HTTP_GET, []() { if (requireAdmin()) handleMqttDebug(); });
+    server.on("/api/telemetry", HTTP_GET, []() { if (requireAdmin()) handleTelemetry(); });
+    server.on("/api/lilygo/modem", HTTP_GET, []() { if (requireAdmin()) handleModem(); });
+    server.on("/api/lilygo/can", HTTP_GET, []() { if (requireAdmin()) handleCan(); });
+    server.on("/api/lilygo/can/frames", HTTP_GET, []() { if (requireAdmin()) handleCanFrames(); });
+    server.on("/api/lilygo/gps", HTTP_GET, []() { if (requireAdmin()) handleGps(); });
+    server.on("/api/lilygo/gnss", HTTP_GET, []() { if (requireAdmin()) handleGps(); });
 
     server.on("/ota", HTTP_GET, handleOtaPage);
     server.on("/ota/update", HTTP_POST, handleOtaDone, handleOtaUpload);

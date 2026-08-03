@@ -96,6 +96,25 @@ bool motLoadAwsCredentials(
 MotAwsIotClient::MotAwsIotClient() : mqtt_(secureClient_) {}
 
 bool MotAwsIotClient::begin(const MotAwsCredentials& credentials) {
+    secureClient_.setCACert(credentials.rootCa.c_str());
+    secureClient_.setCertificate(credentials.certificate.c_str());
+    secureClient_.setPrivateKey(credentials.privateKey.c_str());
+    secureClient_.setHandshakeTimeout(30);
+    return configure(credentials, secureClient_);
+}
+
+bool MotAwsIotClient::begin(
+    const MotAwsCredentials& credentials,
+    Client& transportClient
+) {
+    return configure(credentials, transportClient);
+}
+
+bool MotAwsIotClient::configure(
+    const MotAwsCredentials& credentials,
+    Client& transportClient
+) {
+    disconnect();
     credentials_ = credentials;
     status_ = MotAwsStatus();
     status_.credentialsLoaded = credentials_.loaded;
@@ -103,11 +122,7 @@ bool MotAwsIotClient::begin(const MotAwsCredentials& credentials) {
 
     if (!credentials_.loaded) return false;
 
-    secureClient_.setCACert(credentials_.rootCa.c_str());
-    secureClient_.setCertificate(credentials_.certificate.c_str());
-    secureClient_.setPrivateKey(credentials_.privateKey.c_str());
-    secureClient_.setHandshakeTimeout(30);
-
+    mqtt_.setClient(transportClient);
     mqtt_.setServer(
         credentials_.endpoint.c_str(),
         credentials_.port
@@ -207,7 +222,7 @@ void MotAwsIotClient::loop(
     if (!networkOnline) {
         if (mqtt_.connected()) mqtt_.disconnect();
         status_.connected = false;
-        status_.message = "AWS IoT waiting for WiFi";
+        status_.message = "AWS IoT waiting for network";
         previousConnected_ = false;
         return;
     }

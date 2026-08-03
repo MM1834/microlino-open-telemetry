@@ -16,10 +16,9 @@ static bool requireOtaAuth()
 {
     if (!otaServer) return false;
 
-    // If no OTA password is configured, allow OTA from the local Web UI.
-    // For production/beta use, set an OTA password in Config.
-    if (config.otaPassword.isEmpty()) {
-        return true;
+    if (!config.otaEnabled || !config.localAdminConfigured()) {
+        otaServer->send(403, "text/plain", "OTA disabled or local admin setup incomplete");
+        return false;
     }
 
     if (!otaServer->authenticate("admin", config.otaPassword.c_str())) {
@@ -28,6 +27,19 @@ static bool requireOtaAuth()
     }
 
     return true;
+}
+
+static bool requireOtaSameOrigin()
+{
+    if (!otaServer) return false;
+    const String host = otaServer->hostHeader();
+    const String origin = otaServer->header("Origin");
+    const String referer = otaServer->header("Referer");
+    if (origin == "http://" + host || origin == "https://" + host ||
+        referer.startsWith("http://" + host + "/") ||
+        referer.startsWith("https://" + host + "/")) return true;
+    otaServer->send(403, "text/plain", "Same-origin request required");
+    return false;
 }
 
 static String pageHeader(const char *title)
@@ -58,9 +70,6 @@ static void handleOtaPage()
     s += "<div class='card'>";
     s += "<h2>Upload firmware</h2>";
     s += "<p>Select a PlatformIO firmware binary, usually:<br><code>.pio/build/esp32dev/firmware.bin</code></p>";
-    if (config.otaPassword.isEmpty()) {
-        s += "<p class='warn'>Warning: no OTA password is configured. Set one under Config before beta use.</p>";
-    }
     s += "<form method='POST' action='/update' enctype='multipart/form-data'>";
     s += "<input type='file' name='firmware' accept='.bin' required>";
     s += "<button type='submit'>Upload & Update</button>";
@@ -105,7 +114,7 @@ static void handleOtaUpload()
     HTTPUpload &upload = otaServer->upload();
 
     if (upload.status == UPLOAD_FILE_START) {
-        otaUploadAllowed = requireOtaAuth();
+        otaUploadAllowed = requireOtaAuth() && requireOtaSameOrigin();
         if (!otaUploadAllowed) return;
 
         Serial.printf("OTA: update start: %s\n", upload.filename.c_str());

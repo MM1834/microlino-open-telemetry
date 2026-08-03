@@ -267,3 +267,37 @@ bool mqttTransportConnected()
     return mqtt.connected();
 #endif
 }
+
+MqttDiagResult mqttTransportDiagnostics()
+{
+#ifdef MOT_AWS_IOT
+    const MotAwsStatus& status = awsClient.status();
+    const bool connected = awsClient.connected();
+    MqttDiagResult result;
+    result.mode = "AWS_IOT_X509";
+    result.enabled = config.awsEnabled();
+    result.configured = awsCredentials.loaded;
+    result.host = awsCredentials.endpoint;
+    result.port = awsCredentials.port;
+    result.wifiConnected = networkOnline();
+    // An established AWS MQTT/TLS session proves successful endpoint resolution
+    // and TCP/TLS connectivity without opening a second diagnostic connection.
+    result.dnsOk = connected;
+    result.tcpOk = connected;
+    result.mqttOk = connected;
+    result.mqttState = status.mqttState;
+    result.message = status.message;
+    return result;
+#else
+    MqttDiagResult result = MqttDiagnostics::test(
+        config.mqttHost,
+        config.mqttPort,
+        config.mqttUser,
+        config.mqttPass,
+        "mot-health"
+    );
+    result.enabled = config.mqttEnabled();
+    result.configured = !config.mqttHost.isEmpty() && config.mqttPort > 0;
+    return result;
+#endif
+}

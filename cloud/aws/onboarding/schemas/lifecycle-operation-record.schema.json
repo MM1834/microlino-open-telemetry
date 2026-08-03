@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://microlino-open-telemetry.example/schemas/onboarding-lifecycle-operation-v1.json",
+  "title": "MOT Onboarding Lifecycle Operation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operationId", "operationType", "status", "phase", "vehicleId",
+    "requestedAt", "requestedBySub", "updatedAt", "version", "reasonCode"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operationId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{22,64}$"},
+    "operationType": {
+      "enum": [
+        "REPLACE_ADAPTER", "TRANSFER_OWNERSHIP", "REPORT_LOST",
+        "RECOVER_ADAPTER", "FACTORY_RESET", "RETIRE_IDENTITY"
+      ]
+    },
+    "status": {
+      "enum": ["REQUESTED", "AUTHORIZED", "IN_PROGRESS", "COMPLETED", "FAILED", "CANCELLED"]
+    },
+    "phase": {
+      "enum": [
+        "REQUEST_RECORDED", "OLD_CREDENTIAL_DISABLED", "PROVISIONING_STARTED",
+        "NEW_CREDENTIAL_RECORDED", "NEW_CREDENTIAL_ATTACHED",
+        "DOMAIN_STATE_COMMITTED", "EFFECTIVE_STATE_VERIFIED"
+      ]
+    },
+    "vehicleId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "currentDeviceId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "replacementDeviceId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "currentThingName": {"type": "string", "minLength": 1, "maxLength": 128},
+    "replacementThingName": {"type": "string", "minLength": 1, "maxLength": 128},
+    "currentCertificateId": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "replacementCertificateId": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "sourceOwnerSub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "targetOwnerSub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "requestedAt": {"type": "integer", "minimum": 1},
+    "requestedBySub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "authorizedAt": {"type": "integer", "minimum": 1},
+    "authorizedBySub": {"type": "string", "minLength": 1, "maxLength": 128},
+    "updatedAt": {"type": "integer", "minimum": 1},
+    "completedAt": {"type": "integer", "minimum": 1},
+    "version": {"type": "integer", "minimum": 1},
+    "reasonCode": {
+      "enum": [
+        "DEFECT", "LOST", "STOLEN", "OWNER_CHANGE", "RESET_RECOVERY",
+        "BETA_REASSIGNMENT", "SECURITY_RESPONSE", "END_OF_LIFE"
+      ]
+    },
+    "failureCode": {
+      "enum": [
+        "AUTHORIZATION_FAILED", "OWNERSHIP_CONFLICT", "DEVICE_MISMATCH",
+        "CREDENTIAL_DEACTIVATION_FAILED", "PROVISIONING_FAILED",
+        "STATE_UPDATE_FAILED", "EFFECTIVE_STATE_MISMATCH"
+      ]
+    }
+  }
+}

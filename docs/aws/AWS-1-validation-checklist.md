@@ -1,5 +1,7 @@
 # AWS-1 validation checklist
 
+> **Status:** Historical validation record; not evidence for the current commit or AWS account.
+
 ## Account and endpoint
 
 - [ ] AWS account selected

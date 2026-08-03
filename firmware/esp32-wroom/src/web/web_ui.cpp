@@ -23,6 +23,34 @@ static WebServer server(80);
 static bool rebootPending = false;
 static unsigned long rebootAtMs = 0;
 
+static bool requireAdmin()
+{
+    if (!config.localAdminConfigured()) {
+        server.send(503, "text/plain", "Local admin setup required at /setup");
+        return false;
+    }
+    if (!server.authenticate("admin", config.otaPassword.c_str())) {
+        server.requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
+static bool requireSameOrigin()
+{
+    const String host = server.hostHeader();
+    const String origin = server.header("Origin");
+    const String referer = server.header("Referer");
+    const bool originMatches = origin == "http://" + host || origin == "https://" + host;
+    const bool refererMatches = referer.startsWith("http://" + host + "/") ||
+                                referer.startsWith("https://" + host + "/");
+    if (!originMatches && !refererMatches) {
+        server.send(403, "text/plain", "Same-origin request required");
+        return false;
+    }
+    return true;
+}
+
 static String htmlHeader(const char *title)
 {
     String s;
@@ -69,6 +97,44 @@ static String returnField(const String &target)
 {
     if (target.isEmpty()) return "";
     return "<input type='hidden' name='return' value='" + target + "'>";
+}
+
+static void handleSetup()
+{
+    if (config.localAdminConfigured() && !requireAdmin()) return;
+
+    String s = htmlHeader("MOT Local Setup");
+    s += "<h1>Local administration setup</h1>";
+    s += "<p class='muted'>Required before operational pages, APIs and OTA are available.</p>";
+    s += "<form method='POST' action='/setup'>";
+    s += "<label>WiFi SSID</label><input name='wifiSsid' value='" + config.wifiSsid + "'>";
+    s += "<label>WiFi Password</label><input name='wifiPass' type='password' value='' autocomplete='new-password'>";
+    s += "<label>Local admin password (12–63 characters)</label><input name='adminPassword' type='password' minlength='12' maxlength='63' value='' autocomplete='new-password' required>";
+    s += "<button type='submit'>Secure device & reboot</button></form></body></html>";
+    server.send(200, "text/html", s);
+}
+
+static void handleSetupSave()
+{
+    if (config.localAdminConfigured() && !requireAdmin()) return;
+    if (!requireSameOrigin()) return;
+
+    String password = server.arg("adminPassword");
+    password.trim();
+    if (!isValidLocalAdminPassword(password)) {
+        server.send(400, "text/plain", "Local admin password must be 12-63 printable ASCII characters");
+        return;
+    }
+
+    config.wifiSsid = server.arg("wifiSsid");
+    const String wifiPassword = server.arg("wifiPass");
+    if (!wifiPassword.isEmpty()) config.wifiPass = wifiPassword;
+    config.otaPassword = password;
+    config.onboardingComplete = false;
+    appConfigManager.save();
+    server.send(200, "text/html", "<p>Local administration secured. Device is rebooting.</p>");
+    rebootPending = true;
+    rebootAtMs = millis() + 1500;
 }
 
 static int requestedWizardStep()
@@ -128,7 +194,7 @@ static String wizardPage()
         case 6:
             s += "<h2>Validation</h2><p>Run the existing system-health diagnostics before finishing onboarding.</p>";
             s += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
-            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{};o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\nDNS: ${d.dnsOk?'OK':'WAITING'}\nMQTT: ${d.mqttOk?'OK':'OPTIONAL / WAITING'}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${(g.state==='GPS_DETECTED'||g.state==='GPS_FIX')?'DETECTED':(g.state==='GPS_NOT_DETECTED'?'NOT DETECTED':'N/A')}\nGPS NMEA: ${g.detected?'VALID':'WAITING'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{},m=d.mqtt||{},aws=m.mode==='AWS_IOT_X509',transport=aws?'AWS IoT':'Legacy MQTT',transportState=!m.enabled?'DISABLED':(m.mqttOk?'OK':'WAITING');o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\n${transport}: ${transportState}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${g.detected?'DETECTED':'NOT DETECTED'}\nGPS UART activity: ${g.seen?(g.detected?'VALID NMEA':'UNVALIDATED / NOISE POSSIBLE'):'NONE'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
             s += "<p><a href='/status?return=/wizard?step=6'>Open full status</a></p>";
             break;
         default:
@@ -143,9 +209,10 @@ static String wizardPage()
     return s;
 }
 
-static void handleWizard() { server.send(200, "text/html", wizardPage()); }
+static void handleWizard() { if (!requireAdmin()) return; server.send(200, "text/html", wizardPage()); }
 static void handleOnboardingStatus()
 {
+    if (!requireAdmin()) return;
     const int step = config.onboardingComplete ? onboardingStepCount() : requestedWizardStep();
     String json = "{\"complete\":" + String(config.onboardingComplete ? "true" : "false") +
                   ",\"step\":\"" + String(onboardingStepId(static_cast<OnboardingStep>(step - 1))) +
@@ -156,6 +223,8 @@ static void handleOnboardingStatus()
 }
 static void handleOnboardingComplete()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
     config.onboardingComplete = true;
     appConfigManager.save();
     server.sendHeader("Location", "/status");
@@ -163,6 +232,8 @@ static void handleOnboardingComplete()
 }
 static void handleOnboardingRestart()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
     config.onboardingComplete = false;
     appConfigManager.save();
     server.sendHeader("Location", "/wizard?step=1");
@@ -171,6 +242,7 @@ static void handleOnboardingRestart()
 
 static void handleStatus()
 {
+    if (!requireAdmin()) return;
     String s = htmlHeader("MOT Status");
     s += "<h1>Microlino Open Telemetry</h1>";
     s += "<p class='muted'>" MOT_VERSION " · "; s += motDeviceId(); s += "</p>";
@@ -206,7 +278,8 @@ static void handleStatus()
     s += "const out=document.getElementById('system-health-result');out.textContent='Prüfe System Health…';";
     s += "try{const r=await fetch('/api/system-health');const d=await r.json();";
     s += "const g=d.gps||{};const pos=(g.latitude==null||g.longitude==null)?'--':`${Number(g.latitude).toFixed(6)}, ${Number(g.longitude).toFixed(6)}`;const hdop=g.hdop==null?'--':Number(g.hdop).toFixed(2);";
-    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS data  : ${g.seen?'RECEIVED':'WAITING'}\\nGPS fix   : ${g.valid?'VALID':'NO FIX'}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`; }";
+    s += "const m=d.mqtt||{},aws=m.mode==='AWS_IOT_X509',transport=aws?'AWS IoT':'Legacy MQTT',transportState=!m.enabled?'DISABLED':(m.mqttOk?'OK':'FAIL'),activity=g.seen?(g.detected?'VALID NMEA':'UNVALIDATED / NOISE POSSIBLE'):'NONE';";
+    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nTransport : ${transport}\\nConnected : ${transportState}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS state : ${g.state||'UNKNOWN'}\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS module: ${g.detected?'DETECTED':'NOT DETECTED'}\\nUART data : ${activity}\\nGPS fix   : ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nEndpoint  : ${m.host||'--'}\\nPort      : ${m.port||'--'}\\nMQTT RC   : ${m.mqttState}\\nMessage   : ${m.message||'--'}`; }";
     s += "catch(e){out.textContent='Fehler beim System-Health-Test: '+e.message;}}";
     s += "</script>";
 
@@ -216,11 +289,13 @@ static void handleStatus()
 
 static void handleApiStatus()
 {
+    if (!requireAdmin()) return;
     server.send(200, "application/json", telemetryToJson(telemetry));
 }
 
 static void handleConfig()
 {
+    if (!requireAdmin()) return;
     const String returnTo = requestedReturnUrl();
     String s = htmlHeader("MOT Config");
     s += "<h1>Config</h1><form method='POST' action='/save'>";
@@ -236,7 +311,7 @@ static void handleConfig()
 
     s += "<div class='card'><h2>Network</h2>";
     s += "WiFi SSID<input name='wifiSsid' value='" + config.wifiSsid + "'>";
-    s += "WiFi Password<input name='wifiPass' type='password' value='" + config.wifiPass + "'></div>";
+    s += "WiFi Password<input name='wifiPass' type='password' value='' placeholder='Leave blank to keep current'></div>";
 
     s += "<div class='card'><h2>Services</h2>";
     s += "<label><input style='width:auto' type='checkbox' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label><br>";
@@ -249,7 +324,7 @@ static void handleConfig()
     s += "MQTT Host<input name='mqttHost' value='" + config.mqttHost + "'>";
     s += "MQTT Port<input name='mqttPort' value='" + String(config.mqttPort) + "'>";
     s += "MQTT User<input name='mqttUser' value='" + config.mqttUser + "'>";
-    s += "MQTT Password<input name='mqttPass' type='password' value='" + config.mqttPass + "'>";
+    s += "MQTT Password<input name='mqttPass' type='password' value='' placeholder='Leave blank to keep current'>";
     s += "Publish interval ms<input name='pubMs' value='" + String(config.publishIntervalMs) + "'></div>";
 
     s += "<div class='card'><h2>MQTT Diagnose</h2>";
@@ -277,9 +352,10 @@ static void handleConfig()
 
     s += "<div class='card'><h2>OTA / ABRP</h2>";
     s += "<p class='muted'>ABRP is optional. It is only active when API key and user token are both configured.</p>";
-    s += "ABRP API Key<input name='abrpApiKey' value='" + config.abrpApiKey + "'>";
-    s += "ABRP User Token<input name='abrpToken' value='" + config.abrpUserToken + "'>";
-    s += "OTA Password<input name='otaPass' type='password' value='" + config.otaPassword + "'></div>";
+    s += "ABRP API Key<input name='abrpApiKey' type='password' value='' placeholder='Leave blank to keep current'>";
+    s += "ABRP User Token<input name='abrpToken' type='password' value='' placeholder='Leave blank to keep current'>";
+    s += "<label><input style='width:auto' type='checkbox' name='otaEnabled' value='1'" + String(config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><br>";
+    s += "Local admin password<input name='otaPass' type='password' minlength='12' maxlength='63' value='' placeholder='Leave blank to keep current'></div>";
 
     s += "<button type='submit'>Save & Reboot</button></form>";
 
@@ -298,7 +374,7 @@ static void handleConfig()
     s += "<form method='POST' action='/config/import'>";
     s += "<textarea name='configJson' rows='8' style='width:100%;box-sizing:border-box' placeholder='Paste config JSON here'></textarea>";
     s += "<button type='submit'>Import config & reboot</button></form>";
-    s += "<p class='muted'>Export contains local secrets such as WiFi and MQTT passwords. Keep it private.</p></div>";
+    s += "<p class='muted'>Export excludes passwords and tokens.</p></div>";
     s += "<div class='card'><h2>Factory Reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Factory Reset wirklich ausführen? Alle Einstellungen werden gelöscht.');\"><button type='submit'>Clear config & reboot</button></form></div>";
     if (!returnTo.isEmpty()) s += "<p><a href='" + returnTo + "'>← Back to onboarding</a></p>";
     else s += "<p><a href='/status'>Status</a></p>";
@@ -308,6 +384,14 @@ static void handleConfig()
 
 static void handleSave()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
+    String requestedAdminPassword = server.arg("otaPass");
+    requestedAdminPassword.trim();
+    if (!requestedAdminPassword.isEmpty() && !isValidLocalAdminPassword(requestedAdminPassword)) {
+        server.send(400, "text/plain", "Local admin password must be 12-63 printable ASCII characters");
+        return;
+    }
     config.vehicleName = server.arg("vehicleName");
     if (config.vehicleName.isEmpty()) config.vehicleName = "Microlino Pioneer";
 
@@ -332,7 +416,7 @@ static void handleSave()
     }
     if (config.mqttPrefix.isEmpty()) config.mqttPrefix = "mot";
     config.wifiSsid = server.arg("wifiSsid");
-    config.wifiPass = server.arg("wifiPass");
+    if (!server.arg("wifiPass").isEmpty()) config.wifiPass = server.arg("wifiPass");
     config.awsServiceEnabled = server.hasArg("svcAws");
     config.mqttServiceEnabled = server.hasArg("svcMqtt");
     config.abrpServiceEnabled = server.hasArg("svcAbrp");
@@ -340,14 +424,15 @@ static void handleSave()
     config.mqttPort = server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;
     config.mqttUser = server.arg("mqttUser");
-    config.mqttPass = server.arg("mqttPass");
+    if (!server.arg("mqttPass").isEmpty()) config.mqttPass = server.arg("mqttPass");
     config.publishIntervalMs = server.arg("pubMs").toInt();
     if (config.publishIntervalMs < 1000) config.publishIntervalMs = 5000;
     config.can1Profile = decoderProfileNormalize(server.arg("can1Profile").toInt());
     config.can2Profile = decoderProfileNormalize(server.arg("can2Profile").toInt(), DECODER_PROFILE_DISABLED);
-    config.abrpApiKey = server.arg("abrpApiKey");
-    config.abrpUserToken = server.arg("abrpToken");
-    config.otaPassword = server.arg("otaPass");
+    if (!server.arg("abrpApiKey").isEmpty()) config.abrpApiKey = server.arg("abrpApiKey");
+    if (!server.arg("abrpToken").isEmpty()) config.abrpUserToken = server.arg("abrpToken");
+    config.otaEnabled = server.hasArg("otaEnabled");
+    if (!requestedAdminPassword.isEmpty()) config.otaPassword = requestedAdminPassword;
     appConfigManager.save();
     const String returnTo = requestedReturnUrl();
     String response = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration saved.</h2><p>Device will reboot in 5 seconds...</p>";
@@ -365,23 +450,29 @@ static void handleSave()
 
 static void handleAbrpStatus()
 {
+    if (!requireAdmin()) return;
     server.send(200, "application/json", abrpStatusJson());
 }
 
 static void handleAbrpTest()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
     bool ok = sendAbrpTelemetryNow();
     server.send(ok ? 200 : 503, "application/json", abrpStatusJson());
 }
 
 static void handleConfigExport()
 {
+    if (!requireAdmin()) return;
     server.sendHeader("Content-Disposition", "attachment; filename=mot-config.json");
-    server.send(200, "application/json", appConfigManager.exportJson(true));
+    server.send(200, "application/json", appConfigManager.exportJson(false));
 }
 
 static void handleConfigImport()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
     String json = server.arg("configJson");
     if (json.isEmpty()) json = server.arg("plain");
 
@@ -398,6 +489,8 @@ static void handleConfigImport()
 
 static void handleFactoryReset()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
     appConfigManager.clear();
     server.send(200, "text/html", "<!doctype html><html><body style='font-family:sans-serif;text-align:center;margin-top:60px'><h2>Configuration cleared.</h2><p>Device will reboot in 5 seconds.</p></body></html>");
     rebootPending = true;
@@ -418,12 +511,14 @@ static MqttDiagResult runMqttDiagnostics(const char *clientIdPrefix)
 
 static void handleApiMqttTest()
 {
+    if (!requireAdmin()) return;
     MqttDiagResult result = runMqttDiagnostics("mot-diag");
     server.send(200, "application/json", MqttDiagnostics::toJson(result));
 }
 
 static void handleApiReadiness()
 {
+    if (!requireAdmin()) return;
     ConfigurationReadinessInput input;
     input.onboardingComplete = config.onboardingComplete;
     input.networkConfigured = !config.wifiSsid.isEmpty();
@@ -449,6 +544,8 @@ static void handleApiReadiness()
 
 static void handleApiConfigImport()
 {
+    if (!requireAdmin()) return;
+    if (!requireSameOrigin()) return;
     String json = server.arg("plain");
     if (json.isEmpty()) json = server.arg("configJson");
     String error;
@@ -461,7 +558,8 @@ static void handleApiConfigImport()
 
 static void handleApiSystemHealth()
 {
-    MqttDiagResult mqtt = runMqttDiagnostics("mot-health");
+    if (!requireAdmin()) return;
+    MqttDiagResult mqtt = mqttTransportDiagnostics();
 
     SystemHealthResult health;
     health.deviceId = motDeviceId();
@@ -494,7 +592,11 @@ static void handleApiSystemHealth()
 
 void setupWebUi()
 {
-    server.on("/", []() { if (config.onboardingComplete) handleStatus(); else handleWizard(); });
+    const char* protectedHeaders[] = {"Origin", "Referer"};
+    server.collectHeaders(protectedHeaders, 2);
+    server.on("/", []() { if (!config.localAdminConfigured()) handleSetup(); else if (config.onboardingComplete) handleStatus(); else handleWizard(); });
+    server.on("/setup", HTTP_GET, handleSetup);
+    server.on("/setup", HTTP_POST, handleSetupSave);
     server.on("/wizard", HTTP_GET, handleWizard);
     server.on("/api/onboarding", HTTP_GET, handleOnboardingStatus);
     server.on("/api/onboarding/complete", HTTP_POST, handleOnboardingComplete);
@@ -503,7 +605,7 @@ void setupWebUi()
     server.on("/api/status", handleApiStatus);
     server.on("/api/mqtt-test", handleApiMqttTest);
     server.on("/api/system-health", handleApiSystemHealth);
-    server.on("/api/gps", []() { server.send(200, "application/json", wroomGpsStatusJson()); });
+    server.on("/api/gps", []() { if (!requireAdmin()) return; server.send(200, "application/json", wroomGpsStatusJson()); });
     server.on("/config", handleConfig);
     server.on("/save", HTTP_POST, handleSave);
     server.on("/api/config", HTTP_GET, handleConfigExport);
@@ -517,7 +619,7 @@ void setupWebUi()
     server.on("/factory-reset", HTTP_POST, handleFactoryReset);
     server.on("/favicon.ico", []() { server.send(204); });
     setupOtaRoutes(server);
-    server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
+    server.onNotFound([]() { if (!requireAdmin()) return; server.send(404, "text/plain", "Not found"); });
     server.begin();
     Serial.println("Web UI started");
 }

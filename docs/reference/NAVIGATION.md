@@ -1,14 +1,6 @@
 # Documentation Navigation
 
-README
- -> Introduction
- -> Design Principles
- -> Terminology
- -> Hardware
- -> Firmware
- -> Cloud
- -> Dashboard
- -> API
- -> Security
- -> Development
- -> Roadmap
+> **Status:** Compatibility redirect
+
+Use the current [documentation index](../index.md) and
+[documentation standard](../DOCUMENTATION_STANDARD.md).

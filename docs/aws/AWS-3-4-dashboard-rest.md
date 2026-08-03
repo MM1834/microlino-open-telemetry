@@ -1,5 +1,7 @@
 # AWS-3.4 — Dashboard over REST
 
+> **Status:** Historical delivery record; authentication and live delivery were added later.
+
 The Dashboard now uses the AWS Vehicle API by default.
 
 ```text

@@ -1,170 +1,157 @@
-# CURRENT_STATUS
+# Current Status
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Document Type:** Governance
+**Status:** Controlled portal pilot and release preparation
 
-**Status:** Active
+**Audience:** Maintainer and contributor
 
 **Governance Version:** 1.0
 
-**Maintainer:** Repository Maintainers
+**Last reviewed:** 2026-08-03
 
----
+## Purpose
 
-# Purpose
+This document records the current repository state. A capability is only called
+validated when the repository contains corresponding evidence. Historical sprint
+notes remain useful audit material, but are not by themselves proof of the current
+revision.
 
-This document provides a validated snapshot of the current technical state of the Microlino Open Telemetry (MOT) repository.
+## Current product direction
 
-Its purpose is to summarize the repository's current capabilities, supported platforms, implemented functionality and documentation maturity without describing future work, engineering history or implementation details.
+MOT is preparing a small ESP32-WROOM pilot fleet. The active engineering focus is
+SPR-0005 and REL-001: WROOM evidence, secure portal onboarding and release
+promotion proceed as coordinated workstreams. Onboarding is not planned for the
+firmware's local WebUI.
 
-This document represents the present state of the repository and is expected to evolve as the project evolves.
+The local WebUI remains the device-local setup, diagnostics, recovery and OTA
+interface. The portal is the user-facing service for accounts, vehicle access and
+future fleet functions.
 
----
+## Supported hardware paths
 
-# Scope
+### ESP32-WROOM
 
-CURRENT_STATUS records the repository as it exists today.
+- Current reference platform for the beta devices.
+- Supports CAN telemetry over WiFi.
+- Can be deployed with or without an optional GPS module.
+- Local WebUI, configuration, diagnostics and local OTA are implemented.
+- AWS IoT support is implemented as a build option.
 
-Typical topics include:
+### LilyGO T-A7670G
 
-- supported platforms
-- implemented capabilities
-- supported interfaces
-- available integrations
-- validated functionality
-- known technical limitations
-- documentation maturity
+- Shares the telemetry and AWS IoT architecture with ESP32-WROOM.
+- WiFi remains the preferred transport and LTE/GPRS is the automatic fallback.
+- AWS IoT X.509 over the A7670 TLS client was physically validated through the
+  hosted portal on 2026-08-03 with WiFi unavailable.
+- External L76K GPS support exists.
+- The operational setup AP uses the local administrator password, all operational
+  WebUI/API routes require authentication and local OTA defaults to disabled.
+- ABRP remains WiFi-only and was disabled for the validated AWS/LTE configuration.
 
-The document intentionally excludes engineering decisions, implementation history, active development and future planning.
+## Firmware structure
 
----
+The repository contains shared telemetry, CAN decoding, configuration, readiness,
+MQTT topics, AWS IoT and GPS components under `firmware/common` and
+`firmware/shared-libs`.
 
-# Repository Snapshot
+PlatformIO currently exposes these environments:
 
-This section provides a concise overview of the repository.
+- `esp32dev`
+- `esp32dev-aws`
+- `esp32dev-gps-test`
+- `lilygo-t-a7670`
+- `T-A7670X-AWS`
 
-Typical information may include:
+This environment set is legacy structure, not the desired maintenance model. GPS
+test firmware is no longer a maintained product variant. Pre-AWS environments are
+also no longer intended as separate firmware generations. The target is one
+maintained firmware line per board, with AWS IoT treated as a configurable feature.
+That simplification is planned and has not yet been applied to PlatformIO.
 
-- repository maturity
-- implementation stability
-- current engineering focus
-- overall documentation completeness
+## Portal and AWS backend
 
-The objective is to provide immediate orientation for maintainers without requiring detailed technical knowledge.
+Implemented in the repository:
 
----
+- static portal/dashboard;
+- Cognito Authorization Code flow with PKCE;
+- API Gateway JWT protection for vehicle REST routes;
+- authenticated WebSocket connection;
+- IoT Rule ingestion into DynamoDB;
+- REST snapshots and live telemetry fan-out;
+- per-device AWS IoT credentials loaded from LittleFS;
+- shared AWS IoT firmware transport for both boards.
 
-# Supported Platforms
+Implemented and validated in the controlled AWS development stack:
 
-This section lists all hardware platforms currently supported by the repository.
+- server-side user-to-vehicle authorization for REST and WebSocket;
+- atomic, expiring single-use vehicle claim flow;
+- controlled administrator claim issuance;
+- hosted Cognito login/logout and per-user vehicle isolation at `/motbeta/`;
+- exact HTTPS CORS for the canonical `www` portal origin.
 
-For each platform, document:
+Not implemented:
 
-- support status
-- implementation maturity
-- validation status
-- significant limitations
+- ownership transfer and recovery;
+- automated device certificate provisioning or rotation;
+- cloud-managed OTA.
+- public account self-registration.
 
-Only actively maintained and validated platforms should be listed.
+Authentication, assignment enforcement and controlled claiming now exist in the
+development AWS account and hosted pilot portal. Two controlled users passed
+exclusive-list, symmetric guessed-ID, live revoke/restore, expired-connection and
+hosted role-separation tests. Public self-registration, lifecycle recovery and the
+remaining release/security gates are separate follow-up work.
 
----
+## Vehicle integration
 
-# Supported Interfaces
+The implemented firmware receives telemetry passively and does not control vehicle
+behaviour. The current decoder and wiring are centered on the presently supported
+Microlino CAN connection. Extending support to other vehicle models requires both
+decoder work and a hardware decision for standard CAN access.
 
-Summarize the interfaces currently supported by the repository.
+Known candidate paths are:
 
-Typical examples include:
+- rewire the current module from pins 1 and 9 to standard CAN;
+- add another CAN interface/module;
+- evaluate an ESP32-C6 generation design for the affected hardware variant.
 
-- CAN
-- GNSS
-- Wi-Fi
-- Cellular
-- MQTT
-- Bluetooth (if applicable)
+No choice is currently approved.
 
-The section should describe available functionality rather than implementation details.
+## Validation status
 
----
+Portal authorization and ONB-001.B2 have local, deployed-stack and hosted browser
+evidence dated 2026-08-03. A previously unassigned no-GPS WROOM was erased,
+provisioned with a unique AWS identity, claimed as `beta-02` by an existing user
+and validated through the hosted portal. WROOM local security and AWS operation
+were physically checked. On 2026-08-03 the LilyGO AWS build was hardened, flashed
+without erasing its device identity, connected through LTE/TLS with WiFi absent and
+delivered live CAN/GPS telemetry to the portal. Release-candidate evidence still
+requires the exact final documentation commit, full tests and recorded artifact
+hashes.
 
-# Vehicle Integration
+## Documentation status
 
-Summarize the current vehicle integration capabilities.
+DOC-001 completed a static, source-based documentation baseline on 2026-08-02.
+Current navigation, canonical topic ownership, beta/support drafts, ADR/history
+classification and the validation handover are present. Historical packages remain
+retained and visibly separated; ambiguous rationale and destructive relocation wait
+for ChatGPT Classic export reconciliation.
 
-Typical information includes:
+This documentation completion is not runtime evidence. Builds, hardware, deployed
+AWS state, screenshots and beta release readiness remain to be validated.
 
-- telemetry acquisition
-- supported vehicle interfaces
-- passive monitoring capabilities
-- validated signal groups
+## Security and local credentials
 
-Detailed protocol descriptions belong in technical reference documentation.
+Local AWS IoT credential directories exist and are ignored by Git. Only `.gitkeep`
+files are tracked. Ignore rules reduce accidental commits but do not provide
+encryption, rotation or access control. Credential contents and deployed AWS
+resources were not inspected during the takeover audit.
 
----
+## Related documents
 
-# Telemetry Capabilities
-
-Summarize the telemetry currently available.
-
-Typical topics include:
-
-- vehicle telemetry
-- positioning
-- connectivity status
-- diagnostic information
-- external telemetry outputs
-
-The purpose is to describe available capabilities rather than message formats or implementation details.
-
----
-
-# Known Limitations
-
-Document validated technical limitations that currently affect the repository.
-
-Limitations should be factual, objective and verifiable.
-
-Future improvements belong in ENGINEERING_BACKLOG or WORK_ORDER.
-
----
-
-# Documentation Status
-
-Summarize the maturity of the repository documentation.
-
-Typical areas include:
-
-- governance
-- architecture
-- technical references
-- configuration
-- deployment
-- developer documentation
-
-The objective is to identify documentation completeness rather than implementation progress.
-
----
-
-# Relationship to Other Documents
-
-PROJECT_HANDOVER explains the project.
-
-PROJECT_CONSTITUTION defines repository governance.
-
-WORK_ORDER describes active engineering work.
-
-ENGINEERING_BACKLOG preserves future engineering opportunities.
-
-SELF_REVIEW preserves engineering knowledge gained through development.
-
-CURRENT_STATUS describes the repository as it exists today.
-
----
-
-# Related Documents
-
-- PROJECT_CONSTITUTION.md
-- PROJECT_HANDOVER.md
-- ENGINEERING_BACKLOG.md
-- WORK_ORDER.md
-- SELF_REVIEW.md
+- [PROJECT_HANDOVER.md](PROJECT_HANDOVER.md)
+- [WORK_ORDER.md](WORK_ORDER.md)
+- [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)
+- [DOC-001 validation and handover](../project/DOC-001-VALIDATION.md)

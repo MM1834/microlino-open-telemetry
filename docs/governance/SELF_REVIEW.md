@@ -6,6 +6,8 @@
 
 **Status:** Active
 
+**Audience:** Maintainer and contributor
+
 **Governance Version:** 1.0
 
 **Maintainer:** Repository Maintainers
@@ -139,3 +141,50 @@ SELF_REVIEW preserves engineering knowledge gained through development.
 - CURRENT_STATUS.md
 - ENGINEERING_BACKLOG.md
 - WORK_ORDER.md
+
+---
+
+# Preserved Engineering Lessons
+
+## Authentication is not vehicle authorization
+
+**Context:** Cognito login, JWT-protected REST routes and an authenticated WebSocket
+were implemented before the ownership model.
+
+**Observation:** A valid user token proves identity but does not determine which
+vehicle that user may list, read or subscribe to.
+
+**Outcome:** Portal onboarding remains blocked for multiple untrusted users until
+REST and WebSocket handlers enforce a server-side user-to-vehicle relationship.
+
+**Recommendation:** Test every vehicle access path with an authenticated but
+unauthorized user, not only with missing or invalid tokens.
+
+## Historical delivery records are not current status
+
+**Context:** Two documentation generations, sprint packages, patch manifests and
+roadmaps remained visible together after development moved between chats.
+
+**Observation:** Individually accurate historical documents can contradict the
+current code when they are presented without lifecycle labels.
+
+**Outcome:** Governance status and work-order documents are now the primary current
+status sources; sprint and release material is treated as history.
+
+**Recommendation:** Record validation against an exact commit and move completed
+delivery documents out of current navigation instead of rewriting history.
+
+## Build environments should describe products, not implementation history
+
+**Context:** Separate pre-AWS, AWS and GPS-test PlatformIO environments accumulated
+while capabilities were introduced incrementally.
+
+**Observation:** Once AWS IoT and optional GPS are normal capabilities, maintaining
+them as firmware generations increases support and validation combinations without
+adding product value.
+
+**Outcome:** The target model is one maintained firmware line per board with
+explicit feature/configuration choices.
+
+**Recommendation:** Keep special test environments temporary and document their
+retirement criteria when introduced.

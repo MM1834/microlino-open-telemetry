@@ -1,15 +1,11 @@
 # Roadmap
 
-## v1.2
+This page previously described an obsolete version sequence. Current priorities
+are maintained in the governance documents:
 
-- ABRP over LTE HTTPS
-- Device heartbeat and online/offline status
-- WebUI status split: browser MQTT vs Microlino online
-- Non-blocking LTE operations
+- [Active work](../governance/WORK_ORDER.md)
+- [Engineering backlog](../governance/ENGINEERING_BACKLOG.md)
+- [AWS IoT roadmap](aws-iot.md)
 
-## v1.3
-
-- MQTT TLS
-- AWS IoT evaluation
-- Client certificates
-- Security model for WebApp and device access
+Release-specific plans belong in release documentation and must not duplicate the
+active work order.

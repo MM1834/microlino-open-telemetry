@@ -1,16 +1,10 @@
-# ESP32-WROOM Web UI
+# ESP32-WROOM Local WebUI
 
-Screenshot placeholders:
+> **Status:** Planned beta-user guide; screenshots await revalidation.
 
-```text
-docs/images/esp32-wroom/
-```
+Current subsystem documentation is under [local WebUI](../webui/overview.md).
+The beta guide must cover first connection, status, optional GPS, MQTT/AWS health,
+backup/restore, factory reset, local OTA and a privacy-safe support workflow.
 
-Recommended screenshots:
-
-- Status page
-- Config page
-- ABRP status
-- MQTT health check
-- Backup / Restore
-- OTA
+Required images are tracked in the
+[documentation migration plan](../MIGRATION.md#screenshot-backlog).
