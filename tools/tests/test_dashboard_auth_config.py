@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 AUTH_MANAGER = ROOT / "dashboard/js/auth/auth-manager.js"
 CONFIG_EXAMPLE = ROOT / "dashboard/config.example.js"
 BETA_CONFIG_EXAMPLE = ROOT / "dashboard/config.beta.example.js"
+PRODUCTION_CONFIG_EXAMPLE = ROOT / "dashboard/config.production.example.js"
 CALLBACK_PAGE = ROOT / "dashboard/callback/index.html"
 
 
@@ -32,6 +33,19 @@ class DashboardLogoutConfigurationTests(unittest.TestCase):
             source,
         )
         self.assertNotIn("localhost", source)
+
+    def test_production_config_matches_effective_dashboard_urls(self) -> None:
+        source = PRODUCTION_CONFIG_EXAMPLE.read_text(encoding="utf-8")
+        self.assertIn(
+            'redirectUri: "https://www.microlino-open-telemetry.ch/dashboard/"',
+            source,
+        )
+        self.assertIn(
+            'logoutUri: "https://www.microlino-open-telemetry.ch/dashboard/"',
+            source,
+        )
+        self.assertNotIn("localhost", source)
+        self.assertNotIn("/motbeta/", source)
 
     def test_callback_preserves_portal_subdirectory(self) -> None:
         source = CALLBACK_PAGE.read_text(encoding="utf-8")
