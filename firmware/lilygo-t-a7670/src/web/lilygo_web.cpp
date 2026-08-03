@@ -98,7 +98,7 @@ static void handleRoot()
     s += "<div class='card'><h2>CAN Input</h2><button onclick='loadCan()'>Refresh</button><pre id='can'>Loading...</pre><p><a href='/api/lilygo/can/frames'>Latest frames JSON</a></p></div>";
     s += "<div class='card'><h2>Decoded Telemetry</h2><button onclick='loadTelemetry()'>Refresh</button><pre id='telemetry'>Loading...</pre></div>";
 
-    s += "<div class='card'><h2>MQTT WiFi</h2>";
+    s += "<div class='card'><h2>Telemetry Transport (AWS IoT / Legacy MQTT)</h2>";
     s += "<button onclick='loadMqtt()'>Refresh</button>";
     s += "<pre id='mqtt'>Loading...</pre></div>";
 
@@ -516,7 +516,7 @@ static void handleWizard()
         case 6:
             html += "<h2>Validation</h2><p>Read the live LilyGO diagnostics before completing onboarding.</p>";
             html += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
-            html += "<script>async function getj(u){const r=await fetch(u);return await r.json()}async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const n=await getj('/api/lilygo/network'),m=await getj('/api/lilygo/modem'),g=await getj('/api/lilygo/gps'),c=await getj('/api/lilygo/can'),q=await getj('/api/lilygo/mqtt');o.textContent=`Network:\n${JSON.stringify(n,null,2)}\n\nModem:\n${JSON.stringify(m,null,2)}\n\nGPS:\n${JSON.stringify(g,null,2)}\n\nCAN:\n${JSON.stringify(c,null,2)}\n\nMQTT:\n${JSON.stringify(q,null,2)}`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            html += "<script>async function getj(u){const r=await fetch(u);return await r.json()}async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const n=await getj('/api/lilygo/network'),m=await getj('/api/lilygo/modem'),g=await getj('/api/lilygo/gps'),c=await getj('/api/lilygo/can'),q=await getj('/api/lilygo/mqtt');o.textContent=`Network:\n${JSON.stringify(n,null,2)}\n\nModem:\n${JSON.stringify(m,null,2)}\n\nGPS:\n${JSON.stringify(g,null,2)}\n\nCAN:\n${JSON.stringify(c,null,2)}\n\nTelemetry transport:\n${JSON.stringify(q,null,2)}`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
             html += "<p><a href='/?skip=1&return=/wizard?step=6'>Open full status</a></p>";
             break;
         default:

@@ -7,7 +7,10 @@
 ## Device record
 
 - [ ] Assign a physical asset/device label.
-- [ ] Record MAC-derived MOT device ID without recording unrelated identifiers.
+- [ ] Read and record the firmware-reported MOT device ID from the serial boot
+  output or authenticated local status page. Do not derive it from the final three
+  colon-separated bytes printed by esptool: `ESP.getEfuseMac()` uses a different
+  byte representation for `motDeviceShortId()`.
 - [ ] Assign one vehicle ID and human-readable vehicle name.
 - [ ] Record hardware variant: GPS installed or not installed.
 - [ ] Record board, transceiver, harness revision and enclosure revision.
@@ -48,11 +51,16 @@ Creating or modifying AWS resources requires separate approval.
 
 ## Local security configuration
 
-- [ ] Configure a unique non-empty OTA password.
+- [ ] During controlled first setup, configure a unique 12–63 character local
+  admin password.
 - [ ] Record it in the approved secret/support channel, not the handoff sheet.
+- [ ] Confirm the operational fallback AP uses that password as its WPA2 key.
+- [ ] Confirm unauthenticated operational WebUI/API access fails closed.
+- [ ] Keep local OTA disabled unless an approved update is being performed.
 - [ ] Confirm legacy MQTT is disabled unless explicitly required.
 - [ ] Confirm ABRP is disabled unless provisioned for that tester.
-- [ ] Confirm the user is warned that the fallback AP and WebUI are open locally.
+- [ ] Confirm the user understands that only the controlled first-setup AP is open;
+  after provisioning, fallback AP and WebUI require the local admin password.
 
 ## Functional validation gate
 

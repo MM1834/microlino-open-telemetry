@@ -194,7 +194,7 @@ static String wizardPage()
         case 6:
             s += "<h2>Validation</h2><p>Run the existing system-health diagnostics before finishing onboarding.</p>";
             s += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
-            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{};o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\nDNS: ${d.dnsOk?'OK':'WAITING'}\nMQTT: ${d.mqttOk?'OK':'OPTIONAL / WAITING'}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${(g.state==='GPS_DETECTED'||g.state==='GPS_FIX')?'DETECTED':(g.state==='GPS_NOT_DETECTED'?'NOT DETECTED':'N/A')}\nGPS NMEA: ${g.detected?'VALID':'WAITING'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{},m=d.mqtt||{},aws=m.mode==='AWS_IOT_X509',transport=aws?'AWS IoT':'Legacy MQTT',transportState=!m.enabled?'DISABLED':(m.mqttOk?'OK':'WAITING');o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\n${transport}: ${transportState}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${g.detected?'DETECTED':'NOT DETECTED'}\nGPS UART activity: ${g.seen?(g.detected?'VALID NMEA':'UNVALIDATED / NOISE POSSIBLE'):'NONE'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
             s += "<p><a href='/status?return=/wizard?step=6'>Open full status</a></p>";
             break;
         default:
@@ -278,7 +278,8 @@ static void handleStatus()
     s += "const out=document.getElementById('system-health-result');out.textContent='Prüfe System Health…';";
     s += "try{const r=await fetch('/api/system-health');const d=await r.json();";
     s += "const g=d.gps||{};const pos=(g.latitude==null||g.longitude==null)?'--':`${Number(g.latitude).toFixed(6)}, ${Number(g.longitude).toFixed(6)}`;const hdop=g.hdop==null?'--':Number(g.hdop).toFixed(2);";
-    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nDNS       : ${d.dnsOk?'OK':'FAIL'}\\nTCP       : ${d.tcpOk?'OK':'FAIL'}\\nMQTT      : ${d.mqttOk?'OK':'FAIL'}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS data  : ${g.seen?'RECEIVED':'WAITING'}\\nGPS fix   : ${g.valid?'VALID':'NO FIX'}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nMQTT Host : ${d.mqtt.host}\\nMQTT Port : ${d.mqtt.port}\\nMQTT IP   : ${d.mqtt.resolvedIp||'--'}\\nMQTT RC   : ${d.mqtt.mqttState}\\nMessage   : ${d.mqtt.message}\\nDuration  : ${d.mqtt.durationMs} ms`; }";
+    s += "const m=d.mqtt||{},aws=m.mode==='AWS_IOT_X509',transport=aws?'AWS IoT':'Legacy MQTT',transportState=!m.enabled?'DISABLED':(m.mqttOk?'OK':'FAIL'),activity=g.seen?(g.detected?'VALID NMEA':'UNVALIDATED / NOISE POSSIBLE'):'NONE';";
+    s += "out.textContent=`Device    : ${d.deviceId||'--'}\\nFirmware  : ${d.firmwareVersion||'--'}\\nBuild     : ${d.buildDate||'--'}\\nIP        : ${d.ip||'--'}\\nRSSI      : ${d.rssi} dBm\\nUptime    : ${d.uptimeText}\\n\\nWiFi      : ${d.wifiOk?'OK':'FAIL'}\\nTransport : ${transport}\\nConnected : ${transportState}\\nCAN       : ${d.canOk?'OK':'WAITING'}\\n\\nGPS state : ${g.state||'UNKNOWN'}\\nGPS UART  : ${g.started?'STARTED':'NOT STARTED'}\\nGPS module: ${g.detected?'DETECTED':'NOT DETECTED'}\\nUART data : ${activity}\\nGPS fix   : ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\\nLocation  : ${pos}\\nSatellites: ${g.satellites??0}\\nHDOP      : ${hdop}\\nFix age   : ${g.ageMs??0} ms\\nGPS UTC   : ${d.utc||'--'}\\n\\nEndpoint  : ${m.host||'--'}\\nPort      : ${m.port||'--'}\\nMQTT RC   : ${m.mqttState}\\nMessage   : ${m.message||'--'}`; }";
     s += "catch(e){out.textContent='Fehler beim System-Health-Test: '+e.message;}}";
     s += "</script>";
 
@@ -558,7 +559,7 @@ static void handleApiConfigImport()
 static void handleApiSystemHealth()
 {
     if (!requireAdmin()) return;
-    MqttDiagResult mqtt = runMqttDiagnostics("mot-health");
+    MqttDiagResult mqtt = mqttTransportDiagnostics();
 
     SystemHealthResult health;
     health.deviceId = motDeviceId();

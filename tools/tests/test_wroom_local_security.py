@@ -7,6 +7,7 @@ CONFIG = (ROOT / "firmware/esp32-wroom/src/app_config.cpp").read_text(encoding="
 NETWORK = (ROOT / "firmware/esp32-wroom/src/network/wifi_manager.cpp").read_text(encoding="utf-8")
 OTA = (ROOT / "firmware/esp32-wroom/src/ota/ota_web.cpp").read_text(encoding="utf-8")
 WEB = (ROOT / "firmware/esp32-wroom/src/web/web_ui.cpp").read_text(encoding="utf-8")
+MQTT = (ROOT / "firmware/esp32-wroom/src/mqtt/mqtt_client.cpp").read_text(encoding="utf-8")
 
 
 class WroomLocalSecurityTests(unittest.TestCase):
@@ -65,6 +66,18 @@ class WroomLocalSecurityTests(unittest.TestCase):
     def test_import_cannot_remove_local_admin_boundary(self) -> None:
         self.assertIn("if (!config.localAdminConfigured())", CONFIG)
         self.assertIn('error = "local admin password must be 12-63 characters"', CONFIG)
+
+    def test_system_health_uses_active_transport(self) -> None:
+        self.assertIn("mqttTransportDiagnostics()", WEB)
+        self.assertNotIn('runMqttDiagnostics("mot-health")', WEB)
+        self.assertIn('result.mode = "AWS_IOT_X509"', MQTT)
+        self.assertIn("result.mqttOk = connected", MQTT)
+        self.assertIn("transport=aws?'AWS IoT':'Legacy MQTT'", WEB)
+
+    def test_gps_uart_noise_is_not_reported_as_valid_nmea(self) -> None:
+        self.assertIn("UNVALIDATED / NOISE POSSIBLE", WEB)
+        self.assertIn("GPS state", WEB)
+        self.assertIn("g.detected?'DETECTED':'NOT DETECTED'", WEB)
 
 
 if __name__ == "__main__":
