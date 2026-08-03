@@ -292,6 +292,46 @@ Client* lilygoTinyGsmSecureClient()
     return &lteSecureClient;
 }
 
+bool lilygoConfigureAwsTlsClient(
+    const String& rootCa,
+    const String& certificate,
+    const String& privateKey
+) {
+    if (!lilygoEnsureGprsConnected()) return false;
+
+    static const char* ROOT_CA_FILE = "motRootCA.pem";
+    static const char* CLIENT_CERT_FILE = "motClient.pem";
+    static const char* PRIVATE_KEY_FILE = "motKey.pem";
+
+    // SIMCom stores TLS material in its own filesystem. Never trace the
+    // buffers; only report which upload stage failed.
+    modem.deleteCertificate(ROOT_CA_FILE);
+    if (!modem.downloadCertificate(ROOT_CA_FILE, rootCa.c_str())) {
+        lastMessage = "AWS TLS: root CA upload failed";
+        traceAppend(lastMessage);
+        return false;
+    }
+    modem.deleteCertificate(CLIENT_CERT_FILE);
+    if (!modem.downloadCertificate(CLIENT_CERT_FILE, certificate.c_str())) {
+        lastMessage = "AWS TLS: client certificate upload failed";
+        traceAppend(lastMessage);
+        return false;
+    }
+    modem.deleteCertificate(PRIVATE_KEY_FILE);
+    if (!modem.downloadCertificate(PRIVATE_KEY_FILE, privateKey.c_str())) {
+        lastMessage = "AWS TLS: private key upload failed";
+        traceAppend(lastMessage);
+        return false;
+    }
+
+    lteSecureClient.setCertificate(ROOT_CA_FILE);
+    lteSecureClient.setClientCertificate(CLIENT_CERT_FILE);
+    lteSecureClient.setClientPrivateKey(PRIVATE_KEY_FILE);
+    lastMessage = "AWS TLS: modem client configured";
+    traceAppend(lastMessage);
+    return true;
+}
+
 Client* lilygoTinyGsmClient()
 {
     return &lteClient;
@@ -473,4 +513,3 @@ void lilygoModemLoop()
 {
     // TinyGSM transport currently has no periodic modem work.
 }
-

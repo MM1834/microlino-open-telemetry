@@ -40,8 +40,13 @@ static void startAp()
     apSsid = String(SETUP_AP_SSID) + "-" + chipId();
 
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(apSsid.c_str());
-    // WiFi.softAP(apSsid.c_str(), SETUP_AP_PASS);
+    if (config.localAdminConfigured()) {
+        WiFi.softAP(apSsid.c_str(), config.otaPassword.c_str());
+        Serial.println("Setup AP security: WPA2 enabled");
+    } else {
+        WiFi.softAP(apSsid.c_str());
+        Serial.println("Setup AP security: FIRST SETUP ONLY (open)");
+    }
 
     Serial.printf("Setup AP: %s\n", apSsid.c_str());
     Serial.printf("Setup AP IP: %s\n", WiFi.softAPIP().toString().c_str());

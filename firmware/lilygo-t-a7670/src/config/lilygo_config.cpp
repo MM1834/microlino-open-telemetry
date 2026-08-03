@@ -38,6 +38,21 @@ String lilygoDeviceName()
     return ConfigurationManager::normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
 }
 
+bool LilygoConfig::validLocalAdminPassword(const String& password)
+{
+    if (password.length() < 12 || password.length() > 63) return false;
+    for (size_t i = 0; i < password.length(); ++i) {
+        const uint8_t character = static_cast<uint8_t>(password[i]);
+        if (character < 32 || character > 126) return false;
+    }
+    return true;
+}
+
+bool LilygoConfig::localAdminConfigured() const
+{
+    return validLocalAdminPassword(otaPassword);
+}
+
 void LilygoConfigurationManager::normalize()
 {
     config.deviceName = normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
@@ -66,7 +81,14 @@ void LilygoConfigurationManager::load()
     config.deviceName = getStringOrDefault("deviceName", "");
     config.vehicleId = getStringOrDefault("vehicleId", "pioneer");
     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
-    config.otaEnabled = prefs.isKey("otaEnabled") ? prefs.getBool("otaEnabled", true) : true;
+    const bool securityV1 = prefs.getBool("securityV1", false);
+    config.otaEnabled = securityV1 && prefs.getBool("otaEnabled", false);
+    if (!securityV1) {
+        // Existing installations inherited an unsafe OTA-on default. Force one
+        // explicit opt-in after installing the hardened firmware.
+        prefs.putBool("otaEnabled", false);
+        prefs.putBool("securityV1", true);
+    }
     config.otaPassword = getStringOrDefault("otaPassword", "");
     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
@@ -135,7 +157,6 @@ String LilygoConfigurationManager::exportJson(bool includeSecrets) const
     doc[ConfigKeys::OTA_ENABLED] = config.otaEnabled;
     doc[ConfigKeys::CAN1_PROFILE] = static_cast<int>(config.canProfile);
     doc[ConfigKeys::ONBOARDING_COMPLETE] = config.onboardingComplete;
-    doc[ConfigKeys::ABRP_API_KEY] = config.abrpApiKey;
 
     if (includeSecrets) {
         doc[ConfigKeys::WIFI_PASS] = config.wifiPass;
@@ -144,6 +165,7 @@ String LilygoConfigurationManager::exportJson(bool includeSecrets) const
         doc[ConfigKeys::MQTT_USER] = config.mqttUser;
         doc[ConfigKeys::MQTT_PASS] = config.mqttPass;
         doc[ConfigKeys::OTA_PASSWORD] = config.otaPassword;
+        doc[ConfigKeys::ABRP_API_KEY] = config.abrpApiKey;
         doc[ConfigKeys::ABRP_USER_TOKEN] = config.abrpUserToken;
     }
 
@@ -158,6 +180,10 @@ ConfigurationValidationResult LilygoConfigurationManager::validate() const
     if (config.mqttPort == 0) {
         result.valid = false;
         result.error = "mqttPort must be between 1 and 65535";
+    }
+    if (!config.localAdminConfigured()) {
+        result.valid = false;
+        result.error = "local admin password must be 12-63 printable ASCII characters";
     }
     return result;
 }
@@ -207,6 +233,9 @@ bool LilygoConfigurationManager::importJson(const String& json, String& error)
     if (!doc[ConfigKeys::ONBOARDING_COMPLETE].isNull()) config.onboardingComplete = doc[ConfigKeys::ONBOARDING_COMPLETE].as<bool>();
 
     normalize();
+    if (!config.localAdminConfigured() && previous.localAdminConfigured()) {
+        config.otaPassword = previous.otaPassword;
+    }
     const ConfigurationValidationResult validation = validate();
     if (!validation.valid) {
         config = previous;
