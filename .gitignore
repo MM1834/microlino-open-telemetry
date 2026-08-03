@@ -61,3 +61,6 @@ dashboard/**/*config*~
 *.swp
 # Local packaged AWS artifacts
 build/aws/
+
+# Local portal upload packages
+build/portal/

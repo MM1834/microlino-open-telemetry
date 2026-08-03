@@ -5,6 +5,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 AUTH_MANAGER = ROOT / "dashboard/js/auth/auth-manager.js"
 CONFIG_EXAMPLE = ROOT / "dashboard/config.example.js"
+BETA_CONFIG_EXAMPLE = ROOT / "dashboard/config.beta.example.js"
+CALLBACK_PAGE = ROOT / "dashboard/callback/index.html"
 
 
 class DashboardLogoutConfigurationTests(unittest.TestCase):
@@ -18,6 +20,24 @@ class DashboardLogoutConfigurationTests(unittest.TestCase):
         source = CONFIG_EXAMPLE.read_text(encoding="utf-8")
         self.assertIn('redirectUri: "https://YOUR_DASHBOARD_URL/callback"', source)
         self.assertIn('logoutUri: "https://YOUR_DASHBOARD_URL/"', source)
+
+    def test_beta_config_uses_exact_hosted_paths(self) -> None:
+        source = BETA_CONFIG_EXAMPLE.read_text(encoding="utf-8")
+        self.assertIn(
+            'redirectUri: "https://www.microlino-open-telemetry.ch/MOTbeta/callback/"',
+            source,
+        )
+        self.assertIn(
+            'logoutUri: "https://www.microlino-open-telemetry.ch/MOTbeta/"',
+            source,
+        )
+        self.assertNotIn("localhost", source)
+
+    def test_callback_preserves_portal_subdirectory(self) -> None:
+        source = CALLBACK_PAGE.read_text(encoding="utf-8")
+        self.assertIn("window.location.pathname.replace", source)
+        self.assertIn("/callback(?:\\/index\\.html)?\\/?$/", source)
+        self.assertNotIn("window.location.replace('/'", source)
 
 
 class DashboardRevocationTests(unittest.TestCase):
