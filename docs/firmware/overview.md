@@ -23,13 +23,14 @@ third application target in the repository.
 |---|---|---|
 | `esp32dev` | ESP32-WROOM with legacy plain MQTT path | Legacy build structure |
 | `esp32dev-aws` | ESP32-WROOM with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant |
-| `esp32dev-gps-test` | Standalone GPS diagnostic main | Retired product variant; historical test utility |
 | `lilygo-t-a7670` | LilyGO with legacy WiFi/LTE MQTT path | Legacy build structure |
 | `T-A7670X-AWS` | LilyGO with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant; WiFi-preferred AWS with LTE/TLS fallback |
 
-The target maintenance model is one firmware line per board, with AWS IoT and GPS
-as capabilities rather than generations. PlatformIO has not yet been simplified;
-DOC-001 documents the discrepancy but does not change firmware configuration.
+The standalone ESP32 GPS test environment was removed after GPS became a normal
+runtime capability of the WROOM firmware. The remaining target maintenance model
+is one firmware line per board, with AWS IoT and GPS as capabilities rather than
+generations. Pre-AWS environments remain as legacy regression paths pending the
+rest of that simplification.
 
 ## Shared components
 
