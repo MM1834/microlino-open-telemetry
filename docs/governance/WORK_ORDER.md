@@ -126,6 +126,8 @@ against the exact commit and environment.
 
 ## Completed reference
 
+- [`v1.0.0-rc.1`](../project/sprints/V1.0.0-RC.1.md) completed the repository and
+  documentation consolidation and was published on 2026-08-04.
 - REL-001 is complete and forms the validated predecessor baseline for
   [`v1.0.0-rc.1`](../project/sprints/V1.0.0-RC.1.md).
 - DOC-001 is complete. Current owner pages now replace its intermediate migration
