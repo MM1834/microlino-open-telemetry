@@ -53,8 +53,10 @@ future fleet functions.
   2026-08-04. The updated AWS build was then physically validated from WiFi loss
   through A7670 packet data and AWS IoT LTE/TLS reconnection without replacing its
   device identity or credentials, followed by a successful return to preferred
-  WiFi and AWS IoT reconnection. Extended adverse-condition qualification remains
-  open.
+  WiFi and AWS IoT reconnection. A subsequent maintainer road test confirmed LTE
+  fallback while driving, recovery after loss of mobile coverage and correct
+  operation after a full power cycle. ABRP remains WiFi-only. Extended soak and
+  controlled adverse-condition qualification remain open.
 - External L76K GPS support exists.
 - The operational setup AP uses the local administrator password, all operational
   WebUI/API routes require authentication and local OTA defaults to disabled.
@@ -82,7 +84,8 @@ That simplification is planned and has not yet been applied to PlatformIO.
 
 ## Portal and AWS backend
 
-Implemented in the repository:
+Implemented in the repository under the consolidated `build/dashboard/current/`
+portal source tree:
 
 - static portal/dashboard;
 - Cognito Authorization Code flow with PKCE;
@@ -94,9 +97,12 @@ Implemented in the repository:
 - shared AWS IoT firmware transport for both boards.
 - HIS-001 pilot infrastructure for bounded SOC, charging, plugged and speed history,
   including TTL, authorized API and portal charts. The AWS development stack has
-  SOC/charging and Speed enabled only for `pioneer`. Core and motion intervals
-  are independently configurable and currently set to 5 and 15 minutes. GPS
-  remains live-only.
+  SOC/charging and Speed enabled for the controlled `pioneer` and `xrpioneer`
+  identities. A repository update changes Speed from a 15-minute snapshot to
+  one-minute moving samples, suppresses repeated standstill zeroes, writes a
+  journey-end zero immediately and averages Speed at API resolution. The backend
+  refinement is deployed and read back; the static hosted portal package awaits
+  manual FTPS upload. GPS remains live-only.
 
 The legacy Node-RED forwarder identity `xrpioneer` is provisioned with a dedicated
 publish-only AWS IoT certificate, assigned to its controlled beta user and enabled

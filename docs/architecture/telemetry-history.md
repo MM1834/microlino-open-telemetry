@@ -1,6 +1,6 @@
 # Telemetry History Pilot
 
-> **Status:** Core pilot deployed for `pioneer`; motion signals remain disabled
+> **Status:** Pilot and minute-aggregated Speed update deployed
 >
 > **Work package:** HIS-001
 >
@@ -44,23 +44,31 @@ existing ACTIVE user/vehicle assignment.
 | SOC | `display/soc` | 5 minutes | 5 min / 30 min / 2 h |
 | Charging | `charging/is_charging` | 5 minutes | 5 min / 30 min / 2 h |
 | Plugged | `charging/plugged` | 5 minutes | 5 min / 30 min / 2 h |
-| Speed | `display/speed_kmh` | 15 minutes | 5 min / 30 min / 2 h |
+| Speed | `display/speed_kmh` | 1 active-driving minute plus one stop marker | averaged 5 min / 30 min / 2 h |
 
 The stored cadences are deployment parameters rather than fixed code constants.
 Core and motion intervals can independently be 1, 5, 15, 30 or 60 minutes. The
-pilot defaults remain 5 minutes for SOC/charging/plugged and 15 minutes for Speed.
-Shorter settings increase the documented write ceiling and require a matching
-alarm-threshold review before deployment.
+pilot defaults are 5 minutes for SOC/charging/plugged and one minute for Speed.
+Speed is sampled only while moving. The first transition from a positive value to
+zero is stored immediately, including inside an already sampled minute, and
+subsequent standstill zeroes are suppressed. The API averages the available
+minute samples into its fixed display resolution and also returns `speedMax` for
+each output bucket. This avoids a delayed tail at journey end without changing
+the live value.
 
 The three API ranges are 24 hours, 7 days and 30 days. Storage retention defaults
 to 31 days and CloudFormation prevents a larger pilot value. DynamoDB TTL deletion
 is asynchronous; expired records may remain briefly but the API time window never
 returns data older than the requested range.
 
-At full publication availability the write ceiling is 960 items per vehicle/day:
-three signals × 288 five-minute buckets plus one signal × 96 fifteen-minute
-buckets. Duplicate publishes within a bucket are rejected before a history write
-using the previous timestamp returned by the already-required state update.
+Core signals have a fixed ceiling of 864 items per vehicle/day. Speed adds at most
+one write per active-driving minute plus one stop marker per journey; continuous
+standstill adds no writes. A physically impossible 24-hour driving upper bound is
+therefore about 2,304 items per vehicle/day plus journey markers. The deployed
+daily alarm remains the operational cost guard and must be reviewed against
+observed driving minutes. Duplicate moving publishes within a minute are rejected
+before a history write using the previous value and timestamp returned by the
+already-required state update.
 
 ## API and portal
 
@@ -69,7 +77,7 @@ authorizer and `has_active_access` check as snapshots. An inactive, unknown or
 unassigned vehicle returns the same non-enumerating 404. Queries are partition-key
 bound and eventually consistent.
 
-The portal draws SOC, Speed, charging-state and plugged-state charts. Vehicle
+The portal draws SOC, averaged Speed, charging-state and plugged-state charts. Vehicle
 selection reloads history. No history request contains a user-selected vehicle
 without server-side authorization.
 
@@ -134,8 +142,19 @@ daily ceiling remains below the 1,000-write pilot alarm.
 
 After the Node-RED legacy forwarder passed certificate, namespace and portal-user
 setup, `xrpioneer` was added beside `pioneer` to the History allowlist. The
-two-identity default maximum is 1,920 writes/day, so the usage alarm was adjusted
-to 2,100 writes/day. This changes neither cadence nor retention.
+usage alarm was adjusted to 2,100 writes/day for the two-identity pilot. It
+remains the active guardrail after the driving-minute refinement; an alarm breach
+stops cohort expansion and triggers cadence/usage review.
+
+After a real road test showed that 15-minute first-value Speed buckets were not
+representative, the active-driving cadence was changed to one minute on
+2026-08-04. The deployed ingest suppresses repeated standstill zeroes and writes
+the first positive-to-zero transition immediately. The deployed API averages
+Speed samples per fixed response bucket and returns the bucket maximum. Stack
+`mot-aws-3-1` reached `UPDATE_COMPLETE`, runtime configuration reports 60 seconds,
+both deployed Lambda packages contain the reviewed logic, Health returned 200,
+the unauthenticated History route remained 401 and the 2,100-write alarm remained
+`OK`. Hosted portal upload remains an operator action.
 
 Cost Explorer access remains denied for the maintainer IAM user. Cost control is
 therefore evidenced through bounded writes and CloudWatch usage, not a current
@@ -145,7 +164,9 @@ currency total. Billing access or exported billing evidence remains required.
 
 - No backfill is attempted.
 - TTL is a deletion mechanism, not an exact deletion timestamp.
-- Bucket values are first accepted values, not statistical aggregates.
+- Core bucket values are first accepted values; Speed API buckets are arithmetic
+  means of the available one-minute driving samples and include an immediate
+  zero marker at journey end.
 - Currency-denominated Cost Explorer evidence is unavailable to the current IAM
 user.
 

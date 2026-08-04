@@ -30,7 +30,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
-    handler = partial(RedactingHandler, directory=str(ROOT / "dashboard"))
+    handler = partial(RedactingHandler, directory=str(ROOT / "build/dashboard/current"))
     server = ThreadingHTTPServer(("", args.port), handler)
     print(f"Serving redacted dashboard logs on http://localhost:{args.port}")
     server.serve_forever()

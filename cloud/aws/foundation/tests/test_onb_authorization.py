@@ -275,6 +275,31 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         result = self.module.handler(event, None)
         self.assertEqual(400, result["statusCode"])
 
+    def test_speed_history_is_averaged_per_api_resolution(self):
+        self.history.items.extend([
+            {
+                "vehicleId": "alpha", "sampleKey": "speed#1700000100",
+                "signal": "speed", "sampledAt": 1_700_000_100_000,
+                "receivedAt": 1_700_000_100_000, "value": 20,
+            },
+            {
+                "vehicleId": "alpha", "sampleKey": "speed#1700000160",
+                "signal": "speed", "sampledAt": 1_700_000_160_000,
+                "receivedAt": 1_700_000_160_000, "value": 40,
+            },
+            {
+                "vehicleId": "alpha", "sampleKey": "speed#1700000220",
+                "signal": "speed", "sampledAt": 1_700_000_220_000,
+                "receivedAt": 1_700_000_220_000, "value": 0,
+            },
+        ])
+        points = self.module.load_history(
+            "alpha", 1_700_000_000_000, 1_700_000_299_000, 300
+        )
+        speed_point = next(point for point in points if "speed" in point)
+        self.assertEqual(20.0, speed_point["speed"])
+        self.assertEqual(40, speed_point["speedMax"])
+
 
 class LiveAuthorizationTests(unittest.TestCase):
     def setUp(self):
@@ -417,6 +442,44 @@ class IngestAuthorizationTests(unittest.TestCase):
         self.assertTrue(module.store_history(
             "alpha", "charging/plugged", True, "boolean", 1_700_000_301_000
         ))
+
+    def test_speed_history_samples_driving_minutes_and_one_stop(self):
+        history = VehicleHistoryTable()
+        module = load_lambda(
+            "StateIngestFunction",
+            {
+                "state": VehicleStateTable(), "connections": ConnectionTable(),
+                "access": AccessTable({}), "history": history,
+            },
+            {
+                "TABLE_NAME": "state", "CONNECTION_TABLE_NAME": "connections",
+                "ACCESS_TABLE_NAME": "access", "WEBSOCKET_API_ID": "api",
+                "WEBSOCKET_STAGE": "$default", "AWS_REGION": "eu-north-1",
+                "HISTORY_TABLE_NAME": "history", "HISTORY_ENABLED": "true",
+                "HISTORY_RETENTION_DAYS": "31",
+                "HISTORY_MOTION_ENABLED": "true",
+                "HISTORY_VEHICLE_ALLOWLIST": "alpha",
+                "HISTORY_CORE_INTERVAL_SECONDS": "300",
+                "HISTORY_MOTION_INTERVAL_SECONDS": "60",
+            },
+        )
+        self.assertTrue(module.store_history(
+            "alpha", "display/speed_kmh", 30, "number", 1_700_000_001_000,
+            1_699_999_930_000, 20
+        ))
+        self.assertFalse(module.store_history(
+            "alpha", "display/speed_kmh", 35, "number", 1_700_000_020_000,
+            1_700_000_001_000, 30
+        ))
+        self.assertTrue(module.store_history(
+            "alpha", "display/speed_kmh", 0, "number", 1_700_000_025_000,
+            1_700_000_020_000, 35
+        ))
+        self.assertFalse(module.store_history(
+            "alpha", "display/speed_kmh", 0, "number", 1_700_000_040_000,
+            1_700_000_025_000, 0
+        ))
+        self.assertEqual([30, 0], [item["value"] for item in history.items])
 
 
 class TemplateStructureTests(unittest.TestCase):

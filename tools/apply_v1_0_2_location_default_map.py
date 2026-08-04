@@ -2,13 +2,13 @@ from pathlib import Path
 
 root = Path.cwd()
 
-index = root / "dashboard/index.html"
-app = root / "dashboard/js/app.js"
+index = root / "build/dashboard/current/index.html"
+app = root / "build/dashboard/current/js/app.js"
 
 if not index.exists():
-    raise SystemExit("dashboard/index.html not found")
+    raise SystemExit("build/dashboard/current/index.html not found")
 if not app.exists():
-    raise SystemExit("dashboard/js/app.js not found")
+    raise SystemExit("build/dashboard/current/js/app.js not found")
 
 html = index.read_text(encoding="utf-8")
 
@@ -23,7 +23,7 @@ if 'id="location-map-frame"' not in html:
     if marker in html:
         html = html.replace(marker, iframe + marker, 1)
     else:
-        raise SystemExit("location-text marker not found in dashboard/index.html")
+        raise SystemExit("location-text marker not found in build/dashboard/current/index.html")
 
 index.write_text(html, encoding="utf-8")
 

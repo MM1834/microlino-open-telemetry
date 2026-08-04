@@ -52,9 +52,9 @@ Parameters:
 
   HistoryMotionIntervalSeconds:
     Type: Number
-    Default: 900
+    Default: 60
     AllowedValues: [60, 300, 900, 1800, 3600]
-    Description: Bucket interval for speed.
+    Description: Active-driving sample interval for speed. Repeated standstill zeroes are suppressed.
 
   HistoryDailyWriteAlarmThreshold:
     Type: Number
@@ -409,7 +409,7 @@ Resources:
           }
           history_retention_days = min(31, max(1, int(os.environ.get("HISTORY_RETENTION_DAYS", "31"))))
           history_core_interval = int(os.environ.get("HISTORY_CORE_INTERVAL_SECONDS", "300"))
-          history_motion_interval = int(os.environ.get("HISTORY_MOTION_INTERVAL_SECONDS", "900"))
+          history_motion_interval = int(os.environ.get("HISTORY_MOTION_INTERVAL_SECONDS", "60"))
 
           HISTORY_SIGNALS = {
               "display/soc": ("soc", history_core_interval),
@@ -429,7 +429,10 @@ Resources:
               signal = HISTORY_SIGNALS[topic_suffix][0]
               return signal != "speed" or history_motion_enabled
 
-          def store_history(vehicle_id, topic_suffix, value, value_type, received_at, previous_received_at=0):
+          def store_history(
+              vehicle_id, topic_suffix, value, value_type, received_at,
+              previous_received_at=0, previous_value=None
+          ):
               if not is_history_candidate(vehicle_id, topic_suffix):
                   return False
               signal, interval_seconds = HISTORY_SIGNALS[topic_suffix]
@@ -440,7 +443,20 @@ Resources:
               received_seconds = received_at // 1000
               bucket = received_seconds - (received_seconds % interval_seconds)
               previous_seconds = int(previous_received_at or 0) // 1000
-              if previous_seconds - (previous_seconds % interval_seconds) == bucket:
+              speed_stopped = signal == "speed" and value == 0
+              speed_was_moving = (
+                  signal == "speed"
+                  and isinstance(previous_value, (int, Decimal))
+                  and previous_value > 0
+              )
+              if speed_stopped and not speed_was_moving:
+                  return False
+              if speed_stopped:
+                  # Preserve the end of a drive even if it occurs inside an
+                  # already sampled minute. Continuous standstill writes are
+                  # suppressed above.
+                  bucket = received_seconds
+              elif previous_seconds - (previous_seconds % interval_seconds) == bucket:
                   return False
               try:
                   history.put_item(
@@ -600,6 +616,7 @@ Resources:
                   previous_received_at = int(
                       update_result.get("Attributes", {}).get("receivedAt", 0)
                   )
+                  previous_value = update_result.get("Attributes", {}).get("value")
               except ClientError as error:
                   if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
                       stored = False
@@ -613,7 +630,7 @@ Resources:
                   try:
                       history_stored = store_history(
                           vehicle_id, topic_suffix, value, value_type, received_at,
-                          previous_received_at
+                          previous_received_at, previous_value
                       )
                   except Exception as error:
                       print(json.dumps({
@@ -901,6 +918,7 @@ Resources:
           def load_history(vehicle_id, since_ms, until_ms, resolution_seconds):
               signals = ("soc", "charging", "plugged", "speed")
               buckets = {}
+              speed_buckets = {}
               for signal in signals:
                   lower = f"{signal}#{since_ms // 1000:010d}"
                   upper = f"{signal}#{until_ms // 1000:010d}"
@@ -920,10 +938,25 @@ Resources:
                           sampled_at = int(item.get("sampledAt", 0))
                           bucket_ms = (sampled_at // (resolution_seconds * 1000)) * resolution_seconds * 1000
                           point = buckets.setdefault(bucket_ms, {"ts": bucket_ms})
-                          point[signal] = json_value(item.get("value"))
+                          value = json_value(item.get("value"))
+                          if signal == "speed" and isinstance(value, (int, float)):
+                              aggregate = speed_buckets.setdefault(
+                                  bucket_ms, {"sum": 0.0, "count": 0, "max": 0.0}
+                              )
+                              aggregate["sum"] += value
+                              aggregate["count"] += 1
+                              aggregate["max"] = max(aggregate["max"], value)
+                          else:
+                              point[signal] = value
                       last_evaluated_key = result.get("LastEvaluatedKey")
                       if not last_evaluated_key:
                           break
+              for bucket_ms, aggregate in speed_buckets.items():
+                  point = buckets.setdefault(bucket_ms, {"ts": bucket_ms})
+                  point["speed"] = round(
+                      aggregate["sum"] / aggregate["count"], 1
+                  )
+                  point["speedMax"] = aggregate["max"]
               return [buckets[key] for key in sorted(buckets)]
   
           def handler(event, context):

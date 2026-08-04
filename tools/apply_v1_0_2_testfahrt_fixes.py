@@ -44,7 +44,7 @@ def patch_web(s):
         s = s.replace(old, new)
     return s
 
-rw("dashboard/js/history/history-recorder.js", patch_recorder)
-rw("dashboard/js/app.js", patch_app)
+rw("build/dashboard/current/js/history/history-recorder.js", patch_recorder)
+rw("build/dashboard/current/js/app.js", patch_app)
 rw("firmware/esp32-wroom/src/web/web_ui.cpp", patch_web)
 print("MOT v1.0.2 test-drive fixes patch applied.")

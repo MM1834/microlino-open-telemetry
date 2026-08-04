@@ -25,18 +25,18 @@ Build the ignored upload directory from the tracked portal sources and replace
 the generic configuration with the reviewed production configuration:
 
 ```console
-mkdir -p build/portal/dashboard-rel-001-pilot.1
+mkdir -p build/dashboard/packages/dashboard-rel-001-pilot.1
 rsync -a --delete --delete-excluded \
   --exclude '.DS_Store' \
   --exclude 'config.js' \
   --exclude 'config.example.js' \
   --exclude 'config.*.example.js' \
-  dashboard/ build/portal/dashboard-rel-001-pilot.1/
-cp dashboard/config.production.example.js \
-  build/portal/dashboard-rel-001-pilot.1/config.js
+  build/dashboard/current/ build/dashboard/packages/dashboard-rel-001-pilot.1/
+cp build/dashboard/current/config.production.example.js \
+  build/dashboard/packages/dashboard-rel-001-pilot.1/config.js
 ```
 
-`build/portal/` is intentionally ignored. The generated `config.js` contains
+`build/dashboard/packages/` is intentionally ignored. The generated `config.js` contains
 public browser settings, not device certificates, passwords or private keys.
 
 ## Backup and Upload with FileZilla
@@ -46,7 +46,7 @@ public browser settings, not device certificates, passwords or private keys.
    local backup outside the repository.
 3. Confirm that the backup contains the expected files before continuing.
 4. Upload the **contents** of
-   `build/portal/dashboard-rel-001-pilot.1/` into `/dashboard/`. Do not upload
+   `build/dashboard/packages/dashboard-rel-001-pilot.1/` into `/dashboard/`. Do not upload
    the enclosing `dashboard-rel-001-pilot.1` directory.
 5. Do not modify `/`, `/motbeta/` or their redirects.
 

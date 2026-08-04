@@ -21,11 +21,13 @@
 fixed API ranges, portal charts and measurable AWS guardrails.
 
 **Current status:** Repository implementation, local tests, AWS baseline
-measurement and fail-closed deployment are complete. SOC/charging are enabled
-for `pioneer` at 5-minute cadence; Speed is enabled for the same identity at
-15-minute cadence. Fresh-traffic live regression,
-authenticated history acceptance, portal deployment and the first TTL/cost
-observation remain open. The existing live state and WebSocket path remain the
+measurement and fail-closed deployment are complete. The controlled `pioneer`
+and `xrpioneer` identities are enabled. Live, authorized portal and History
+operation passed with fresh traffic. After road-test review, a repository update
+now samples Speed per active-driving minute, records one immediate journey-end
+zero, suppresses continuous standstill writes and averages Speed into the fixed
+API resolutions. The AWS backend deployment passed; hosted-portal upload and the
+first moving-road-test/TTL/cost observation remain open. The existing live state and WebSocket path remain the
 release boundary and must not regress.
 
 ### Harden local firmware administration — active
@@ -98,8 +100,10 @@ is required by fleet growth.
 
 The configurable APN path, bounded reconnect/backoff, modem recovery diagnostics
 and WiFi-first AWS IoT fallback are implemented. Focused repository tests and both
-LilyGO compile gates pass. Hardware soak, weak-signal, SIM-loss and power-condition
-qualification remain open before general production readiness.
+LilyGO compile gates pass. Stationary round-trip and maintainer road tests passed,
+including loss of mobile coverage and a full power cycle. Long-duration soak,
+controlled weak-signal, SIM-loss and repeated transition-cycle qualification
+remain open before general production readiness.
 
 ### Simplify maintained firmware environments
 

@@ -20,7 +20,7 @@ secrets.*
 *.local
 .env
 # Local dashboard deployment config
-dashboard/config.js
+build/dashboard/config.js
 
 # Local firmware build artifacts
 firmware/esp32-wroom/.pio/
@@ -45,22 +45,23 @@ secrets/aws-iot/*
 *.zip
 
 # Local dashboard configuration with credentials
-dashboard/config.js
-dashboard/**/config.js
+build/dashboard/config.js
+build/dashboard/**/config.js
 
 # Common local copies and backups
-dashboard/**/config.local.js
-dashboard/**/config.dev.js
-dashboard/**/config.prod.js
-dashboard/**/config.*.local.js
-dashboard/**/config.js.*
-dashboard/**/*config*.bak
-dashboard/**/*config*.backup
-dashboard/**/*config*.copy
-dashboard/**/*config*~
+build/dashboard/**/config.local.js
+build/dashboard/**/config.dev.js
+build/dashboard/**/config.prod.js
+build/dashboard/**/config.*.local.js
+build/dashboard/**/config.js.*
+build/dashboard/**/*config*.bak
+build/dashboard/**/*config*.backup
+build/dashboard/**/*config*.copy
+build/dashboard/**/*config*~
 *.swp
 # Local packaged AWS artifacts
 build/aws/
 
 # Local portal upload packages
 build/portal/
+build/dashboard/packages/

@@ -22,10 +22,10 @@ manual operator action using FileZilla with FTP over TLS. The existing
 
 ## Prepare the local upload directory
 
-1. Make a local copy of the complete `dashboard/` directory.
+1. Make a local copy of the complete `build/dashboard/current/` directory.
 2. Name the copied directory `motbeta`.
 3. In that copy, replace `config.js` with the contents of
-   `dashboard/config.beta.example.js`.
+   `build/dashboard/current/config.beta.example.js`.
 4. Do not upload local backups, logs, credentials, `.env` files, or files from
    `secrets/`.
 5. Upload the contents to the web-server directory that maps to `/motbeta/`.

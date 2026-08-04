@@ -5,7 +5,7 @@
 > **Audience:** Portal developer, backend developer and administrator
 >
 > **Sources of truth:** `cloud/aws/foundation/template.yaml` and
-> `dashboard/js/live/websocket-client.js`
+> `build/dashboard/current/js/live/websocket-client.js`
 
 ## Connection authentication
 

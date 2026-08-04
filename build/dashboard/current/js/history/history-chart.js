@@ -44,7 +44,7 @@ async function render(hours=24){
     emptyId:"speed-history-empty",
     samples,
     field:samples.some(s=>s.speed!==undefined)?"speed":"speedKmh",
-    label:"Speed",
+    label:"Ø Speed",
     unit:"km/h",
     min:0,
     max:null,

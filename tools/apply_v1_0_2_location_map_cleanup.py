@@ -2,9 +2,9 @@ from pathlib import Path
 import re
 
 root = Path.cwd()
-index = root / "dashboard/index.html"
+index = root / "build/dashboard/current/index.html"
 if not index.exists():
-    raise SystemExit("dashboard/index.html not found")
+    raise SystemExit("build/dashboard/current/index.html not found")
 
 html = index.read_text(encoding="utf-8")
 
