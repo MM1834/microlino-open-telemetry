@@ -6,9 +6,9 @@
 
 ## Common local network behaviour
 
-Both targets start a setup/fallback access point without a password and can attempt
-a configured WiFi station connection. The AP provides local setup/recovery but is
-not an authenticated security boundary.
+Both targets start a setup/fallback access point and can attempt a configured WiFi
+station connection. After initial provisioning, the operational AP and local
+administration use the configured local administrator password.
 
 ## ESP32-WROOM
 
@@ -18,14 +18,16 @@ online state.
 
 ## LilyGO
 
-The network/modem source includes WiFi and LTE/GPRS state. Transport behaviour is
-build-path specific:
+The network/modem source includes WiFi and LTE/GPRS state. WiFi is preferred and
+LTE is inactive when no APN is configured. Transport behaviour is build-path
+specific:
 
-- AWS IoT: WiFi connectivity is passed to the shared AWS client;
+- AWS IoT: selects WiFi first and the A7670 X.509/TLS client as fallback;
 - legacy MQTT: chooses WiFi first and LTE when WiFi is unavailable and GPRS is up.
 
-Historical retry intervals and successful modem-layer experiments are not a public
-guarantee for the current commit.
+LTE registration uses bounded attempts, exponential backoff and modem recovery
+after repeated failures. Hardware soak and adverse-condition qualification remain
+open.
 
 ## Security and support
 

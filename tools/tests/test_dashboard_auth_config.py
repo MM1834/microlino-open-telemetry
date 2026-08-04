@@ -67,7 +67,7 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "dashboard/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260803-4", source)
+        self.assertIn("aws-backend-provider.js?v=20260804-1", source)
 
 
 class DashboardFreshnessTests(unittest.TestCase):

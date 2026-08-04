@@ -19,6 +19,49 @@ Parameters:
     Default: "false"
     AllowedValues: ["true", "false"]
 
+  EnableTelemetryHistory:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Enables the bounded pilot history side path. Live state remains independent.
+
+  EnableHistoryMotionSignals:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Adds speed after the SOC/charging pilot gate passes.
+
+  HistoryVehicleAllowlist:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[a-z0-9][a-z0-9_-]{0,63}(,[a-z0-9][a-z0-9_-]{0,63})*$'
+    Description: Comma-separated pilot vehicles. Empty means no history writes.
+
+  HistoryRetentionDays:
+    Type: Number
+    Default: 31
+    MinValue: 1
+    MaxValue: 31
+    Description: DynamoDB TTL horizon for pilot history. Capped at 31 days.
+
+  HistoryCoreIntervalSeconds:
+    Type: Number
+    Default: 300
+    AllowedValues: [60, 300, 900, 1800, 3600]
+    Description: Bucket interval for SOC, charging state and plugged state.
+
+  HistoryMotionIntervalSeconds:
+    Type: Number
+    Default: 900
+    AllowedValues: [60, 300, 900, 1800, 3600]
+    Description: Bucket interval for speed.
+
+  HistoryDailyWriteAlarmThreshold:
+    Type: Number
+    Default: 1000
+    MinValue: 1
+    Description: Alarm when history table writes exceed this daily pilot budget.
+
 
   ApiAllowedOrigin:
     Type: String
@@ -61,6 +104,9 @@ Parameters:
 Conditions:
   CognitoSelfRegistrationIsEnabled: !Equals
     - !Ref CognitoSelfRegistrationEnabled
+    - "true"
+  TelemetryHistoryIsEnabled: !Equals
+    - !Ref EnableTelemetryHistory
     - "true"
 
 Resources:
@@ -161,6 +207,56 @@ Resources:
         - Key: environment
           Value: !Ref Environment
 
+  VehicleHistoryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-vehicle-history"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: vehicleId
+          AttributeType: S
+        - AttributeName: sampleKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: vehicleId
+          KeyType: HASH
+        - AttributeName: sampleKey
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+        - Key: component
+          Value: telemetry-history-pilot
+
+  VehicleHistoryDailyWriteAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-history-daily-writes"
+      AlarmDescription: Pilot guardrail; investigate before enabling more vehicles.
+      Namespace: AWS/DynamoDB
+      MetricName: ConsumedWriteCapacityUnits
+      Dimensions:
+        - Name: TableName
+          Value: !Ref VehicleHistoryTable
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: !Ref HistoryDailyWriteAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
   UserVehicleAccessTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -236,6 +332,12 @@ Resources:
               - Effect: Allow
                 Action: [dynamodb:UpdateItem]
                 Resource: !GetAtt VehicleStateTable.Arn
+              - !If
+                - TelemetryHistoryIsEnabled
+                - Effect: Allow
+                  Action: [dynamodb:PutItem]
+                  Resource: !GetAtt VehicleHistoryTable.Arn
+                - !Ref AWS::NoValue
               - Effect: Allow
                 Action:
                   - dynamodb:Query
@@ -268,6 +370,13 @@ Resources:
           WEBSOCKET_API_ID: !Ref VehicleWebSocketApi
           WEBSOCKET_STAGE: "$default"
           VERBOSE_MESSAGE_LOGS: !Ref EnableVerboseMessageLogs
+          HISTORY_ENABLED: !Ref EnableTelemetryHistory
+          HISTORY_TABLE_NAME: !Ref VehicleHistoryTable
+          HISTORY_RETENTION_DAYS: !Ref HistoryRetentionDays
+          HISTORY_MOTION_ENABLED: !Ref EnableHistoryMotionSignals
+          HISTORY_VEHICLE_ALLOWLIST: !Ref HistoryVehicleAllowlist
+          HISTORY_CORE_INTERVAL_SECONDS: !Ref HistoryCoreIntervalSeconds
+          HISTORY_MOTION_INTERVAL_SECONDS: !Ref HistoryMotionIntervalSeconds
       Code:
         ZipFile: |
           import base64
@@ -283,6 +392,7 @@ Resources:
           table = dynamodb.Table(os.environ["TABLE_NAME"])
           connections = dynamodb.Table(os.environ["CONNECTION_TABLE_NAME"])
           access = dynamodb.Table(os.environ["ACCESS_TABLE_NAME"])
+          history = dynamodb.Table(os.environ["HISTORY_TABLE_NAME"])
           management = boto3.client(
               "apigatewaymanagementapi",
               endpoint_url=(
@@ -291,6 +401,66 @@ Resources:
               )
           )
           verbose = os.environ.get("VERBOSE_MESSAGE_LOGS", "false").lower() == "true"
+          history_enabled = os.environ.get("HISTORY_ENABLED", "false").lower() == "true"
+          history_motion_enabled = os.environ.get("HISTORY_MOTION_ENABLED", "false").lower() == "true"
+          history_vehicle_allowlist = {
+              item.strip() for item in os.environ.get("HISTORY_VEHICLE_ALLOWLIST", "").split(",")
+              if item.strip()
+          }
+          history_retention_days = min(31, max(1, int(os.environ.get("HISTORY_RETENTION_DAYS", "31"))))
+          history_core_interval = int(os.environ.get("HISTORY_CORE_INTERVAL_SECONDS", "300"))
+          history_motion_interval = int(os.environ.get("HISTORY_MOTION_INTERVAL_SECONDS", "900"))
+
+          HISTORY_SIGNALS = {
+              "display/soc": ("soc", history_core_interval),
+              "charging/is_charging": ("charging", history_core_interval),
+              "charging/plugged": ("plugged", history_core_interval),
+              "display/speed_kmh": ("speed", history_motion_interval),
+              "display/speed": ("speed", history_motion_interval),
+          }
+
+          def is_history_candidate(vehicle_id, topic_suffix):
+              if (
+                  not history_enabled
+                  or vehicle_id not in history_vehicle_allowlist
+                  or topic_suffix not in HISTORY_SIGNALS
+              ):
+                  return False
+              signal = HISTORY_SIGNALS[topic_suffix][0]
+              return signal != "speed" or history_motion_enabled
+
+          def store_history(vehicle_id, topic_suffix, value, value_type, received_at, previous_received_at=0):
+              if not is_history_candidate(vehicle_id, topic_suffix):
+                  return False
+              signal, interval_seconds = HISTORY_SIGNALS[topic_suffix]
+              if signal in ("charging", "plugged") and not isinstance(value, bool):
+                  return False
+              if signal not in ("charging", "plugged") and not isinstance(value, (int, Decimal)):
+                  return False
+              received_seconds = received_at // 1000
+              bucket = received_seconds - (received_seconds % interval_seconds)
+              previous_seconds = int(previous_received_at or 0) // 1000
+              if previous_seconds - (previous_seconds % interval_seconds) == bucket:
+                  return False
+              try:
+                  history.put_item(
+                      Item={
+                          "vehicleId": vehicle_id,
+                          "sampleKey": f"{signal}#{bucket:010d}",
+                          "signal": signal,
+                          "sampledAt": bucket * 1000,
+                          "receivedAt": received_at,
+                          "value": value,
+                          "valueType": value_type,
+                          "expiresAt": bucket + history_retention_days * 86400,
+                      },
+                      ConditionExpression="attribute_not_exists(sampleKey)"
+                  )
+                  return True
+              except ClientError as error:
+                  if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                      return False
+                  raise
 
           def disconnect(cid):
               connections.delete_item(Key={"connectionId": cid})
@@ -404,7 +574,7 @@ Resources:
               value_type, value, payload_text, payload_bytes = decode_payload(event.get("payloadBase64"))
 
               try:
-                  table.update_item(
+                  update_result = table.update_item(
                       Key={"vehicleId": vehicle_id, "topicSuffix": topic_suffix},
                       UpdateExpression=(
                           "SET #v=:v, valueType=:t, receivedAt=:r, fullTopic=:f, "
@@ -420,9 +590,16 @@ Resources:
                           ":c": category,
                           ":b": payload_bytes,
                           ":p": payload_text or ""
-                      }
+                      },
+                      ReturnValues=(
+                          "ALL_OLD" if is_history_candidate(vehicle_id, topic_suffix)
+                          else "NONE"
+                      )
                   )
                   stored = True
+                  previous_received_at = int(
+                      update_result.get("Attributes", {}).get("receivedAt", 0)
+                  )
               except ClientError as error:
                   if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
                       stored = False
@@ -431,7 +608,20 @@ Resources:
                       raise
 
               fanout = {"sent": 0, "removed": 0}
+              history_stored = False
               if stored:
+                  try:
+                      history_stored = store_history(
+                          vehicle_id, topic_suffix, value, value_type, received_at,
+                          previous_received_at
+                      )
+                  except Exception as error:
+                      print(json.dumps({
+                          "eventType": "history_ingest_failed",
+                          "vehicleId": vehicle_id,
+                          "topicSuffix": topic_suffix,
+                          "error": str(error)
+                      }, separators=(",", ":")))
                   try:
                       fanout = broadcast_live_update(
                           vehicle_id, topic, topic_suffix, value, value_type, received_at
@@ -452,11 +642,12 @@ Resources:
                       "valueType":value_type,
                       "receivedAt":received_at,
                       "stored":stored,
+                      "historyStored":history_stored,
                       "liveSent":fanout["sent"],
                       "staleConnectionsRemoved":fanout["removed"]
                   }, default=str, separators=(",", ":")))
 
-              return {"accepted": True, "stored": stored, "live": fanout}
+              return {"accepted": True, "stored": stored, "historyStored": history_stored, "live": fanout}
 
   StateIngestLogGroup:
     Type: AWS::Logs::LogGroup
@@ -518,6 +709,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:Query
+                Resource: !GetAtt VehicleHistoryTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
                   - dynamodb:GetItem
                 Resource: !GetAtt UserVehicleAccessTable.Arn
       Tags:
@@ -542,6 +737,8 @@ Resources:
           ENVIRONMENT: !Ref Environment
           TABLE_NAME: !Ref VehicleStateTable
           ACCESS_TABLE_NAME: !Ref UserVehicleAccessTable
+          HISTORY_TABLE_NAME: !Ref VehicleHistoryTable
+          HISTORY_RETENTION_DAYS: !Ref HistoryRetentionDays
       Code:
         ZipFile: |
           import json
@@ -555,8 +752,10 @@ Resources:
           PROJECT = os.environ.get("PROJECT_NAME", "mot")
           ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
           TABLE_NAME = os.environ["TABLE_NAME"]
+          HISTORY_RETENTION_DAYS = min(31, max(1, int(os.environ.get("HISTORY_RETENTION_DAYS", "31"))))
   
           table = boto3.resource("dynamodb").Table(TABLE_NAME)
+          history = boto3.resource("dynamodb").Table(os.environ["HISTORY_TABLE_NAME"])
           access = boto3.resource("dynamodb").Table(
               os.environ["ACCESS_TABLE_NAME"]
           )
@@ -698,6 +897,34 @@ Resources:
                       })
   
               return vehicles
+
+          def load_history(vehicle_id, since_ms, until_ms, resolution_seconds):
+              signals = ("soc", "charging", "plugged", "speed")
+              buckets = {}
+              for signal in signals:
+                  lower = f"{signal}#{since_ms // 1000:010d}"
+                  upper = f"{signal}#{until_ms // 1000:010d}"
+                  last_evaluated_key = None
+                  while True:
+                      kwargs = {
+                          "KeyConditionExpression": (
+                              Key("vehicleId").eq(vehicle_id)
+                              & Key("sampleKey").between(lower, upper)
+                          ),
+                          "ConsistentRead": False
+                      }
+                      if last_evaluated_key:
+                          kwargs["ExclusiveStartKey"] = last_evaluated_key
+                      result = history.query(**kwargs)
+                      for item in result.get("Items", []):
+                          sampled_at = int(item.get("sampledAt", 0))
+                          bucket_ms = (sampled_at // (resolution_seconds * 1000)) * resolution_seconds * 1000
+                          point = buckets.setdefault(bucket_ms, {"ts": bucket_ms})
+                          point[signal] = json_value(item.get("value"))
+                      last_evaluated_key = result.get("LastEvaluatedKey")
+                      if not last_evaluated_key:
+                          break
+              return [buckets[key] for key in sorted(buckets)]
   
           def handler(event, context):
               method = (
@@ -754,6 +981,34 @@ Resources:
                       })
   
                   return response(200, snapshot)
+
+              if (
+                  method == "GET"
+                  and path.startswith("/api/vehicles/")
+                  and path.endswith("/history")
+              ):
+                  vehicle_id = path_parameters.get("vehicleId")
+                  if not vehicle_id or not has_active_access(user_sub, vehicle_id):
+                      return response(404, {"error": "vehicle_not_found"})
+                  query = event.get("queryStringParameters") or {}
+                  try:
+                      hours = int(query.get("hours", "24"))
+                  except (TypeError, ValueError):
+                      return response(400, {"error": "invalid_hours"})
+                  if hours not in (24, 168, 720):
+                      return response(400, {"error": "unsupported_range"})
+                  resolution_seconds = {24: 300, 168: 1800, 720: 7200}[hours]
+                  until_ms = int(time.time() * 1000)
+                  since_ms = until_ms - hours * 3600000
+                  points = load_history(vehicle_id, since_ms, until_ms, resolution_seconds)
+                  return response(200, {
+                      "vehicleId": vehicle_id,
+                      "hours": hours,
+                      "resolutionSeconds": resolution_seconds,
+                      "retentionDays": HISTORY_RETENTION_DAYS,
+                      "count": len(points),
+                      "points": points
+                  })
   
               return response(404, {
                   "error": "route_not_found",
@@ -841,6 +1096,15 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles/{vehicleId}/snapshot"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
+      Target: !Sub "integrations/${VehicleApiIntegration}"
+
+  VehicleApiHistoryRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      RouteKey: "GET /api/vehicles/{vehicleId}/history"
       AuthorizationType: JWT
       AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"
@@ -1339,6 +1603,12 @@ Outputs:
     Value: !Ref VehicleStateTable
   VehicleStateTableArn:
     Value: !GetAtt VehicleStateTable.Arn
+  VehicleHistoryTableName:
+    Value: !Ref VehicleHistoryTable
+  VehicleHistoryTableArn:
+    Value: !GetAtt VehicleHistoryTable.Arn
+  VehicleHistoryDailyWriteAlarmName:
+    Value: !Ref VehicleHistoryDailyWriteAlarm
   UserVehicleAccessTableName:
     Description: Controlled user-to-vehicle assignment table for ONB-001.A.
     Value: !Ref UserVehicleAccessTable

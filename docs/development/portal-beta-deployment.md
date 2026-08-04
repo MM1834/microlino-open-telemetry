@@ -74,9 +74,10 @@ After upload and AWS configuration:
 7. Verify onboarding claim issue and consumption with a controlled test
    assignment.
 
-Production-host access logs must not retain OAuth `code`, `state`, or claim
-proof values. Verify query-string redaction and retention with the hosting
-provider before treating the beta portal as operational.
+Production-host access logs must not retain claim proof values. OAuth `code` and
+`state` retention must either be prevented or remain within the explicit bounded
+CLOUD-017 pilot acceptance. Verify query-string treatment and retention before a
+broader rollout.
 
 ### Confirmed hosting log exposure, 2026-08-03
 
@@ -87,21 +88,26 @@ Successfully exchanged authorization codes are single use and PKCE-bound, but
 their presence in two access logs confirms CLOUD-017 rather than resolving it.
 
 The available hosting UI exposes log rotation but no callback-path exclusion or
-query-string redaction. Before external pilot accounts are admitted, obtain a
-provider-side logging change or record an explicit short-retention exception with
-restricted log access and a deletion schedule. Claim proofs remain prohibited in
-URLs and logs regardless of any OAuth exception.
+query-string redaction. A provider-side logging change or an explicit
+short-retention exception with restricted log access and a deletion schedule is
+required. Claim proofs remain prohibited in URLs and logs regardless of any OAuth
+exception.
 
-### Bounded pilot acceptance, 2026-08-03
+### Bounded pilot acceptance and provider response
 
-While the provider request is unanswered, the maintainer accepted the confirmed
-OAuth callback logging for the controlled REL-001 pilot only. Accounts remain
-invitation-only and directly supported; log access remains restricted to the
-hosting account; callback values are not copied into project/support records; and
-the shortest practical log rotation/deletion is used. The decision must be
-reviewed when the provider responds and cannot be inherited by public
-self-registration or a general public release. See CLOUD-017 in the cloud risk
-register for the complete boundary.
+On 2026-08-03 the maintainer accepted the confirmed OAuth callback logging for the
+controlled REL-001 pilot only. On 2026-08-04 the provider confirmed that individual
+redaction or exclusion for `access_ssl_log` and `proxy_access_ssl_log` is not
+available with the shared-hosting service and would require a vServer subscription.
+The project will not add that fixed cost solely for the small pilot portal.
+
+Accounts remain invitation-only and directly supported; log access remains
+restricted to the hosting account; callback values are not copied into
+project/support records; and the shortest practical log rotation/deletion is used.
+The exception cannot be inherited by public self-registration or a general public
+release. The preferred later option is migration of only the static portal to
+controlled AWS static hosting; see CLOUD-017 in the cloud risk register for the
+complete boundary and migration gate.
 
 ### Confirmed end-user smoke test, 2026-08-03
 

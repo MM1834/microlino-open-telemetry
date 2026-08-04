@@ -12,6 +12,22 @@
 
 ## High priority
 
+### Execute HIS-001 bounded telemetry history pilot
+
+**Active work package:** [HIS-001 — Bounded Telemetry History Pilot](../project/sprints/HIS-001.md)
+
+**Objective:** Measure normal publish volume, then introduce a disabled-by-default,
+31-day SOC/charging/plugged/speed history service with existing vehicle authorization,
+fixed API ranges, portal charts and measurable AWS guardrails.
+
+**Current status:** Repository implementation, local tests, AWS baseline
+measurement and fail-closed deployment are complete. SOC/charging are enabled
+for `pioneer` at 5-minute cadence; Speed is enabled for the same identity at
+15-minute cadence. Fresh-traffic live regression,
+authenticated history acceptance, portal deployment and the first TTL/cost
+observation remain open. The existing live state and WebSocket path remain the
+release boundary and must not regress.
+
 ### Harden local firmware administration — active
 
 **Active security sprint:** [FW-SEC-001 — Local Firmware Administration Hardening](../project/sprints/FW-SEC-001.md)
@@ -75,6 +91,15 @@ ownership still uses the bounded compatibility guard until a reviewed migration
 is required by fleet growth.
 
 ## Medium priority
+
+### Harden LilyGO LTE resilience — repository implementation complete
+
+**Active work package:** [LTE-001 — LilyGO LTE Resilience](../project/sprints/LTE-001.md)
+
+The configurable APN path, bounded reconnect/backoff, modem recovery diagnostics
+and WiFi-first AWS IoT fallback are implemented. Focused repository tests and both
+LilyGO compile gates pass. Hardware soak, weak-signal, SIM-loss and power-condition
+qualification remain open before general production readiness.
 
 ### Simplify maintained firmware environments
 

@@ -175,6 +175,8 @@ static void handleConfig()
     s += "<label>WiFi Password</label><input name='wifiPass' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
 
     s += "<label>LTE APN</label><input name='lteApn' value='" + config.lteApn + "'>";
+    s += "<label>LTE Username (optional)</label><input name='lteUser' value='" + config.lteUser + "'>";
+    s += "<label>LTE Password (optional)</label><input name='ltePass' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
 
     s += "<label>MQTT Host</label><input name='mqttHost' value='" + config.mqttHost + "'>";
     s += "<label>MQTT Port</label><input name='mqttPort' value='" + String(config.mqttPort) + "'>";
@@ -228,6 +230,8 @@ static void handleConfigSave()
     if (!server.arg("wifiPass").isEmpty()) config.wifiPass = server.arg("wifiPass");
 
     config.lteApn = server.arg("lteApn");
+    config.lteUser = server.arg("lteUser");
+    if (!server.arg("ltePass").isEmpty()) config.ltePass = server.arg("ltePass");
 
     config.awsServiceEnabled = server.hasArg("svcAws");
     config.mqttServiceEnabled = server.hasArg("svcMqtt");

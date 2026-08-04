@@ -13,10 +13,12 @@ static unsigned long lastCheckMs = 0;
 static unsigned long wifiLostSinceMs = 0;
 static unsigned long lastWifiRetryMs = 0;
 static unsigned long lastLteRetryMs = 0;
+static unsigned long lteRetryIntervalMs = 15000;
 
 static const unsigned long WIFI_LOSS_GRACE_MS = 20000;
 static const unsigned long WIFI_RETRY_INTERVAL_MS = 60000;
-static const unsigned long LTE_RETRY_INTERVAL_MS = 15000;
+static const unsigned long LTE_RETRY_INITIAL_MS = 15000;
+static const unsigned long LTE_RETRY_MAX_MS = 300000;
 
 static String lastMessage = "";
 
@@ -102,6 +104,7 @@ static bool tryLte()
     if (lilygoGprsConnected()) {
         mode = LilygoNetworkMode::LTE;
         lastMessage = "LTE connected";
+        lteRetryIntervalMs = LTE_RETRY_INITIAL_MS;
 
         Serial.printf(
         "Network: LTE connected ip=%s\n",
@@ -110,7 +113,12 @@ static bool tryLte()
         return true;
     }
 
-    if (millis() - lastLteRetryMs < LTE_RETRY_INTERVAL_MS) return false;
+    if (config.lteApn.isEmpty()) {
+        lastMessage = "LTE disabled: APN not configured";
+        return false;
+    }
+
+    if (lastLteRetryMs != 0 && millis() - lastLteRetryMs < lteRetryIntervalMs) return false;
     lastLteRetryMs = millis();
 
     Serial.println("Network: LTE ensure/retry");
@@ -118,11 +126,13 @@ static bool tryLte()
     if (lilygoEnsureGprsConnected()) {
         mode = LilygoNetworkMode::LTE;
         lastMessage = "LTE connected";
+        lteRetryIntervalMs = LTE_RETRY_INITIAL_MS;
         Serial.println("Network: LTE connected");
         return true;
     }
 
     lastMessage = "LTE not ready";
+    lteRetryIntervalMs = min(lteRetryIntervalMs * 2UL, LTE_RETRY_MAX_MS);
     return false;
 }
 
@@ -239,7 +249,8 @@ String lilygoNetworkStatusJson()
     json += "\"apSsid\":\"" + esc(apSsid) + "\",";
     json += "\"wifiLossGraceMs\":" + String(WIFI_LOSS_GRACE_MS) + ",";
     json += "\"wifiRetryIntervalMs\":" + String(WIFI_RETRY_INTERVAL_MS) + ",";
-    json += "\"lteRetryIntervalMs\":" + String(LTE_RETRY_INTERVAL_MS) + ",";
+    json += "\"lteConfigured\":" + String(config.lteApn.isEmpty() ? "false" : "true") + ",";
+    json += "\"lteRetryIntervalMs\":" + String(lteRetryIntervalMs) + ",";
     json += "\"message\":\"" + esc(lastMessage) + "\"";
     json += "}";
     return json;

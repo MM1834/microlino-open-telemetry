@@ -12,11 +12,20 @@ async function init(){
 
 async function render(hours=24){
   currentRangeHours=hours;
-  if(!window.MOTHistoryDB) return;
-
   const vehicleId=getVehicleId();
-  const since=Date.now()-hours*3600000;
-  const samples=await window.MOTHistoryDB.getSamples(vehicleId,since);
+  let samples=[];
+  let resolutionSeconds=null;
+  try{
+    if(window.MOTHistorySource?.getHistory){
+      const result=await window.MOTHistorySource.getHistory(hours);
+      samples=Array.isArray(result?.points)?result.points:[];
+      resolutionSeconds=result?.resolutionSeconds||null;
+    }else if(window.MOTHistoryDB){
+      samples=await window.MOTHistoryDB.getSamples(vehicleId,Date.now()-hours*3600000);
+    }
+  }catch(error){
+    console.error("MOT history request failed",error);
+  }
 
   renderSeries({
     canvasId:"soc-history-chart",
@@ -34,7 +43,7 @@ async function render(hours=24){
     canvasId:"speed-history-chart",
     emptyId:"speed-history-empty",
     samples,
-    field:"speedKmh",
+    field:samples.some(s=>s.speed!==undefined)?"speed":"speedKmh",
     label:"Speed",
     unit:"km/h",
     min:0,
@@ -42,9 +51,38 @@ async function render(hours=24){
     color:"#22c55e"
   });
 
+  renderSeries({
+    canvasId:"charging-history-chart",
+    emptyId:"charging-history-empty",
+    samples,
+    field:"charging",
+    label:"Laden",
+    unit:"",
+    min:0,
+    max:1,
+    color:"#a855f7",
+    formatValue:value=>Number(value)>=0.5?"Ja":"Nein"
+  });
+
+  renderSeries({
+    canvasId:"plugged-history-chart",
+    emptyId:"plugged-history-empty",
+    samples,
+    field:"plugged",
+    label:"Kabel angeschlossen",
+    unit:"",
+    min:0,
+    max:1,
+    color:"#ec4899",
+    formatValue:value=>Number(value)>=0.5?"Ja":"Nein"
+  });
+
   const meta=document.getElementById("soc-history-meta");
   if(meta){
-    meta.textContent=`${samples.length} Samples · ${vehicleId} · letzte ${hours<24?hours+"h":Math.round(hours/24)+"d"}`;
+    const charging=samples.filter(s=>s.charging===true).length;
+    const plugged=samples.filter(s=>s.plugged===true).length;
+    const resolution=resolutionSeconds?` · Auflösung ${formatResolution(resolutionSeconds)}`:"";
+    meta.textContent=`${samples.length} Punkte · ${vehicleId} · letzte ${Math.round(hours/24)}d${resolution} · Laden ${charging} · Kabel ${plugged} Intervalle`;
   }
 }
 
@@ -83,7 +121,7 @@ function draw(canvas,points,o){
   const minY=o.min ?? Math.min(...vals);
   let maxY=o.max ?? Math.max(...vals,1);
   if(maxY<=minY) maxY=minY+1;
-  if(o.field==="speedKmh") maxY=Math.max(20,Math.ceil(maxY/10)*10);
+  if(o.field==="speedKmh"||o.field==="speed") maxY=Math.max(20,Math.ceil(maxY/10)*10);
 
   ctx.strokeStyle="rgba(148,163,184,.25)";
   ctx.lineWidth=1;
@@ -131,7 +169,8 @@ function draw(canvas,points,o){
   const first=points[0], last=points[points.length-1];
   ctx.fillStyle="rgba(226,232,240,.95)";
   ctx.font="13px system-ui";
-  ctx.fillText(`${o.label}: ${Number(last[o.field]).toFixed(0)} ${o.unit}`,L,T+14);
+  const latestValue=o.formatValue?o.formatValue(last[o.field]):Number(last[o.field]).toFixed(0);
+  ctx.fillText(`${o.label}: ${latestValue}${o.unit?" "+o.unit:""}`,L,T+14);
 
   ctx.fillStyle="rgba(148,163,184,.9)";
   ctx.font="11px system-ui";
@@ -148,12 +187,17 @@ function bindButtons(){
 }
 
 function getVehicleId(){
-  return window.MOT_CONFIG?.mqtt?.vehicleId||
+  return window.MOTHistorySource?.getVehicleId?.()||
+    window.MOT_CONFIG?.mqtt?.vehicleId||
     window.MOT_CONFIG?.vehicleId||
     window.MOT?.vehicleId||
     window.CONFIG?.vehicleId||
     window.CONFIG?.mqtt?.vehicle||
     "pioneer";
+}
+
+function formatResolution(seconds){
+  return seconds<3600?`${Math.round(seconds/60)} min`:`${Math.round(seconds/3600)} h`;
 }
 
 window.MOTHistoryChart={init,render};

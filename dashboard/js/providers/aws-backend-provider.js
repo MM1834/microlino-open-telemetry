@@ -197,6 +197,15 @@
         if (callbacksRef) await poll(callbacksRef);
       },
 
+      async getHistory(hours = 24) {
+        if (!activeVehicleId) return { points: [], count: 0, hours };
+        const allowedHours = [24, 168, 720];
+        const selectedHours = allowedHours.includes(Number(hours)) ? Number(hours) : 24;
+        return get(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/history?hours=${selectedHours}`
+        );
+      },
+
       getSelectedVehicleId() { return activeVehicleId; },
 
       async claimVehicle(claim) {

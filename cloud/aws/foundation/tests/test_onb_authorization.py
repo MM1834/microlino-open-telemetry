@@ -30,7 +30,23 @@ class KeyExpression:
         self.name = name
 
     def eq(self, value):
-        return self.name, value
+        return KeyCondition(self.name, "eq", value)
+
+    def between(self, lower, upper):
+        return KeyCondition(self.name, "between", (lower, upper))
+
+
+class KeyCondition:
+    def __init__(self, name, operator, value):
+        self.name = name
+        self.operator = operator
+        self.value = value
+
+    def __and__(self, other):
+        return self, other
+
+    def __getitem__(self, index):
+        return (self.name, self.value)[index]
 
 
 class FakeClientError(Exception):
@@ -134,6 +150,30 @@ class VehicleStateTable:
         }]}
 
 
+class VehicleHistoryTable:
+    def __init__(self, items=None):
+        self.items = list(items or [])
+
+    def put_item(self, Item, **_kwargs):
+        if any(
+            item["vehicleId"] == Item["vehicleId"]
+            and item["sampleKey"] == Item["sampleKey"]
+            for item in self.items
+        ):
+            raise FakeClientError("ConditionalCheckFailedException", 400)
+        self.items.append(dict(Item))
+
+    def query(self, **kwargs):
+        vehicle_condition, range_condition = kwargs["KeyConditionExpression"]
+        vehicle_id = vehicle_condition.value
+        lower, upper = range_condition.value
+        return {"Items": [
+            dict(item) for item in self.items
+            if item["vehicleId"] == vehicle_id
+            and lower <= item["sampleKey"] <= upper
+        ]}
+
+
 class ConnectionTable:
     def __init__(self, items=None):
         self.items = {item["connectionId"]: dict(item) for item in (items or [])}
@@ -181,11 +221,23 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
             ("user-a", "beta"): "REVOKED",
             ("user-b", "beta"): "ACTIVE",
         })
+        self.history = VehicleHistoryTable([{
+            "vehicleId": "alpha", "sampleKey": "soc#1700000000",
+            "signal": "soc", "sampledAt": 1_700_000_000_000,
+            "receivedAt": 1_700_000_001_000, "value": 55,
+        }])
         self.module = load_lambda(
             "VehicleApiFunction",
-            {"state": VehicleStateTable(), "access": access},
-            {"TABLE_NAME": "state", "ACCESS_TABLE_NAME": "access"},
+            {
+                "state": VehicleStateTable(), "access": access,
+                "history": self.history,
+            },
+            {
+                "TABLE_NAME": "state", "ACCESS_TABLE_NAME": "access",
+                "HISTORY_TABLE_NAME": "history",
+            },
         )
+        self.module.time = types.SimpleNamespace(time=lambda: 1_700_000_100)
 
     def test_missing_subject_is_denied(self):
         result = self.module.handler(rest_event("/api/vehicles"), None)
@@ -202,6 +254,26 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         )
         self.assertEqual(404, result["statusCode"])
         self.assertNotIn("beta", result["body"])
+
+    def test_history_of_unassigned_vehicle_is_not_disclosed(self):
+        result = self.module.handler(
+            rest_event("/api/vehicles/beta/history", "user-a", "beta"), None
+        )
+        self.assertEqual(404, result["statusCode"])
+        self.assertNotIn("beta", result["body"])
+
+    def test_history_uses_existing_access_and_fixed_range(self):
+        event = rest_event("/api/vehicles/alpha/history", "user-a", "alpha")
+        event["queryStringParameters"] = {"hours": "24"}
+        result = self.module.handler(event, None)
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertEqual(300, body["resolutionSeconds"])
+        self.assertEqual(55, body["points"][0]["soc"])
+
+        event["queryStringParameters"] = {"hours": "25"}
+        result = self.module.handler(event, None)
+        self.assertEqual(400, result["statusCode"])
 
 
 class LiveAuthorizationTests(unittest.TestCase):
@@ -281,11 +353,15 @@ class IngestAuthorizationTests(unittest.TestCase):
         management = FakeManagement()
         module = load_lambda(
             "StateIngestFunction",
-            {"state": VehicleStateTable(), "connections": connections, "access": access},
+            {
+                "state": VehicleStateTable(), "connections": connections,
+                "access": access, "history": VehicleHistoryTable(),
+            },
             {
                 "TABLE_NAME": "state", "CONNECTION_TABLE_NAME": "connections",
                 "ACCESS_TABLE_NAME": "access", "WEBSOCKET_API_ID": "api",
                 "WEBSOCKET_STAGE": "$default", "AWS_REGION": "eu-north-1",
+                "HISTORY_TABLE_NAME": "history", "HISTORY_ENABLED": "false",
             },
             management,
         )
@@ -297,6 +373,51 @@ class IngestAuthorizationTests(unittest.TestCase):
         self.assertEqual(["active"], [post["ConnectionId"] for post in management.posts])
         self.assertEqual(["expired", "revoked"], management.deletes)
 
+    def test_history_bucket_is_bounded_and_deduplicated(self):
+        history = VehicleHistoryTable()
+        module = load_lambda(
+            "StateIngestFunction",
+            {
+                "state": VehicleStateTable(), "connections": ConnectionTable(),
+                "access": AccessTable({}), "history": history,
+            },
+            {
+                "TABLE_NAME": "state", "CONNECTION_TABLE_NAME": "connections",
+                "ACCESS_TABLE_NAME": "access", "WEBSOCKET_API_ID": "api",
+                "WEBSOCKET_STAGE": "$default", "AWS_REGION": "eu-north-1",
+                "HISTORY_TABLE_NAME": "history", "HISTORY_ENABLED": "true",
+                "HISTORY_RETENTION_DAYS": "31",
+                "HISTORY_MOTION_ENABLED": "false",
+                "HISTORY_VEHICLE_ALLOWLIST": "alpha",
+                "HISTORY_CORE_INTERVAL_SECONDS": "300",
+                "HISTORY_MOTION_INTERVAL_SECONDS": "900",
+            },
+        )
+        self.assertTrue(module.store_history(
+            "alpha", "display/soc", 55, "number", 1_700_000_001_000
+        ))
+        self.assertFalse(module.store_history(
+            "alpha", "display/soc", 56, "number", 1_700_000_002_000
+        ))
+        self.assertEqual(1, len(history.items))
+        self.assertEqual("soc", history.items[0]["signal"])
+        self.assertLessEqual(
+            history.items[0]["expiresAt"] - history.items[0]["sampledAt"] // 1000,
+            31 * 86400,
+        )
+        self.assertFalse(module.store_history(
+            "alpha", "display/speed_kmh", 42, "number", 1_700_000_001_000
+        ))
+        self.assertFalse(module.is_history_candidate("beta", "display/soc"))
+        self.assertTrue(module.is_history_candidate("alpha", "display/soc"))
+        self.assertEqual(300, module.HISTORY_SIGNALS["display/soc"][1])
+        self.assertEqual(300, module.HISTORY_SIGNALS["charging/plugged"][1])
+        self.assertEqual(900, module.HISTORY_SIGNALS["display/speed_kmh"][1])
+        self.assertNotIn("display/odometer_km", module.HISTORY_SIGNALS)
+        self.assertTrue(module.store_history(
+            "alpha", "charging/plugged", True, "boolean", 1_700_000_301_000
+        ))
+
 
 class TemplateStructureTests(unittest.TestCase):
     def test_inline_python_compiles(self):
@@ -305,6 +426,18 @@ class TemplateStructureTests(unittest.TestCase):
             "LiveAuthorizerFunction", "LiveHandlerFunction",
         ):
             compile(inline_code(resource), resource, "exec")
+
+    def test_history_guardrails_are_fail_closed(self):
+        template = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn("EnableTelemetryHistory:", template)
+        self.assertIn("EnableHistoryMotionSignals:", template)
+        self.assertIn("HistoryVehicleAllowlist:", template)
+        self.assertIn("HistoryCoreIntervalSeconds:", template)
+        self.assertIn("HistoryMotionIntervalSeconds:", template)
+        self.assertIn('Default: ""', template)
+        self.assertIn("MaxValue: 31", template)
+        self.assertIn("VehicleHistoryDailyWriteAlarm:", template)
+        self.assertIn('RouteKey: "GET /api/vehicles/{vehicleId}/history"', template)
 
 
 if __name__ == "__main__":

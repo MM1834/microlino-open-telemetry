@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-03
+**Last reviewed:** 2026-08-04
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -26,26 +26,6 @@ an approved implementation.
 Design fleet provisioning, certificate rotation, revocation, device replacement
 and ownership transfer. Continue to prohibit a shared operational certificate for
 multiple deployed devices.
-
-## Telemetry history and retention
-
-Define durable cloud history storage, retention periods, export, deletion and cost
-controls. Browser-local history and the current DynamoDB state snapshot are not a
-complete fleet history service.
-
-Use modular service levels rather than treating every signal as equally live or
-historical:
-
-- reliable SOC and charging/not-charging state form the low-cost product core;
-- battery diagnostics are the primary candidate for bounded history;
-- GPS and live position remain optional because most owners know where the vehicle
-  is and location data adds privacy, storage and update-frequency costs;
-- each optional module needs an explicit update cadence, retention period and cost
-  budget before fleet rollout.
-
-Measure normal post-loop-fix telemetry volume before selecting limits. The unusually
-high June/July invocation sample may include a resolved publish loop and must not be
-used alone as the steady-state fleet forecast.
 
 ## Charging and SOC notifications
 
@@ -77,10 +57,31 @@ After basic ownership enforcement, evaluate support/operator roles, multiple use
 per vehicle, temporary sharing and least-privilege support access. Avoid encoding
 vehicle ownership solely in Cognito attributes.
 
+Concrete pilot request: allow an owner to grant a second existing portal user
+read-only `VIEWER` access to one vehicle without creating a second owner. The
+implementation must preserve the single-`OWNER` invariant, enforce roles in REST
+and WebSocket paths, provide explicit grant/revoke operations and retain an audit
+record. Manual duplicate ACTIVE assignments are not an accepted interim solution.
+
 ## Authentication session lifecycle
 
 Add a reviewed refresh-token and reauthentication strategy. The current portal
 clears expired sessions and requires a new login.
+
+## Portal hosting migration
+
+Before public self-registration, material pilot growth or a general-public portal
+release, evaluate migration of only the static dashboard from shared hosting to a
+controlled AWS static-hosting path, initially a private S3 origin behind
+CloudFront. Retain the landing page and unrelated website content on the existing
+hosting unless a separate need justifies moving them.
+
+The objective is to remediate CLOUD-017 without purchasing a vServer subscription
+solely for a low-volume pilot. The design must keep access logging disabled or
+privacy-safe, preserve exact Cognito and API origins, include rollback and hosted
+authorization regression tests, and operate under a small AWS budget alert. This
+is a deferred option, not an active migration or a claim that the risk is already
+resolved.
 
 ## Additional Microlino model decoders
 

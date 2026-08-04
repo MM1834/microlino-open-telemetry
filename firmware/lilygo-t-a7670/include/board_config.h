@@ -28,11 +28,6 @@
 #define GPS_WAKEUP_PIN 19
 #define GPS_BAUD 9600
 
-// Swisscom APN used for Sprint 2 LTE test
-#define LTE_APN "gprs.swisscom.ch"
-#define LTE_USER ""
-#define LTE_PASS ""
-
 // Planned CAN Display Bus via SN65HVD230.
 // NOTE: GPIO33 is MODEM_RI_PIN on this board, so CAN TX=33 is not enabled yet.
 // CAN remains intentionally disabled in LilyGO Sprint 2.

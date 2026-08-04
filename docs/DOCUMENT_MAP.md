@@ -14,6 +14,7 @@ task. Follow links from that owner page instead of scanning adjacent directories
 | Local WebUI | `webui/overview.md` | Relevant feature page and firmware route |
 | Portal/dashboard | `dashboard/overview.md` | `architecture/authentication.md`, relevant portal source |
 | AWS/backend | `architecture/aws-iot.md` | `api/`, `administrator/aws/`, relevant template or handler |
+| Legacy MQTT forwarding | `tools/node-red-legacy-aws-forwarder.md` | AWS credential and onboarding docs |
 | Authentication/onboarding | `architecture/onboarding-authorization.md` | Active ONB sprint, `auth/`, backend source |
 | Hardware | `hardware/overview.md` | One board or wiring page |
 | Build/release/deployment | `development/release-process.md` | Relevant build/deployment page and active release record |

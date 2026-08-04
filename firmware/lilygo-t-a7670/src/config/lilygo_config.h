@@ -10,7 +10,7 @@ struct LilygoConfig {
     String wifiPass;
     bool mqttServiceEnabled = false;
     bool awsServiceEnabled = true;
-    String lteApn = "gprs.swisscom.ch";
+    String lteApn;
     String lteUser;
     String ltePass;
     String mqttHost;

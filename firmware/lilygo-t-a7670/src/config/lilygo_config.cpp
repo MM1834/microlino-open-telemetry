@@ -60,7 +60,7 @@ void LilygoConfigurationManager::normalize()
     config.mqttPrefix = normalizeTopicPrefix(config.mqttPrefix);
     config.mqttPort = normalizePort(config.mqttPort);
     config.lteApn.trim();
-    if (config.lteApn.isEmpty()) config.lteApn = "gprs.swisscom.ch";
+    config.lteUser.trim();
     config.canProfile = decoderProfileNormalize(config.canProfile);
 }
 
@@ -69,7 +69,7 @@ void LilygoConfigurationManager::load()
     prefs.begin(PREFERENCES_NAMESPACE, false);
     config.wifiSsid = getStringOrDefault("wifiSsid", "");
     config.wifiPass = getStringOrDefault("wifiPass", "");
-    config.lteApn = getStringOrDefault("lteApn", "gprs.swisscom.ch");
+    config.lteApn = getStringOrDefault("lteApn", "");
     config.lteUser = getStringOrDefault("lteUser", "");
     config.ltePass = getStringOrDefault("ltePass", "");
     config.mqttHost = getStringOrDefault("mqttHost", "");

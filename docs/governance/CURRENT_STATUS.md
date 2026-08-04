@@ -47,6 +47,14 @@ future fleet functions.
 - WiFi remains the preferred transport and LTE/GPRS is the automatic fallback.
 - AWS IoT X.509 over the A7670 TLS client was physically validated through the
   hosted portal on 2026-08-03 with WiFi unavailable.
+- LTE resilience now uses explicit runtime APN configuration, bounded registration
+  attempts, exponential reconnect backoff and modem recovery after repeated
+  failures. Both LilyGO build variants and focused source tests passed on
+  2026-08-04. The updated AWS build was then physically validated from WiFi loss
+  through A7670 packet data and AWS IoT LTE/TLS reconnection without replacing its
+  device identity or credentials, followed by a successful return to preferred
+  WiFi and AWS IoT reconnection. Extended adverse-condition qualification remains
+  open.
 - External L76K GPS support exists.
 - The operational setup AP uses the local administrator password, all operational
   WebUI/API routes require authentication and local OTA defaults to disabled.
@@ -84,6 +92,16 @@ Implemented in the repository:
 - REST snapshots and live telemetry fan-out;
 - per-device AWS IoT credentials loaded from LittleFS;
 - shared AWS IoT firmware transport for both boards.
+- HIS-001 pilot infrastructure for bounded SOC, charging, plugged and speed history,
+  including TTL, authorized API and portal charts. The AWS development stack has
+  SOC/charging and Speed enabled only for `pioneer`. Core and motion intervals
+  are independently configurable and currently set to 5 and 15 minutes. GPS
+  remains live-only.
+
+The legacy Node-RED forwarder identity `xrpioneer` is provisioned with a dedicated
+publish-only AWS IoT certificate, assigned to its controlled beta user and enabled
+for the same bounded History service. The two-identity daily write alarm is 2,100
+against a default-cadence maximum of 1,920 writes.
 
 Implemented and validated in the controlled AWS development stack:
 
@@ -100,6 +118,15 @@ Not implemented:
 - automated device certificate provisioning or rotation;
 - cloud-managed OTA.
 - public account self-registration.
+
+HIS-001 was deployed on 2026-08-04 after measuring 1,761,194 ingest invocations
+across 119 active hourly datapoints in the preceding week; steady active plateaus
+were near 17,400/hour. The fail-closed deployment and subsequent one-vehicle core
+activation both reached `UPDATE_COMPLETE`. The history table still had zero rows
+because `pioneer` had not published after activation. Authenticated history,
+live-path regression under fresh traffic, portal deployment, motion enablement and
+cost/TTL observation remain open. Cost Explorer access is not granted to the
+maintainer IAM user.
 
 Authentication, assignment enforcement and controlled claiming now exist in the
 development AWS account and hosted pilot portal. Two controlled users passed

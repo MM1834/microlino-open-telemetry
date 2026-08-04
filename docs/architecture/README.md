@@ -21,6 +21,7 @@
 - [Telemetry data flow](telemetry-data-flow.md)
 - [Firmware architecture](../firmware/architecture.md)
 - [AWS IoT and portal architecture](aws-iot.md)
+- [Telemetry history pilot](telemetry-history.md)
 - [Authentication](authentication.md)
 - [CAN profile framework](can-profile-framework.md)
 

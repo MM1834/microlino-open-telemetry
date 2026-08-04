@@ -4,7 +4,7 @@
 >
 > **Audience:** Developer, administrator and security reviewer
 >
-> **Last verified:** 2026-08-03 against code and the AWS development stack
+> **Last verified:** Live path 2026-08-03 against code and AWS; history 2026-08-04 locally only
 
 ## Implemented data path
 
@@ -13,6 +13,7 @@ flowchart LR
     Device["MOT device"] -->|"MQTT/TLS 8883\nunique X.509 certificate"| IoT["AWS IoT Core"]
     IoT -->|"mot/# rule"| Ingest["State ingestion Lambda"]
     Ingest --> State["DynamoDB vehicle-state"]
+    Ingest -.->|"optional bounded buckets"| History["DynamoDB vehicle-history\n31-day TTL"]
     Ingest --> Connections["DynamoDB live-connections"]
     Ingest --> Access["DynamoDB user-vehicle-access"]
     Ingest -->|"post_to_connection"| WSS["WebSocket API"]
@@ -20,6 +21,7 @@ flowchart LR
     Portal["Static portal"] -->|"Bearer access token"| HTTP["HTTP Vehicle API\nJWT authorizer"]
     HTTP --> VehicleApi["Vehicle API Lambda"] --> State
     VehicleApi --> Access
+    VehicleApi --> History
     Portal -->|"access_token on WSS connect"| Authorizer["WebSocket JWT authorizer"]
     Authorizer --> WSS
 ```
@@ -92,10 +94,16 @@ mot/<vehicleId>/status/...
 The current IoT Rule consumes `mot/#`. Per-device IoT policy enforcement and
 server-side vehicle access enforcement remain distinct controls.
 
+## History pilot
+
+The repository now contains a disabled-by-default bounded history side path and an
+authorized history endpoint. It is not yet deployed or AWS-validated. See
+[Telemetry history pilot](telemetry-history.md).
+
 ## Not currently implemented
 
 - deployed account invitation/device-claim backend (B1/B2 exist locally only);
-- cloud telemetry history service;
+- production telemetry history beyond the bounded pilot;
 - Device Shadow integration;
 - Fleet Provisioning and certificate rotation;
 - remote OTA/AWS IoT Jobs;

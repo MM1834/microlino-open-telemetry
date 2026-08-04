@@ -32,6 +32,15 @@ Requires a JWT and ACTIVE assignment. The handler checks access before querying 
 DynamoDB state partition. Unknown, inactive and unassigned vehicle IDs share the
 same non-enumerating 404 response.
 
+### `GET /api/vehicles/{vehicleId}/history?hours=24|168|720`
+
+Requires the same JWT and ACTIVE assignment as the snapshot route. It returns a
+bounded SOC, charging, plugged and speed series. Supported response resolutions are 5
+minutes for 24 hours, 30 minutes for 7 days and 2 hours for 30 days. Other ranges
+return HTTP 400; unknown or unassigned vehicles return the non-enumerating 404.
+
+This route is present in the repository but is not yet claimed as deployed.
+
 ## Authentication
 
 The HTTP API JWT authorizer uses:

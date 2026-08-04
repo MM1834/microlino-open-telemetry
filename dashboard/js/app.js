@@ -560,9 +560,11 @@
     if (OBD2_FRESHNESS_KEYS.includes(key)) updateObd2Freshness();
     if (key === 'display/soc') updateSocFreshness();
 
-    window.MOTHistoryRecorder?.update(state.values, {
-      vehicleId: state.selectedVehicleId || mqttCfg.vehicleId || 'pioneer'
-    });
+    if (dataSourceCfg.type === 'legacy-mqtt') {
+      window.MOTHistoryRecorder?.update(state.values, {
+        vehicleId: state.selectedVehicleId || mqttCfg.vehicleId || 'pioneer'
+      });
+    }
   }
 
   function updateLocationMap(lat, lon) {
@@ -711,6 +713,7 @@ async function selectVehicle(vehicleId) {
   if (state.dataProvider?.selectVehicle) {
     await state.dataProvider.selectVehicle(vehicleId);
   }
+  window.MOTHistoryChart?.render?.();
 }
 
 function startDataProvider() {
@@ -743,6 +746,10 @@ function startDataProvider() {
   try {
     const provider = registry.create(type, { config: providerConfig });
     state.dataProvider = provider;
+    window.MOTHistorySource = {
+      getHistory: hours => provider.getHistory?.(hours),
+      getVehicleId: () => state.selectedVehicleId
+    };
 
     provider.start({
       onConnection: (ok, detail) => setOnline(ok, detail),
@@ -762,6 +769,7 @@ function startDataProvider() {
             resetDashboardForVehicle(selected);
           }
         }
+        window.MOTHistoryChart?.render?.();
       },
       onOnboardingRequired: required => renderOnboarding(required),
       onSnapshot: snapshot => {

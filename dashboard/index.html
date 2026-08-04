@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260804-2" />
   <link rel="stylesheet" href="css/history.css">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -21,12 +21,12 @@
       </div>
       <nav class="nav">
         <a class="active" href="#overview">⌂ Übersicht</a>
+        <a href="#location">⌖ Standort</a>
         <a href="#battery">▣ Batterie</a>
         <a href="#vehicle">▱ Fahrzeug</a>
         <a href="#charging">⌁ Laden</a>
         <a href="#temps">♨ Temperaturen</a>
         <a href="#cells">▦ Zellen</a>
-        <a href="#location">⌖ Standort</a>
         <a href="#history">↗ History</a>
       </nav>
       <div class="side-status card compact">
@@ -127,14 +127,28 @@
       </section>
 
       <section id="overview" class="hero card">
-        <div class="hero-image-wrap"><img id="hero-image" src="img/microlino.jpeg" alt="Microlino" /></div>
-        <div class="hero-title"><h1 id="vehicle-name">Microlino Pioneer</h1><p>Dein Microlino. Immer im Blick.</p></div>
+        <div class="hero-title">
+          <h1 id="vehicle-name">Microlino Pioneer</h1>
+          <p>Dein Microlino. Immer im Blick.</p>
+          <a class="history-link" href="#history">History ansehen →</a>
+        </div>
         <div class="hero-metrics">
           <div class="metric-card soc-card"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="soc-updated" class="muted">Stand: --</small></div>
           <div class="metric-card"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
           <div class="metric-card"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><p>Ladestatus</p></div>
           <div class="metric-card"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Laufleistung</p></div>
         </div>
+
+        <article id="location" class="hero-location">
+          <div class="hero-location-heading">
+            <h2>⌖ Standort</h2>
+            <a id="location-map-link" class="location-map-link" href="#" target="_blank" rel="noopener">OpenStreetMap öffnen</a>
+          </div>
+          <iframe id="location-map-frame" class="location-map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="location-text"><strong id="location-title">Standort nicht verfügbar</strong><span id="location-coords">--</span><small id="location-updated">--</small></div>
+        </article>
+
+        <div class="hero-image-wrap"><img id="hero-image" src="img/microlino.jpeg" alt="Microlino" /></div>
       </section>
 
       <section class="grid">
@@ -161,12 +175,6 @@
           <div class="cell-meta"><span>Min: <b id="cell-min">--</b></span><span>Max: <b id="cell-max">--</b></span><span>Δ: <b id="cell-delta">--</b></span></div>
           <div id="cell-bars" class="cell-bars"></div>
         </article>
-<article id="location" class="card panel location-panel">
-          <h2>⌖ Standort</h2>
-          <iframe id="location-map-frame" class="location-map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-          <a id="location-map-link" class="location-map-link" href="#" target="_blank" rel="noopener">OpenStreetMap öffnen</a>
-          <div class="location-text"><strong id="location-title">Standort nicht verfügbar</strong><span id="location-coords">--</span><small id="location-updated">--</small></div>
-        </article>
         <article class="card panel status-panel">
           <h2>Status</h2>
           <ul class="data-list"><li><span>Firmware</span><strong id="fw-version">--</strong></li><li><span>Device</span><strong id="device-id">--</strong></li><li><span>RSSI</span><strong id="rssi">-- dBm</strong></li><li><span>Uptime</span><strong id="uptime">--</strong></li></ul>
@@ -176,7 +184,7 @@
 <section class="card history-card" id="history">
   <div class="card-header">
     <h2>History</h2>
-    <span class="muted">local browser storage</span>
+    <span class="muted">AWS · fahrzeugbezogen · 31 Tage</span>
   </div>
   <div class="history-toolbar">
     <button class="active" data-history-range="24">24h</button>
@@ -199,23 +207,22 @@
         <canvas id="speed-history-chart"></canvas>
       </div>
     </div>
+    <div class="history-mini">
+      <h3>Ladezustand</h3>
+      <div class="history-chart-wrap">
+        <div id="charging-history-empty" class="history-empty">Noch keine Lade-History vorhanden.</div>
+        <canvas id="charging-history-chart"></canvas>
+      </div>
+    </div>
+    <div class="history-mini">
+      <h3>Ladekabel</h3>
+      <div class="history-chart-wrap">
+        <div id="plugged-history-empty" class="history-empty">Noch keine Plugged-History vorhanden.</div>
+        <canvas id="plugged-history-chart"></canvas>
+      </div>
+    </div>
   </div>
   <div id="soc-history-meta" class="history-meta"></div>
-
-  <div class="history-actions">
-    <button id="history-demo" type="button">Demo-Daten</button>
-    <button id="history-export-csv" type="button">CSV Export</button>
-    <button id="history-export-json" type="button">JSON Export</button>
-    <button id="history-clear" type="button">History löschen</button>
-  </div>
-
-  <div class="history-debug">
-    <div><strong id="history-debug-count">--</strong>Samples</div>
-    <div><strong id="history-debug-oldest">--</strong>Ältester Punkt</div>
-    <div><strong id="history-debug-newest">--</strong>Neuster Punkt</div>
-    <div><strong id="history-debug-latest-soc">--</strong>Letzter SoC</div>
-  </div>
-
 </section>
 
 </main>
@@ -226,11 +233,11 @@
   <script src="js/auth/auth-manager.js?v=20260803-1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260803-4"></script>
-  <script src="js/app.js?v=20260803-4"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260804-1"></script>
+  <script src="js/app.js?v=20260804-1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js"></script>
+  <script src="js/history/history-chart.js?v=20260804-4"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>

@@ -37,6 +37,8 @@ static String lastMessage = "";
 static String lastTrace = "";
 static uint32_t lastGprsEnsureMs = 0;
 static uint32_t connectAttempts = 0;
+static uint32_t consecutiveConnectFailures = 0;
+static uint32_t recoveryCount = 0;
 static uint32_t tcpOpenCount = 0;
 static uint32_t tcpFailCount = 0;
 static uint32_t bytesWritten = 0;
@@ -133,7 +135,7 @@ static bool initTinyGsmModem()
     return true;
 }
 
-static bool connectNetworkAndGprs(uint32_t timeoutMs = 60000)
+static bool connectNetworkAndGprs(uint32_t timeoutMs = 15000)
 {
     if (!modemReadyFlag && !initTinyGsmModem()) {
         return false;
@@ -154,6 +156,8 @@ static bool connectNetworkAndGprs(uint32_t timeoutMs = 60000)
         Serial.println("fail");
         lastMessage = "TinyGSM network wait failed";
         traceAppend(lastMessage);
+        gprsReadyFlag = false;
+        consecutiveConnectFailures++;
         return false;
     }
 
@@ -163,6 +167,7 @@ static bool connectNetworkAndGprs(uint32_t timeoutMs = 60000)
     if (config.lteApn.isEmpty()) {
         lastMessage = "No LTE APN configured";
         traceAppend(lastMessage);
+        gprsReadyFlag = false;
         return false;
     }
 
@@ -179,6 +184,7 @@ static bool connectNetworkAndGprs(uint32_t timeoutMs = 60000)
         Serial.println("fail");
         lastMessage = "TinyGSM GPRS connect failed";
         traceAppend(lastMessage);
+        consecutiveConnectFailures++;
         return false;
     }
 
@@ -186,6 +192,7 @@ static bool connectNetworkAndGprs(uint32_t timeoutMs = 60000)
     Serial.printf("IP Address: %s\n", modem.getLocalIP().c_str());
 
     lastGprsEnsureMs = millis();
+    consecutiveConnectFailures = 0;
     lastMessage = "TinyGSM GPRS connected ip=" + modem.getLocalIP();
     traceAppend(lastMessage);
 
@@ -243,13 +250,18 @@ void setupLilygoModem()
         initTinyGsmModem();
     }
 
-    if (modemReadyFlag) {
-        connectNetworkAndGprs(60000);
-    }
+    // Packet data is established by the WiFi-first network manager only when
+    // WiFi is unavailable. Modem setup must not delay a working WiFi path.
 }
 
 bool lilygoEnsureGprsConnected()
 {
+    if (config.lteApn.isEmpty()) {
+        gprsReadyFlag = false;
+        lastMessage = "No LTE APN configured";
+        return false;
+    }
+
     if (!modemReadyFlag && !initTinyGsmModem()) {
         return false;
     }
@@ -259,12 +271,25 @@ bool lilygoEnsureGprsConnected()
         return true;
     }
 
-    // Do not hammer reconnects; PubSubClient may retry often.
-    if (millis() - lastGprsEnsureMs < 5000 && gprsReadyFlag) {
-        return true;
+    const bool connected = connectNetworkAndGprs(15000);
+
+    // Escalate repeated registration/PDP failures to a bounded modem recovery.
+    // The network manager applies the outer retry backoff.
+    if (!connected && consecutiveConnectFailures >= 4) {
+        recoveryCount++;
+        consecutiveConnectFailures = 0;
+        modemReadyFlag = false;
+        networkReadyFlag = false;
+        gprsReadyFlag = false;
+        lteClient.stop();
+        lteSecureClient.stop();
+        traceAppend("modem recovery power pulse");
+        powerKeyPulse();
+        delay(3000);
+        initTinyGsmModem();
     }
 
-    return connectNetworkAndGprs(60000);
+    return connected;
 }
 
 bool lilygoGprsConnected()
@@ -493,6 +518,9 @@ String lilygoModemStatusJson()
     json += "\"pdpConfigured\":" + String(gprsReadyFlag ? "true" : "false") + ",";
     json += "\"lteIp\":\"" + esc(lilygoLteIp()) + "\",";
     json += "\"signalQuality\":" + String(signal) + ",";
+    json += "\"connectAttempts\":" + String(connectAttempts) + ",";
+    json += "\"consecutiveConnectFailures\":" + String(consecutiveConnectFailures) + ",";
+    json += "\"recoveryCount\":" + String(recoveryCount) + ",";
     json += "\"tcpOpen\":" + String(tcpOpenFlag ? "true" : "false") + ",";
     json += "\"tcpOpenCount\":" + String(tcpOpenCount) + ",";
     json += "\"tcpFailCount\":" + String(tcpFailCount) + ",";

@@ -21,11 +21,19 @@ return to WiFi and delivered current CAN/GPS telemetry through the hosted portal
 That is functional field evidence, not long-duration or adverse-condition
 qualification.
 
-## Source configuration
+## Runtime configuration
 
-The board header identifies an A7670G modem and declares UART/control pins plus a
-Swisscom APN default. Runtime configuration can supply the LTE APN. Provider
-defaults must not be treated as portable beta configuration.
+The board header identifies an A7670G modem and declares UART/control pins. LTE is
+inactive until an APN is configured in the authenticated local WebUI or imported
+configuration. Optional APN username/password values are supported; stored
+passwords are not rendered by the UI. New and reset devices have no provider
+default.
+
+Normal reconnect attempts wait at most 15 seconds for registration and use
+exponential retry backoff from 15 seconds to 5 minutes. Four consecutive failures
+trigger a modem power/init recovery. Diagnostics expose the current interval and
+recovery counters. These bounds improve loop availability but do not make the
+underlying TinyGSM registration call asynchronous.
 
 ## Remaining qualification
 

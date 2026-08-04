@@ -24,8 +24,8 @@ not a penetration test and does not assert that the current template is deployed
 | CLOUD-013 | DynamoDB recovery controls absent | No PITR/deletion protection declared | State loss/recovery behaviour undefined | Evaluate after data classification and beta needs |
 | CLOUD-014 | WROOM credential staging was not ignored | Upload tool copies four files into `firmware/esp32-wroom/data/aws`; SPR-0005.A added the missing rule | Accidental commit risk mitigated for known staging names | Resolved locally; retain `git check-ignore` release check |
 | CLOUD-015 | Shared credential uploader lacked WROOM assignment guards | Tool accepted mismatched `device.json.thingName` and arbitrary environment | Credentials could be uploaded to the wrong Thing/firmware target | Resolved locally with fail-closed validation and unit tests; no upload performed |
-| CLOUD-016 | Telemetry request amplification and billing visibility | CloudWatch recorded about 2.78 million state-ingest Lambda invocations from 2026-07-01 through 2026-08-04; current IAM user cannot read Cost Explorer | Per-topic IoT Rule, Lambda, DynamoDB and live fan-out operations may produce low but non-zero recurring cost and scale linearly with publish frequency | Enable billing visibility/budget alert; measure per-device publishes and evaluate batching before fleet growth |
-| CLOUD-017 | OAuth callback query parameters in web access logs | Confirmed 2026-08-03 in both hosted `access_ssl_log` and `proxy_access_ssl_log` for `/motbeta/callback/`; no values were copied into project records. The redacting local server already avoids the same local exposure | One-time PKCE-bound authorization artifacts are duplicated in hosting logs even after successful exchange | Bounded pilot acceptance recorded below; provider-side query redaction or callback exclusion remains the required durable remediation |
+| CLOUD-016 | Telemetry request amplification and billing visibility | CloudWatch recorded about 2.88 million daily-binned state-ingest invocations from 2026-07-15 through 2026-08-03. A narrower hourly query measured 1,761,194 invocations across 119 active hours with regular plateaus near 17,400/hour. Cost Explorer remains denied to the maintainer IAM user | Per-topic IoT Rule, Lambda, DynamoDB and live fan-out operations produce recurring cost and scale linearly with publish frequency | Keep HIS-001 bucketed and allowlisted, observe its 1,000-write daily alarm, obtain billing visibility/export and evaluate firmware batching before fleet growth |
+| CLOUD-017 | OAuth callback query parameters in web access logs | Confirmed 2026-08-03 in both hosted `access_ssl_log` and `proxy_access_ssl_log` for `/motbeta/callback/`; no values were copied into project records. On 2026-08-04 the provider confirmed that individual log redaction or callback exclusion is unavailable on the shared-hosting service and would require a vServer subscription | One-time PKCE-bound authorization artifacts are duplicated in hosting logs even after successful exchange | Continue the bounded pilot acceptance; do not buy a vServer solely for the pilot portal. Evaluate migration of only the static portal to controlled AWS hosting before broader rollout |
 
 ## Priority boundary
 
@@ -40,7 +40,11 @@ scope.
 ## CLOUD-017 bounded pilot acceptance
 
 On 2026-08-03 the maintainer explicitly accepted CLOUD-017 for the controlled
-REL-001 pilot while the hosting provider request remains unanswered.
+REL-001 pilot. On 2026-08-04 the hosting provider answered that the requested
+individual treatment of `access_ssl_log` and `proxy_access_ssl_log` cannot be
+implemented on the shared-hosting service; individual configuration is available
+only with a vServer subscription. The maintainer decided not to add that fixed
+hosting cost solely for the small pilot portal.
 
 The acceptance is limited to:
 
@@ -53,14 +57,41 @@ The acceptance is limited to:
   records or support bundles;
 - the shortest practical hosting-log rotation and deletion available to the
   maintainer;
-- renewed review when the provider responds, before public self-registration,
-  before materially expanding the pilot group, or before calling the portal a
-  general public release.
+- renewed review before public self-registration, before materially expanding the
+  pilot group, or before calling the portal a general public release.
 
 The rationale is that the exposed authorization code is one-time, short-lived and
 PKCE-bound, while account creation and pilot support remain controlled. This lowers
 but does not remove the consequence of log access. The acceptance does not resolve
 CLOUD-017 and must not be carried silently into a public rollout.
+
+## CLOUD-017 preferred later remediation
+
+The preferred low-fixed-cost option is to migrate only the static portal to an
+AWS-controlled origin, while retaining the landing page and unrelated website
+content on the existing shared hosting. The initial candidate is a private S3
+origin behind CloudFront on a dedicated portal hostname, with CloudFront standard
+access logging and S3 server access logging disabled unless a reviewed
+privacy-safe logging design is introduced.
+
+That migration is deferred while the directly supported pilot remains small. It
+becomes a release decision before public self-registration, material pilot growth
+or general-public positioning. Implementation must include:
+
+- a dedicated portal hostname and TLS certificate;
+- deployment and rollback of the static `dashboard/` package;
+- exact Cognito callback and logout URL changes;
+- exact REST and WebSocket origin/CORS review;
+- confirmation that no upstream or origin access log retains OAuth callback query
+  values;
+- hosted login, logout, session-expiry, role and cross-user-isolation regression
+  tests;
+- a small AWS budget alert and post-deployment cost observation.
+
+A callback-only edge redirect and a server-side API Gateway/Lambda callback remain
+possible alternatives, but both add authentication-flow complexity. They are not
+the preferred pilot remediation. Replacing Authorization Code + PKCE with an
+implicit token flow is not an accepted alternative.
 
 ## Relationship to documentation
 
