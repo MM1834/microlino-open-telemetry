@@ -84,7 +84,7 @@ first-setup state may be open.
 
 ## Related records
 
-- [REL-001](REL-001.md)
+- [v1.0.0-rc.1](V1.0.0-RC.1.md)
 - [Firmware known gaps](../../firmware/known-gaps.md)
 - [Firmware OTA](../../firmware/ota.md)
 - [Cloud credential handling](../../security/aws-iot-credentials.md)

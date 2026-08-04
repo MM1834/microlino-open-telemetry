@@ -70,7 +70,7 @@ device replacement or general LilyGO production readiness.
 
 ## Related documents
 
-- [REL-001](../project/sprints/REL-001.md)
+- [v1.0.0-rc.1](../project/sprints/V1.0.0-RC.1.md)
 - [ONB-001.B2 validation](ONB-001-B2-validation.md)
 - [WROOM build evidence](SPR-0005-wroom-aws-build.md)
 - [Cloud risk register](../security/cloud-risk-register.md)

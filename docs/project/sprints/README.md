@@ -1,28 +1,26 @@
-# Sprint Record Index
+# Active Work Package Index
 
-> **Status:** Current index; records are historical unless marked active
+> **Status:** Current index
 >
 > **Audience:** Maintainer and auditor
 
+## Active release work
+
+- [v1.0.0-rc.1 — repository and documentation consolidation](V1.0.0-RC.1.md)
+
 ## Active implementation work
 
-- [REL-001 — Portal pilot release readiness](REL-001.md)
+- [HIS-001 — bounded telemetry history pilot](HIS-001.md)
 - [FW-SEC-001 — Local firmware administration hardening](FW-SEC-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
+- [LTE-001 — LilyGO LTE resilience](LTE-001.md)
 
-## Completed documentation work
+## Completed predecessors
 
-- [DOC-001 — Documentation consolidation and beta baseline](DOC-001.md)
+- REL-001 established and validated the accepted portal pilot baseline now carried
+  by `v1.0.0-rc.1`.
+- DOC-001 established the source-based documentation baseline.
 
-## Retained implementation records
-
-- `SPR-0003-GPS-2.md` — shared GPS integration record
-- `SPR-0004B.1*` — Cognito infrastructure increments
-- `SPR-0004B.2*` — API JWT-authorizer increments
-- `SPR-0004B.3.md` — dashboard PKCE implementation record
-- `SPR-0004B.5.md` — multi-CAN-profile foundation record
-
-These records retain original goals, exclusions and acceptance criteria. Consult
-current architecture, APIs, firmware and gap registers before using any statement
-as present-state evidence.
+Completed delivery records are available through Git history rather than retained
+as parallel status documents in the working tree.

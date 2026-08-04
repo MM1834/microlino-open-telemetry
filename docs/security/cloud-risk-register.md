@@ -106,4 +106,4 @@ implicit token flow is not an accepted alternative.
 - [Declared stack state](../administrator/aws/declared-stack-state.md)
 - [Read-only verification](../administrator/aws/read-only-verification.md)
 - [AWS architecture](../architecture/aws-iot.md)
-- [DOC-001](../project/sprints/DOC-001.md)
+- [Current documentation status](../governance/CURRENT_STATUS.md#documentation-status)

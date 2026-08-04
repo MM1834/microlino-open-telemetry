@@ -4,8 +4,9 @@
 >
 > **Audience:** All readers
 
-This directory contains current product documentation and retained engineering
-history for Microlino Open Telemetry.
+This directory contains current product, operating and release documentation for
+Microlino Open Telemetry. Superseded delivery packages are retained by Git history,
+not duplicated in the current working tree.
 
 ## Start here
 
@@ -13,32 +14,32 @@ history for Microlino Open Telemetry.
 - [Validated current status](governance/CURRENT_STATUS.md)
 - [Active work](governance/WORK_ORDER.md)
 - [Architecture](architecture/README.md)
+- [Authentication architecture](architecture/authentication.md)
+- [API reference](api/README.md)
 - [Firmware overview](firmware/overview.md)
-- [ESP32-WROOM beta documentation](beta/README.md)
+- [ESP32-WROOM beta guide](beta/esp32-wroom-guide.md)
 - [AWS IoT roadmap](roadmap/aws-iot.md)
 - [Documentation standard](DOCUMENTATION_STANDARD.md)
 - [Task-oriented documentation map](DOCUMENT_MAP.md)
-- [Migration tracker](MIGRATION.md)
-- [Documentation classification](project/DOCUMENT_CLASSIFICATION.md)
 - [Architecture decisions](adr/README.md)
-- [Engineering history](history/README.md)
-- [Documentation archive](archive/README.md)
-- [DOC-001 validation and handover](project/DOC-001-VALIDATION.md)
+- [Developer build guide](development/build.md)
+- [AWS declared-state operations](administrator/aws/declared-stack-state.md)
+- [Stable terminology](reference/03-terminology.md)
+- [Active work packages](project/sprints/README.md)
+- [v1.0.0-rc.1 release notes](release-notes/v1.0.0-rc.1.md)
 
 ## Documentation lifecycle
 
-Documentation is being consolidated after two development generations were kept in
-parallel. Until that work is complete, use this order of authority:
+Use this order of authority:
 
 1. current code and configuration;
 2. accepted current ADRs;
 3. governance `CURRENT_STATUS` and `WORK_ORDER`;
 4. current architecture and operator documentation;
-5. release notes, sprint documents, manifests and patch packages as history.
+5. current release notes and active work packages.
 
-Historical documents may accurately describe an earlier revision without
-describing the current repository. They must not be used as deployment or security
-instructions unless revalidated.
+Historical documents may be recovered from Git when needed. They must not be used
+as deployment or security instructions unless revalidated.
 
 ## Main sections
 
@@ -50,9 +51,8 @@ instructions unless revalidated.
 - `administrator/` — code-based service state and approved operational procedures
 - `developer/`, `development/`, `testing/` — engineering, procedures and validation
 - `reference/` — stable terminology and contracts
-- `release-notes/`, completed `project/sprints/`, `legacy/` — retained history
-- `history/` — current navigation to retained historical collections
-- `archive/` — consolidated historical packages; excluded from normal work
+- `release-notes/` — one versioned record per maintained release candidate/release
+- `project/sprints/` — active work packages only
 
 Each current topic should have one source of truth. Other documents should link to
 it instead of maintaining a second status description.
