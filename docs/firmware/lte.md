@@ -51,6 +51,5 @@ ABRP HTTPS remains WiFi-only. Enabling ABRP does not route it over LTE.
 
 ## Historical investigations
 
-Detailed experiments are indexed under
-[archived LTE development](../archive/developer-history/lte/README.md).
-They are engineering evidence, not current operational instructions.
+Detailed experiments remain available in Git history. They are engineering
+evidence, not current operational instructions.

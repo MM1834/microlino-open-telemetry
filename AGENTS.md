@@ -29,9 +29,10 @@ Ignore generated and local-only content, including:
 Do not inspect large images unless the task specifically concerns
 hardware identification, documentation imagery, branding, or layout.
 
-Treat `docs/archive/` as audit-only. Do not search or read it during normal
-implementation, review or documentation work unless an authoritative document
-references a specific archived record or the task explicitly concerns history.
+Treat historical Git revisions and the consolidated pre-RC history package as
+audit-only. Do not inspect them during normal implementation, review or
+documentation work unless an authoritative document references a specific older
+record or the task explicitly concerns history.
 
 For documentation work, inspect firmware and dashboard sources only
 when needed to verify a technical statement or cross-reference.

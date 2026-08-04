@@ -101,6 +101,6 @@ an explicit user/vehicle assignment plan and a new handoff record.
 
 ## Related records
 
-- [REL-001](../project/sprints/REL-001.md)
+- [v1.0.0-rc.1](../project/sprints/V1.0.0-RC.1.md)
 - [Device field validation](SPR-0005-device-field-validation.md)
-- [Pilot.1 release notes](../release-notes/REL-001-pilot.1.md)
+- [v1.0.0-rc.1 release notes](../release-notes/v1.0.0-rc.1.md)

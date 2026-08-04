@@ -209,7 +209,8 @@ After completing these documents, the repository structure and engineering philo
 
 Current follow-up work should then be selected from `WORK_ORDER` and approached
 through the task-oriented [documentation map](../DOCUMENT_MAP.md). REL-001 and the
-documentation baseline are complete; remaining work includes beta support
+documentation baseline are complete and are being consolidated as `v1.0.0-rc.1`;
+remaining work includes beta support
 readiness, lifecycle recovery, firmware-environment simplification and extended
 LilyGO qualification.
 

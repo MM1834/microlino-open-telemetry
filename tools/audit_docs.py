@@ -9,16 +9,19 @@ docs = root / "docs"
 errors = []
 
 required_release_evidence = [
-    docs / "project/sprints/REL-001.md",
-    docs / "release-notes/REL-001-pilot.1.md",
+    docs / "project/sprints/V1.0.0-RC.1.md",
+    docs / "release-notes/v1.0.0-rc.1.md",
     docs / "testing/REL-001-rc-validation.md",
     docs / "security/cloud-risk-register.md",
 ]
 for required in required_release_evidence:
     if not required.is_file():
-        errors.append(f"missing REL-001 evidence: {required.relative_to(root)}")
+        errors.append(f"missing v1.0.0-rc.1 evidence: {required.relative_to(root)}")
 
 retired_directories = [
+    docs / "archive",
+    docs / "aws",
+    docs / "legacy",
     docs / "images",
     docs / "release",
     docs / "releases",
