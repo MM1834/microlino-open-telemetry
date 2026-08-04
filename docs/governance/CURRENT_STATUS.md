@@ -2,7 +2,7 @@
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Status:** `v1.0.0-rc.1` consolidation active; REL-001 pilot deployed at `/dashboard/`
+**Status:** `v1.0.0-rc.1` published; REL-001 pilot deployed at `/dashboard/`
 
 **Audience:** Maintainer and contributor
 

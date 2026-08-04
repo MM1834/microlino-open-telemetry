@@ -4,9 +4,9 @@
 >
 > **Audience:** Maintainer and auditor
 
-## Active release work
+## Current release record
 
-- [v1.0.0-rc.1 — repository and documentation consolidation](V1.0.0-RC.1.md)
+- [v1.0.0-rc.1 — completed repository and documentation consolidation](V1.0.0-RC.1.md)
 
 ## Active implementation work
 

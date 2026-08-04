@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0-rc.1 — in preparation
+## v1.0.0-rc.1 — 2026-08-04
 
 - Consolidates the accepted REL-001 pilot into one named release candidate.
 - Removes superseded sprint packages, manifests, patch files, hotfix copies and
