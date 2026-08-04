@@ -2,7 +2,7 @@
 
 **Project:** Microlino Open Telemetry (MOT)
 
-**Status:** REL-001 pilot release deployed at `/dashboard/`
+**Status:** `v1.0.0-rc.1` consolidation active; REL-001 pilot deployed at `/dashboard/`
 
 **Audience:** Maintainer and contributor
 
@@ -20,7 +20,8 @@ revision.
 ## Current product direction
 
 MOT has promoted the reviewed REL-001 repository pilot through `develop` to
-`main`. WROOM evidence, secure portal onboarding and the LilyGO AWS/LTE functional
+`main` and opened the consolidated `v1.0.0-rc.1` release candidate. WROOM evidence,
+secure portal onboarding and the LilyGO AWS/LTE functional
 path are included. On 2026-08-04 the reviewed portal package was deployed to
 `/dashboard/` after backup of the previous directory. The landing page at `/` and
 the validated fallback portal at `/motbeta/` remain available. Hosted acceptance
@@ -170,11 +171,11 @@ validation evidence.
 ## Documentation status
 
 DOC-001 completed a static, source-based documentation baseline on 2026-08-02.
-Current navigation, canonical topic ownership, beta/support drafts, ADR/history
-classification and the validation handover are present. Historical root packages
-are retained under `docs/archive/` and visibly separated from current guidance.
-Ambiguous rationale and destructive consolidation beyond fully preserved
-duplicates still wait for ChatGPT Classic export reconciliation.
+The `v1.0.0-rc.1` consolidation removes superseded README, SPR, manifest, patch and
+hotfix packages from the current working tree after mapping current owners. Git
+history retains the removed records. Current navigation, canonical topic ownership,
+beta/support guidance and exact release evidence remain visible without an in-tree
+historical archive.
 
 This documentation completion is not runtime evidence. Builds, hardware, deployed
 AWS state, screenshots and beta release readiness remain to be validated.
@@ -192,4 +193,4 @@ resources were not inspected during the takeover audit.
 - [WORK_ORDER.md](WORK_ORDER.md)
 - [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md)
 - [SELF_REVIEW.md](SELF_REVIEW.md)
-- [DOC-001 validation and handover](../project/DOC-001-VALIDATION.md)
+- [v1.0.0-rc.1 consolidation sprint](../project/sprints/V1.0.0-RC.1.md)

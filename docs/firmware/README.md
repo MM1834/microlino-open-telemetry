@@ -24,8 +24,8 @@
 Files named after a release, fix, debug/trace experiment, transport migration or
 stability increment are retained as engineering history. This includes most
 `lilygo-*fix`, `*debug`, `*trace`, `*stack-v*`, `*transport` and version-specific
-pages. Use [archived LTE history](../archive/developer-history/lte/README.md) for the investigation
-index.
+pages. Those records are available from Git history when an investigation requires
+them.
 
 Historical detail may explain current code but does not establish current build or
 hardware validation.

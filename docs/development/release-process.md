@@ -52,9 +52,9 @@ Firmware upload, device credential mutation, cloud deployment and public portal
 promotion remain separately approved operations. A Git merge alone authorizes
 none of them.
 
-## Current portal release
+## Current release candidate
 
 The active release definition is
-[REL-001 — Portal Pilot Release Readiness](../project/sprints/REL-001.md). Its
-version is selected only after the fresh-device pilot gate and `develop`
-integration; no version number is implied by this document.
+[`v1.0.0-rc.1` — Repository and Documentation Consolidation](../project/sprints/V1.0.0-RC.1.md).
+It carries forward the accepted REL-001 pilot baseline. The RC label does not
+authorize a final `v1.0.0` tag or a general-public deployment.

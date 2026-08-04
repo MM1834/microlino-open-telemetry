@@ -19,7 +19,7 @@ task. Follow links from that owner page instead of scanning adjacent directories
 | Hardware | `hardware/overview.md` | One board or wiring page |
 | Build/release/deployment | `development/release-process.md` | Relevant build/deployment page and active release record |
 | Validation | Relevant file under `testing/` | Exact sprint/release record |
-| Historical audit | `history/README.md`, then `archive/README.md` | Only the named historical collection |
+| Historical audit | Git log for the relevant current owner path | Open the named older revision only |
 
-`archive/` is excluded from normal work. Historical documents do not override
-current code, accepted ADRs or governance status.
+Historical revisions do not override current code, accepted ADRs or governance
+status.

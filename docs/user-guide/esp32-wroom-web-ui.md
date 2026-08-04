@@ -7,4 +7,4 @@ The beta guide must cover first connection, status, optional GPS, MQTT/AWS healt
 backup/restore, factory reset, local OTA and a privacy-safe support workflow.
 
 Required images are tracked in the
-[documentation migration plan](../MIGRATION.md#screenshot-backlog).
+[beta screenshot specification](../beta/screenshot-specification.md).

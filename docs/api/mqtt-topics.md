@@ -99,4 +99,3 @@ and must not publish guessed data for other vehicle models.
 
 - [AWS architecture](../architecture/aws-iot.md)
 - [Firmware architecture](../firmware/architecture.md)
-- [Historical AWS-2.3 contract](../aws/AWS-2-3-telemetry-contract.md)

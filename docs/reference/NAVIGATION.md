@@ -2,5 +2,5 @@
 
 > **Status:** Compatibility redirect
 
-Use the current [documentation index](../index.md) and
+Use the current [documentation index](../README.md) and
 [documentation standard](../DOCUMENTATION_STANDARD.md).

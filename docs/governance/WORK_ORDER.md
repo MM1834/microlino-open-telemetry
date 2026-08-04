@@ -88,7 +88,7 @@ open.
 **Current workstream:** ONB-001 within SPR-0005.
 
 **Active slice:** ONB-001.B2 is deployed and functionally validated. B3 lifecycle
-implementation remains open and is explicitly outside REL-001. Retained legacy
+implementation remains open and is explicitly outside `v1.0.0-rc.1`. Retained legacy
 ownership still uses the bounded compatibility guard until a reviewed migration
 is required by fleet growth.
 
@@ -126,17 +126,16 @@ against the exact commit and environment.
 
 ## Completed reference
 
-- [REL-001 portal pilot release](../project/sprints/REL-001.md) is complete; its
-  release notes, validation evidence and risk decisions remain authoritative.
-- [DOC-001 documentation baseline](../project/sprints/DOC-001.md) is complete;
-  historical material is separated from current guidance.
+- REL-001 is complete and forms the validated predecessor baseline for
+  [`v1.0.0-rc.1`](../project/sprints/V1.0.0-RC.1.md).
+- DOC-001 is complete. Current owner pages now replace its intermediate migration
+  and classification records.
 
 ## Completion policy
 
 Work only moves to `CURRENT_STATUS` when it is present in the current code and has
 appropriate validation evidence. Deferred opportunities move to
-`ENGINEERING_BACKLOG`; historical implementation detail belongs under legacy or
-release documentation.
+`ENGINEERING_BACKLOG`; historical implementation detail belongs in Git history.
 
 ## Related documents
 

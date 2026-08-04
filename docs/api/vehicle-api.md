@@ -74,4 +74,3 @@ is never sufficient evidence of authorization.
 - [Live WebSocket API](live-websocket-api.md)
 - [AWS architecture](../architecture/aws-iot.md)
 - [Onboarding authorization](../architecture/onboarding-authorization.md)
-- [Historical AWS-3.3 record](../aws/AWS-3-3-vehicle-api.md)

@@ -30,13 +30,10 @@ standard.
 | `developer/` | Current engineering guides |
 | `development/` | Current build, release and deployment procedures |
 | `testing/` | Repeatable validation plans and evidence |
-| `history/` | Superseded sprint, patch, validation and release records |
-| `archive/` | Retained historical packages excluded from normal work |
 | `assets/images/` | Canonical image and diagram assets |
 
-`aws/`, `gps/`, completed `project/sprints/`, older `release-notes/` and `legacy/`
-remain historical sources outside the consolidated archive where stable inbound
-links or audit value justify their current paths.
+Completed sprints, patch packages, superseded release notes and legacy delivery
+records belong in Git history rather than the current documentation tree.
 
 ## Required page header
 
