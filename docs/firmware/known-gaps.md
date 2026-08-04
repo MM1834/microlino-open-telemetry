@@ -6,7 +6,7 @@
 
 | ID | Finding | Evidence/impact | Next decision or validation |
 |---|---|---|---|
-| FW-001 | Too many maintained-looking PlatformIO environments | AWS, pre-AWS and GPS-test environments expose implementation history as product variants | Simplify after DOC-001; preserve one line per board |
+| FW-001 | Too many maintained-looking PlatformIO environments | GPS-test was removed; AWS and pre-AWS environments still expose implementation history as product variants | Complete the simplification while preserving one line per board |
 | FW-002 | Open local AP and unauthenticated WebUI | Resolved for operational WROOM and LilyGO use in FW-SEC-001: controlled first setup only, then WPA2 plus authenticated WebUI/API; physically validated 2026-08-03 | Retain provisioning checks and never hand off a device in first-setup state |
 | FW-003 | Standard-CAN profile is empty | Registered profile deliberately decodes nothing | Obtain official identifiers/scaling before other models |
 | FW-004 | ESP32 wiring was wrong in prior docs | Source declares RX27/TX26, old page showed LilyGO RX32/TX13 | Physically review every beta harness |

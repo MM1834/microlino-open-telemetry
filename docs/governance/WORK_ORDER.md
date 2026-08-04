@@ -107,9 +107,10 @@ remain open before general production readiness.
 
 ### Simplify maintained firmware environments
 
-Maintain one firmware line per board. Retire the GPS test environment and stop
-treating pre-AWS environments as separate product firmware generations. Preserve
-AWS IoT as a normal configurable feature while keeping local standalone operation.
+Maintain one firmware line per board. The standalone GPS test environment is
+retired and removed. Continue by stopping treatment of pre-AWS environments as
+separate product firmware generations. Preserve AWS IoT as a normal configurable
+feature while keeping local standalone operation.
 
 ### Qualify LilyGO LTE/GPRS beyond the functional pilot path
 

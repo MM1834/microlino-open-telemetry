@@ -32,7 +32,6 @@ No connection to a vehicle is authorized by this draft checklist alone.
 - [ ] Use the approved ESP32 AWS environment/artifact.
 - [ ] Record Git commit, PlatformIO environment, build time and binary SHA-256.
 - [ ] Confirm the firmware reports the expected `MOT_VERSION` and `esp32-wroom`.
-- [ ] Confirm the binary is not the retired standalone GPS-test environment.
 - [ ] Preserve the approved binary in a controlled release location.
 
 Build and flash steps remain outside DOC-001 until explicitly approved.

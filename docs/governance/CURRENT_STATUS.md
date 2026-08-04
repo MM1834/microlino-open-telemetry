@@ -73,15 +73,14 @@ PlatformIO currently exposes these environments:
 
 - `esp32dev`
 - `esp32dev-aws`
-- `esp32dev-gps-test`
 - `lilygo-t-a7670`
 - `T-A7670X-AWS`
 
-This environment set is legacy structure, not the desired maintenance model. GPS
-test firmware is no longer a maintained product variant. Pre-AWS environments are
-also no longer intended as separate firmware generations. The target is one
-maintained firmware line per board, with AWS IoT treated as a configurable feature.
-That simplification is planned and has not yet been applied to PlatformIO.
+The standalone GPS test firmware and its PlatformIO environment have been removed.
+Pre-AWS environments are no longer intended as separate firmware generations but
+remain as legacy regression paths. The target is one maintained firmware line per
+board, with AWS IoT and optional GPS treated as configurable capabilities. The
+remaining environment simplification is still planned.
 
 ## Portal and AWS backend
 
