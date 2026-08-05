@@ -106,8 +106,10 @@ portal source tree:
 
 The legacy Node-RED forwarder identity `xrpioneer` is provisioned with a dedicated
 publish-only AWS IoT certificate, assigned to its controlled beta user and enabled
-for the same bounded History service. The two-identity daily write alarm is 2,100
-against a default-cadence maximum of 1,920 writes.
+for the same bounded History service. On 2026-08-05 its unstable second MQTT
+subscriber was replaced with exact allowlisted `ioBroker in` state subscriptions;
+successive AWS reads confirmed continuously changing SOC, Speed and power values.
+The two-identity daily write alarm remains 2,100.
 
 Implemented and validated in the controlled AWS development stack:
 
