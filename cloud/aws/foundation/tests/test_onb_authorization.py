@@ -298,7 +298,29 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         )
         speed_point = next(point for point in points if "speed" in point)
         self.assertEqual(20.0, speed_point["speed"])
+        self.assertEqual(0, speed_point["speedMin"])
         self.assertEqual(40, speed_point["speedMax"])
+
+    def test_power_history_is_averaged_per_api_resolution(self):
+        self.history.items.extend([
+            {
+                "vehicleId": "alpha", "sampleKey": "power#1700000100",
+                "signal": "power", "sampledAt": 1_700_000_100_000,
+                "receivedAt": 1_700_000_100_000, "value": 120,
+            },
+            {
+                "vehicleId": "alpha", "sampleKey": "power#1700000160",
+                "signal": "power", "sampledAt": 1_700_000_160_000,
+                "receivedAt": 1_700_000_160_000, "value": -40,
+            },
+        ])
+        points = self.module.load_history(
+            "alpha", 1_700_000_000_000, 1_700_000_299_000, 300
+        )
+        power_point = next(point for point in points if "power" in point)
+        self.assertEqual(40.0, power_point["power"])
+        self.assertEqual(-40, power_point["powerMin"])
+        self.assertEqual(120, power_point["powerMax"])
 
 
 class LiveAuthorizationTests(unittest.TestCase):
@@ -438,6 +460,7 @@ class IngestAuthorizationTests(unittest.TestCase):
         self.assertEqual(300, module.HISTORY_SIGNALS["display/soc"][1])
         self.assertEqual(300, module.HISTORY_SIGNALS["charging/plugged"][1])
         self.assertEqual(900, module.HISTORY_SIGNALS["display/speed_kmh"][1])
+        self.assertEqual(900, module.HISTORY_SIGNALS["charging/power_signed"][1])
         self.assertNotIn("display/odometer_km", module.HISTORY_SIGNALS)
         self.assertTrue(module.store_history(
             "alpha", "charging/plugged", True, "boolean", 1_700_000_301_000
@@ -480,6 +503,44 @@ class IngestAuthorizationTests(unittest.TestCase):
             1_700_000_025_000, 0
         ))
         self.assertEqual([30, 0], [item["value"] for item in history.items])
+
+    def test_power_history_samples_active_minutes_and_one_zero(self):
+        history = VehicleHistoryTable()
+        module = load_lambda(
+            "StateIngestFunction",
+            {
+                "state": VehicleStateTable(), "connections": ConnectionTable(),
+                "access": AccessTable({}), "history": history,
+            },
+            {
+                "TABLE_NAME": "state", "CONNECTION_TABLE_NAME": "connections",
+                "ACCESS_TABLE_NAME": "access", "WEBSOCKET_API_ID": "api",
+                "WEBSOCKET_STAGE": "$default", "AWS_REGION": "eu-north-1",
+                "HISTORY_TABLE_NAME": "history", "HISTORY_ENABLED": "true",
+                "HISTORY_RETENTION_DAYS": "31",
+                "HISTORY_MOTION_ENABLED": "true",
+                "HISTORY_VEHICLE_ALLOWLIST": "alpha",
+                "HISTORY_CORE_INTERVAL_SECONDS": "300",
+                "HISTORY_MOTION_INTERVAL_SECONDS": "60",
+            },
+        )
+        self.assertTrue(module.store_history(
+            "alpha", "charging/power_signed", -80, "number",
+            1_700_000_001_000, 1_699_999_930_000, -20
+        ))
+        self.assertFalse(module.store_history(
+            "alpha", "charging/power_signed", -90, "number",
+            1_700_000_020_000, 1_700_000_001_000, -80
+        ))
+        self.assertTrue(module.store_history(
+            "alpha", "charging/power_signed", 0, "number",
+            1_700_000_025_000, 1_700_000_020_000, -90
+        ))
+        self.assertFalse(module.store_history(
+            "alpha", "charging/power_signed", 0, "number",
+            1_700_000_040_000, 1_700_000_025_000, 0
+        ))
+        self.assertEqual([-80, 0], [item["value"] for item in history.items])
 
 
 class TemplateStructureTests(unittest.TestCase):

@@ -18,6 +18,8 @@ task. Follow links from that owner page instead of scanning adjacent directories
 | Authentication/onboarding | `architecture/onboarding-authorization.md` | Active ONB sprint, `auth/`, backend source |
 | Hardware | `hardware/overview.md` | One board or wiring page |
 | Build/release/deployment | `development/release-process.md` | Relevant build/deployment page and active release record |
+| Marketing and project poster | `marketing/project-poster.md` | `governance/CURRENT_STATUS.md`, `governance/WORK_ORDER.md` |
+| Public landing page | `marketing/landing-page.md` | `project/sprints/WEB-001.md`, `development/release-process.md` |
 | Validation | Relevant file under `testing/` | Exact sprint/release record |
 | Historical audit | Git log for the relevant current owner path | Open the named older revision only |
 

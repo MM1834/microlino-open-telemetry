@@ -24,6 +24,8 @@ Only the supplied `mot/xrpioneer` suffixes are allowed. Unknown topics are block
 and reported to the debug sidebar. Boolean `0/1` payloads for
 `charging/is_charging` and `charging/plugged` become JSON booleans. Numeric topics
 become JSON numbers; bounded system values remain strings.
+`charging/power_signed` is forwarded as a signed numeric value for the bounded
+Power-History comparison with SOC and Speed.
 
 Each direct state input emits the current value at flow start and then every
 subsequent ioBroker state event. AWS publications remain retained so a newly

@@ -51,7 +51,8 @@ flowchart TB
 | Profile | Key | Implemented | Behaviour |
 |---|---|---:|---|
 | Display CAN | `display-can` | Yes | Decodes standard 11-bit frames `0x602`, `0x603`, `0x604` |
-| Standard CAN | `standard-can` | No | Intentionally empty pending official identifiers/scaling |
+| Standard-CAN V1 - Pioneer | `standard-can-v1-pioneer` | No | Intentionally empty pending verified identifiers/scaling |
+| Standard-CAN V2 | `standard-can-v2` | No | Intentionally empty pending verified identifiers/scaling |
 | Disabled | `disabled` | Yes | Receives but does not decode frames |
 
 The Display-CAN decoder derives SOC, speed, odometer, estimated range, charging

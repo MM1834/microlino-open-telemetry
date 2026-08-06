@@ -62,6 +62,10 @@ build/dashboard/**/*config*~
 # Local packaged AWS artifacts
 build/aws/
 
+# Generated documentation previews and scratch output
+/output/
+/tmp/
+
 # Local portal upload packages
 build/portal/
 build/dashboard/packages/

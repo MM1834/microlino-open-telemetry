@@ -515,6 +515,28 @@
     const n = Number(s); if (s.trim() !== '' && Number.isFinite(n)) return n;
     try { return JSON.parse(s); } catch { return s; }
   }
+  function updateBmsPowerFlow() {
+    const vehiclePower = Number(state.values['bms/vehicle_power_w']);
+    const packPower = Number(state.values['bms/pack_power_w']);
+    const powerW = Number.isFinite(vehiclePower)
+      ? vehiclePower
+      : (Number.isFinite(packPower) ? -packPower : NaN);
+    const charging = state.values['charging/is_charging'] === true || Number(state.values['charging/is_charging']) === 1;
+    const regenerating = state.values['bms/is_regenerating'] === true || Number(state.values['bms/is_regenerating']) === 1 || powerW < -100;
+    const discharging = state.values['bms/is_discharging'] === true || Number(state.values['bms/is_discharging']) === 1 || powerW > 100;
+    if (Number.isFinite(powerW)) {
+      const displayedPowerW = charging ? Math.abs(powerW) : powerW;
+      setText('power', `${fmtNum(displayedPowerW / 1000, 2)} kW`);
+    }
+    const chargingPowerMain = document.getElementById('charging-power-main');
+    if (chargingPowerMain) {
+      chargingPowerMain.hidden = !(charging && Number.isFinite(powerW));
+      if (!chargingPowerMain.hidden) chargingPowerMain.textContent = `${fmtNum(Math.abs(powerW) / 1000, 2)} kW`;
+    }
+    setText('power-label', charging ? 'Ladeleistung' : 'Fahrzeugleistung');
+    const flow = charging ? 'Laden' : regenerating ? 'Rekuperation' : discharging ? 'Verbrauch' : 'Bereit';
+    setText('power-flow', flow);
+  }
   function applyTopic(topic, payload, metadata = null) {
     const base = baseTopic() + '/';
     const key = topic.startsWith(base) ? topic.slice(base.length) : topic;
@@ -533,10 +555,22 @@
       case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); break;
       case 'display/odometer_km': case 'display/odo': setText('odo-main', `${fmtNum(val,1)} km`); break;
       case 'display/estimated_range_km': case 'display/range': state.values.range = val; setText('range-main', `${fmtNum(val,0)} km`); break;
-      case 'charging/is_charging': { const charging = !!Number(val) || val === true; const t = charging ? 'Lädt' : 'Nicht am Laden'; setText('charging-main', t); setText('charging-card', t); break; }
-      case 'charging/power_signed': case 'charging/power_display': { const p=Number(val)/10; setText('power', `${fmtNum(p,1)} kW`); if(p < -0.1) setText('charging-card','Rekuperation'); break; }
+      case 'charging/is_charging': { const charging = !!Number(val) || val === true; const t = charging ? 'Lädt' : 'Nicht am Laden'; setText('charging-main', t); setText('charging-card', t); updateBmsPowerFlow(); break; }
+      case 'charging/plugged': { const plugged = !!Number(val) || val === true; if(plugged && !(!!Number(state.values['charging/is_charging']) || state.values['charging/is_charging'] === true)){ setText('charging-main','Eingesteckt'); setText('charging-card','Eingesteckt'); } break; }
+      case 'charging/power_signed': case 'charging/power_display': {
+        const p=Number(val)/10;
+        const charging = state.values['charging/is_charging'] === true || Number(state.values['charging/is_charging']) === 1;
+        const plugged = state.values['charging/plugged'] === true || Number(state.values['charging/plugged']) === 1;
+        setText('power', `${fmtNum(charging ? Math.abs(p) : p,1)} kW`);
+        if(p < -0.1 && !charging && !plugged) setText('charging-card','Rekuperation');
+        break;
+      }
       case 'bms/pack_voltage': setText('voltage', `${fmtNum(val,1)} V`); setText('charge-voltage', `${fmtNum(val,1)} V`); break;
       case 'bms/pack_current': setText('current', `${fmtNum(val,1)} A`); setText('charge-current', `${fmtNum(val,1)} A`); break;
+      case 'bms/pack_power_w': case 'bms/vehicle_power_w': case 'bms/is_regenerating': case 'bms/is_discharging': updateBmsPowerFlow(); break;
+      case 'bms/cell_min_mv': setText('cell-min', `${fmtNum(Number(val)/1000,3)} V`); break;
+      case 'bms/cell_max_mv': setText('cell-max', `${fmtNum(Number(val)/1000,3)} V`); break;
+      case 'bms/cell_delta_mv': setText('cell-delta', `${fmtNum(val,0)} mV`); break;
       case 'system/firmware': case 'system/version': case 'system/firmware_version': setText('fw-version', val); break;
       case 'system/device_id': setText('device-id', val); break;
       case 'system/rssi': case 'system/wifi_rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;

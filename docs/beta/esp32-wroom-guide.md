@@ -62,7 +62,8 @@ wizard launch. It is not proof that WiFi, CAN, AWS or GPS works.
 - Keep the provisioned device name unless support instructs otherwise.
 - Keep the assigned `vehicleId`; it controls `mot/<vehicleId>/...` topics.
 - Select Display CAN for the currently supported vehicle/bus.
-- Do not select Standard CAN expecting data; its decoder is empty.
+- Do not select Standard-CAN V1 - Pioneer or Standard-CAN V2 expecting data; both
+  decoders are intentionally empty pending verified identifiers and scaling.
 
 ### Network
 

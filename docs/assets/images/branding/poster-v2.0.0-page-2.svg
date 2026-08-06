@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024" role="img" aria-labelledby="title description">
+  <title id="title">Microlino Open Telemetry — portal and onboarding</title>
+  <desc id="description">Portal screenshots and a five-step high-level onboarding process from receiving an invitation and claim code through Cognito sign-in, one-time vehicle claim and authorized telemetry.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.58" stop-color="#0b1728"/>
+      <stop offset="1" stop-color="#0d2031"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102a3e"/>
+      <stop offset="1" stop-color="#0d1d2e"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#020617" flood-opacity="0.42"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#38bdf8"/>
+    </marker>
+    <clipPath id="desktopClip"><rect x="0" y="0" width="770" height="354" rx="22"/></clipPath>
+    <clipPath id="multiClip"><rect x="0" y="0" width="514" height="112" rx="18"/></clipPath>
+    <clipPath id="mobileClip"><rect x="0" y="0" width="242" height="354" rx="22"/></clipPath>
+    <style>
+      text { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .eyebrow { fill:#67e8f9; font-size:17px; font-weight:700; letter-spacing:3px; }
+      .title { fill:#f8fafc; font-size:56px; font-weight:760; letter-spacing:-1.5px; }
+      .subtitle { fill:#cbd5e1; font-size:21px; }
+      .section { fill:#e2e8f0; font-size:19px; font-weight:700; letter-spacing:1.4px; }
+      .caption { fill:#cbd5e1; font-size:15px; }
+      .step-number { fill:#07111f; font-size:20px; font-weight:800; text-anchor:middle; }
+      .step-title { fill:#f8fafc; font-size:20px; font-weight:700; }
+      .step-copy { fill:#b7c7d9; font-size:14px; }
+      .small { fill:#94a3b8; font-size:13px; }
+    </style>
+  </defs>
+
+  <rect width="1536" height="1024" fill="url(#background)"/>
+  <circle cx="1440" cy="-90" r="390" fill="#0ea5e9" opacity="0.07"/>
+  <circle cx="90" cy="1080" r="380" fill="#2dd4bf" opacity="0.05"/>
+
+  <g transform="translate(68 52)">
+    <image href="mot-logo.svg" x="0" y="0" width="225" height="60" preserveAspectRatio="xMinYMid meet"/>
+    <text x="245" y="20" class="eyebrow">SECURE PORTAL &amp; ONBOARDING</text>
+    <text x="245" y="64" class="title">Connect. Claim. Drive.</text>
+    <text x="245" y="99" class="subtitle">One device identity. One authorized owner. Live telemetry on every screen.</text>
+    <rect x="1224" y="7" width="176" height="38" rx="19" fill="#102b3d" stroke="#38bdf8" stroke-opacity="0.55"/>
+    <circle cx="1247" cy="26" r="6" fill="#34d399"/>
+    <text x="1262" y="31" class="caption">CONTROLLED BETA</text>
+  </g>
+
+  <g transform="translate(68 184)">
+    <text x="0" y="0" class="section">THE MOT EXPERIENCE</text>
+    <g transform="translate(0 24)" filter="url(#shadow)">
+      <rect width="770" height="354" rx="22" fill="#0a1726" stroke="#2b485f"/>
+      <image href="../dashboard/desktop-home.png" x="0" y="0" width="770" height="394" preserveAspectRatio="xMidYMin slice" clip-path="url(#desktopClip)"/>
+    </g>
+    <g transform="translate(794 24)" filter="url(#shadow)">
+      <rect width="514" height="112" rx="18" fill="#0a1726" stroke="#2b485f"/>
+      <image href="../dashboard/multi-vehicle.png" x="0" y="0" width="514" height="130" preserveAspectRatio="xMidYMid slice" clip-path="url(#multiClip)"/>
+      <text x="0" y="140" class="caption">Authorized vehicle switching</text>
+    </g>
+    <g transform="translate(794 188)" filter="url(#shadow)">
+      <rect width="514" height="190" rx="18" fill="url(#panel)" stroke="#2b485f"/>
+      <text x="28" y="43" fill="#67e8f9" font-size="16" font-weight="700" letter-spacing="1.5">PORTAL CAPABILITIES</text>
+      <text x="28" y="82" class="caption">Dual-CAN battery energy flow + optional GPS</text>
+      <text x="28" y="112" class="caption">SOC · charging · speed · net-power history</text>
+      <text x="28" y="142" class="caption">Cognito sign-in + authenticated HTTPS/WSS</text>
+      <text x="28" y="172" class="caption">Server-side user ↔ vehicle isolation</text>
+    </g>
+  </g>
+
+  <g transform="translate(68 606)">
+    <text x="0" y="0" class="section">QUICK START · CONTROLLED BETA ONBOARDING</text>
+    <text x="1400" y="0" class="small" text-anchor="end">Device certificates stay on the device — never in the browser.</text>
+
+    <g transform="translate(0 32)">
+      <path d="M250 67 H286 M536 67 H572 M822 67 H858 M1108 67 H1144" fill="none" stroke="#38bdf8" stroke-width="3" marker-end="url(#arrow)"/>
+
+      <g>
+        <rect width="250" height="230" rx="22" fill="#0d1b2b" stroke="#274158"/>
+        <circle cx="34" cy="34" r="19" fill="#67e8f9"/><text x="34" y="41" class="step-number">1</text>
+        <text x="64" y="41" class="step-title">Receive</text>
+        <path d="M31 86 H91 V128 H31 Z M31 86 L61 108 L91 86" fill="none" stroke="#67e8f9" stroke-width="3" stroke-linejoin="round"/>
+        <text x="24" y="164" class="step-copy">Administrator prepares the device,</text>
+        <text x="24" y="185" class="step-copy">beta account and expiring</text>
+        <text x="24" y="206" class="step-copy">single-use claim code.</text>
+      </g>
+
+      <g transform="translate(286 0)">
+        <rect width="250" height="230" rx="22" fill="#0d1b2b" stroke="#274158"/>
+        <circle cx="34" cy="34" r="19" fill="#67e8f9"/><text x="34" y="41" class="step-number">2</text>
+        <text x="64" y="41" class="step-title">Sign in</text>
+        <circle cx="61" cy="99" r="23" fill="none" stroke="#67e8f9" stroke-width="3"/>
+        <path d="M25 143 Q61 113 97 143" fill="none" stroke="#67e8f9" stroke-width="3" stroke-linecap="round"/>
+        <text x="24" y="174" class="step-copy">Open /dashboard/ and sign in</text>
+        <text x="24" y="195" class="step-copy">through Cognito Authorization</text>
+        <text x="24" y="216" class="step-copy">Code flow with PKCE.</text>
+      </g>
+
+      <g transform="translate(572 0)">
+        <rect width="250" height="230" rx="22" fill="#0d1b2b" stroke="#274158"/>
+        <circle cx="34" cy="34" r="19" fill="#67e8f9"/><text x="34" y="41" class="step-number">3</text>
+        <text x="64" y="41" class="step-title">Claim</text>
+        <rect x="27" y="78" width="90" height="58" rx="10" fill="none" stroke="#67e8f9" stroke-width="3"/>
+        <circle cx="46" cy="97" r="5" fill="#67e8f9"/><circle cx="66" cy="97" r="5" fill="#67e8f9"/><circle cx="86" cy="97" r="5" fill="#67e8f9"/>
+        <text x="24" y="174" class="step-copy">Enter or scan the one-time</text>
+        <text x="24" y="195" class="step-copy">claim proof. No device private</text>
+        <text x="24" y="216" class="step-copy">key is exposed.</text>
+      </g>
+
+      <g transform="translate(858 0)">
+        <rect width="250" height="230" rx="22" fill="#0d1b2b" stroke="#274158"/>
+        <circle cx="34" cy="34" r="19" fill="#67e8f9"/><text x="34" y="41" class="step-number">4</text>
+        <text x="64" y="41" class="step-title">Authorize</text>
+        <path d="M33 108 H103 M68 76 V140" stroke="#67e8f9" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="34" cy="108" r="12" fill="#0d1b2b" stroke="#67e8f9" stroke-width="3"/>
+        <circle cx="102" cy="108" r="12" fill="#0d1b2b" stroke="#67e8f9" stroke-width="3"/>
+        <text x="24" y="174" class="step-copy">Backend atomically binds the</text>
+        <text x="24" y="195" class="step-copy">vehicle to the signed-in user</text>
+        <text x="24" y="216" class="step-copy">and consumes the claim code.</text>
+      </g>
+
+      <g transform="translate(1144 0)">
+        <rect width="256" height="230" rx="22" fill="#0b2630" stroke="#2dd4bf" stroke-width="1.5"/>
+        <circle cx="34" cy="34" r="19" fill="#5eead4"/><text x="34" y="41" class="step-number">5</text>
+        <text x="64" y="41" class="step-title">Drive</text>
+        <circle cx="70" cy="108" r="36" fill="none" stroke="#5eead4" stroke-width="5"/>
+        <path d="M70 108 L91 91" stroke="#5eead4" stroke-width="5" stroke-linecap="round"/>
+        <text x="24" y="174" class="step-copy">The portal lists only authorized</text>
+        <text x="24" y="195" class="step-copy">vehicles and receives live and</text>
+        <text x="24" y="216" class="step-copy">historical telemetry.</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(68 978)">
+    <rect width="1400" height="1" fill="#274158"/>
+    <text x="0" y="28" class="small">microlino-open-telemetry.ch</text>
+    <text x="700" y="28" class="small" text-anchor="middle">Controlled onboarding · Least privilege · Secure by design</text>
+    <text x="1400" y="28" class="small" text-anchor="end">Page 2 / 2</text>
+  </g>
+</svg>

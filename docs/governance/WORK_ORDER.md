@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-04
+**Last reviewed:** 2026-08-06
 
 ## High priority
 
@@ -24,9 +24,10 @@ fixed API ranges, portal charts and measurable AWS guardrails.
 measurement and fail-closed deployment are complete. The controlled `pioneer`
 and `xrpioneer` identities are enabled. Live, authorized portal and History
 operation passed with fresh traffic. After road-test review, a repository update
-now samples Speed per active-driving minute, records one immediate journey-end
-zero, suppresses continuous standstill writes and averages Speed into the fixed
-API resolutions. The AWS backend deployment passed; hosted-portal upload and the
+now samples Speed and signed power per active minute, records immediate zero
+transitions, suppresses continuous zero writes and averages both into the fixed
+API resolutions. Speed reception gaps are closed at zero in the portal instead
+of linearly interpolated. The AWS backend deployment passed; hosted-portal upload and the
 first moving-road-test/TTL/cost observation remain open. The existing live state and WebSocket path remain the
 release boundary and must not regress.
 
@@ -127,6 +128,13 @@ against the exact commit and environment.
 
 ## Completed reference
 
+- [C6-001](../project/sprints/C6-001.md) closed the bounded N16 dual-CAN
+  WiFi/AWS pilot qualification on 2026-08-06. Authenticated C6 WebUI, runtime OTA,
+  controlled channel injection, extended soak and production hardware remain in
+  the engineering backlog.
+- [WEB-001](../project/sprints/WEB-001.md) delivered the repository-owned public
+  landing page; the maintainer deployed and validated it on desktop and smartphone
+  on 2026-08-05.
 - [`v1.0.0-rc.1`](../project/sprints/V1.0.0-RC.1.md) completed the repository and
   documentation consolidation and was published on 2026-08-04.
 - REL-001 is complete and forms the validated predecessor baseline for
