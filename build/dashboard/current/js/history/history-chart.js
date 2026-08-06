@@ -39,16 +39,46 @@ async function render(hours=24){
     color:"#38bdf8"
   });
 
+  const speedField=samples.some(s=>s.speed!==undefined)?"speed":"speedKmh";
+  updateSpeedStatus(samples,speedField,resolutionSeconds);
+  const speedSamples=closeInactiveGaps(samples,speedField,resolutionSeconds);
   renderSeries({
     canvasId:"speed-history-chart",
     emptyId:"speed-history-empty",
-    samples,
-    field:samples.some(s=>s.speed!==undefined)?"speed":"speedKmh",
+    samples:speedSamples,
+    field:speedField,
     label:"Ø Speed",
     unit:"km/h",
     min:0,
     max:null,
     color:"#22c55e"
+  });
+
+  const powerSource=samples
+    .filter(s=>s.power!==null&&s.power!==undefined&&Number.isFinite(Number(s.power)))
+    .map(s=>{
+      const signedPower=Number(s.power)/10;
+      return {...s,power:Math.abs(signedPower),_signedPower:signedPower,_powerMode:powerMode(signedPower,s)};
+    })
+    .sort((a,b)=>a.ts-b.ts);
+  const powerSamples=closeInactiveGaps(
+    powerSource,
+    "power",
+    resolutionSeconds
+  );
+  renderSeries({
+    canvasId:"power-history-chart",
+    emptyId:"power-history-empty",
+    samples:powerSamples,
+    field:"power",
+    label:"Ø Nettoleistung",
+    unit:"kW",
+    min:0,
+    max:null,
+    color:"#f59e0b",
+    decimals:1,
+    latestPoint:powerSource[powerSource.length-1],
+    formatValue:(value,point)=>`${point?._powerMode||"Leistung"} ${Number(value).toFixed(1)}`
   });
 
   renderSeries({
@@ -102,6 +132,68 @@ function renderSeries(o){
   if(empty) empty.style.display="none";
   canvas.style.display="block";
   draw(canvas,points,o);
+}
+
+function closeInactiveGaps(samples,field,resolutionSeconds){
+  const points=samples
+    .filter(s=>s[field]!==null&&s[field]!==undefined&&Number.isFinite(Number(s[field])))
+    .map(s=>({...s}))
+    .sort((a,b)=>a.ts-b.ts);
+  if(!points.length) return points;
+
+  const intervalMs=Math.max(60,Number(resolutionSeconds)||300)*1000;
+  const gapThresholdMs=intervalMs*1.5;
+  const closed=[points[0]];
+
+  for(let i=1;i<points.length;i++){
+    const previous=points[i-1];
+    const current=points[i];
+    if(current.ts-previous.ts>gapThresholdMs){
+      const stopTs=Math.min(previous.ts+intervalMs,current.ts-1000);
+      if(Number(previous[field])!==0&&stopTs>previous.ts){
+        closed.push({ts:stopTs,[field]:0,_syntheticGap:true});
+      }
+      const restartTs=current.ts-1000;
+      const lastClosed=closed[closed.length-1];
+      if(Number(current[field])>0&&restartTs>lastClosed.ts){
+        closed.push({ts:restartTs,[field]:0,_syntheticGap:true});
+      }
+    }
+    closed.push(current);
+  }
+
+  const last=closed[closed.length-1];
+  if(Number(last[field])!==0&&Date.now()-last.ts>gapThresholdMs){
+    closed.push({ts:last.ts+intervalMs,[field]:0,_syntheticGap:true});
+  }
+  return closed;
+}
+
+function updateSpeedStatus(samples,field,resolutionSeconds){
+  const status=document.getElementById("speed-history-status");
+  if(!status) return;
+  const points=samples
+    .filter(s=>s[field]!==null&&s[field]!==undefined&&Number.isFinite(Number(s[field])))
+    .sort((a,b)=>a.ts-b.ts);
+  if(!points.length){
+    status.textContent="Nicht aktuell · noch kein Messpunkt";
+    status.classList.add("is-stale");
+    return;
+  }
+  const intervalMs=Math.max(60,Number(resolutionSeconds)||300)*1000;
+  const last=points[points.length-1];
+  const stale=Date.now()-last.ts>intervalMs*1.5;
+  const time=new Date(last.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  status.textContent=stale
+    ?`Nicht aktuell · letzter Messpunkt ${time} (Stillstand oder offline)`
+    :`Aktuell · letzter Messpunkt ${time}`;
+  status.classList.toggle("is-stale",stale);
+}
+
+function powerMode(signedPower,sample){
+  if(Math.abs(signedPower)<0.05) return "Leistung";
+  if(signedPower>0) return "Verbrauch";
+  return sample.charging===true||Number(sample.charging)>=0.5?"Laden":"Rekuperation";
 }
 
 function draw(canvas,points,o){
@@ -167,13 +259,18 @@ function draw(canvas,points,o){
   ctx.stroke();
 
   const first=points[0], last=points[points.length-1];
+  const latestPoint=o.latestPoint||last;
   ctx.fillStyle="rgba(226,232,240,.95)";
   ctx.font="13px system-ui";
-  const latestValue=o.formatValue?o.formatValue(last[o.field]):Number(last[o.field]).toFixed(0);
-  ctx.fillText(`${o.label}: ${latestValue}${o.unit?" "+o.unit:""}`,L,T+14);
+  ctx.textAlign="right";
+  const latestValue=o.formatValue
+    ?o.formatValue(latestPoint[o.field],latestPoint)
+    :Number(latestPoint[o.field]).toFixed(o.decimals??0);
+  ctx.fillText(`${o.label}: ${latestValue}${o.unit?" "+o.unit:""}`,w-R,T+14);
 
   ctx.fillStyle="rgba(148,163,184,.9)";
   ctx.font="11px system-ui";
+  ctx.textAlign="left";
   ctx.fillText(new Date(first.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),L,h-8);
   ctx.fillText(new Date(last.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),Math.max(L,w-80),h-8);
 }
@@ -200,5 +297,5 @@ function formatResolution(seconds){
   return seconds<3600?`${Math.round(seconds/60)} min`:`${Math.round(seconds/3600)} h`;
 }
 
-window.MOTHistoryChart={init,render};
+window.MOTHistoryChart={init,render,closeInactiveGaps};
 })();

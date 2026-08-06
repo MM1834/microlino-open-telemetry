@@ -135,7 +135,7 @@
         <div class="hero-metrics">
           <div class="metric-card soc-card"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="soc-updated" class="muted">Stand: --</small></div>
           <div class="metric-card"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
-          <div class="metric-card"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><p>Ladestatus</p></div>
+          <div class="metric-card"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><p>Ladestatus</p></div>
           <div class="metric-card"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Laufleistung</p></div>
         </div>
 
@@ -154,7 +154,7 @@
       <section class="grid">
         <article id="battery" class="card panel battery-panel">
           <h2>▣ Batterie</h2>
-          <div class="battery-layout"><div><label>Spannung</label><strong id="voltage">-- V</strong><label>Strom</label><strong id="current">-- A</strong><label>Leistung</label><strong id="power">-- kW</strong></div><div class="ring big" id="soc-ring-2"><span id="soc-battery">--%</span><small>SoC</small></div></div>
+          <div class="battery-layout"><div><label>Spannung</label><strong id="voltage">-- V</strong><label>Strom</label><strong id="current">-- A</strong><label id="power-label">Fahrzeugleistung</label><strong id="power">-- kW</strong><label>Leistungsfluss</label><strong id="power-flow">--</strong></div><div class="ring big" id="soc-ring-2"><span id="soc-battery">--%</span><small>SoC</small></div></div>
         </article>
         <article id="vehicle" class="card panel">
           <h2>▱ Fahrzeug</h2>
@@ -171,8 +171,9 @@
           <ul class="data-list"><li><span>Batterie Min</span><strong id="temp-min">-- °C</strong></li><li><span>Batterie Max</span><strong id="temp-max">-- °C</strong></li><li><span>Batterie Ø</span><strong id="temp-avg">-- °C</strong></li><li><span>Umgebung</span><strong id="temp-ambient">-- °C</strong></li></ul>
         </article>
         <article id="cells" class="card panel cells-panel">
-          <h2>▦ Zellspannungen</h2>
+          <h2>▦ Zellspannungs-Kandidaten</h2>
           <div class="cell-meta"><span>Min: <b id="cell-min">--</b></span><span>Max: <b id="cell-max">--</b></span><span>Δ: <b id="cell-delta">--</b></span></div>
+          <small class="muted">Zwei plausible Standard-CAN-Werte; packweite Extrema noch nicht bestätigt.</small>
           <div id="cell-bars" class="cell-bars"></div>
         </article>
         <article class="card panel status-panel">
@@ -202,9 +203,18 @@
 
     <div class="history-mini">
       <h3>Ø Speed Verlauf</h3>
+      <div id="speed-history-status" class="history-series-status" aria-live="polite"></div>
       <div class="history-chart-wrap">
         <div id="speed-history-empty" class="history-empty">Noch keine Speed-History vorhanden.</div>
         <canvas id="speed-history-chart"></canvas>
+      </div>
+    </div>
+    <div class="history-mini">
+      <h3>Ø Nettoleistung</h3>
+      <div class="history-series-status">Positiver Anzeigewert · Richtung: Verbrauch, Laden oder Rekuperation</div>
+      <div class="history-chart-wrap">
+        <div id="power-history-empty" class="history-empty">Noch keine Leistungs-History vorhanden.</div>
+        <canvas id="power-history-chart"></canvas>
       </div>
     </div>
     <div class="history-mini">
@@ -234,10 +244,10 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260804-1"></script>
-  <script src="js/app.js?v=20260804-1"></script>
+  <script src="js/app.js?v=20260806-bms1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260804-5"></script>
+  <script src="js/history/history-chart.js?v=20260806-1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>
