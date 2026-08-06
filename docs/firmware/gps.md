@@ -12,6 +12,22 @@ are published only with a valid location fix.
 |---|---:|---:|---:|---|
 | ESP32-WROOM | 16 | 17 | 9600 | Optional external GPS |
 | LilyGO | 22 | 21 | 9600 | External L76K; PPS 23, wakeup 19 |
+| nanoESP32-C6-N16 | 20 | 21 | 9600 | Same optional receiver and detection states as WROOM |
+| Seeed XIAO ESP32-C6 | 17 | 16 | 9600 | Candidate compact-board wiring |
+
+The nanoESP32-C6-N16 UART wiring was physically checked on 2026-08-06: receiver
+TX to GPIO20 and receiver RX to GPIO21 produced continuously increasing UART-byte
+counts and checksum-valid NMEA sentences. The indoor test confirmed module
+detection but not a satellite fix.
+
+The same assembly subsequently reached and retained `GPS_FIX` under open sky,
+confirming the complete receiver-to-UART-to-parser location-fix path. Combined
+GPS, dual-CAN and WiFi operation remains a C6 qualification gate.
+
+The XIAO wiring was physically checked outdoors on 2026-08-06. Receiver TX on
+D7/GPIO17 and receiver RX on D6/GPIO16 produced checksum-valid NMEA and a valid
+fix after a cold-start interval, with the character count exceeding 59,000. CAN
+was not connected and WiFi was not configured during this test.
 
 GPS is optional in the shared readiness model and does not block basic readiness.
 ESP32-WROOM beta devices may therefore be delivered with or without GPS using the

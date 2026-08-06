@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-04
+**Last reviewed:** 2026-08-06
 
 ## Purpose
 
@@ -31,6 +31,12 @@ firmware's local WebUI.
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
 future fleet functions.
+
+The repository-owned public landing page under `build/landing/current/` was
+deployed to the hosted root by the maintainer on 2026-08-05 and successfully
+tested on desktop and smartphone. It presents the validated architecture, portal,
+controlled onboarding, direct ABRP path and dated project status while remaining
+operationally separate from `/dashboard/` and `/motbeta/`.
 
 ## Supported hardware paths
 
@@ -75,6 +81,48 @@ PlatformIO currently exposes these environments:
 - `esp32dev-aws`
 - `lilygo-t-a7670`
 - `T-A7670X-AWS`
+- `nanoesp32c6-n16` — C6-001 qualification build;
+- `xiao-esp32c6` — C6-001 compatibility qualification build;
+- `nanoesp32c6-n16-aws` — N16 WiFi/AWS pilot build;
+- `xiao-esp32c6-aws` — XIAO WiFi/AWS compatibility build.
+
+C6-001 closed on 2026-08-06 as a bounded pilot qualification. One shared C6 source
+line and board-specific PlatformIO profiles provide two passive CAN inputs plus
+optional GPS. The Muse Lab nanoESP32-C6-N16 is the recommended dual-CAN WiFi pilot:
+it received both Pioneer CAN buses simultaneously, retained independent decoder
+profiles and zero receive errors, and later delivered live AWS/portal telemetry.
+The XIAO 4 MB profile compiled, flashed and passed GPS/startup checks but did not
+receive the same vehicle dual-CAN/AWS qualification. Neither board is a generally
+approved production module; the deferred hardening gates are recorded separately.
+
+On 2026-08-06 controlled lower-SOC charging confirmed Pioneer Standard-CAN pack
+current at 0.3 A per raw unit, pack voltage, derived power and stable plug/charge
+state. The shared decoder now applies bounded plausibility gates. Common AWS BMS
+topics, C6 WiFi/AWS build profiles and portal live rendering are implemented and
+compile/contract tested in the repository. The later N16 road run physically
+validated WiFi/TLS publication and live state ingestion.
+
+Three subsequent flat-road dual-CAN captures confirmed the same current scale and
+sign during traction and regeneration. Negative pack current is discharge;
+positive pack current is charging or regeneration. Light braking increased
+observed electrical regeneration from about 4.5 kW on pedal release to about
+7.8 kW. Firmware now publishes explicit battery- and vehicle-sign power values
+plus regeneration/discharge states, and the repository portal renders the
+vehicle convention. Deployment of these additions remains open.
+
+The N16 qualification device was subsequently flashed with the AWS profile and
+received a unique per-device AWS IoT Thing/certificate for vehicle `pioneer`.
+LittleFS upload passed and firmware loaded the credentials. At that checkpoint
+WiFi was not yet configured, so no TLS or publication evidence was claimed.
+
+A subsequent approximately 12.7-minute home drive then physically validated the
+N16 WiFi/AWS path through live state ingestion: both CAN channels remained
+error-free, AWS received the new BMS and energy-flow suffixes, and the device
+remained online. The run exposed a valid approximately 20.9 kW discharge peak
+above the original 15 kW symmetric filter. The decoder now uses a 25 kW discharge
+and 12 kW charge/regeneration boundary; the corrected AWS image was reflashed and
+reconnected with credentials and WiFi preserved. Hosted static-portal deployment
+and extended coexistence/soak remain open.
 
 The standalone GPS test firmware and its PlatformIO environment have been removed.
 Pre-AWS environments are no longer intended as separate firmware generations but
@@ -100,7 +148,9 @@ portal source tree:
   SOC/charging and Speed enabled for the controlled `pioneer` and `xrpioneer`
   identities. A repository update changes Speed from a 15-minute snapshot to
   one-minute moving samples, suppresses repeated standstill zeroes, writes a
-  journey-end zero immediately and averages Speed at API resolution. The backend
+  journey-end zero immediately and averages Speed at API resolution. Signed power
+  now uses the same active-minute aggregation, and the portal closes Speed/power
+  reception gaps at zero instead of drawing diagonal phantom values. The backend
   refinement is deployed and read back; the static hosted portal package awaits
   manual FTPS upload. GPS remains live-only.
 
@@ -149,13 +199,18 @@ behaviour. The current decoder and wiring are centered on the presently supporte
 Microlino CAN connection. Extending support to other vehicle models requires both
 decoder work and a hardware decision for standard CAN access.
 
-Known candidate paths are:
+Known candidate paths were:
 
 - rewire the current module from pins 1 and 9 to standard CAN;
 - add another CAN interface/module;
 - evaluate an ESP32-C6 generation design for the affected hardware variant.
 
-No choice is currently approved.
+C6-001 selected the nanoESP32-C6-N16 plus two external transceivers as the bounded
+dual-CAN WiFi pilot path. Pilot duplication must retain the recorded GPIO mapping,
+USB power, per-device credentials and one-active-publisher-per-vehicle rule.
+Authenticated C6 local administration, runtime OTA/rollback, extended soak and
+production wiring/enclosure approval remain deferred rather than implied by the
+pilot result.
 
 ## Validation status
 

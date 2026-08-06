@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024" role="img" aria-labelledby="title description">
+  <title id="title">Microlino Open Telemetry — system architecture and project status</title>
+  <desc id="description">High-level architecture from the passive Microlino CAN connection through an ESP32 telemetry device and AWS IoT to the authenticated web portal. A separate local path remains available for setup, diagnostics, recovery and OTA.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.58" stop-color="#0b1728"/>
+      <stop offset="1" stop-color="#0d2031"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e2539"/>
+      <stop offset="1" stop-color="#102e40"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#020617" flood-opacity="0.38"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#38bdf8"/>
+    </marker>
+    <style>
+      text { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .eyebrow { fill:#67e8f9; font-size:17px; font-weight:700; letter-spacing:3px; }
+      .title { fill:#f8fafc; font-size:58px; font-weight:760; letter-spacing:-1.6px; }
+      .subtitle { fill:#cbd5e1; font-size:22px; }
+      .section { fill:#e2e8f0; font-size:19px; font-weight:700; letter-spacing:1.4px; }
+      .node-title { fill:#f8fafc; font-size:21px; font-weight:700; }
+      .node-copy { fill:#b7c7d9; font-size:15px; }
+      .small { fill:#94a3b8; font-size:13px; }
+      .status-title { fill:#f8fafc; font-size:23px; font-weight:700; }
+      .status-copy { fill:#cbd5e1; font-size:15px; }
+      .pill { fill:#cbd5e1; font-size:13px; font-weight:650; }
+    </style>
+  </defs>
+
+  <rect width="1536" height="1024" fill="url(#background)"/>
+  <circle cx="1390" cy="-80" r="390" fill="#0ea5e9" opacity="0.07"/>
+  <circle cx="120" cy="1050" r="360" fill="#2dd4bf" opacity="0.05"/>
+
+  <g transform="translate(68 56)">
+    <image href="mot-logo.svg" x="0" y="0" width="225" height="60" preserveAspectRatio="xMinYMid meet"/>
+    <text x="245" y="20" class="eyebrow">OPEN-SOURCE VEHICLE TELEMETRY</text>
+    <text x="245" y="64" class="title">From CAN bus to trusted insight.</text>
+    <text x="245" y="100" class="subtitle">A modular, passive telemetry platform for Microlino — local-first and cloud-connected.</text>
+    <rect x="1240" y="7" width="160" height="38" rx="19" fill="#102b3d" stroke="#38bdf8" stroke-opacity="0.55"/>
+    <circle cx="1263" cy="26" r="6" fill="#34d399"/>
+    <text x="1278" y="31" class="pill">v1.0.0-rc.1</text>
+  </g>
+
+  <g transform="translate(68 200)">
+    <rect width="1400" height="488" rx="28" fill="url(#hero)" stroke="#274158" filter="url(#shadow)"/>
+    <text x="34" y="48" class="section">ONE TELEMETRY CORE · TWO OPERATING PATHS</text>
+
+    <g transform="translate(34 82)">
+      <text x="0" y="0" class="small">VEHICLE</text>
+      <rect x="0" y="18" width="210" height="158" rx="20" fill="#0a1726" stroke="#2b485f"/>
+      <g color="#67e8f9">
+        <image href="microlino-outline.svg" x="26" y="29" width="158" height="104" preserveAspectRatio="xMidYMid meet"/>
+      </g>
+      <text x="22" y="153" class="node-title">Microlino CAN</text>
+    </g>
+
+    <path d="M260 179 H326" fill="none" stroke="#38bdf8" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="267" y="161" class="small">CAN</text>
+
+    <g transform="translate(326 100)">
+      <text x="0" y="-18" class="small">EDGE DEVICE</text>
+      <rect width="316" height="224" rx="22" fill="#0a1726" stroke="#36b5d8" stroke-width="1.5"/>
+      <rect x="22" y="24" width="76" height="76" rx="17" fill="#12344a"/>
+      <rect x="43" y="45" width="34" height="34" rx="6" fill="none" stroke="#67e8f9" stroke-width="3"/>
+      <path d="M50 35 V45 M60 35 V45 M70 35 V45 M50 79 V89 M60 79 V89 M70 79 V89 M33 52 H43 M33 62 H43 M33 72 H43 M77 52 H87 M77 62 H87 M77 72 H87" stroke="#67e8f9" stroke-width="2"/>
+      <text x="116" y="49" class="node-title">MOT device</text>
+      <text x="116" y="74" class="node-copy">ESP32-C6 · WROOM · LilyGO</text>
+      <text x="22" y="126" class="node-copy">Dual-CAN decode  →  shared telemetry</text>
+      <text x="22" y="152" class="node-copy">WiFi first  ·  LTE fallback on LilyGO</text>
+      <text x="22" y="178" class="node-copy">Optional GPS  ·  unique device identity</text>
+      <rect x="22" y="193" width="168" height="21" rx="10.5" fill="#12344a"/>
+      <text x="34" y="208" class="small" fill="#a5f3fc">NO VEHICLE CONTROL</text>
+    </g>
+
+    <path d="M642 179 H710" fill="none" stroke="#38bdf8" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="650" y="151" class="small">MQTT/TLS</text>
+    <text x="650" y="168" class="small">X.509</text>
+
+    <g transform="translate(710 82)">
+      <text x="0" y="0" class="small">SECURE CLOUD</text>
+      <rect x="0" y="18" width="330" height="258" rx="22" fill="#0a1726" stroke="#2b485f"/>
+      <circle cx="55" cy="72" r="30" fill="#12344a"/>
+      <path d="M33 79 Q35 62 50 63 Q58 45 73 57 Q87 57 88 72 Q99 75 94 86 H39 Q31 86 33 79" fill="none" stroke="#67e8f9" stroke-width="3"/>
+      <text x="102" y="67" class="node-title">AWS IoT Core</text>
+      <text x="102" y="91" class="node-copy">Broker + IoT Rule</text>
+      <path d="M34 126 H296" stroke="#243d52"/>
+      <text x="34" y="155" class="node-copy">Ingestion Lambda</text>
+      <text x="34" y="184" class="node-copy">DynamoDB live state + bounded history</text>
+      <text x="34" y="213" class="node-copy">REST API + authenticated live WebSocket</text>
+      <text x="34" y="242" class="node-copy">Server-side user ↔ vehicle authorization</text>
+    </g>
+
+    <path d="M1040 179 H1108" fill="none" stroke="#38bdf8" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="1049" y="151" class="small">JWT</text>
+    <text x="1049" y="168" class="small">HTTPS/WSS</text>
+
+    <g transform="translate(1108 100)">
+      <text x="0" y="-18" class="small">USER SERVICE</text>
+      <rect width="258" height="224" rx="22" fill="#0a1726" stroke="#2b485f"/>
+      <rect x="23" y="24" width="68" height="58" rx="9" fill="#12344a" stroke="#67e8f9" stroke-width="2"/>
+      <path d="M36 94 H78 M57 82 V94" stroke="#67e8f9" stroke-width="3" stroke-linecap="round"/>
+      <text x="108" y="49" class="node-title">Web portal</text>
+      <text x="108" y="74" class="node-copy">/dashboard/</text>
+      <text x="23" y="126" class="node-copy">Cognito sign-in + PKCE</text>
+      <text x="23" y="152" class="node-copy">Authorized live telemetry</text>
+      <text x="23" y="178" class="node-copy">SOC · speed · net-power history</text>
+      <text x="23" y="204" class="node-copy">Multi-user vehicle isolation</text>
+    </g>
+
+    <g transform="translate(326 355)">
+      <path d="M158 0 V18 H250" fill="none" stroke="#2dd4bf" stroke-width="3" marker-end="url(#arrow)"/>
+      <path d="M158 0 V8 H650 V18" fill="none" stroke="#38bdf8" stroke-width="3" marker-end="url(#arrow)"/>
+      <rect x="250" y="18" width="360" height="76" rx="18" fill="#0b2630" stroke="#2dd4bf" stroke-opacity="0.65"/>
+      <text x="274" y="49" class="node-title">Local WebUI</text>
+      <text x="274" y="75" class="node-copy">Setup · diagnostics · recovery · local OTA</text>
+      <rect x="650" y="18" width="360" height="76" rx="18" fill="#10263a" stroke="#38bdf8" stroke-opacity="0.65"/>
+      <text x="674" y="49" class="node-title">Direct ABRP path</text>
+      <text x="674" y="75" class="node-copy">Firmware → ABRP telemetry API · WiFi</text>
+      <text x="0" y="82" class="small">DIRECT DEVICE SERVICES · NO PORTAL REQUIRED</text>
+    </g>
+  </g>
+
+  <g transform="translate(68 720)">
+    <text x="0" y="0" class="section">PROJECT STATUS · 06 AUGUST 2026</text>
+    <g transform="translate(0 24)">
+      <rect width="334" height="190" rx="22" fill="#0d1b2b" stroke="#274158"/>
+      <circle cx="28" cy="34" r="8" fill="#34d399"/>
+      <text x="48" y="41" class="status-title">Release candidate live</text>
+      <text x="24" y="78" class="status-copy">v1.0.0-rc.1 published</text>
+      <text x="24" y="104" class="status-copy">Pilot portal deployed at /dashboard/</text>
+      <text x="24" y="130" class="status-copy">Hosted acceptance passed</text>
+      <text x="24" y="164" class="small">Controlled beta · not general production</text>
+    </g>
+    <g transform="translate(354 24)">
+      <rect width="334" height="190" rx="22" fill="#0d1b2b" stroke="#274158"/>
+      <circle cx="28" cy="34" r="8" fill="#34d399"/>
+      <text x="48" y="41" class="status-title">Validated paths</text>
+      <text x="24" y="78" class="status-copy">ESP32-WROOM over WiFi</text>
+      <text x="24" y="104" class="status-copy">LilyGO WiFi → LTE fallback</text>
+      <text x="24" y="130" class="status-copy">C6 N16 dual-CAN over WiFi/AWS</text>
+      <text x="24" y="156" class="status-copy">Unique X.509 device identities</text>
+    </g>
+    <g transform="translate(708 24)">
+      <rect width="334" height="190" rx="22" fill="#0d1b2b" stroke="#274158"/>
+      <circle cx="28" cy="34" r="8" fill="#38bdf8"/>
+      <text x="48" y="41" class="status-title">Available today</text>
+      <text x="24" y="78" class="status-copy">Battery power + dual-CAN telemetry</text>
+      <text x="24" y="104" class="status-copy">Local administration on mature targets</text>
+      <text x="24" y="130" class="status-copy">Authenticated portal and live updates</text>
+      <text x="24" y="156" class="status-copy">Bounded 24 h / 7 d / 30 d history</text>
+    </g>
+    <g transform="translate(1062 24)">
+      <rect width="338" height="190" rx="22" fill="#0d1b2b" stroke="#274158"/>
+      <circle cx="28" cy="34" r="8" fill="#fbbf24"/>
+      <text x="48" y="41" class="status-title">Next milestones</text>
+      <text x="24" y="78" class="status-copy">C6 WebUI, OTA and hardware hardening</text>
+      <text x="24" y="104" class="status-copy">C6/LTE soak and adverse tests</text>
+      <text x="24" y="130" class="status-copy">Ownership transfer and recovery</text>
+      <text x="24" y="156" class="status-copy">Production and public-signup gates</text>
+    </g>
+  </g>
+
+  <g transform="translate(68 978)">
+    <rect width="1400" height="1" fill="#274158"/>
+    <text x="0" y="28" class="small">microlino-open-telemetry.ch</text>
+    <text x="700" y="28" class="small" text-anchor="middle">Open source · Local-first · Privacy-aware</text>
+    <text x="1400" y="28" class="small" text-anchor="end">github.com/mot-telemetry/microlino-open-telemetry</text>
+  </g>
+</svg>

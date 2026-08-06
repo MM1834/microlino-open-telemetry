@@ -27,6 +27,8 @@ not duplicated in the current working tree.
 - [Stable terminology](reference/03-terminology.md)
 - [Active work packages](project/sprints/README.md)
 - [v1.0.0-rc.1 release notes](release-notes/v1.0.0-rc.1.md)
+- [Project poster and website summary](marketing/project-poster.md)
+- [Public landing page](marketing/landing-page.md)
 
 ## Documentation lifecycle
 
@@ -52,6 +54,7 @@ as deployment or security instructions unless revalidated.
 - `developer/`, `development/`, `testing/` — engineering, procedures and validation
 - `reference/` — stable terminology and contracts
 - `release-notes/` — one versioned record per maintained release candidate/release
+- `marketing/` — public high-level summaries derived from validated project status
 - `project/sprints/` — active work packages only
 
 Each current topic should have one source of truth. Other documents should link to

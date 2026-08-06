@@ -45,26 +45,32 @@ existing ACTIVE user/vehicle assignment.
 | Charging | `charging/is_charging` | 5 minutes | 5 min / 30 min / 2 h |
 | Plugged | `charging/plugged` | 5 minutes | 5 min / 30 min / 2 h |
 | Speed | `display/speed_kmh` | 1 active-driving minute plus one stop marker | averaged 5 min / 30 min / 2 h |
+| Signed power | `charging/power_signed` | 1 active minute plus one zero marker | averaged 5 min / 30 min / 2 h |
 
 The stored cadences are deployment parameters rather than fixed code constants.
 Core and motion intervals can independently be 1, 5, 15, 30 or 60 minutes. The
-pilot defaults are 5 minutes for SOC/charging/plugged and one minute for Speed.
-Speed is sampled only while moving. The first transition from a positive value to
-zero is stored immediately, including inside an already sampled minute, and
-subsequent standstill zeroes are suppressed. The API averages the available
-minute samples into its fixed display resolution and also returns `speedMax` for
-each output bucket. This avoids a delayed tail at journey end without changing
-the live value.
+pilot defaults are 5 minutes for SOC/charging/plugged and one minute for Speed and
+signed power. Motion/power values are sampled only while non-zero. The first
+transition to zero is stored immediately, including inside an already sampled
+minute, and subsequent zeroes are suppressed. The API averages the available
+minute samples into its fixed display resolution and also returns minimum and
+maximum values for each output bucket.
+
+The portal closes gaps in Speed and power series visually: after an overdue
+sample it inserts zero, and one second before the next positive Speed value it
+inserts zero again. This prevents linear interpolation from drawing a fictitious
+slow drive across an offline/standstill interval. These markers are presentation
+points only and do not create DynamoDB rows.
 
 The three API ranges are 24 hours, 7 days and 30 days. Storage retention defaults
 to 31 days and CloudFormation prevents a larger pilot value. DynamoDB TTL deletion
 is asynchronous; expired records may remain briefly but the API time window never
 returns data older than the requested range.
 
-Core signals have a fixed ceiling of 864 items per vehicle/day. Speed adds at most
-one write per active-driving minute plus one stop marker per journey; continuous
-standstill adds no writes. A physically impossible 24-hour driving upper bound is
-therefore about 2,304 items per vehicle/day plus journey markers. The deployed
+Core signals have a fixed ceiling of 864 items per vehicle/day. Speed and signed
+power each add at most one write per active minute plus one zero marker per active
+period; continuous zero values add no writes. A physically impossible 24-hour
+upper bound is therefore about 3,744 items per vehicle/day plus transition markers. The deployed
 daily alarm remains the operational cost guard and must be reviewed against
 observed driving minutes. Duplicate moving publishes within a minute are rejected
 before a history write using the previous value and timestamp returned by the
@@ -77,7 +83,8 @@ authorizer and `has_active_access` check as snapshots. An inactive, unknown or
 unassigned vehicle returns the same non-enumerating 404. Queries are partition-key
 bound and eventually consistent.
 
-The portal draws SOC, averaged Speed, charging-state and plugged-state charts. Vehicle
+The portal draws SOC, averaged Speed, averaged signed power, charging-state and
+plugged-state charts. Vehicle
 selection reloads history. No history request contains a user-selected vehicle
 without server-side authorization.
 
@@ -88,7 +95,7 @@ without server-side authorization.
 - an explicit allowlist bounds the pilot cohort; an empty list is fail-closed;
 - DynamoDB uses pay per request, has no indexes and has PITR disabled for the MVP;
 - the 31-day TTL and fixed sampling buckets bound storage growth;
-- the API accepts only three fixed windows and performs four partition queries;
+- the API accepts only three fixed windows and performs five partition queries;
 - `VehicleHistoryDailyWriteAlarm` defaults to 1,000 consumed writes/day;
 - `tools/aws/measure_history_pilot.sh` reports daily ingest invocations plus
   history read/write capacity.
@@ -164,9 +171,14 @@ currency total. Billing access or exported billing evidence remains required.
 
 - No backfill is attempted.
 - TTL is a deletion mechanism, not an exact deletion timestamp.
+- Road-test comparison suggests that `charging/plugged` may be inverted and that
+  the current charging bit may need interpretation together with plugged/power.
+  History deliberately preserves the raw decoded flags; correction belongs to a
+  separately validated firmware/decoder work package.
 - Core bucket values are first accepted values; Speed API buckets are arithmetic
   means of the available one-minute driving samples and include an immediate
-  zero marker at journey end.
+  zero marker at journey end. Signed-power buckets use the same active-minute
+  aggregation and preserve negative values.
 - Currency-denominated Cost Explorer evidence is unavailable to the current IAM
 user.
 
