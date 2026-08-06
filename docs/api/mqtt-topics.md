@@ -26,11 +26,33 @@ provide `vehicleId` and `topicPrefix`, also defaulting to `mot`.
 | `charging/is_charging` | boolean-like | Yes | Yes | derived threshold; calibration noted in code |
 | `charging/plugged` | boolean-like | Yes | Yes | Display-CAN flag |
 | `charging/power_display` | integer | Yes | Yes | raw/display value |
-| `charging/power_signed` | integer | Yes | Yes | sign derived from regen candidate bit |
+| `charging/power_signed` | integer (0.1 kW) | Yes | Yes | vehicle convention: consumption positive, charge/regen negative; Display-only fallback remains decoder-derived |
 
 Legacy MQTT encodes booleans as `1`/`0`; AWS IoT encodes them as JSON-style
 `true`/`false` strings. Consumers must not assume identical boolean payload text
 across transports.
+
+## Standard-CAN battery telemetry
+
+WROOM, LilyGO and both C6 AWS build profiles share these suffixes. Values are
+published only after the relevant decoder validity gate passes.
+
+| Suffix | Value/unit | Pioneer status |
+|---|---|---|
+| `bms/pack_voltage` | V | Confirmed |
+| `bms/pack_current` | A | Confirmed; positive into battery, negative out of battery |
+| `bms/pack_power_w` | W | battery convention: positive charge/regen, negative discharge |
+| `bms/vehicle_power_w` | W | vehicle convention: positive consumption, negative charge/regen |
+| `bms/is_regenerating` | boolean | confirmed from current direction while unplugged |
+| `bms/is_discharging` | boolean | confirmed from current direction below -2 A |
+| `bms/status_byte` | raw integer | `0x10` unplugged, `0x20` plugged confirmed |
+| `bms/cell_min_mv` | mV | Provisional `0x4AD` pair |
+| `bms/cell_max_mv` | mV | Provisional `0x4AD` pair |
+| `bms/cell_delta_mv` | mV | Provisional derived delta |
+
+The C6 AWS profiles are repository-build validated but not yet physically
+provisioned or connected to AWS. See the
+[Pioneer decoder evidence](../firmware/pioneer-standard-can.md).
 
 ## Location
 
@@ -92,8 +114,10 @@ presence/last-seen fields rather than equating a retained value with fresh data.
 
 ## Decoder limitation
 
-The current implemented source is Display CAN. The Standard-CAN profile is empty
-and must not publish guessed data for other vehicle models.
+Pioneer Standard-CAN publishes only the evidence-bounded fields above. V2 uses
+the same candidate layout but remains unverified on a V2 vehicle. Display-CAN SOC
+continues to be authoritative for Pioneer because `0x18D data[7]` is not its
+displayed SOC.
 
 ## Related documents
 

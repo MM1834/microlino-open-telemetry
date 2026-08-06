@@ -69,8 +69,11 @@ bool MotGps::begin(const MotGpsConfig& config)
         return false;
     }
 
+    // UART0 is reserved for board diagnostics and may be USB CDC rather than a
+    // HardwareSerial instance (notably on the XIAO ESP32-C6).
     if (config_.serialPort == 0) {
-        serial_ = &Serial;
+        status_.message = "GNSS UART0 is reserved for diagnostics";
+        return false;
     } else if (config_.serialPort == 1) {
         serial_ = &Serial1;
     } else {

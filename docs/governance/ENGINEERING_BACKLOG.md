@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-04
+**Last reviewed:** 2026-08-06
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -89,14 +89,25 @@ Extend OBD/CAN decoding to additional vehicle models after obtaining verified
 traces and choosing the required hardware interface. Preserve passive monitoring
 and record signal confidence.
 
-Hardware options requiring evaluation:
+Hardware options previously requiring evaluation:
 
 - rewire pins 1 and 9 of the current module to standard CAN;
 - add another CAN transceiver/interface;
-- use an ESP32-C6 generation board for the affected hardware variant.
+- use an ESP32-C6 generation board for the affected hardware variant. This option
+  was promoted into active [C6-001](../project/sprints/C6-001.md) qualification on
+  2026-08-05; it remains unapproved hardware until that sprint's gates pass.
 
 The decision must consider electrical safety, isolation, connector compatibility,
 available CAN controllers, firmware portability and support burden.
+
+## ESP32-C6 production hardening
+
+Carry the bounded C6-001 N16 pilot result into a production-capable adapter only
+after completing the deferred gates: authenticated local WebUI, tested local OTA
+and rollback, controlled cross-channel injection, simultaneous retained GPS/CAN/
+WiFi operation, long-duration soak, stable regulated power, termination review,
+strain-relieved wiring and enclosure qualification. The XIAO remains a 4 MB
+compatibility target until it passes the same vehicle dual-CAN/AWS path.
 
 ## Decoder profiles and compatibility data
 
@@ -134,11 +145,47 @@ external services only after the beta identity, authorization and connectivity
 foundations are reliable. SOC notification processing is tracked separately above
 because it is a plausible bounded pilot feature.
 
-## Related documents
+## Telemetry service groups and bundled state envelopes
 
-- [CURRENT_STATUS.md](CURRENT_STATUS.md)
-- [WORK_ORDER.md](WORK_ORDER.md)
-- [SELF_REVIEW.md](SELF_REVIEW.md)
+Introduce two independent configuration dimensions before material C6/AWS pilot
+growth:
+
+1. **Transport services:** local-only, legacy MQTT, AWS IoT, ABRP and future
+   consumers can be enabled independently. Existing WROOM service booleans are a
+   partial board-specific implementation, not yet a shared cross-board model.
+2. **Telemetry groups:** core/display, charging, BMS, location and diagnostics can
+   be selected per transport with bounded intervals, change thresholds and
+   immediate state-transition publication.
+
+Replace the AWS scalar-topic burst with a versioned state envelope such as
+`mot/<vehicleId>/telemetry/state/v1`. The current C6 full cycle can issue up to 18
+individual telemetry publishes every five seconds, each causing a separate IoT
+Rule invocation, ingest Lambda request, DynamoDB state write and possible live
+fan-out. One sub-5-KB envelope at the same interval would reduce message/rule/
+Lambda operations by up to roughly 18:1 for a complete C6 sample.
+
+The optimization must be end-to-end. Merely unpacking one envelope into the same
+number of DynamoDB writes would save IoT/Lambda requests but not state-write
+volume. Prefer one current-state envelope item plus only the existing bounded,
+selected history writes. Preserve immediate plug/charge/online transitions and
+avoid waiting for the next periodic envelope.
+
+Required migration work:
+
+- versioned envelope schema with sequence, device timestamp, validity/age and
+  optional groups;
+- payload-size guard below one AWS IoT 5-KB metering unit;
+- adaptive cadence for moving/charging versus parked/unchanged state;
+- backend dual-read or bounded compatibility window for existing scalar devices;
+- one WebSocket envelope fan-out and portal-side unpacking;
+- retained-state, offline/stale-data and out-of-order semantics;
+- publish, Rule, Lambda, DynamoDB and WebSocket counters before/after rollout;
+- per-device fallback to scalar topics during migration, disabled after validation.
+
+Do not enable both scalar and envelope publication indefinitely: that doubles
+traffic and makes state precedence ambiguous. Decide this contract before the
+first persistent C6 AWS pilot deployment if practical.
+
 ## Cloud cost controls
 
 Grant a billing-only maintainer view or provide regular exported cost evidence,
@@ -146,3 +193,9 @@ create a small AWS Budget alert, and measure MQTT publishes per device. CloudWat
 observed roughly 2.78 million state-ingest Lambda invocations between 2026-07-01
 and 2026-08-04. Evaluate batching/coarser state envelopes before fleet growth; do
 not optimize the low-frequency onboarding claim path ahead of telemetry ingestion.
+
+## Related documents
+
+- [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- [WORK_ORDER.md](WORK_ORDER.md)
+- [SELF_REVIEW.md](SELF_REVIEW.md)

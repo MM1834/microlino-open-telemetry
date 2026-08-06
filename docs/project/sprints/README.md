@@ -18,6 +18,10 @@
 
 ## Completed predecessors
 
+- [C6-001](C6-001.md) closed the bounded N16 dual-CAN WiFi/AWS pilot
+  qualification on 2026-08-06; its production-hardening gates remain deferred.
+- [WEB-001](WEB-001.md) delivered the repository-owned public landing page and
+  completed hosted desktop/smartphone acceptance on 2026-08-05.
 - REL-001 established and validated the accepted portal pilot baseline now carried
   by `v1.0.0-rc.1`.
 - DOC-001 established the source-based documentation baseline.

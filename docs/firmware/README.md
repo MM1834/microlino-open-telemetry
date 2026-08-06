@@ -9,6 +9,8 @@
 - [Overview and environments](overview.md)
 - [Architecture](architecture.md)
 - [CAN and decoder pipeline](can.md)
+- [Pioneer Standard-CAN decoder and charge evidence](pioneer-standard-can.md)
+- [CAN signal matrix — Display CAN, Pioneer Standard CAN and V2](can-signal-matrix.rtf)
 - [GPS](gps.md)
 - [Network](network.md)
 - [LTE/GPRS](lte.md)
@@ -16,6 +18,7 @@
 - [MQTT](mqtt.md)
 - [OTA](ota.md)
 - [Known gaps](known-gaps.md)
+- [ESP32-C6 qualification firmware](../../firmware/esp32-c6/README.md)
 - [Local HTTP API](../api/local-device-api.md)
 - [MQTT topic contract](../api/mqtt-topics.md)
 

@@ -5,7 +5,10 @@
 
 enum DecoderProfile : uint8_t {
     DECODER_PROFILE_DISPLAY_CAN = 0,
-    DECODER_PROFILE_STANDARD_CAN = 2,
+    // Keep value 2 for compatibility with devices that already stored the
+    // former generic Standard-CAN template.
+    DECODER_PROFILE_STANDARD_CAN_V1_PIONEER = 2,
+    DECODER_PROFILE_STANDARD_CAN_V2 = 3,
     DECODER_PROFILE_DISABLED = 255
 };
 

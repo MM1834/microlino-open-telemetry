@@ -1,6 +1,6 @@
 # Node-RED Legacy MQTT to AWS IoT Forwarder
 
-> **Status:** AWS identity validated; Node-RED deployment pending
+> **Status:** Direct ioBroker-state forwarding deployed and validated
 >
 > **Source identity:** ioBroker `mqtt.3` / MQTT `mot/xrpioneer/#`
 >
@@ -8,13 +8,15 @@
 
 ## Purpose
 
-This flow forwards telemetry from the first-generation ESP32 and its local MQTT
-broker into the current AWS pipeline without changing the old firmware. It uses a
-dedicated AWS IoT identity and does not expose the unencrypted broker to AWS.
+This flow forwards telemetry from the first-generation ESP32 through its existing
+`mqtt.3` ioBroker objects into the current AWS pipeline without changing the old
+firmware. Node-RED subscribes directly to the allowlisted ioBroker states instead
+of opening a second connection to the local MQTT broker. It uses a dedicated AWS
+IoT identity and does not expose the unencrypted broker to AWS.
 
 Import [the flow template](../../tools/node-red/mot-xrpioneer-aws-forwarder.json)
 through Node-RED's **Import → Clipboard/File** dialog. Keep the flow disabled until
-both broker configuration nodes are complete.
+the AWS broker configuration node is complete.
 
 ## Forwarded topics
 
@@ -22,21 +24,25 @@ Only the supplied `mot/xrpioneer` suffixes are allowed. Unknown topics are block
 and reported to the debug sidebar. Boolean `0/1` payloads for
 `charging/is_charging` and `charging/plugged` become JSON booleans. Numeric topics
 become JSON numbers; bounded system values remain strings.
+`charging/power_signed` is forwarded as a signed numeric value for the bounded
+Power-History comparison with SOC and Speed.
 
-Retained messages replayed when Node-RED connects to the local broker are dropped.
-This prevents an old retained snapshot from appearing as fresh AWS history. The
-next live publish is forwarded and retained in AWS.
+Each direct state input emits the current value at flow start and then every
+subsequent ioBroker state event. AWS publications remain retained so a newly
+connected portal can obtain current state immediately.
 
-## Local broker node
+## Direct ioBroker inputs
 
-Open **ioBroker mqtt.3 · CONFIGURE** and set:
+The flow contains one `ioBroker in` node for each allowed
+`mqtt.3.mot.xrpioneer.*` state. Each node emits `payload`, sends all state events,
+fires once at start and formats its object ID as an MQTT-style topic. The function
+accepts both dot and slash topic formats before mapping to `mot/xrpioneer/...`.
 
-- host and port of the local MQTT broker;
-- username/password if used;
-- no TLS only when the connection remains on the trusted local host/network.
-
-The flow subscribes to `mot/xrpioneer/#`, corresponding to the supplied ioBroker
-object IDs `mqtt.3.mot.xrpioneer.*`.
+This direct path replaced the local MQTT subscriber on 2026-08-05 after the
+`mqtt.3` server interface repeatedly delivered only a restart snapshot and then
+stopped answering subscriber connections while ioBroker objects continued to
+update. Two successive AWS reads confirmed changing SOC, Speed and power values
+after the replacement.
 
 ## AWS broker node
 
@@ -91,10 +97,10 @@ On 2026-08-04 the controlled Cognito user
 `xruser@microlino-open-telemetry.ch` was invited and assigned exclusively to
 `xrpioneer` as ACTIVE OWNER. The user remains in Cognito
 `FORCE_CHANGE_PASSWORD` state until the invitation is accepted. History remains
-enabled for this identity as of 2026-08-04, using 5-minute core and 15-minute
-Speed buckets with the shared 31-day TTL. No backfill occurs; collection starts
-with the next live forwarded publish.
+enabled for this identity, using 5-minute core buckets and one-minute
+active-driving Speed samples with the shared 31-day TTL. No backfill occurs;
+collection starts with live forwarded state events.
 
-Validate initially with History disabled for this identity. Confirm current state,
-payload types, update frequency and absence of forwarding loops before enabling
-bounded history.
+The deployed direct-state path was validated with current state, payload types,
+successive update frequency and absence of forwarding loops before retaining the
+bounded History enablement.

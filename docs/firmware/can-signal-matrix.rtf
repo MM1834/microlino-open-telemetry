@@ -1,0 +1,170 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2870
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww19560\viewh12720\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 # CAN Signal Matrix \'97 Display CAN, Pioneer Standard CAN and V2\
+\
+> **Status:** Working evidence matrix\
+>\
+> **Last updated:** 2026-08-06\
+>\
+> **Audience:** Firmware developer, decoder reviewer and hardware tester\
+\
+## Purpose and evidence levels\
+\
+This document separates signals by physical bus and vehicle/profile source. It\
+must not be read as proof that similarly named values are interchangeable.\
+\
+| Status | Meaning |\
+|---|---|\
+| **Confirmed by MOT** | Reproduced during a controlled live capture on the Microlino Pioneer |\
+| **Plausible** | Raw values and behaviour fit the proposed interpretation, but meaning or scale still needs an independent check |\
+| **Externally confirmed for V2** | Supplied by a separate V2 reverse-engineering source; MOT has no V2 vehicle for direct validation |\
+| **Externally indicated** | Present in supplied notes/screenshots, but byte order, scale, signedness or exact semantics remain incomplete |\
+| **Not observed** | Targeted ID did not appear during the stationary Pioneer capture |\
+\
+All MOT captures used two ESP32-C6 TWAI controllers at 500 kbit/s in listen-only\
+mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
+\
+## Cross-bus signal summary\
+\
+| Signal | Display CAN | Pioneer Standard CAN (V1 vehicle) | Standard CAN V2 evidence | Current assessment |\
+|---|---|---|---|---|\
+| Display SOC | `0x602 data[0] / 2` | No equivalent confirmed | `0x18D data[7]` according to external source | Display CAN confirmed by existing decoder. Pioneer `0x18D data[7]` stayed 90 while the display moved from 97 to 100%, so it is not Pioneer Display SOC. |\
+| Standard/BMS SOC candidate | Not used | `0x18D data[7]` | `0x18D data[7]` | Raw Pioneer field confirmed, semantics unresolved; externally confirmed as Display SOC for V2. Keep sources separate. |\
+| Speed | `0x602 data[1] / 2` | Not found | No supplied mapping | Display-CAN decoder field. |\
+| Odometer | `0x602 data[4..7]` with current packed scaling | Not found | No supplied mapping | Display-CAN decoder field. |\
+| HV pack voltage | Not currently decoded | `0x18D data[3..4]`, unsigned little-endian mV | Same mapping | Confirmed by MOT on Pioneer and externally confirmed for V2. |\
+| Battery current | Not currently decoded | `0x18D data[1..2]`, signed little-endian; `raw x 0.3 A` | External material also identifies a current field and lists `0x2BA` | Scale and sign confirmed on Pioneer during multi-level charging, traction and regeneration. |\
+| DC charging power | Dashboard power byte is unscaled and bidirectional | Derived as pack voltage \'d7 battery current | Derivable if current scaling is shared | Pioneer result agrees closely with two measured AC-input points after allowing for losses. |\
+| Plugged | Existing candidate `0x604 data[4] & 0x10` | `0x18D data[6]`: stable `0x10` unplugged and `0x20` plugged | `data[6]` externally described as charge/status | Pioneer Standard-CAN state confirmed, including an AC-deenergized EVSE test. Display-CAN candidate still needs a direct state comparison. |\
+| Active charging | Current `0x603` power-threshold inference is not reliable | Positive signed `0x18D data[1..2]`; idle offset about -3/-4 | Current signal externally indicated | Confirmed on Pioneer across start, stable charge, AC removal and natural completion. |\
+| Cell values A/B | Not decoded | `0x4AD data[0..1]` and `[2..3]`, unsigned little-endian mV | Same mapping | Plausible on Pioneer in stable states; externally confirmed for V2. Exact semantics as individual cells versus reported extrema remain open. |\
+| Cell min/max/delta | Not decoded | Derived from the two `0x4AD` values | Same derivation | Plausible on Pioneer; externally confirmed for V2. |\
+| SOH | Not decoded | Not found | `0x1B1 data[2..3] / 100` candidate | Externally indicated only. |\
+| Pedal/power request | `0x603 data[4]` is the dashboard power display | `0x37F data[2..3]` candidate | Same candidate | `0x37F` was present but constant in stationary Pioneer testing; driving evidence is required. |\
+\
+## Pioneer Standard-CAN findings\
+\
+### CAN ID `0x18D`\
+\
+| Bytes | Type and conversion | Proposed meaning | Pioneer evidence | Same as supplied V2 evidence? |\
+|---|---|---|---|---|\
+| `data[0]` | `uint8` | rolling counter or sequence | Covered nearly the full byte range during stable charging; not a direct measurement | Unknown |\
+| `data[1..2]` | `int16`, little-endian | battery current; amperes = raw x 0.3 | Scale and sign confirmed during charging, traction and regeneration | Likely related, but the V2 source does not expose an unambiguous raw-ID association |\
+| `data[3..4]` | `uint16`, little-endian mV | HV pack voltage | Confirmed by MOT | Yes |\
+| `data[5]` | `uint8` | unknown | Stable `0x00` in recorded phases | Unknown |\
+| `data[6]` | `uint8` state | `0x10` unplugged; `0x20` plugged | Confirmed by repeated powered and AC-deenergized plug tests; transient `0x04` also occurred | V2 source calls it a charge/status byte |\
+| `data[7]` | `uint8` | Standard/BMS SOC candidate | Raw value confirmed; stayed 90 while Pioneer display showed 97\'96100% | Same byte, different observed Pioneer semantics |\
+\
+### Charging evidence for `0x18D data[1..2]`\
+\
+| Vehicle/charger state | Signed raw | Pack voltage | External measurement | Interpretation |\
+|---|---:|---:|---:|---|\
+| Awake, unplugged | about -4 | about 53.0 V | 0 W | Idle offset |\
+| Plugged, EVSE AC-side off | about -4 | about 53.0 V | 0 W | Plugged but not charging |\
+| Stable charge | 112\'96118 | about 53.3 V | 1,836 W gross AC input | `115 \'d7 0.3 A \'d7 53.3 V \uc0\u8776  1,839 W` |\
+| Taper charge at 98\'9699% display SOC | 43\'9647 | about 53.2 V | 762 W gross AC input | `45 \'d7 0.3 A \'d7 53.2 V \uc0\u8776  718 W` before conversion losses |\
+| External AC removed, cable retained | about -4 | falling from charge voltage | 0 W | Charging stopped, still plugged |\
+| Natural completion at 100% display SOC | fell from +45 to -3 | about 53.24 V at end | Fell from 762 W to 0 W | Stable post-charge idle offset |\
+\
+Lower-SOC measurements at several charge settings confirmed 0.3 A per raw unit.\
+At about 50 V, the derived DC values tracked independent 1,809 W, 2,088 W and\
+approximately 2,340 W references within expected conversion and vehicle-load\
+differences. Three controlled road captures then confirmed negative current during\
+traction and positive current during regeneration. Observed results included about\
+4.8 kW pedal-release regeneration, 7.8 kW with light braking and a later normal-\
+road peak of about 20.9 kW discharge.\
+\
+### CAN ID `0x4AD`\
+\
+| Bytes | Type and conversion | Proposed meaning | Status |\
+|---|---|---|---|\
+| `data[0..1]` | `uint16`, little-endian mV | cell value A | Plausible on Pioneer; externally confirmed for V2 |\
+| `data[2..3]` | `uint16`, little-endian mV | cell value B | Plausible on Pioneer; externally confirmed for V2 |\
+| derived | `min(A, B)` | minimum cell value | Plausible |\
+| derived | `max(A, B)` | maximum cell value | Plausible |\
+| derived | `max(A, B) - min(A, B)` | cell delta | Plausible |\
+\
+Stable examples included 4,081/4,078 mV before charging and approximately\
+4,105/4,100 mV during charge. Larger transient divergence occurred around charge\
+start, so the exact semantics must remain provisional until repeated captures\
+exclude multiplexing or transition-specific payload use.\
+\
+### Other targeted Pioneer IDs\
+\
+| CAN ID | Pioneer result | External V2 information |\
+|---:|---|---|\
+| `0x101` | Not observed | Byte 4 candidate for positive power request; unit/scale incomplete |\
+| `0x107` | Not observed | Separate ESPHome source watched bytes 0\'963 without a decoding rule |\
+| `0x1B0` | Not observed | Bytes 2\'963 pack voltage, 4\'965 minimum cell voltage, 6\'967 maximum cell voltage; byte order incomplete |\
+| `0x1B1` | Not observed | Bytes 0\'961 SOC \'d7100, bytes 2\'963 SOH \'d7100; byte order incomplete |\
+| `0x2BA` | Not observed | Bytes 0\'961 battery-current candidate; signedness/order/exact scale incomplete |\
+| `0x37F` | Observed and constant while stationary | Bytes 2\'963 pedal/power-request candidate |\
+\
+## Display-CAN signal map\
+\
+### CAN ID `0x602`\
+\
+| Bytes | Current decoding | Status |\
+|---|---|---|\
+| `data[0]` | SOC = byte / 2 | Implemented Display-CAN signal |\
+| `data[1]` | speed = byte / 2 km/h | Implemented Display-CAN signal |\
+| `data[4..7]` | packed odometer / 1024 km | Implemented Display-CAN signal |\
+| derived | estimated range from SOC | Firmware-derived estimate, not a direct vehicle signal |\
+\
+### CAN ID `0x603`\
+\
+The external source uses one-based byte and bit numbering. Positions below are\
+converted to zero-based firmware indices, assuming its bit 1 is the least-\
+significant bit.\
+\
+| Firmware position | Mask | Meaning | Status |\
+|---|---:|---|---|\
+| `data[1]` | `0x01` | seat-belt sensor/status | Externally indicated |\
+| `data[2]` | `0x08` | handbrake | Externally indicated |\
+| `data[2]` | `0x02` | parking/position light | Externally indicated |\
+| `data[2]` | `0x04` | low beam | Externally indicated |\
+| `data[3]` | `0x80` | D/R interlock warning when brake was not pressed first | Externally indicated |\
+| `data[3]` | `0x20`, `0x40` | indicator-state bits | Externally indicated; left/right mapping missing |\
+| `data[4]` | full byte | dashboard power display | Implemented; sign/scale and charging interpretation remain provisional |\
+| `data[5]` | `0x01` | sport mode | Externally indicated |\
+| `data[6]` | `0x02` | brake pressed | Externally indicated |\
+\
+`data[4]` is a bidirectional dashboard display value. It must not by itself be\
+used as proof of active charging. The current firmware threshold-derived charging\
+state is compatibility behaviour pending replacement by the confirmed Standard-\
+CAN current/plug signals or another independently verified source.\
+\
+### CAN ID `0x604`\
+\
+| Firmware position | Mask | Meaning | Status |\
+|---|---:|---|---|\
+| `data[4]` | `0x10` | plugged candidate | Implemented, but not yet directly compared with the controlled plug sequence |\
+\
+## Decoder policy\
+\
+- Preserve Display-CAN and Standard-CAN values as source-specific telemetry.\
+- Do not overwrite Display-CAN SOC with `0x18D data[7]` on Pioneer.\
+- Permit every registered decoder profile on every physical CAN controller; board\
+  defaults are configuration policy, not decoder-engine restrictions.\
+- Keep CAN operation listen-only during discovery and pilot operation.\
+- Promote plausible or externally indicated fields to confirmed only after a\
+  repeatable state change or independent physical reference.\
+\
+## Remaining validation\
+\
+- Stationary/drive comparison of `0x37F` to test the pedal hypothesis.\
+- Direct Display-CAN `0x604` plug-state comparison.\
+- V2 vehicle capture when access becomes available.\
+- Controlled cross-channel injection and extended dual-CAN soak.\
+\
+## Related documents\
+\
+- [CAN and decoder pipeline](can.md)\
+- [Firmware architecture](architecture.md)\
+- [C6-001 dual-CAN sprint](../project/sprints/C6-001.md)\
+}

@@ -163,7 +163,7 @@ static void handleConfig()
     s += "<label>MQTT Prefix</label><input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
     s += "<div class='card'><h2>CAN channels</h2><h3>CAN 1</h3><p>Available · ESP32 TWAI</p>";
     s += "<label>Decoder profile</label><select name='canProfile'>" + profileOptions(config.canProfile) + "</select>";
-    s += "<p class='muted'>Display CAN is active. Standard CAN is a template and intentionally decodes no values until official PIDs are available.</p><hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on LilyGO T-A7670 hardware.</p></div>";
+    s += "<p class='muted'>Display-CAN is the single-CAN default. Standard-CAN V1 - Pioneer decodes the verified battery energy-flow fields; Standard-CAN V2 uses the same provisional layout pending validation on a V2 vehicle.</p><hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on LilyGO T-A7670 hardware.</p></div>";
 
     s += "<div class='card'><h2>Services</h2>";
     s += "<label><input type='checkbox' style='width:auto' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label>";
