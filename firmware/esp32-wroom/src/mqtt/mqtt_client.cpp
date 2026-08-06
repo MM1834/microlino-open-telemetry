@@ -120,6 +120,10 @@ void mqttLoop()
 
 void publishTelemetry()
 {
+    const bool freshBmsCurrent = telemetry.bms.packCurrentValid &&
+        millis() - telemetry.bms.packCurrentLastUpdateMs <= 10000;
+    const bool freshBmsStatus = telemetry.bms.packStatusValid &&
+        millis() - telemetry.bms.statusLastUpdateMs <= 10000;
 #ifdef MOT_AWS_IOT
     if (!config.awsEnabled() || !awsClient.connected()) return;
 
@@ -137,22 +141,38 @@ void publishTelemetry()
         telemetry.display.estimatedRangeKm
     );
 
-    awsClient.publishBool(
-        "charging/is_charging",
-        telemetry.charging.isCharging
-    );
-    awsClient.publishBool(
-        "charging/plugged",
-        telemetry.charging.plugged
-    );
+    awsClient.publishBool("charging/is_charging",
+        freshBmsCurrent && freshBmsStatus
+            ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f
+            : telemetry.charging.isCharging);
+    awsClient.publishBool("charging/plugged",
+        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged);
     awsClient.publishInt(
         "charging/power_display",
         telemetry.charging.powerDisplay
     );
     awsClient.publishInt(
         "charging/power_signed",
-        telemetry.charging.powerSigned
+        freshBmsCurrent
+            ? static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f))
+            : telemetry.charging.powerSigned
     );
+    if (telemetry.bms.packStatusValid) {
+        awsClient.publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
+        awsClient.publishInt("bms/status_byte", telemetry.bms.statusByte);
+    }
+    if (telemetry.bms.packCurrentValid) {
+        awsClient.publishFloat("bms/pack_current", telemetry.bms.packCurrentA, 1);
+        awsClient.publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);
+        awsClient.publishFloat("bms/vehicle_power_w", telemetry.bms.vehiclePowerW, 0);
+        awsClient.publishBool("bms/is_regenerating", telemetry.bms.isRegenerating);
+        awsClient.publishBool("bms/is_discharging", telemetry.bms.isDischarging);
+    }
+    if (telemetry.bms.cellVoltagesValid) {
+        awsClient.publishInt("bms/cell_min_mv", telemetry.bms.minCellVoltageMv);
+        awsClient.publishInt("bms/cell_max_mv", telemetry.bms.maxCellVoltageMv);
+        awsClient.publishInt("bms/cell_delta_mv", telemetry.bms.cellVoltageDeltaMv);
+    }
 
     awsClient.publish(
         "system/device_id",
@@ -234,19 +254,38 @@ void publishTelemetry()
         "display/estimated_range_km",
         telemetry.display.estimatedRangeKm
     );
-    publishBool(
-        "charging/is_charging",
-        telemetry.charging.isCharging
-    );
-    publishBool("charging/plugged", telemetry.charging.plugged);
+    publishBool("charging/is_charging",
+        freshBmsCurrent && freshBmsStatus
+            ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f
+            : telemetry.charging.isCharging);
+    publishBool("charging/plugged",
+        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged);
     publishInt(
         "charging/power_display",
         telemetry.charging.powerDisplay
     );
     publishInt(
         "charging/power_signed",
-        telemetry.charging.powerSigned
+        freshBmsCurrent
+            ? static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f))
+            : telemetry.charging.powerSigned
     );
+    if (telemetry.bms.packStatusValid) {
+        publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
+        publishInt("bms/status_byte", telemetry.bms.statusByte);
+    }
+    if (telemetry.bms.packCurrentValid) {
+        publishFloat("bms/pack_current", telemetry.bms.packCurrentA);
+        publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);
+        publishFloat("bms/vehicle_power_w", telemetry.bms.vehiclePowerW, 0);
+        publishBool("bms/is_regenerating", telemetry.bms.isRegenerating);
+        publishBool("bms/is_discharging", telemetry.bms.isDischarging);
+    }
+    if (telemetry.bms.cellVoltagesValid) {
+        publishInt("bms/cell_min_mv", telemetry.bms.minCellVoltageMv);
+        publishInt("bms/cell_max_mv", telemetry.bms.maxCellVoltageMv);
+        publishInt("bms/cell_delta_mv", telemetry.bms.cellVoltageDeltaMv);
+    }
 
     if (wroomGpsValid()) {
         publishFloat("location/latitude", wroomGpsLatitude(), 6);

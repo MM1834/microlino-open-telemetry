@@ -1,0 +1,19 @@
+#pragma once
+
+#include "decoders/decoder_profile.h"
+
+struct C6Configuration {
+    DecoderProfile can1Profile = DECODER_PROFILE_STANDARD_CAN_V1_PIONEER;
+    DecoderProfile can2Profile = DECODER_PROFILE_DISPLAY_CAN;
+    String wifiSsid;
+    String wifiPassword;
+    uint32_t publishIntervalMs = 5000;
+};
+
+extern C6Configuration c6Config;
+
+void c6ConfigLoad();
+void c6ConfigSave();
+bool c6ConfigSetCanProfile(size_t channel, DecoderProfile profile);
+bool c6ConfigSetWifi(const String &ssid, const String &password);
+void c6ConfigClearWifi();

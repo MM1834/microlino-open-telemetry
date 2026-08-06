@@ -6,6 +6,7 @@ const TYPES = {
   'charging/is_charging': 'boolean',
   'charging/plugged': 'boolean',
   'charging/power_display': 'number',
+  'charging/power_signed': 'number',
   'display/estimated_range_km': 'number',
   'display/odometer_km': 'number',
   'display/soc': 'number',

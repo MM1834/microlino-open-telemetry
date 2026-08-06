@@ -16,18 +16,19 @@ FILES = (
 )
 
 AWS_ENVIRONMENTS = {
-    "esp32-wroom": "esp32dev-aws",
-    "lilygo-t-a7670": "T-A7670X-AWS",
+    "esp32-wroom": ("esp32dev-aws",),
+    "lilygo-t-a7670": ("T-A7670X-AWS",),
+    "esp32-c6": ("nanoesp32c6-n16-aws", "xiao-esp32c6-aws"),
 }
 
 
 def select_environment(firmware: str, requested: str | None) -> str:
-    expected = AWS_ENVIRONMENTS[firmware]
-    environment = requested or expected
-    if environment != expected:
+    allowed = AWS_ENVIRONMENTS[firmware]
+    environment = requested or allowed[0]
+    if environment not in allowed:
         raise ValueError(
             f"Environment {environment!r} is not the AWS provisioning target "
-            f"for {firmware!r}; expected {expected!r}"
+            f"for {firmware!r}; expected one of {allowed!r}"
         )
     return environment
 
@@ -53,7 +54,7 @@ def main() -> int:
     parser.add_argument("thing_name")
     parser.add_argument(
         "firmware",
-        choices=("esp32-wroom", "lilygo-t-a7670")
+        choices=("esp32-wroom", "lilygo-t-a7670", "esp32-c6")
     )
     parser.add_argument(
         "--environment",

@@ -9,6 +9,7 @@ Usage:
 Example:
   ./tools/bootstrap_aws_iot_thing.sh eu-central-1 mot-esp32-f924f0 pioneer esp32-wroom
   ./tools/bootstrap_aws_iot_thing.sh eu-north-1 mot-lilygo-fe8ce0 pioneer lilygo-t-a7670
+  ./tools/bootstrap_aws_iot_thing.sh eu-north-1 mot-esp32c6-daa280 pioneer esp32-c6
 
 Requirements:
   - AWS CLI v2 configured with an IAM identity allowed to manage AWS IoT
@@ -53,7 +54,9 @@ if [[ ! "$VEHICLE_ID" =~ ^[A-Za-z0-9_-]+$ ]]; then
   exit 1
 fi
 
-if [[ "$BOARD_TYPE" != "esp32-wroom" && "$BOARD_TYPE" != "lilygo-t-a7670" ]]; then
+if [[ "$BOARD_TYPE" != "esp32-wroom" &&
+      "$BOARD_TYPE" != "lilygo-t-a7670" &&
+      "$BOARD_TYPE" != "esp32-c6" ]]; then
   echo "Invalid board type: $BOARD_TYPE"
   exit 1
 fi

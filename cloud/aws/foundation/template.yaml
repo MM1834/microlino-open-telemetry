@@ -415,6 +415,7 @@ Resources:
               "display/soc": ("soc", history_core_interval),
               "charging/is_charging": ("charging", history_core_interval),
               "charging/plugged": ("plugged", history_core_interval),
+              "charging/power_signed": ("power", history_motion_interval),
               "display/speed_kmh": ("speed", history_motion_interval),
               "display/speed": ("speed", history_motion_interval),
           }
@@ -427,7 +428,7 @@ Resources:
               ):
                   return False
               signal = HISTORY_SIGNALS[topic_suffix][0]
-              return signal != "speed" or history_motion_enabled
+              return signal not in ("speed", "power") or history_motion_enabled
 
           def store_history(
               vehicle_id, topic_suffix, value, value_type, received_at,
@@ -443,18 +444,18 @@ Resources:
               received_seconds = received_at // 1000
               bucket = received_seconds - (received_seconds % interval_seconds)
               previous_seconds = int(previous_received_at or 0) // 1000
-              speed_stopped = signal == "speed" and value == 0
-              speed_was_moving = (
-                  signal == "speed"
+              motion_stopped = signal in ("speed", "power") and value == 0
+              motion_was_active = (
+                  signal in ("speed", "power")
                   and isinstance(previous_value, (int, Decimal))
-                  and previous_value > 0
+                  and previous_value != 0
               )
-              if speed_stopped and not speed_was_moving:
+              if motion_stopped and not motion_was_active:
                   return False
-              if speed_stopped:
-                  # Preserve the end of a drive even if it occurs inside an
-                  # already sampled minute. Continuous standstill writes are
-                  # suppressed above.
+              if motion_stopped:
+                  # Preserve the end of motion or power flow even if it occurs
+                  # inside an already sampled minute. Continuous zero writes
+                  # are suppressed above.
                   bucket = received_seconds
               elif previous_seconds - (previous_seconds % interval_seconds) == bucket:
                   return False
@@ -916,9 +917,9 @@ Resources:
               return vehicles
 
           def load_history(vehicle_id, since_ms, until_ms, resolution_seconds):
-              signals = ("soc", "charging", "plugged", "speed")
+              signals = ("soc", "charging", "plugged", "speed", "power")
               buckets = {}
-              speed_buckets = {}
+              aggregate_buckets = {}
               for signal in signals:
                   lower = f"{signal}#{since_ms // 1000:010d}"
                   upper = f"{signal}#{until_ms // 1000:010d}"
@@ -939,24 +940,29 @@ Resources:
                           bucket_ms = (sampled_at // (resolution_seconds * 1000)) * resolution_seconds * 1000
                           point = buckets.setdefault(bucket_ms, {"ts": bucket_ms})
                           value = json_value(item.get("value"))
-                          if signal == "speed" and isinstance(value, (int, float)):
-                              aggregate = speed_buckets.setdefault(
-                                  bucket_ms, {"sum": 0.0, "count": 0, "max": 0.0}
+                          if signal in ("speed", "power") and isinstance(value, (int, float)):
+                              aggregate = aggregate_buckets.setdefault(
+                                  (signal, bucket_ms), {
+                                      "sum": 0.0, "count": 0,
+                                      "min": value, "max": value
+                                  }
                               )
                               aggregate["sum"] += value
                               aggregate["count"] += 1
+                              aggregate["min"] = min(aggregate["min"], value)
                               aggregate["max"] = max(aggregate["max"], value)
                           else:
                               point[signal] = value
                       last_evaluated_key = result.get("LastEvaluatedKey")
                       if not last_evaluated_key:
                           break
-              for bucket_ms, aggregate in speed_buckets.items():
+              for (signal, bucket_ms), aggregate in aggregate_buckets.items():
                   point = buckets.setdefault(bucket_ms, {"ts": bucket_ms})
-                  point["speed"] = round(
+                  point[signal] = round(
                       aggregate["sum"] / aggregate["count"], 1
                   )
-                  point["speedMax"] = aggregate["max"]
+                  point[f"{signal}Min"] = aggregate["min"]
+                  point[f"{signal}Max"] = aggregate["max"]
               return [buckets[key] for key in sorted(buckets)]
   
           def handler(event, context):

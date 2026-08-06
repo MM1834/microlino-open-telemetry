@@ -174,6 +174,10 @@ void lilygoMqttLoop()
 void publishLilygoTelemetry()
 {
     if (!config.awsServiceEnabled || !awsClient.connected()) return;
+    const bool freshBmsCurrent = telemetry.bms.packCurrentValid &&
+        millis() - telemetry.bms.packCurrentLastUpdateMs <= 10000;
+    const bool freshBmsStatus = telemetry.bms.packStatusValid &&
+        millis() - telemetry.bms.statusLastUpdateMs <= 10000;
 
     awsClient.publishFloat(
         "display/soc",
@@ -194,11 +198,13 @@ void publishLilygoTelemetry()
 
     awsClient.publishBool(
         "charging/is_charging",
-        telemetry.charging.isCharging
+        freshBmsCurrent && freshBmsStatus
+            ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f
+            : telemetry.charging.isCharging
     );
     awsClient.publishBool(
         "charging/plugged",
-        telemetry.charging.plugged
+        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged
     );
     awsClient.publishInt(
         "charging/power_display",
@@ -206,8 +212,26 @@ void publishLilygoTelemetry()
     );
     awsClient.publishInt(
         "charging/power_signed",
-        telemetry.charging.powerSigned
+        freshBmsCurrent
+            ? static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f))
+            : telemetry.charging.powerSigned
     );
+    if (telemetry.bms.packStatusValid) {
+        awsClient.publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
+        awsClient.publishInt("bms/status_byte", telemetry.bms.statusByte);
+    }
+    if (telemetry.bms.packCurrentValid) {
+        awsClient.publishFloat("bms/pack_current", telemetry.bms.packCurrentA, 1);
+        awsClient.publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);
+        awsClient.publishFloat("bms/vehicle_power_w", telemetry.bms.vehiclePowerW, 0);
+        awsClient.publishBool("bms/is_regenerating", telemetry.bms.isRegenerating);
+        awsClient.publishBool("bms/is_discharging", telemetry.bms.isDischarging);
+    }
+    if (telemetry.bms.cellVoltagesValid) {
+        awsClient.publishInt("bms/cell_min_mv", telemetry.bms.minCellVoltageMv);
+        awsClient.publishInt("bms/cell_max_mv", telemetry.bms.maxCellVoltageMv);
+        awsClient.publishInt("bms/cell_delta_mv", telemetry.bms.cellVoltageDeltaMv);
+    }
 
     if (l76kGpsValid()) {
         awsClient.publishFloat(
@@ -584,6 +608,10 @@ void lilygoMqttLoop()
 void publishLilygoTelemetry()
 {
     if (!mqtt.connected()) return;
+    const bool freshBmsCurrent = telemetry.bms.packCurrentValid &&
+        millis() - telemetry.bms.packCurrentLastUpdateMs <= 10000;
+    const bool freshBmsStatus = telemetry.bms.packStatusValid &&
+        millis() - telemetry.bms.statusLastUpdateMs <= 10000;
 
     publishLegacyFloat("display/soc", telemetry.display.soc);
     publishLegacyFloat(
@@ -601,11 +629,13 @@ void publishLilygoTelemetry()
 
     publishLegacyBool(
         "charging/is_charging",
-        telemetry.charging.isCharging
+        freshBmsCurrent && freshBmsStatus
+            ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f
+            : telemetry.charging.isCharging
     );
     publishLegacyBool(
         "charging/plugged",
-        telemetry.charging.plugged
+        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged
     );
     publishLegacyInt(
         "charging/power_display",
@@ -613,8 +643,26 @@ void publishLilygoTelemetry()
     );
     publishLegacyInt(
         "charging/power_signed",
-        telemetry.charging.powerSigned
+        freshBmsCurrent
+            ? static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f))
+            : telemetry.charging.powerSigned
     );
+    if (telemetry.bms.packStatusValid) {
+        publishLegacyFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
+        publishLegacyInt("bms/status_byte", telemetry.bms.statusByte);
+    }
+    if (telemetry.bms.packCurrentValid) {
+        publishLegacyFloat("bms/pack_current", telemetry.bms.packCurrentA);
+        publishLegacyFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);
+        publishLegacyFloat("bms/vehicle_power_w", telemetry.bms.vehiclePowerW, 0);
+        publishLegacyBool("bms/is_regenerating", telemetry.bms.isRegenerating);
+        publishLegacyBool("bms/is_discharging", telemetry.bms.isDischarging);
+    }
+    if (telemetry.bms.cellVoltagesValid) {
+        publishLegacyInt("bms/cell_min_mv", telemetry.bms.minCellVoltageMv);
+        publishLegacyInt("bms/cell_max_mv", telemetry.bms.maxCellVoltageMv);
+        publishLegacyInt("bms/cell_delta_mv", telemetry.bms.cellVoltageDeltaMv);
+    }
 
     if (l76kGpsValid()) {
         publishLegacyFloat(

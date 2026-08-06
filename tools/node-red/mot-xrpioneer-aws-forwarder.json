@@ -21,7 +21,7 @@
     "type": "function",
     "z": "a31f10a2d0f6c001",
     "name": "Allowlist · normalize · remap",
-    "func": "const IOBROKER_DOT_PREFIX = 'mqtt.3.mot.xrpioneer.';\nconst IOBROKER_MQTT_PREFIX = 'mqtt/3/mot/xrpioneer/';\nconst TARGET_PREFIX = 'mot/xrpioneer/';\n\nconst TYPES = {\n  'charging/is_charging': 'boolean',\n  'charging/plugged': 'boolean',\n  'charging/power_display': 'number',\n  'display/estimated_range_km': 'number',\n  'display/odometer_km': 'number',\n  'display/soc': 'number',\n  'display/speed_kmh': 'number',\n  'system/device_id': 'string',\n  'system/device_name': 'string',\n  'system/firmware_version': 'string',\n  'system/ip_address': 'string',\n  'system/mqtt_client_id': 'string',\n  'system/network_mode': 'string',\n  'system/uptime_sec': 'number',\n  'system/wifi_rssi': 'number'\n};\n\nfunction reject(reason) {\n  const count = (context.get('rejected') || 0) + 1;\n  context.set('rejected', count);\n  node.status({fill: 'yellow', shape: 'ring', text: `blocked ${count}: ${reason}`});\n  return [null, {\n    payload: {\n      event: 'mot_forward_blocked',\n      reason,\n      topic: String(msg.topic || '')\n    }\n  }];\n}\n\nif (typeof msg.topic !== 'string') {\n  return reject('source-prefix');\n}\n\nlet suffix;\nif (msg.topic.startsWith(IOBROKER_MQTT_PREFIX)) {\n  suffix = msg.topic.slice(IOBROKER_MQTT_PREFIX.length);\n} else if (msg.topic.startsWith(IOBROKER_DOT_PREFIX)) {\n  suffix = msg.topic.slice(IOBROKER_DOT_PREFIX.length).replaceAll('.', '/');\n} else {\n  return reject('source-prefix');\n}\nconst type = TYPES[suffix];\nif (!type) return reject('topic-not-allowlisted');\n\nlet value = Buffer.isBuffer(msg.payload) ? msg.payload.toString('utf8') : msg.payload;\nif (typeof value === 'string') value = value.trim();\n\nif (type === 'boolean') {\n  if (value === true || value === 1 || /^(1|true|on|yes)$/i.test(String(value))) value = true;\n  else if (value === false || value === 0 || /^(0|false|off|no)$/i.test(String(value))) value = false;\n  else return reject('invalid-boolean');\n} else if (type === 'number') {\n  value = Number(value);\n  if (!Number.isFinite(value)) return reject('invalid-number');\n} else {\n  value = String(value);\n  if (!value.length || value.length > 256) return reject('invalid-string');\n}\n\nmsg.topic = TARGET_PREFIX + suffix;\nmsg.payload = value;\nmsg.qos = 0;\nmsg.retain = true;\nmsg._motForwarded = true;\nconst count = (context.get('forwarded') || 0) + 1;\ncontext.set('forwarded', count);\nnode.status({fill: 'green', shape: 'dot', text: `forwarded ${count}: ${suffix}`});\nreturn [msg, null];\n",
+    "func": "const IOBROKER_DOT_PREFIX = 'mqtt.3.mot.xrpioneer.';\nconst IOBROKER_MQTT_PREFIX = 'mqtt/3/mot/xrpioneer/';\nconst TARGET_PREFIX = 'mot/xrpioneer/';\n\nconst TYPES = {\n  'charging/is_charging': 'boolean',\n  'charging/plugged': 'boolean',\n  'charging/power_display': 'number',\n  'charging/power_signed': 'number',\n  'display/estimated_range_km': 'number',\n  'display/odometer_km': 'number',\n  'display/soc': 'number',\n  'display/speed_kmh': 'number',\n  'system/device_id': 'string',\n  'system/device_name': 'string',\n  'system/firmware_version': 'string',\n  'system/ip_address': 'string',\n  'system/mqtt_client_id': 'string',\n  'system/network_mode': 'string',\n  'system/uptime_sec': 'number',\n  'system/wifi_rssi': 'number'\n};\n\nfunction reject(reason) {\n  const count = (context.get('rejected') || 0) + 1;\n  context.set('rejected', count);\n  node.status({fill: 'yellow', shape: 'ring', text: `blocked ${count}: ${reason}`});\n  return [null, {\n    payload: {\n      event: 'mot_forward_blocked',\n      reason,\n      topic: String(msg.topic || '')\n    }\n  }];\n}\n\nif (typeof msg.topic !== 'string') {\n  return reject('source-prefix');\n}\n\nlet suffix;\nif (msg.topic.startsWith(IOBROKER_MQTT_PREFIX)) {\n  suffix = msg.topic.slice(IOBROKER_MQTT_PREFIX.length);\n} else if (msg.topic.startsWith(IOBROKER_DOT_PREFIX)) {\n  suffix = msg.topic.slice(IOBROKER_DOT_PREFIX.length).replaceAll('.', '/');\n} else {\n  return reject('source-prefix');\n}\nconst type = TYPES[suffix];\nif (!type) return reject('topic-not-allowlisted');\n\nlet value = Buffer.isBuffer(msg.payload) ? msg.payload.toString('utf8') : msg.payload;\nif (typeof value === 'string') value = value.trim();\n\nif (type === 'boolean') {\n  if (value === true || value === 1 || /^(1|true|on|yes)$/i.test(String(value))) value = true;\n  else if (value === false || value === 0 || /^(0|false|off|no)$/i.test(String(value))) value = false;\n  else return reject('invalid-boolean');\n} else if (type === 'number') {\n  value = Number(value);\n  if (!Number.isFinite(value)) return reject('invalid-number');\n} else {\n  value = String(value);\n  if (!value.length || value.length > 256) return reject('invalid-string');\n}\n\nmsg.topic = TARGET_PREFIX + suffix;\nmsg.payload = value;\nmsg.qos = 0;\nmsg.retain = true;\nmsg._motForwarded = true;\nconst count = (context.get('forwarded') || 0) + 1;\ncontext.set('forwarded', count);\nnode.status({fill: 'green', shape: 'dot', text: `forwarded ${count}: ${suffix}`});\nreturn [msg, null];\n",
     "outputs": 2,
     "timeout": 0,
     "noerr": 0,
@@ -447,5 +447,26 @@
     ],
     "attrname": "payload",
     "outFormat": "MQTT"
+  },
+  {
+    "id": "a31f10a2d0f6d116",
+    "type": "ioBroker in",
+    "z": "a31f10a2d0f6c001",
+    "name": "charging / power_signed",
+    "attrname": "payload",
+    "topic": "mqtt.3.mot.xrpioneer.charging.power_signed",
+    "payloadType": "value",
+    "onlyack": "",
+    "func": "all",
+    "gap": "",
+    "fireOnStart": "true",
+    "outFormat": "MQTT",
+    "x": 210,
+    "y": 700,
+    "wires": [
+      [
+        "a31f10a2d0f6c004"
+      ]
+    ]
   }
 ]

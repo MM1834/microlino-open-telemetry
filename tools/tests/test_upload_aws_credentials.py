@@ -24,6 +24,16 @@ class EnvironmentValidationTests(unittest.TestCase):
             select_environment("lilygo-t-a7670", None),
             "T-A7670X-AWS",
         )
+        self.assertEqual(
+            select_environment("esp32-c6", None),
+            "nanoesp32c6-n16-aws",
+        )
+
+    def test_accepts_both_c6_aws_board_environments(self) -> None:
+        self.assertEqual(
+            select_environment("esp32-c6", "xiao-esp32c6-aws"),
+            "xiao-esp32c6-aws",
+        )
 
     def test_rejects_non_aws_or_other_board_environment(self) -> None:
         with self.assertRaises(ValueError):
