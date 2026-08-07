@@ -144,6 +144,19 @@ remaining environment simplification is still planned.
 
 ## Portal and AWS backend
 
+NTF-001 has an additive notification pilot stack with separate preferences,
+charging-session state and expiring event storage, an isolated IoT/Lambda path,
+a JWT-protected preference API and filtered SNS email delivery. On 2026-08-07 a
+physical `pioneer` charge from 58% across a temporary 60% target produced exactly
+one stored event and one received email containing SOC and `vehicleId`; the target
+was restored to 80%. SMS remains disabled because the AWS account does not yet
+have End User Messaging SMS service access. The repository portal now contains a
+first authenticated, per-vehicle settings UI for notification activation, target
+SOC and email delivery. The hosted production portal successfully loaded the
+stored `pioneer` settings and persisted several changed SOC targets after its
+endpoint and exact CORS origin were corrected. The bounded email/portal pilot is
+complete; SMS remains deferred.
+
 Implemented in the repository under the consolidated `build/dashboard/current/`
 portal source tree:
 

@@ -18,6 +18,9 @@
 
 ## Completed predecessors
 
+- [NTF-001](NTF-001.md) completed the bounded charging/SOC email notification
+  and authenticated per-vehicle portal-settings pilot on 2026-08-08; SMS remains
+  a deferred channel.
 - [C6-PH-001](C6-PH-001.md) completed N16 production hardening and XIAO
   compatibility validation on 2026-08-07.
 - [C6-001](C6-001.md) closed the bounded N16 dual-CAN WiFi/AWS pilot

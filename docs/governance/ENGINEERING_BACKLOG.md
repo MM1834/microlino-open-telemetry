@@ -27,29 +27,40 @@ Design fleet provisioning, certificate rotation, revocation, device replacement
 and ownership transfer. Continue to prohibit a shared operational certificate for
 multiple deployed devices.
 
-## Charging and SOC notifications
+## Notification follow-ups
 
-Add optional user notifications for charging milestones, initially by email and
-later by web push or an application channel. Pilot examples include notifying the
-driver when a configured SOC threshold is reached so a charging break can end, or
-when an intended 80% charge limit has been reached.
+The bounded email/portal work was completed in
+[NTF-001](../project/sprints/NTF-001.md). Preserve the following later extensions
+outside that completed cloud pilot:
 
-The first implementation should consume normalized cloud state rather than add
-firmware-specific notification logic. It must include:
+- web push and application-native channels;
+- direct SMTP or another notification path for modules intentionally operated
+  without AWS;
+- an optional GPIO target-SOC output for external local automation;
+- fleet-wide policies and support/operator notification administration;
+- automatic per-user cost allocation, chargeback, invoicing, tax handling and
+  payment collection.
 
-- per-user and per-vehicle opt-in with a configurable SOC threshold;
-- rising-threshold detection rather than one notification per telemetry update;
-- at most one notification per threshold and charging session, with hysteresis or
-  equivalent deduplication;
-- delayed/missing telemetry handling and an explicit statement that this is an
-  informational notification, not a vehicle charge-control function;
-- privacy-safe delivery logs, unsubscribe controls and a bounded retention period;
-- publish, Lambda and delivery-volume metrics with a small cost budget.
+AWS continues to bill the project account. NTF-001 may retain provider message IDs,
+delivery counts and actual SMS costs so later allocation remains possible, but it
+must not imply that end-user billing is implemented.
 
-Email is the preferred pilot channel because it does not require an application or
-browser push subscription. Provider choice, verified sender/domain handling and
-production deliverability remain design decisions. Push is a later channel, not a
-release dependency.
+## Portal user and administrator settings
+
+Build a coherent authenticated portal settings area as user-configurable services
+grow. NTF-001 is the first bounded self-service slice: each user manages notification
+preferences and separately verified destinations for each authorized vehicle.
+
+Later user settings may include account presentation preferences, time zone,
+privacy/retention choices and other per-vehicle services. Define one versioned API
+and storage model rather than adding unrelated settings to Cognito attributes or
+static portal configuration.
+
+Administrator functions must remain a separate least-privilege surface. A future
+admin UI may expose inventory, invitation/claim state, roles, delivery health and
+bounded support actions, but must not reveal device credentials or plaintext user
+contact destinations by default. Every administrative mutation requires explicit
+authorization and an audit record.
 
 ## Portal roles and vehicle sharing
 
