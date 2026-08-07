@@ -7,10 +7,18 @@ CONFIG = (ROOT / "firmware/esp32-wroom/src/app_config.cpp").read_text(encoding="
 NETWORK = (ROOT / "firmware/esp32-wroom/src/network/wifi_manager.cpp").read_text(encoding="utf-8")
 OTA = (ROOT / "firmware/esp32-wroom/src/ota/ota_web.cpp").read_text(encoding="utf-8")
 WEB = (ROOT / "firmware/esp32-wroom/src/web/web_ui.cpp").read_text(encoding="utf-8")
+SHARED_OTA = (ROOT / "firmware/common/web/local_ota.cpp").read_text(encoding="utf-8")
+SHARED_SECURITY = (ROOT / "firmware/common/web/local_web_security.cpp").read_text(encoding="utf-8")
 MQTT = (ROOT / "firmware/esp32-wroom/src/mqtt/mqtt_client.cpp").read_text(encoding="utf-8")
+MAIN = (ROOT / "firmware/esp32-wroom/src/main.cpp").read_text(encoding="utf-8")
 
 
 class WroomLocalSecurityTests(unittest.TestCase):
+    def test_physical_admin_recovery_preserves_other_configuration(self) -> None:
+        self.assertIn('equalsIgnoreCase("admin recover")', MAIN)
+        self.assertIn("LocalWebSecurity::generateRecoveryPassword()", MAIN)
+        self.assertIn("appConfigManager.save()", MAIN)
+
     def test_admin_password_is_bounded_and_printable(self) -> None:
         self.assertIn("password.length() < 12", CONFIG)
         self.assertIn("password.length() > 63", CONFIG)
@@ -21,12 +29,14 @@ class WroomLocalSecurityTests(unittest.TestCase):
         self.assertIn("WiFi.softAP(ssid.c_str(), config.otaPassword.c_str())", NETWORK)
 
     def test_ota_fails_closed_and_checks_origin(self) -> None:
-        self.assertIn("!config.otaEnabled || !config.localAdminConfigured()", OTA)
-        self.assertIn("requireOtaAuth() && requireOtaSameOrigin()", OTA)
-        self.assertNotIn("if (config.otaPassword.isEmpty()) {\n        return true;", OTA)
+        self.assertIn("options.enabled = config.otaEnabled", OTA)
+        self.assertIn("!settings->enabled", SHARED_OTA)
+        self.assertIn("LocalWebSecurity::requireSameOrigin", SHARED_OTA)
+        self.assertNotIn("password.isEmpty()", SHARED_OTA)
 
     def test_operational_web_routes_require_authentication(self) -> None:
-        self.assertIn('server.authenticate("admin", config.otaPassword.c_str())', WEB)
+        self.assertIn("LocalWebSecurity::authenticate(server, config.otaPassword)", WEB)
+        self.assertIn('server.authenticate("admin", password.c_str())', SHARED_SECURITY)
         for handler in (
             "handleStatus",
             "handleConfig",

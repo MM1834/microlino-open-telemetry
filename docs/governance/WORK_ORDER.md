@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-06
+**Last reviewed:** 2026-08-07
 
 ## High priority
 
@@ -128,10 +128,11 @@ against the exact commit and environment.
 
 ## Completed reference
 
+- [C6-PH-001](../project/sprints/C6-PH-001.md) completed N16 local administration,
+  recovery/OTA and runtime hardening plus XIAO compatibility validation on
+  2026-08-07. Extended soak and production hardware qualification remain backlog.
 - [C6-001](../project/sprints/C6-001.md) closed the bounded N16 dual-CAN
-  WiFi/AWS pilot qualification on 2026-08-06. Authenticated C6 WebUI, runtime OTA,
-  controlled channel injection, extended soak and production hardware remain in
-  the engineering backlog.
+  WiFi/AWS pilot qualification on 2026-08-06.
 - [WEB-001](../project/sprints/WEB-001.md) delivered the repository-owned public
   landing page; the maintainer deployed and validated it on desktop and smartphone
   on 2026-08-05.

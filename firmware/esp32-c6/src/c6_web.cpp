@@ -1,0 +1,217 @@
+#include "c6_web.h"
+
+#include <Arduino.h>
+#include <WebServer.h>
+
+#include "c6_aws.h"
+#include "c6_config.h"
+#include "c6_dual_can.h"
+#include "c6_gps.h"
+#include "c6_network.h"
+#include "decoders/decoder_profile.h"
+#include "system/device_id.h"
+#include "system/version.h"
+#include "telemetry/telemetry.h"
+#include "web/local_ota.h"
+#include "web/local_web_security.h"
+
+namespace {
+WebServer server(80);
+LocalOtaOptions otaOptions;
+bool rebootPending = false;
+uint32_t rebootAtMs = 0;
+
+String htmlEscape(String value)
+{
+    value.replace("&", "&amp;"); value.replace("<", "&lt;");
+    value.replace(">", "&gt;"); value.replace("\"", "&quot;"); value.replace("'", "&#39;");
+    return value;
+}
+
+String jsonEscape(String value)
+{
+    value.replace("\\", "\\\\"); value.replace("\"", "\\\"");
+    value.replace("\n", "\\n"); value.replace("\r", "\\r");
+    return value;
+}
+
+bool requireAdmin() { return LocalWebSecurity::authenticate(server, c6Config.adminPassword); }
+
+bool requireSetupAccess()
+{
+    if (c6ConfigAdminConfigured()) return requireAdmin();
+    const String initial = c6Config.setupPassword;
+    if (!server.authenticate("setup", initial.c_str())) {
+        server.requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
+String header(const char *title)
+{
+    String out = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>";
+    out += title;
+    out += "</title><style>body{font-family:system-ui;margin:24px;max-width:820px;background:#f7f8fa;color:#18202b}.card{background:white;border:1px solid #d9dee7;border-radius:12px;padding:16px;margin:12px 0}input,select,textarea{width:100%;padding:9px;margin:4px 0 12px;box-sizing:border-box}button{padding:10px 16px}.muted{color:#667085}pre{white-space:pre-wrap;background:#101828;color:#e4e7ec;padding:12px;border-radius:8px}a{color:#175cd3}</style></head><body>";
+    return out;
+}
+
+String profileOptions(DecoderProfile current)
+{
+    String out;
+    for (size_t i = 0; i < decoderProfileCount(); ++i) {
+        const DecoderProfileDescriptor &profile = decoderProfileAt(i);
+        out += "<option value='" + String(static_cast<int>(profile.id)) + "'";
+        if (profile.id == current) out += " selected";
+        out += ">" + htmlEscape(profile.name) + "</option>";
+    }
+    return out;
+}
+
+void scheduleReboot(uint32_t delayMs = 2000) { rebootPending = true; rebootAtMs = millis() + delayMs; }
+
+void setupPage()
+{
+    if (!requireSetupAccess()) return;
+    String out = header("MOT C6 Setup");
+    out += "<h1>Secure local setup</h1><p class='muted'>The setup access and fallback AP are protected by the device setup password printed on the serial console.</p>";
+    out += "<form method='POST' action='/setup'><div class='card'><label>WiFi SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'>";
+    out += "<label>WiFi password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'>";
+    out += "<label>New local admin password (12–63 characters)</label><input type='password' name='adminPassword' minlength='12' maxlength='63' required>";
+    out += "<button>Secure device &amp; reboot</button></div></form></body></html>";
+    server.send(200, "text/html", out);
+}
+
+void setupSave()
+{
+    if (!requireSetupAccess() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    if (!c6ConfigSetAdminPassword(server.arg("adminPassword"))) {
+        server.send(400, "text/plain", "Admin password must be 12-63 printable ASCII characters"); return;
+    }
+    String ssid = server.arg("ssid"); ssid.trim();
+    if (ssid.length() > 32) { server.send(400, "text/plain", "Invalid SSID"); return; }
+    c6Config.wifiSsid = ssid;
+    if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
+    c6Config.otaEnabled = true;
+    c6ConfigSave();
+    server.send(200, "text/html", header("Setup saved") + "<h1>Setup saved</h1><p>Rebooting with protected local administration.</p></body></html>");
+    scheduleReboot();
+}
+
+String channelJson(size_t channel)
+{
+    const C6CanChannelStatus &state = c6CanStatus(channel);
+    return "{\"started\":" + String(state.started ? "true" : "false") +
+           ",\"profile\":\"" + jsonEscape(decoderProfileName(state.profile)) + "\"" +
+           ",\"frames\":" + String(state.frames) + ",\"errors\":" + String(state.receiveErrors) +
+           ",\"lastFrameAgeMs\":" + String(state.frames ? millis() - state.lastFrameMs : 0) + "}";
+}
+
+String diagnosticsJson()
+{
+    String out = "{\"deviceId\":\"" + motDeviceId() + "\",\"board\":\"" MOT_BOARD "\",\"firmware\":\"" MOT_VERSION "\"";
+    out += ",\"uptimeSec\":" + String(millis() / 1000UL);
+    out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"status\":\"" + jsonEscape(c6NetworkStatus()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
+    out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
+    out += ",\"gps\":{\"state\":\"" + jsonEscape(c6GpsState()) + "\",\"detected\":" + String(c6GpsDetected() ? "true" : "false") + ",\"fix\":" + String(c6GpsValid() ? "true" : "false") + ",\"chars\":" + String(static_cast<unsigned long long>(c6GpsChars())) + ",\"satellites\":" + String(c6GpsSatellites()) + "}";
+    out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"}";
+    return out;
+}
+
+void statusPage()
+{
+    if (!requireAdmin()) return;
+    String out = header("MOT C6 Status");
+    out += "<h1>Microlino Open Telemetry</h1><p>" MOT_VERSION " · " MOT_BOARD " · " + motDeviceId() + "</p>";
+    out += "<div class='card'><h2>Runtime diagnostics</h2><pre id='diag'>Loading…</pre><button onclick='load()'>Refresh</button></div>";
+    out += "<p><a href='/config'>Configuration</a> · <a href='/update'>Local OTA</a> · <a href='/api/status'>JSON diagnostics</a></p>";
+    out += "<script>async function load(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('diag').textContent=JSON.stringify(d,null,2)}load()</script></body></html>";
+    server.send(200, "text/html", out);
+}
+
+void configPage()
+{
+    if (!requireAdmin()) return;
+    String out = header("MOT C6 Configuration");
+    out += "<h1>Configuration</h1><form method='POST' action='/save'>";
+    out += "<div class='card'><h2>WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'></div>";
+    out += "<div class='card'><h2>CAN decoder assignment</h2><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><select name='can2'>" + profileOptions(c6Config.can2Profile) + "</select></div>";
+    out += "<div class='card'><h2>Runtime</h2><label>Telemetry interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button>Save &amp; reboot</button></form>";
+    out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
+    out += "<div class='card'><h2>Factory reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Erase all local configuration?')\"><button>Erase configuration &amp; reboot</button></form></div><p><a href='/status'>Status</a></p></body></html>";
+    server.send(200, "text/html", out);
+}
+
+void saveConfig()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    String ssid = server.arg("ssid"); ssid.trim();
+    const uint32_t interval = server.arg("pubMs").toInt();
+    const DecoderProfile can1 = decoderProfileNormalize(server.arg("can1").toInt());
+    const DecoderProfile can2 = decoderProfileNormalize(server.arg("can2").toInt(), DECODER_PROFILE_DISABLED);
+    if (ssid.length() > 32 || interval < 1000 || interval > 3600000) { server.send(400, "text/plain", "Invalid configuration"); return; }
+    const String newAdmin = server.arg("adminPassword");
+    if (!newAdmin.isEmpty() && !c6ConfigSetAdminPassword(newAdmin)) { server.send(400, "text/plain", "Invalid admin password"); return; }
+    c6Config.wifiSsid = ssid;
+    if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
+    c6Config.can1Profile = can1; c6Config.can2Profile = can2;
+    c6Config.publishIntervalMs = interval; c6Config.otaEnabled = server.hasArg("otaEnabled");
+    c6ConfigSave();
+    server.send(200, "text/html", header("Saved") + "<h1>Configuration saved</h1><p>Rebooting.</p></body></html>");
+    scheduleReboot();
+}
+
+void exportConfig()
+{
+    if (!requireAdmin()) return;
+    server.sendHeader("Content-Disposition", "attachment; filename=mot-c6-config.json");
+    server.send(200, "application/json", c6ConfigExportJson(false));
+}
+
+void importConfig()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    String error;
+    if (!c6ConfigImportJson(server.arg("configJson"), error)) { server.send(400, "text/plain", "Restore failed: " + error); return; }
+    server.send(200, "text/html", header("Restored") + "<h1>Configuration restored</h1><p>Rebooting.</p></body></html>");
+    scheduleReboot();
+}
+
+void factoryReset()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6ConfigFactoryReset();
+    server.send(200, "text/html", header("Reset") + "<h1>Factory reset complete</h1><p>Rebooting into protected setup mode.</p></body></html>");
+    scheduleReboot();
+}
+}
+
+void c6WebSetup()
+{
+    LocalWebSecurity::collectSecurityHeaders(server);
+    server.on("/", HTTP_GET, [] { c6ConfigAdminConfigured() ? statusPage() : setupPage(); });
+    server.on("/setup", HTTP_GET, setupPage);
+    server.on("/setup", HTTP_POST, setupSave);
+    server.on("/status", HTTP_GET, statusPage);
+    server.on("/api/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", diagnosticsJson()); });
+    server.on("/config", HTTP_GET, configPage);
+    server.on("/save", HTTP_POST, saveConfig);
+    server.on("/api/config/export", HTTP_GET, exportConfig);
+    server.on("/config/import", HTTP_POST, importConfig);
+    server.on("/factory-reset", HTTP_POST, factoryReset);
+    server.on("/favicon.ico", [] { server.send(204); });
+    otaOptions.adminPassword = c6Config.adminPassword;
+    otaOptions.enabled = c6Config.otaEnabled;
+    otaOptions.firmwareLabel = String(MOT_VERSION) + " · " + MOT_BOARD + " · " + motDeviceId();
+    localOtaSetup(server, &otaOptions);
+    server.onNotFound([] { if (requireAdmin()) server.send(404, "text/plain", "Not found"); });
+    server.begin();
+    Serial.println("Local authenticated WebUI started");
+}
+
+void c6WebLoop()
+{
+    server.handleClient();
+    localOtaLoop();
+    if (rebootPending && static_cast<int32_t>(millis() - rebootAtMs) >= 0) ESP.restart();
+}

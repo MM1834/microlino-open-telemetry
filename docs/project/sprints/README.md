@@ -18,8 +18,10 @@
 
 ## Completed predecessors
 
+- [C6-PH-001](C6-PH-001.md) completed N16 production hardening and XIAO
+  compatibility validation on 2026-08-07.
 - [C6-001](C6-001.md) closed the bounded N16 dual-CAN WiFi/AWS pilot
-  qualification on 2026-08-06; its production-hardening gates remain deferred.
+  qualification on 2026-08-06.
 - [WEB-001](WEB-001.md) delivered the repository-owned public landing page and
   completed hosted desktop/smartphone acceptance on 2026-08-05.
 - REL-001 established and validated the accepted portal pilot baseline now carried

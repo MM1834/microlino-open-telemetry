@@ -14,6 +14,8 @@ Current implemented slice:
 - shared optional-GPS detection and NMEA fix-state handling;
 - bounded in-memory drive capture with on-demand summaries for known CAN IDs;
 - WiFi station configuration and optional per-device AWS IoT publication;
+- protected device-specific setup/fallback AP and non-blocking reconnect;
+- authenticated local WebUI, backup/restore, factory reset and local OTA;
 - XIAO external-antenna selection.
 
 Build without flashing:
@@ -27,9 +29,9 @@ pio run -e xiao-esp32c6-aws
 
 GPS reception is physically validated separately on both boards. The N16 also
 passed simultaneous dual-CAN reception and a normal-road WiFi/AWS IoT run with a
-unique certificate and live portal ingestion. The current firmware does not yet
-claim WebUI or OTA runtime support. The partition tables reserve dual OTA slots
-and LittleFS; this layout evidence is not an OTA rollback test.
+unique certificate and live portal ingestion. Local administration and OTA now
+use the same security and OTA core as WROOM. N16 runtime acceptance remains open;
+physical USB is the supported recovery path and signed-image rollback is not claimed.
 
 Default decoder assignment is Standard-CAN V1 - Pioneer on CAN1 and Display-CAN
 on CAN2. Both channels accept any registered decoder profile at runtime; these are
@@ -62,7 +64,22 @@ and increased electrical regeneration under light braking.
 
 ## WiFi and AWS qualification
 
-Configure WiFi over the serial console without echoing the password:
+For first setup, connect to the WPA2-protected `MOT-XXXXXX` AP. Its device-specific
+password is printed on USB serial. Open `http://192.168.4.1/`, authenticate as
+`setup`, and set a unique 12–63 character local administrator password.
+If native USB reconnects after the boot message, enter `setup status` on the
+115200-baud serial console. It reveals the setup credential only before a local
+administrator password exists.
+
+If that administrator password is lost, connect physically over USB and enter
+`admin recover`. The device replaces only the administrator password with a new
+random password and prints it once on that serial console. WiFi and decoder
+settings remain unchanged.
+
+The same physical USB recovery command is available on the ESP32-WROOM and
+LilyGO T-A7670 firmware families.
+
+WiFi can also be configured over serial without echoing the password:
 
 ```text
 wifi set MySSID|MyPassword

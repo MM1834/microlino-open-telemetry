@@ -6,7 +6,7 @@
 
 ## Common local network behaviour
 
-Both targets start a setup/fallback access point and can attempt a configured WiFi
+All current targets can start a setup/fallback access point and can attempt a configured WiFi
 station connection. After initial provisioning, the operational AP and local
 administration use the configured local administrator password.
 
@@ -15,6 +15,20 @@ administration use the configured local administrator password.
 The network manager selects WiFi station mode when connected and otherwise reports
 the fallback AP address/mode. AWS IoT and legacy MQTT both depend on WiFi/network
 online state.
+
+## ESP32-C6
+
+The C6 network loop is cooperative: station connection and 15-second reconnect
+attempts do not wait inside the loop and therefore do not stop Dual-CAN, GPS,
+WebUI or AWS processing. With no configuration it starts a protected setup AP.
+If a configured station is unavailable for 20 seconds, the protected fallback AP
+starts while station reconnect continues.
+
+Before local administration is configured, the device-specific setup password is
+printed on USB serial and protects both WPA2 AP access and the `setup` WebUI
+account. Afterwards the local administrator password protects the fallback AP and
+the `admin` account. This slice stores one station profile; WIFI-001 owns ordered
+Home/mobile profiles.
 
 ## LilyGO
 

@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-06
+**Last reviewed:** 2026-08-07
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -102,11 +102,12 @@ available CAN controllers, firmware portability and support burden.
 
 ## ESP32-C6 production hardening
 
-Carry the bounded C6-001 N16 pilot result into a production-capable adapter only
-after completing the deferred gates: authenticated local WebUI, tested local OTA
-and rollback, controlled cross-channel injection, simultaneous retained GPS/CAN/
-WiFi operation, long-duration soak, stable regulated power, termination review,
-strain-relieved wiring and enclosure qualification. The XIAO remains a 4 MB
+The local WebUI, protected AP, backup/reset, local OTA and cooperative reconnect
+slice was completed in [C6-PH-001](../project/sprints/C6-PH-001.md). Production
+hardware still requires controlled cross-channel
+injection, simultaneous retained GPS/CAN/WiFi soak, stable regulated power,
+termination review, strain-relieved wiring and enclosure qualification. Signed
+rollback remains a later remote/fleet-OTA concern. The XIAO remains a 4 MB
 compatibility target until it passes the same vehicle dual-CAN/AWS path.
 
 ## Decoder profiles and compatibility data

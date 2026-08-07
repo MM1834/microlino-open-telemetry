@@ -44,9 +44,19 @@ flowchart TD
 | [Live status](live-status.md) | Live JSON status inspection |
 | [System health](system-health.md) | Runtime and health diagnostics |
 
-## Access point note
+## Access and authentication
 
-Both current network implementations start the local AP without a password. The
-WebUI and local APIs have no application login. Treat access as local/physical and
-never expose it directly to the public Internet. Screenshot and workflow details
-must be refreshed after beta firmware validation.
+Operational WebUI and API routes on WROOM, LilyGO and C6 require the local `admin`
+credential. Mutating routes also enforce a same-origin request boundary, and
+operational fallback APs use WPA2 with the local administrator password.
+
+The C6 additionally protects first setup: the device-specific password printed on
+USB serial is required for its WPA2 setup AP and `setup` WebUI account. Never
+expose these local interfaces directly to the public Internet. Screenshots still
+require refresh after final C6 hardware acceptance.
+
+If the `admin` password is lost, every supported firmware family provides a
+physical recovery path over its 115200-baud USB serial console. Enter
+`admin recover`; the device preserves its other configuration, replaces only
+the administrator password with a random one and prints the replacement once
+on that console.

@@ -1,6 +1,6 @@
 # OTA firmware update
 
-For ESP32-WROOM under FW-SEC-001, OTA is available only when it is explicitly
+For ESP32-WROOM and ESP32-C6 under FW-SEC-001, OTA is available only when it is explicitly
 enabled and the request passes the device's local administrator authentication and
 same-origin check. Missing or invalid local credentials fail closed. LilyGO now
 implements and physically passes the same boundary; its hardened migration forces
@@ -22,6 +22,13 @@ OTA off until a provisioner explicitly enables it again.
 ## Recovery
 
 Beta devices should retain a physical USB recovery option. OTA must not be the only way to recover a unit.
+On C6, WROOM and LilyGO firmware, `admin recover` on the 115200-baud physical
+USB serial console replaces only a lost local administrator password with a new
+random credential and prints it once. It does not clear network or decoder state.
+An aborted upload invokes the update abort path. A rejected or invalid image does
+not schedule a reboot, leaving the running application active. Successful uploads
+reboot only after the HTTP result is returned. This is local recovery behaviour,
+not a claim of signed-image rollback or fleet rollout.
 
 ## Security
 

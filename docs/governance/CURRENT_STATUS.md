@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-06
+**Last reviewed:** 2026-08-07
 
 ## Purpose
 
@@ -92,8 +92,20 @@ optional GPS. The Muse Lab nanoESP32-C6-N16 is the recommended dual-CAN WiFi pil
 it received both Pioneer CAN buses simultaneously, retained independent decoder
 profiles and zero receive errors, and later delivered live AWS/portal telemetry.
 The XIAO 4 MB profile compiled, flashed and passed GPS/startup checks but did not
-receive the same vehicle dual-CAN/AWS qualification. Neither board is a generally
-approved production module; the deferred hardening gates are recorded separately.
+receive the same vehicle dual-CAN/AWS qualification. C6-PH-001 completed the
+protected setup/fallback AP, authenticated WebUI, WiFi/CAN/GPS/AWS diagnostics,
+backup/restore, factory reset, shared local OTA core and cooperative runtime
+reconnect. N16 base/AWS and WROOM regression builds pass. A physical N16 run on
+2026-08-07 retained WiFi/AWS credentials, received both vehicle CAN buses with
+zero errors, acquired a GPS fix and continued AWS publication. Protected fallback,
+first setup, authenticated WebUI, secret-free backup/restore, successful local OTA
+and invalid-image recovery also passed physically. A subsequent vehicle run
+confirmed automatic hotspot/AWS return with fresh GPS telemetry. XIAO then passed
+station/fallback WiFi, authenticated WebUI, GPS and physical administrator-password
+recovery while preserving configuration. All C6, WROOM and LilyGO base/AWS builds
+and 25 focused security tests passed. Extended soak and XIAO vehicle Dual-CAN/AWS
+equivalence remain non-blocking follow-up evidence. Neither board is yet a generally
+approved production module.
 
 On 2026-08-06 controlled lower-SOC charging confirmed Pioneer Standard-CAN pack
 current at 0.3 A per raw unit, pack voltage, derived power and stable plug/charge

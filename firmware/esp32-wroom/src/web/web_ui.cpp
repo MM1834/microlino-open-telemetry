@@ -18,6 +18,7 @@
 #include "onboarding/onboarding.h"
 #include "config/configuration_readiness.h"
 #include <WiFi.h>
+#include "web/local_web_security.h"
 
 static WebServer server(80);
 static bool rebootPending = false;
@@ -25,30 +26,12 @@ static unsigned long rebootAtMs = 0;
 
 static bool requireAdmin()
 {
-    if (!config.localAdminConfigured()) {
-        server.send(503, "text/plain", "Local admin setup required at /setup");
-        return false;
-    }
-    if (!server.authenticate("admin", config.otaPassword.c_str())) {
-        server.requestAuthentication();
-        return false;
-    }
-    return true;
+    return LocalWebSecurity::authenticate(server, config.otaPassword);
 }
 
 static bool requireSameOrigin()
 {
-    const String host = server.hostHeader();
-    const String origin = server.header("Origin");
-    const String referer = server.header("Referer");
-    const bool originMatches = origin == "http://" + host || origin == "https://" + host;
-    const bool refererMatches = referer.startsWith("http://" + host + "/") ||
-                                referer.startsWith("https://" + host + "/");
-    if (!originMatches && !refererMatches) {
-        server.send(403, "text/plain", "Same-origin request required");
-        return false;
-    }
-    return true;
+    return LocalWebSecurity::requireSameOrigin(server);
 }
 
 static String htmlHeader(const char *title)
@@ -592,8 +575,7 @@ static void handleApiSystemHealth()
 
 void setupWebUi()
 {
-    const char* protectedHeaders[] = {"Origin", "Referer"};
-    server.collectHeaders(protectedHeaders, 2);
+    LocalWebSecurity::collectSecurityHeaders(server);
     server.on("/", []() { if (!config.localAdminConfigured()) handleSetup(); else if (config.onboardingComplete) handleStatus(); else handleWizard(); });
     server.on("/setup", HTTP_GET, handleSetup);
     server.on("/setup", HTTP_POST, handleSetupSave);

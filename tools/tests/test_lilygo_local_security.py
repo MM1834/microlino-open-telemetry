@@ -10,9 +10,15 @@ WEB = (BASE / "web/lilygo_web.cpp").read_text(encoding="utf-8")
 MQTT = (BASE / "mqtt/lilygo_mqtt.cpp").read_text(encoding="utf-8")
 MODEM = (BASE / "modem/lilygo_modem.cpp").read_text(encoding="utf-8")
 AWS_H = (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.h").read_text(encoding="utf-8")
+MAIN = (BASE / "main.cpp").read_text(encoding="utf-8")
 
 
 class LilygoLocalSecurityTests(unittest.TestCase):
+    def test_physical_admin_recovery_preserves_other_configuration(self) -> None:
+        self.assertIn('equalsIgnoreCase("admin recover")', MAIN)
+        self.assertIn("LocalWebSecurity::generateRecoveryPassword()", MAIN)
+        self.assertIn("lilygoConfigManager.save()", MAIN)
+
     def test_admin_password_is_bounded_and_printable(self) -> None:
         self.assertIn("password.length() < 12", CONFIG)
         self.assertIn("password.length() > 63", CONFIG)
