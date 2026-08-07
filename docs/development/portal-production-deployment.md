@@ -36,6 +36,11 @@ cp build/dashboard/current/config.production.example.js \
   build/dashboard/packages/dashboard-rel-001-pilot.1/config.js
 ```
 
+Before upload, verify that the generated production `config.js` contains all
+currently configured service endpoints. In particular, NTF-001 requires
+`notificationApiBaseUrl`; omitting it leaves the settings form visible but prevents
+preferences from being loaded or saved.
+
 `build/dashboard/packages/` is intentionally ignored. The generated `config.js` contains
 public browser settings, not device certificates, passwords or private keys.
 

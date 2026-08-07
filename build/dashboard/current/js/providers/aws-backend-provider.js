@@ -10,6 +10,7 @@
 
     const baseUrl = () => String(config.apiBaseUrl || '').replace(/\/$/, '');
     const onboardingBaseUrl = () => String(config.onboardingApiBaseUrl || '').replace(/\/$/, '');
+    const notificationBaseUrl = () => String(config.notificationApiBaseUrl || '').replace(/\/$/, '');
     const interval = () => {
       const value = Number(config.pollingIntervalMs ?? 5000);
       return Number.isFinite(value) && value >= 1000 ? value : 5000;
@@ -54,6 +55,23 @@
         const error = new Error(response.status === 409
           ? conflictMessage
           : `Onboarding API HTTP ${response.status}`);
+        error.status = response.status;
+        if (response.status === 401) config.onUnauthorized?.(error);
+        throw error;
+      }
+      return response.json();
+    }
+
+    async function notificationRequest(path, method = 'GET', body = null) {
+      if (!notificationBaseUrl()) throw new Error('Notification API URL fehlt');
+      const response = await fetch(`${notificationBaseUrl()}${path}`, {
+        method,
+        headers: { ...(await headers()), ...(body ? { 'content-type': 'application/json' } : {}) },
+        cache: 'no-store',
+        body: body ? JSON.stringify(body) : null
+      });
+      if (!response.ok) {
+        const error = new Error(`Notification API HTTP ${response.status}`);
         error.status = response.status;
         if (response.status === 401) config.onUnauthorized?.(error);
         throw error;
@@ -219,6 +237,19 @@
         return post('/api/onboarding/claims', { vehicleId });
       },
 
+      async getNotificationPreferences() {
+        if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
+        return notificationRequest(`/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications`);
+      },
+
+      async saveNotificationPreferences(preferences) {
+        if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
+        return notificationRequest(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications`,
+          'PUT', preferences
+        );
+      },
+
       stop() {
         stopped = true;
         callbacksRef = null;
@@ -234,6 +265,7 @@
           type: 'aws-backend',
           apiBaseUrl: baseUrl(),
           onboardingApiBaseUrl: onboardingBaseUrl(),
+          notificationApiBaseUrl: notificationBaseUrl(),
           websocketUrl: String(config.websocketUrl || ''),
           vehicleId: activeVehicleId,
           pollingIntervalMs: interval(),

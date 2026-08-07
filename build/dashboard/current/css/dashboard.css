@@ -30,6 +30,23 @@
   .topbar .mobile-device-detail{display:block}
 }
 
+.settings-card{padding:22px}
+.settings-card[hidden]{display:none}
+.settings-card .card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:20px}
+.settings-card .card-header h2{margin:0 0 4px}
+.notification-form{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:16px 24px;max-width:820px}
+.notification-form>label:not(.settings-toggle){display:flex;flex-direction:column;gap:7px}
+.notification-form input[type="email"],.notification-form input[type="number"]{width:100%;border:1px solid var(--line);border-radius:9px;padding:11px;color:var(--text);background:var(--panel)}
+.settings-toggle{display:flex;align-items:center;gap:10px;color:var(--text)}
+.settings-toggle input{width:18px;height:18px;accent-color:var(--blue)}
+.disabled-setting{opacity:.58}
+.settings-input-suffix{display:flex;align-items:center;gap:9px}
+.settings-input-suffix input{max-width:130px}
+.settings-note,.settings-actions{grid-column:1/-1}
+.settings-note{margin:0;line-height:1.45}
+.settings-actions{display:flex;align-items:center;gap:14px}
+@media (max-width:700px){.notification-form{grid-template-columns:1fr}.settings-note,.settings-actions{grid-column:auto}}
+
 
 /* Separate browser-to-broker MQTT state from vehicle/OBD2 freshness. */
 .connection-status{

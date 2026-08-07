@@ -23,7 +23,9 @@
     authBusy: false,
     onboardingBusy: false,
     onboardingRequired: false,
-    onboardingExpanded: false
+    onboardingExpanded: false,
+    notificationBusy: false,
+    notificationVehicleId: null
   };
 
 
@@ -747,7 +749,67 @@ async function selectVehicle(vehicleId) {
   if (state.dataProvider?.selectVehicle) {
     await state.dataProvider.selectVehicle(vehicleId);
   }
+  await loadNotificationPreferences(true);
   window.MOTHistoryChart?.render?.();
+}
+
+function renderNotificationPreferences(preferences = null, message = '') {
+  const panel = $('settings');
+  const supported = Boolean(state.dataProvider?.getNotificationPreferences && auth?.isAuthenticated());
+  if (!panel) return;
+  panel.hidden = !supported || !state.selectedVehicleId;
+  if (panel.hidden) return;
+  $('notification-vehicle').textContent = state.selectedVehicleId;
+  if (preferences) {
+    $('notification-enabled').checked = preferences.enabled === true;
+    $('notification-threshold').value = Number(preferences.threshold || 80);
+    $('notification-email-enabled').checked = preferences.emailEnabled === true;
+    $('notification-email').value = preferences.email || '';
+    $('notification-email-state').textContent = preferences.emailConfirmed
+      ? 'E-Mail-Adresse bestätigt'
+      : (preferences.emailEnabled ? 'Bestätigung ausstehend' : 'E-Mail deaktiviert');
+  }
+  const disabled = state.notificationBusy;
+  ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
+    'notification-email', 'notification-save'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
+  $('notification-status').textContent = message;
+}
+
+async function loadNotificationPreferences(force = false) {
+  if (!state.dataProvider?.getNotificationPreferences || !state.selectedVehicleId) return;
+  if (!force && state.notificationVehicleId === state.selectedVehicleId) return;
+  state.notificationBusy = true;
+  renderNotificationPreferences(null, 'Einstellungen werden geladen…');
+  try {
+    const preferences = await state.dataProvider.getNotificationPreferences();
+    state.notificationVehicleId = state.selectedVehicleId;
+    state.notificationBusy = false;
+    renderNotificationPreferences(preferences, '');
+  } catch (error) {
+    state.notificationBusy = false;
+    renderNotificationPreferences(null, error?.message || 'Einstellungen konnten nicht geladen werden');
+  }
+}
+
+async function saveNotificationPreferences(event) {
+  event.preventDefault();
+  if (state.notificationBusy || !state.dataProvider?.saveNotificationPreferences) return;
+  state.notificationBusy = true;
+  renderNotificationPreferences(null, 'Wird gespeichert…');
+  try {
+    const preferences = await state.dataProvider.saveNotificationPreferences({
+      enabled: $('notification-enabled').checked,
+      threshold: Number($('notification-threshold').value),
+      emailEnabled: $('notification-email-enabled').checked,
+      email: String($('notification-email').value || '').trim(),
+      smsEnabled: false
+    });
+    state.notificationBusy = false;
+    renderNotificationPreferences(preferences, 'Gespeichert');
+  } catch (error) {
+    state.notificationBusy = false;
+    renderNotificationPreferences(null, error?.message || 'Speichern fehlgeschlagen');
+  }
 }
 
 function startDataProvider() {
@@ -804,6 +866,7 @@ function startDataProvider() {
           }
         }
         window.MOTHistoryChart?.render?.();
+        loadNotificationPreferences().catch(error => console.error('Notification settings failed:', error));
       },
       onOnboardingRequired: required => renderOnboarding(required),
       onSnapshot: snapshot => {
@@ -834,6 +897,7 @@ function startDataProvider() {
   $('onboarding-form')?.addEventListener('submit', submitOnboarding);
   $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
   $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
+  $('notification-form')?.addEventListener('submit', saveNotificationPreferences);
   async function bootstrap() {
     initStatic();
     resetDashboardForVehicle(state.selectedVehicleId);

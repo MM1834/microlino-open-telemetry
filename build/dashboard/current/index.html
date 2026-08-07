@@ -28,6 +28,7 @@
         <a href="#temps">♨ Temperaturen</a>
         <a href="#cells">▦ Zellen</a>
         <a href="#history">↗ History</a>
+        <a href="#settings">⚙ Einstellungen</a>
       </nav>
       <div class="side-status card compact">
         <div class="status-line"><span id="side-dot" class="dot"></span><strong id="side-online">Offline</strong></div>
@@ -235,6 +236,47 @@
   <div id="soc-history-meta" class="history-meta"></div>
 </section>
 
+<section class="card settings-card" id="settings" hidden>
+  <div class="card-header">
+    <div>
+      <h2>Benachrichtigungen</h2>
+      <span class="muted">Persönlich · fahrzeugbezogen</span>
+    </div>
+    <strong id="notification-vehicle">--</strong>
+  </div>
+  <form id="notification-form" class="notification-form">
+    <label class="settings-toggle">
+      <input id="notification-enabled" type="checkbox" />
+      <span>Benachrichtigung für dieses Fahrzeug aktivieren</span>
+    </label>
+    <label>
+      Ziel-SOC
+      <div class="settings-input-suffix">
+        <input id="notification-threshold" type="number" min="50" max="100" step="1" value="80" required />
+        <span>%</span>
+      </div>
+    </label>
+    <label class="settings-toggle">
+      <input id="notification-email-enabled" type="checkbox" />
+      <span>E-Mail senden</span>
+    </label>
+    <label>
+      E-Mail-Adresse
+      <input id="notification-email" type="email" autocomplete="email" />
+    </label>
+    <div id="notification-email-state" class="connection-detail"></div>
+    <label class="settings-toggle disabled-setting" title="Für den AWS-Free-Plan zurückgestellt">
+      <input id="notification-sms-enabled" type="checkbox" disabled />
+      <span>SMS senden – derzeit nicht verfügbar</span>
+    </label>
+    <p class="muted settings-note">Die Meldung ist rein informativ und steuert den Ladevorgang nicht. Eine neue E-Mail-Adresse muss über die zugesandte SNS-Mail bestätigt werden.</p>
+    <div class="settings-actions">
+      <button id="notification-save" class="auth-button" type="submit">Speichern</button>
+      <span id="notification-status" class="connection-detail" aria-live="polite"></span>
+    </div>
+  </form>
+</section>
+
 </main>
   </div>
   <script src="config.js"></script>
@@ -243,8 +285,8 @@
   <script src="js/auth/auth-manager.js?v=20260803-1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260804-1"></script>
-  <script src="js/app.js?v=20260806-bms1"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
+  <script src="js/app.js?v=20260807-ntf1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260806-1"></script>

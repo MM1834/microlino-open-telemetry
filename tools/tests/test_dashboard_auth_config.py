@@ -67,7 +67,36 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260804-1", source)
+        self.assertIn("aws-backend-provider.js?v=20260807-ntf1", source)
+
+
+class DashboardNotificationSettingsTests(unittest.TestCase):
+    def test_portal_exposes_vehicle_scoped_email_settings(self) -> None:
+        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        self.assertIn('id="notification-form"', html)
+        self.assertIn('id="notification-threshold"', html)
+        self.assertIn('id="notification-email"', html)
+        self.assertIn('id="notification-sms-enabled" type="checkbox" disabled', html)
+        self.assertIn("Persönlich · fahrzeugbezogen", html)
+
+    def test_provider_uses_separate_notification_api(self) -> None:
+        provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("notificationApiBaseUrl", provider)
+        self.assertIn("async getNotificationPreferences()", provider)
+        self.assertIn("async saveNotificationPreferences(preferences)", provider)
+
+        for config in (CONFIG_EXAMPLE, BETA_CONFIG_EXAMPLE, PRODUCTION_CONFIG_EXAMPLE):
+            self.assertIn("notificationApiBaseUrl:", config.read_text(encoding="utf-8"))
+
+    def test_app_loads_and_saves_for_selected_vehicle(self) -> None:
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
+        self.assertIn("async function loadNotificationPreferences", app)
+        self.assertIn("async function saveNotificationPreferences", app)
+        self.assertIn("state.selectedVehicleId", app)
+        self.assertIn("getNotificationPreferences", app)
+        self.assertIn("saveNotificationPreferences", app)
 
 
 class DashboardFreshnessTests(unittest.TestCase):

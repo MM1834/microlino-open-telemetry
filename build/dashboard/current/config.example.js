@@ -15,6 +15,7 @@ window.MOT_CONFIG = {
   awsBackend: {
     apiBaseUrl: "https://YOUR_API_ID.execute-api.eu-north-1.amazonaws.com",
     onboardingApiBaseUrl: "https://YOUR_ONBOARDING_API_ID.execute-api.eu-north-1.amazonaws.com",
+    notificationApiBaseUrl: "https://YOUR_NOTIFICATION_API_ID.execute-api.eu-north-1.amazonaws.com",
     websocketUrl: "wss://YOUR_WEBSOCKET_API_ID.execute-api.eu-north-1.amazonaws.com/$default",
 
     // REST remains the data source in Phase 4A. WebSocket carries connection,

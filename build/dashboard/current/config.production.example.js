@@ -6,6 +6,7 @@ window.MOT_CONFIG = {
   awsBackend: {
     apiBaseUrl: "https://yaugi9zu8l.execute-api.eu-north-1.amazonaws.com",
     onboardingApiBaseUrl: "https://3izicgmdxi.execute-api.eu-north-1.amazonaws.com",
+    notificationApiBaseUrl: "https://llojj35e6e.execute-api.eu-north-1.amazonaws.com",
     websocketUrl: "wss://pvmzhwb5c1.execute-api.eu-north-1.amazonaws.com/$default",
     pollingIntervalMs: 30000,
     heartbeatMs: 30000,
