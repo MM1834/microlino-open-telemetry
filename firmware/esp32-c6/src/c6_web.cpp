@@ -75,8 +75,10 @@ void setupPage()
     if (!requireSetupAccess()) return;
     String out = header("MOT C6 Setup");
     out += "<h1>Secure local setup</h1><p class='muted'>The setup access and fallback AP are protected by the device setup password printed on the serial console.</p>";
-    out += "<form method='POST' action='/setup'><div class='card'><label>WiFi SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'>";
-    out += "<label>WiFi password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'>";
+    out += "<form method='POST' action='/setup'><div class='card'><h2>Preferred home WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'>";
+    out += "<label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'>";
+    out += "<h2>Second / mobile hotspot</h2><label>SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'>";
+    out += "<label>Password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'>";
     out += "<label>New local admin password (12–63 characters)</label><input type='password' name='adminPassword' minlength='12' maxlength='63' required>";
     out += "<button>Secure device &amp; reboot</button></div></form></body></html>";
     server.send(200, "text/html", out);
@@ -89,9 +91,14 @@ void setupSave()
         server.send(400, "text/plain", "Admin password must be 12-63 printable ASCII characters"); return;
     }
     String ssid = server.arg("ssid"); ssid.trim();
-    if (ssid.length() > 32) { server.send(400, "text/plain", "Invalid SSID"); return; }
+    String ssid2 = server.arg("ssid2"); ssid2.trim();
+    if (ssid.length() > 32 || ssid2.length() > 32 || server.arg("wifiPassword").length() > 63 || server.arg("wifi2Password").length() > 63) { server.send(400, "text/plain", "Invalid WiFi configuration"); return; }
     c6Config.wifiSsid = ssid;
     if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
+    if (ssid.isEmpty()) c6Config.wifiPassword = "";
+    c6Config.wifi2Ssid = ssid2;
+    if (!server.arg("wifi2Password").isEmpty()) c6Config.wifi2Password = server.arg("wifi2Password");
+    if (ssid2.isEmpty()) c6Config.wifi2Password = "";
     c6Config.otaEnabled = true;
     c6ConfigSave();
     server.send(200, "text/html", header("Setup saved") + "<h1>Setup saved</h1><p>Rebooting with protected local administration.</p></body></html>");
@@ -111,7 +118,7 @@ String diagnosticsJson()
 {
     String out = "{\"deviceId\":\"" + motDeviceId() + "\",\"board\":\"" MOT_BOARD "\",\"firmware\":\"" MOT_VERSION "\"";
     out += ",\"uptimeSec\":" + String(millis() / 1000UL);
-    out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"status\":\"" + jsonEscape(c6NetworkStatus()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
+    out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"homeConfigured\":" + String(c6NetworkHomeConfigured() ? "true" : "false") + ",\"mobileConfigured\":" + String(c6NetworkMobileConfigured() ? "true" : "false") + ",\"state\":\"" + c6NetworkStateName() + "\",\"profile\":\"" + c6NetworkProfileName() + "\",\"reason\":\"" + jsonEscape(c6NetworkReason()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
     out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
     out += ",\"gps\":{\"state\":\"" + jsonEscape(c6GpsState()) + "\",\"detected\":" + String(c6GpsDetected() ? "true" : "false") + ",\"fix\":" + String(c6GpsValid() ? "true" : "false") + ",\"chars\":" + String(static_cast<unsigned long long>(c6GpsChars())) + ",\"satellites\":" + String(c6GpsSatellites()) + "}";
     out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"}";
@@ -134,7 +141,7 @@ void configPage()
     if (!requireAdmin()) return;
     String out = header("MOT C6 Configuration");
     out += "<h1>Configuration</h1><form method='POST' action='/save'>";
-    out += "<div class='card'><h2>WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'></div>";
+    out += "<div class='card'><h2>Preferred home WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'><h2>Second / mobile hotspot</h2><label>SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'><label>Password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'></div>";
     out += "<div class='card'><h2>CAN decoder assignment</h2><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><select name='can2'>" + profileOptions(c6Config.can2Profile) + "</select></div>";
     out += "<div class='card'><h2>Runtime</h2><label>Telemetry interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button>Save &amp; reboot</button></form>";
     out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
@@ -146,14 +153,19 @@ void saveConfig()
 {
     if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
     String ssid = server.arg("ssid"); ssid.trim();
+    String ssid2 = server.arg("ssid2"); ssid2.trim();
     const uint32_t interval = server.arg("pubMs").toInt();
     const DecoderProfile can1 = decoderProfileNormalize(server.arg("can1").toInt());
     const DecoderProfile can2 = decoderProfileNormalize(server.arg("can2").toInt(), DECODER_PROFILE_DISABLED);
-    if (ssid.length() > 32 || interval < 1000 || interval > 3600000) { server.send(400, "text/plain", "Invalid configuration"); return; }
+    if (ssid.length() > 32 || ssid2.length() > 32 || server.arg("wifiPassword").length() > 63 || server.arg("wifi2Password").length() > 63 || interval < 1000 || interval > 3600000) { server.send(400, "text/plain", "Invalid configuration"); return; }
     const String newAdmin = server.arg("adminPassword");
     if (!newAdmin.isEmpty() && !c6ConfigSetAdminPassword(newAdmin)) { server.send(400, "text/plain", "Invalid admin password"); return; }
     c6Config.wifiSsid = ssid;
     if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
+    if (ssid.isEmpty()) c6Config.wifiPassword = "";
+    c6Config.wifi2Ssid = ssid2;
+    if (!server.arg("wifi2Password").isEmpty()) c6Config.wifi2Password = server.arg("wifi2Password");
+    if (ssid2.isEmpty()) c6Config.wifi2Password = "";
     c6Config.can1Profile = can1; c6Config.can2Profile = can2;
     c6Config.publishIntervalMs = interval; c6Config.otaEnabled = server.hasArg("otaEnabled");
     c6ConfigSave();

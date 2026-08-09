@@ -8,15 +8,31 @@ CONFIG = (BASE / "c6_config.cpp").read_text(encoding="utf-8")
 NETWORK = (BASE / "c6_network.cpp").read_text(encoding="utf-8")
 WEB = (BASE / "c6_web.cpp").read_text(encoding="utf-8")
 MAIN = (BASE / "main.cpp").read_text(encoding="utf-8")
+BOARD = (BASE / "c6_board.cpp").read_text(encoding="utf-8")
+PLATFORMIO = (ROOT / "firmware/esp32-c6/platformio.ini").read_text(encoding="utf-8")
 SHARED_OTA = (ROOT / "firmware/common/web/local_ota.cpp").read_text(encoding="utf-8")
 SHARED_SECURITY = (ROOT / "firmware/common/web/local_web_security.cpp").read_text(encoding="utf-8")
 
 
 class C6ProductionHardeningTests(unittest.TestCase):
+    def test_xiao_standard_build_uses_internal_antenna(self) -> None:
+        xiao = PLATFORMIO.split("[env:xiao-esp32c6]", 1)[1].split("[env:", 1)[0]
+        self.assertIn("MOT_XIAO_BOARD=1", xiao)
+        self.assertNotIn("MOT_XIAO_EXTERNAL_ANTENNA", xiao)
+        self.assertIn("#ifdef MOT_XIAO_EXTERNAL_ANTENNA", BOARD)
+        self.assertIn("digitalWrite(14, HIGH)", BOARD)
+        self.assertIn("digitalWrite(14, LOW)", BOARD)
+        self.assertIn('WiFi antenna: internal ceramic', BOARD)
+
+    def test_device_id_uses_device_specific_efuse_bytes(self):
+        source = (ROOT / "firmware/common/system/device_id.cpp").read_text()
+        self.assertIn("(mac >> 40) & 0xFFFFFF", source)
+        self.assertNotIn("mac & 0xFFFFFF", source)
+
     def test_setup_and_fallback_ap_are_always_protected(self) -> None:
         self.assertIn("c6Config.setupPassword", NETWORK)
         self.assertIn("esp_random()", SHARED_SECURITY)
-        self.assertIn("WiFi.softAP(motFallbackApSsid().c_str(), password.c_str()", NETWORK)
+        self.assertIn("WiFi.softAP(motFallbackApSsid().c_str(), value.c_str()", NETWORK)
         self.assertNotIn("WiFi.softAP(motFallbackApSsid().c_str())", NETWORK)
         self.assertIn('server.authenticate("setup", initial.c_str())', WEB)
         self.assertIn('normalized == "setup status"', MAIN)
@@ -55,7 +71,7 @@ class C6ProductionHardeningTests(unittest.TestCase):
         for call in ("c6DualCanLoop();", "c6GpsLoop();", "c6NetworkLoop();", "c6WebLoop();", "c6AwsLoop();"):
             self.assertIn(call, loop)
         self.assertNotIn("while (WiFi.status()", NETWORK)
-        self.assertIn("WiFi.setAutoReconnect(true)", NETWORK)
+        self.assertIn("WiFi.setAutoReconnect(false)", NETWORK)
         self.assertNotIn("WiFi.reconnect();", NETWORK)
 
 

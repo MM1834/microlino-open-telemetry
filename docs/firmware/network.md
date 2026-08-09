@@ -18,17 +18,29 @@ online state.
 
 ## ESP32-C6
 
-The C6 network loop is cooperative: station connection and 15-second reconnect
-attempts do not wait inside the loop and therefore do not stop Dual-CAN, GPS,
-WebUI or AWS processing. With no configuration it starts a protected setup AP.
-If a configured station is unavailable for 20 seconds, the protected fallback AP
-starts while station reconnect continues.
+The C6 network loop is cooperative and uses two ordered station profiles. It tries
+the preferred Home-WiFi first and then the second/mobile hotspot after a bounded
+15-second timeout. If neither configured profile connects, the protected fallback
+AP starts and the preferred sequence retries after 30 seconds. This does not block
+Dual-CAN, GPS, WebUI or AWS processing.
+
+While the mobile profile is active, an asynchronous scan checks for Home-WiFi every
+60 seconds and switches back when the preferred SSID is visible. The fallback AP
+stays available during association and is stopped only after 10 seconds of stable
+station connectivity. Repository tests and builds pass; physical transition and
+concurrent-service validation remain open in WIFI-001.
 
 Before local administration is configured, the device-specific setup password is
 printed on USB serial and protects both WPA2 AP access and the `setup` WebUI
 account. Afterwards the local administrator password protects the fallback AP and
-the `admin` account. This slice stores one station profile; WIFI-001 owns ordered
-Home/mobile profiles.
+the `admin` account. The WebUI, backup/import and serial console store both
+profiles without rendering or logging their passwords. Runtime diagnostics report
+the active profile, state and transition reason.
+
+XIAO hardware testing found that the ESP32-C6 driver can briefly retain
+`WL_CONNECTED` after hotspot loss while its local address is already `0.0.0.0`.
+The online predicate therefore requires both connected status and a non-zero local
+address before a profile is considered usable.
 
 ## LilyGO
 

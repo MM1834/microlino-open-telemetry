@@ -7,6 +7,8 @@ struct C6Configuration {
     DecoderProfile can2Profile = DECODER_PROFILE_DISPLAY_CAN;
     String wifiSsid;
     String wifiPassword;
+    String wifi2Ssid;
+    String wifi2Password;
     String adminPassword;
     String setupPassword;
     bool otaEnabled = false;
@@ -20,6 +22,8 @@ void c6ConfigSave();
 bool c6ConfigSetCanProfile(size_t channel, DecoderProfile profile);
 bool c6ConfigSetWifi(const String &ssid, const String &password);
 void c6ConfigClearWifi();
+bool c6ConfigSetWifi2(const String &ssid, const String &password);
+void c6ConfigClearWifi2();
 bool c6ConfigAdminConfigured();
 bool c6ConfigSetAdminPassword(const String &password);
 String c6ConfigRecoverAdminPassword();

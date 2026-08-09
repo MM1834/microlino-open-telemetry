@@ -19,6 +19,8 @@ constexpr char MQTT_PREFIX[] = "mqttPrefix";
 
 constexpr char WIFI_SSID[] = "wifiSsid";
 constexpr char WIFI_PASS[] = "wifiPass";
+constexpr char WIFI2_SSID[] = "wifi2Ssid";
+constexpr char WIFI2_PASS[] = "wifi2Pass";
 constexpr char LTE_APN[] = "lteApn";
 constexpr char LTE_USER[] = "lteUser";
 constexpr char LTE_PASS[] = "ltePass";

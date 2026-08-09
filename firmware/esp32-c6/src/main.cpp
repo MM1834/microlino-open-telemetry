@@ -75,20 +75,38 @@ void handleSerialCommand(String command)
 
     if (normalized == "wifi status") {
         Serial.println("WiFi: " + c6NetworkStatus());
+        Serial.printf("Profiles configured: home=%s mobile=%s\n",
+                      c6NetworkHomeConfigured() ? "yes" : "no",
+                      c6NetworkMobileConfigured() ? "yes" : "no");
         return;
     }
     if (normalized == "wifi clear") {
         c6ConfigClearWifi();
-        Serial.println("WiFi configuration cleared; restart required");
+        Serial.println("Home WiFi configuration cleared; restart required");
         return;
     }
     if (normalized.startsWith("wifi set ")) {
         const String value = command.substring(9);
         const int separator = value.indexOf('|');
         if (separator <= 0 || !c6ConfigSetWifi(value.substring(0, separator), value.substring(separator + 1))) {
-            Serial.println("Usage: wifi set <ssid>|<password>");
+            Serial.println("Usage: wifi set <ssid>|<password> (home profile)");
         } else {
-            Serial.println("WiFi credentials saved without echo; restart required");
+            Serial.println("Home WiFi credentials saved without echo; restart required");
+        }
+        return;
+    }
+    if (normalized == "wifi2 clear") {
+        c6ConfigClearWifi2();
+        Serial.println("Mobile WiFi configuration cleared; restart required");
+        return;
+    }
+    if (normalized.startsWith("wifi2 set ")) {
+        const String value = command.substring(10);
+        const int separator = value.indexOf('|');
+        if (separator <= 0 || !c6ConfigSetWifi2(value.substring(0, separator), value.substring(separator + 1))) {
+            Serial.println("Usage: wifi2 set <ssid>|<password> (mobile profile)");
+        } else {
+            Serial.println("Mobile WiFi credentials saved without echo; restart required");
         }
         return;
     }
@@ -115,7 +133,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | setup status | admin recover | aws status");
+        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status");
         return;
     }
 
@@ -171,7 +189,7 @@ void setup()
     c6WebSetup();
     c6AwsSetup();
     c6DriveCaptureReset();
-    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | setup status | admin recover | aws status");
+    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status");
 }
 
 void loop()

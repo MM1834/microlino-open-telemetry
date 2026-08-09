@@ -35,6 +35,8 @@ void c6ConfigLoad()
         DECODER_PROFILE_DISPLAY_CAN);
     c6Config.wifiSsid = preferences.getString("ssid", "");
     c6Config.wifiPassword = preferences.getString("pass", "");
+    c6Config.wifi2Ssid = preferences.getString("ssid2", "");
+    c6Config.wifi2Password = preferences.getString("pass2", "");
     c6Config.adminPassword = preferences.getString("otaPass", "");
     c6Config.setupPassword = preferences.getString("setupPass", "");
     c6Config.otaEnabled = preferences.getBool("otaEn", false);
@@ -79,6 +81,31 @@ void c6ConfigClearWifi()
     preferences.end();
 }
 
+bool c6ConfigSetWifi2(const String &ssidValue, const String &passwordValue)
+{
+    String ssid = ssidValue;
+    String password = passwordValue;
+    ssid.trim();
+    if (ssid.isEmpty() || ssid.length() > 32 || password.length() > 63) return false;
+    c6Config.wifi2Ssid = ssid;
+    c6Config.wifi2Password = password;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putString("ssid2", c6Config.wifi2Ssid);
+    preferences.putString("pass2", c6Config.wifi2Password);
+    preferences.end();
+    return true;
+}
+
+void c6ConfigClearWifi2()
+{
+    c6Config.wifi2Ssid = "";
+    c6Config.wifi2Password = "";
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.remove("ssid2");
+    preferences.remove("pass2");
+    preferences.end();
+}
+
 void c6ConfigSave()
 {
     preferences.begin(PREFERENCES_NAMESPACE, false);
@@ -86,6 +113,8 @@ void c6ConfigSave()
     preferences.putUChar("can2", static_cast<uint8_t>(c6Config.can2Profile));
     preferences.putString("ssid", c6Config.wifiSsid);
     preferences.putString("pass", c6Config.wifiPassword);
+    preferences.putString("ssid2", c6Config.wifi2Ssid);
+    preferences.putString("pass2", c6Config.wifi2Password);
     preferences.putString("otaPass", c6Config.adminPassword);
     preferences.putString("setupPass", c6Config.setupPassword);
     preferences.putBool("otaEn", c6Config.otaEnabled);
@@ -123,6 +152,8 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["board"] = MOT_BOARD;
     doc["wifiSsid"] = c6Config.wifiSsid;
     if (includeSecrets) doc["wifiPassword"] = c6Config.wifiPassword;
+    doc["wifi2Ssid"] = c6Config.wifi2Ssid;
+    if (includeSecrets) doc["wifi2Pass"] = c6Config.wifi2Password;
     doc["can1Profile"] = static_cast<int>(c6Config.can1Profile);
     doc["can2Profile"] = static_cast<int>(c6Config.can2Profile);
     doc["publishIntervalMs"] = c6Config.publishIntervalMs;
@@ -145,13 +176,17 @@ bool c6ConfigImportJson(const String &json, String &error)
     C6Configuration candidate = c6Config;
     if (!doc["wifiSsid"].isNull()) candidate.wifiSsid = doc["wifiSsid"].as<String>();
     if (!doc["wifiPassword"].isNull()) candidate.wifiPassword = doc["wifiPassword"].as<String>();
+    if (!doc["wifi2Ssid"].isNull()) candidate.wifi2Ssid = doc["wifi2Ssid"].as<String>();
+    if (!doc["wifi2Pass"].isNull()) candidate.wifi2Password = doc["wifi2Pass"].as<String>();
     if (!doc["can1Profile"].isNull()) candidate.can1Profile = decoderProfileNormalize(doc["can1Profile"].as<int>());
     if (!doc["can2Profile"].isNull()) candidate.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
     if (!doc["publishIntervalMs"].isNull()) candidate.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
     if (!doc["adminPassword"].isNull()) candidate.adminPassword = doc["adminPassword"].as<String>();
     candidate.wifiSsid.trim();
+    candidate.wifi2Ssid.trim();
     if (candidate.wifiSsid.length() > 32 || candidate.wifiPassword.length() > 63 ||
+        candidate.wifi2Ssid.length() > 32 || candidate.wifi2Password.length() > 63 ||
         candidate.publishIntervalMs < 1000 || candidate.publishIntervalMs > 3600000) {
         error = "invalid WiFi or publish interval";
         return false;

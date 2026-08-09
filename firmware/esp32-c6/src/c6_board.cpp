@@ -4,13 +4,21 @@
 
 void c6BoardSetup()
 {
-#ifdef MOT_XIAO_EXTERNAL_ANTENNA
-    // Seeed XIAO ESP32-C6 RF switch: enable software control, then select U.FL.
+#ifdef MOT_XIAO_BOARD
+    // Seeed XIAO ESP32-C6 RF switch: enable software control, then select the
+    // ceramic antenna by default. Define MOT_XIAO_EXTERNAL_ANTENNA only for a
+    // build whose target has a connected 2.4 GHz U.FL antenna.
     pinMode(3, OUTPUT);
     digitalWrite(3, LOW);
     delay(100);
     pinMode(14, OUTPUT);
+#ifdef MOT_XIAO_EXTERNAL_ANTENNA
     digitalWrite(14, HIGH);
+    Serial.println("WiFi antenna: external U.FL");
+#else
+    digitalWrite(14, LOW);
+    Serial.println("WiFi antenna: internal ceramic");
+#endif
 #endif
 
     Serial.printf("Board: %s\n", MOT_BOARD);

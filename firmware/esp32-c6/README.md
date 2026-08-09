@@ -16,7 +16,14 @@ Current implemented slice:
 - WiFi station configuration and optional per-device AWS IoT publication;
 - protected device-specific setup/fallback AP and non-blocking reconnect;
 - authenticated local WebUI, backup/restore, factory reset and local OTA;
-- XIAO external-antenna selection.
+- XIAO internal ceramic antenna by default, with explicit external-U.FL build
+  selection for hardware fitted with a 2.4 GHz antenna.
+
+The maintained `xiao-esp32c6` and `xiao-esp32c6-aws` environments select the
+onboard ceramic antenna and print that selection at boot. For a dedicated unit
+with a connected external antenna, add `MOT_XIAO_EXTERNAL_ANTENNA=1` to that
+unit's build flags; do not distribute such an image to XIAO units without an
+antenna on the U.FL connector.
 
 Build without flashing:
 
@@ -82,12 +89,14 @@ LilyGO T-A7670 firmware families.
 WiFi can also be configured over serial without echoing the password:
 
 ```text
-wifi set MySSID|MyPassword
+wifi set MyHomeSSID|MyPassword
+wifi2 set MyMobileHotspot|MyPassword
 wifi status
 aws status
 ```
 
-Restart after changing WiFi. AWS builds load unique X.509 credential files from
+`wifi clear` and `wifi2 clear` remove each profile independently. Restart after
+changing WiFi through the console. AWS builds load unique X.509 credential files from
 LittleFS `/aws`; credentials are not linked into the application image. The
 shared upload helper accepts `esp32-c6` and defaults to
 `nanoesp32c6-n16-aws`, with `xiao-esp32c6-aws` selectable explicitly.

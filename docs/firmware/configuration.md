@@ -13,7 +13,8 @@ targets retain Display-CAN as the default for their available input.
 | `deviceName` | Stable device identity and MQTT client-name source |
 | `vehicleId` | Vehicle component in MQTT topic paths |
 | `mqttPrefix` | Root MQTT topic prefix |
-| `wifiSsid` / `wifiPass` | WiFi station credentials |
+| `wifiSsid` / `wifiPass` | Preferred home-WiFi station credentials |
+| `wifi2Ssid` / `wifi2Pass` | C6 second/mobile-hotspot credentials; persistence implemented, runtime selection remains in WIFI-001 |
 | `lteApn` / user / password | Mobile packet-data configuration |
 | `mqttHost` / `mqttPort` | MQTT broker endpoint |
 | `mqttUser` / `mqttPass` | MQTT credentials |
@@ -40,11 +41,12 @@ MQTT should only be started when a broker host is configured. ABRP should only b
 4. Export a JSON backup.
 5. Store the backup securely.
 
-During C6 qualification, WiFi credentials can additionally be stored over the
-115200-baud serial console with `wifi set <ssid>|<password>` and inspected without
-secret echo using `wifi status`. `wifi clear` removes them. A restart applies a
-new setting. This is a temporary provisioning surface, not a replacement for the
-authenticated local administration acceptance gate.
+On C6, credentials can be configured through the authenticated WebUI or the
+115200-baud serial console. `wifi set <ssid>|<password>` configures preferred Home
+WiFi; `wifi2 set <ssid>|<password>` configures the second/mobile hotspot.
+`wifi clear` and `wifi2 clear` remove the respective profile. `wifi status`
+reports selection state without secret echo. A restart applies configuration
+changes made through the console.
 
 The C6 AWS builds load the same four per-device credential files from
 `/aws` in LittleFS as WROOM and LilyGO. `aws status` reports credential and
