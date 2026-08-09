@@ -1,10 +1,15 @@
 (function(){
 "use strict";
 let currentRangeHours=24;
+const RANGE_STORAGE_KEY="mot-history-range";
+const RANGE_STORAGE_TTL_MS=7*24*60*60*1000;
+const ALLOWED_RANGES=[24,168,720];
 
 async function init(){
   if(!document.getElementById("soc-history-chart")) return;
+  currentRangeHours=restoreRange();
   bindButtons();
+  updateRangeButtons(currentRangeHours);
   await render(currentRangeHours);
   window.addEventListener("mot-history-sample",()=>render(currentRangeHours));
   window.addEventListener("mot-history-cleared",()=>render(currentRangeHours));
@@ -36,7 +41,8 @@ async function render(hours=24){
     unit:"%",
     min:0,
     max:100,
-    color:"#38bdf8"
+    color:"#38bdf8",
+    rangeHours:hours
   });
 
   const speedField=samples.some(s=>s.speed!==undefined)?"speed":"speedKmh";
@@ -51,7 +57,8 @@ async function render(hours=24){
     unit:"km/h",
     min:0,
     max:null,
-    color:"#22c55e"
+    color:"#22c55e",
+    rangeHours:hours
   });
 
   const powerSource=samples
@@ -77,6 +84,7 @@ async function render(hours=24){
     max:null,
     color:"#f59e0b",
     decimals:1,
+    rangeHours:hours,
     latestPoint:powerSource[powerSource.length-1],
     formatValue:(value,point)=>`${point?._powerMode||"Leistung"} ${Number(value).toFixed(1)}`
   });
@@ -91,6 +99,7 @@ async function render(hours=24){
     min:0,
     max:1,
     color:"#a855f7",
+    rangeHours:hours,
     formatValue:value=>Number(value)>=0.5?"Ja":"Nein"
   });
 
@@ -104,6 +113,7 @@ async function render(hours=24){
     min:0,
     max:1,
     color:"#ec4899",
+    rangeHours:hours,
     formatValue:value=>Number(value)>=0.5?"Ja":"Nein"
   });
 
@@ -271,16 +281,60 @@ function draw(canvas,points,o){
   ctx.fillStyle="rgba(148,163,184,.9)";
   ctx.font="11px system-ui";
   ctx.textAlign="left";
-  ctx.fillText(new Date(first.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),L,h-8);
-  ctx.fillText(new Date(last.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),Math.max(L,w-80),h-8);
+  ctx.fillText(formatAxisTime(first.ts,o.rangeHours),L,h-8);
+  ctx.textAlign="right";
+  ctx.fillText(formatAxisTime(last.ts,o.rangeHours),w-R,h-8);
+}
+
+function formatAxisTime(timestamp,rangeHours=24){
+  const date=new Date(timestamp);
+  const locale=window.MOT_CONFIG?.dashboard?.locale||"de-CH";
+  if(rangeHours<=24){
+    return date.toLocaleTimeString(locale,{hour:"2-digit",minute:"2-digit"});
+  }
+  if(rangeHours<=168){
+    return date.toLocaleDateString(locale,{weekday:"short",day:"2-digit",month:"2-digit"});
+  }
+  return date.toLocaleDateString(locale,{day:"2-digit",month:"2-digit",year:"numeric"});
 }
 
 function bindButtons(){
   document.querySelectorAll("[data-history-range]").forEach(btn=>btn.addEventListener("click",()=>{
-    document.querySelectorAll("[data-history-range]").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    render(Number(btn.dataset.historyRange));
+    const hours=Number(btn.dataset.historyRange);
+    updateRangeButtons(hours);
+    storeRange(hours);
+    render(hours);
   }));
+}
+
+function updateRangeButtons(hours){
+  document.querySelectorAll("[data-history-range]").forEach(btn=>{
+    btn.classList.toggle("active",Number(btn.dataset.historyRange)===hours);
+  });
+}
+
+function restoreRange(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(RANGE_STORAGE_KEY)||"null");
+    const hours=Number(stored?.hours);
+    if(ALLOWED_RANGES.includes(hours)&&Number(stored?.expiresAt)>Date.now()) return hours;
+    localStorage.removeItem(RANGE_STORAGE_KEY);
+  }catch(_error){
+    // Storage can be unavailable in restrictive browser/privacy modes.
+  }
+  return 24;
+}
+
+function storeRange(hours){
+  if(!ALLOWED_RANGES.includes(hours)) return;
+  try{
+    localStorage.setItem(RANGE_STORAGE_KEY,JSON.stringify({
+      hours,
+      expiresAt:Date.now()+RANGE_STORAGE_TTL_MS
+    }));
+  }catch(_error){
+    // The chart remains functional even when browser storage is unavailable.
+  }
 }
 
 function getVehicleId(){

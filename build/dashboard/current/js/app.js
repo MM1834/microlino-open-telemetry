@@ -192,7 +192,20 @@
     'display/odometer_km'
   ];
 
-  function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
+  function setText(id, value) {
+    const el = $(id);
+    if (el) el.textContent = value;
+    document.querySelectorAll(`[data-mirror-for="${id}"]`).forEach(mirror => {
+      mirror.textContent = value;
+    });
+  }
+  function syncDot(id) {
+    const source = $(id);
+    if (!source) return;
+    document.querySelectorAll(`[data-mirror-dot="${id}"]`).forEach(mirror => {
+      mirror.className = source.className;
+    });
+  }
   function fmtNum(v, digits = 0) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(digits) : '--'; }
   function fmtCoord(v, positiveSuffix, negativeSuffix) {
     const n = Number(v);
@@ -256,10 +269,11 @@
     dotEl.classList.remove('online', 'stale', 'offline');
 
     if (!state.vehicleLastSeenMs) {
-      statusEl.textContent = 'Keine Daten';
-      detailEl.textContent = 'Noch kein Update empfangen';
+      setText('vehicle-status', 'Keine Daten');
+      setText('vehicle-last-update', 'Noch kein Update empfangen');
       setText('side-updated', '--');
       dotEl.classList.add('offline');
+      syncDot('vehicle-dot');
       return;
     }
 
@@ -278,7 +292,10 @@
     }
 
     detailEl.textContent = `Letztes Update ${relative}`;
+    setText('vehicle-status', statusEl.textContent);
+    setText('vehicle-last-update', detailEl.textContent);
     setText('side-updated', relative);
+    syncDot('vehicle-dot');
   }
 
   function setLiveStatus(status = {}) {
@@ -297,6 +314,7 @@
     dot.classList.remove('online', 'stale');
     if (stateName === 'connected') dot.classList.add('online');
     else if (stateName === 'connecting' || stateName === 'reconnecting') dot.classList.add('stale');
+    syncDot('live-dot');
   }
 
   function updateObd2Freshness() {
@@ -383,6 +401,7 @@
           : 'Noch keine Geräte-IP über MQTT empfangen';
       }
     }
+    setText('mobile-connection-network', `Netzwerk: ${mode} · WebUI: ${hasIp ? ip : '--'}`);
   }
 
   function openLocalWebUi() {
@@ -418,6 +437,7 @@
     setText('side-online', ok ? 'Online' : 'Offline');
     $('mqtt-dot')?.classList.toggle('online', ok);
     $('side-dot')?.classList.toggle('online', ok);
+    syncDot('mqtt-dot');
 
     updateDeviceInfo();
   }
@@ -539,6 +559,13 @@
     const flow = charging ? 'Laden' : regenerating ? 'Rekuperation' : discharging ? 'Verbrauch' : 'Bereit';
     setText('power-flow', flow);
   }
+  function renderChargingState() {
+    const charging = state.values['charging/is_charging'] === true || Number(state.values['charging/is_charging']) === 1;
+    const plugged = state.values['charging/plugged'] === true || Number(state.values['charging/plugged']) === 1;
+    const label = charging ? 'Lädt' : plugged ? 'Eingesteckt' : 'Nicht am Laden';
+    setText('charging-main', label);
+    setText('charging-card', label);
+  }
   function applyTopic(topic, payload, metadata = null) {
     const base = baseTopic() + '/';
     const key = topic.startsWith(base) ? topic.slice(base.length) : topic;
@@ -557,8 +584,8 @@
       case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); break;
       case 'display/odometer_km': case 'display/odo': setText('odo-main', `${fmtNum(val,1)} km`); break;
       case 'display/estimated_range_km': case 'display/range': state.values.range = val; setText('range-main', `${fmtNum(val,0)} km`); break;
-      case 'charging/is_charging': { const charging = !!Number(val) || val === true; const t = charging ? 'Lädt' : 'Nicht am Laden'; setText('charging-main', t); setText('charging-card', t); updateBmsPowerFlow(); break; }
-      case 'charging/plugged': { const plugged = !!Number(val) || val === true; if(plugged && !(!!Number(state.values['charging/is_charging']) || state.values['charging/is_charging'] === true)){ setText('charging-main','Eingesteckt'); setText('charging-card','Eingesteckt'); } break; }
+      case 'charging/is_charging': renderChargingState(); updateBmsPowerFlow(); break;
+      case 'charging/plugged': renderChargingState(); break;
       case 'charging/power_signed': case 'charging/power_display': {
         const p=Number(val)/10;
         const charging = state.values['charging/is_charging'] === true || Number(state.values['charging/is_charging']) === 1;

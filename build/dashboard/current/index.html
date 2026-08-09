@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260804-3" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260809-mobile1" />
   <link rel="stylesheet" href="css/history.css">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -134,10 +134,10 @@
           <a class="history-link" href="#history">History ansehen →</a>
         </div>
         <div class="hero-metrics">
-          <div class="metric-card soc-card"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="soc-updated" class="muted">Stand: --</small></div>
-          <div class="metric-card"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
-          <div class="metric-card"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><p>Ladestatus</p></div>
-          <div class="metric-card"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Laufleistung</p></div>
+          <div class="metric-card soc-card overview-soc"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="soc-updated" class="muted">Stand: --</small></div>
+          <div class="metric-card overview-speed"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
+          <div class="metric-card overview-charging"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><p>Ladestatus</p></div>
+          <div class="metric-card overview-odometer"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Gesamtkilometer</p></div>
         </div>
 
         <article id="location" class="hero-location">
@@ -150,6 +150,25 @@
         </article>
 
         <div class="hero-image-wrap"><img id="hero-image" src="img/microlino.jpeg" alt="Microlino" /></div>
+      </section>
+
+      <section class="card mobile-connection-card" aria-label="Verbindungsstatus">
+        <h2>Verbindungsstatus</h2>
+        <div class="mobile-connection-list" aria-live="polite">
+          <div class="mobile-connection-item">
+            <span class="dot" data-mirror-dot="mqtt-dot"></span>
+            <div><span>Cloud</span><strong data-mirror-for="mqtt-status">Verbinden…</strong><small data-mirror-for="mqtt-detail">AWS Vehicle API wird verbunden</small></div>
+          </div>
+          <div class="mobile-connection-item">
+            <span class="dot" data-mirror-dot="live-dot"></span>
+            <div><span>Live-Kanal</span><strong data-mirror-for="live-status">Nicht verbunden</strong><small data-mirror-for="live-detail">WebSocket wartet</small></div>
+          </div>
+          <div class="mobile-connection-item">
+            <span class="dot vehicle-dot" data-mirror-dot="vehicle-dot"></span>
+            <div><span>Microlino / OBD2</span><strong data-mirror-for="vehicle-status">Keine Daten</strong><small data-mirror-for="vehicle-last-update">Noch kein Update empfangen</small></div>
+          </div>
+        </div>
+        <div id="mobile-connection-network" class="mobile-connection-network">Netzwerk: -- · WebUI: --</div>
       </section>
 
       <section class="grid">
@@ -289,7 +308,7 @@
   <script src="js/app.js?v=20260807-ntf1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260806-1"></script>
+  <script src="js/history/history-chart.js?v=20260809-1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>
