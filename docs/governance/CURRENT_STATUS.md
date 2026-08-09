@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-07
+**Last reviewed:** 2026-08-09
 
 ## Purpose
 
@@ -31,6 +31,14 @@ firmware's local WebUI.
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
 future fleet functions.
+
+Future firmware feature development is now centered on the dual-CAN ESP32-C6
+line, with the 16 MB nanoESP32-C6-N16 as the primary target. The 4 MB XIAO remains
+a bounded compatibility target where the shared C6 implementation fits without a
+fork. ESP32-WROOM and LilyGO remain supported at their validated baseline but are
+no longer feature-development targets. WIFI-001 uses a second C6 WiFi profile for
+an external LTE/GSM hotspot; replacement of LilyGO's onboard cellular path remains
+an open hardware/architecture evaluation.
 
 The repository-owned public landing page under `build/landing/current/` was
 deployed to the hosted root by the maintainer on 2026-08-05 and successfully
@@ -69,6 +77,12 @@ operationally separate from `/dashboard/` and `/motbeta/`.
   WebUI/API routes require authentication and local OTA defaults to disabled.
 - ABRP remains WiFi-only and was disabled for the validated AWS/LTE configuration.
 
+LTE-001 is parked as of 2026-08-09. Its validated WiFi/LTE baseline remains
+supported, but the open extended soak, weak-signal, SIM-variation and repeated
+failover qualification is not part of the active work order. FW-SEC-001 was
+formally closed on the same date at its currently validated security baseline;
+future firmware feature and security work is concentrated on the ESP32-C6 line.
+
 ## Firmware structure
 
 The repository contains shared telemetry, CAN decoding, configuration, readiness,
@@ -106,6 +120,33 @@ recovery while preserving configuration. All C6, WROOM and LilyGO base/AWS build
 and 25 focused security tests passed. Extended soak and XIAO vehicle Dual-CAN/AWS
 equivalence remain non-blocking follow-up evidence. Neither board is yet a generally
 approved production module.
+
+WIFI-001 now has a C6-only repository implementation for preferred Home-WiFi and
+a second/mobile hotspot profile. The cooperative policy, authenticated WebUI,
+serial configuration, secret-safe backup and diagnostics compile from the same
+source for N16 and XIAO; 107 repository tests and all four C6 base/AWS builds pass.
+The slice adds 5,222 bytes and leaves XIAO-AWS at 75.6% application flash. On
+2026-08-08 XIAO physically passed Home/mobile fallback and automatic return while
+GPS and both CAN loops continued. The test exposed and closed a stale
+`WL_CONNECTED` with zero-IP edge case. On 2026-08-08 the N16-AWS image was
+installed by OTA: it used the mobile hotspot outside Home coverage, continued
+publishing, then automatically returned to Home WiFi on entering the garage and
+updated its Home-network address in the portal. A USB-observed N16 road run then
+captured Home loss, bounded fallback to Mobile, AWS reconnect, periodic Home
+detection and automatic return. Both CAN counters advanced with zero controller
+errors, live BMS data continued and GPS obtained a valid fix across the run. The
+final controlled test disabled the only reachable hotspot: N16 started its
+protected fallback AP after bounded retries while CAN/GPS continued, then recovered
+to Mobile, AWS publication and automatically stopped the AP after the hotspot was
+restored. WIFI-001 hardware and repository qualification is complete. The XIAO was then
+explicitly erased, re-provisioned with the current 4 MB partition layout and an
+empty valid LittleFS image, and verified in its clean protected-AP state for a
+separate onboarding exercise.
+
+On 2026-08-09 the standard XIAO base/AWS profiles were corrected from an
+unintended external-U.FL selection to the onboard ceramic antenna used by the
+deployed modules. External U.FL selection remains an explicit per-build option
+for hardware with a connected 2.4 GHz antenna. The N16 profiles are unaffected.
 
 On 2026-08-06 controlled lower-SOC charging confirmed Pioneer Standard-CAN pack
 current at 0.3 A per raw unit, pack voltage, derived power and stable plug/charge
@@ -176,8 +217,16 @@ portal source tree:
   journey-end zero immediately and averages Speed at API resolution. Signed power
   now uses the same active-minute aggregation, and the portal closes Speed/power
   reception gaps at zero instead of drawing diagonal phantom values. The backend
-  refinement is deployed and read back; the static hosted portal package awaits
-  manual FTPS upload. GPS remains live-only.
+  refinement is deployed and read back. The static portal package was uploaded on
+  2026-08-09 and accepted on smartphone and desktop. GPS remains live-only.
+
+The hosted portal now uses a charging-first smartphone information hierarchy:
+vehicle selection and compact connection indicators, charging state/power, SOC
+and range, Speed, total mileage, location, detailed connectivity, engineering
+cards, History, notifications, technical status and finally vehicle branding.
+The same URL selects this layout responsively; desktop retains its established
+dashboard layout. Plugged-but-not-charging is rendered consistently as
+`Eingesteckt`, independent of telemetry arrival order.
 
 The legacy Node-RED forwarder identity `xrpioneer` is provisioned with a dedicated
 publish-only AWS IoT certificate, assigned to its controlled beta user and enabled
@@ -206,10 +255,10 @@ HIS-001 was deployed on 2026-08-04 after measuring 1,761,194 ingest invocations
 across 119 active hourly datapoints in the preceding week; steady active plateaus
 were near 17,400/hour. The fail-closed deployment and subsequent one-vehicle core
 activation both reached `UPDATE_COMPLETE`. The history table still had zero rows
-because `pioneer` had not published after activation. Authenticated history,
-live-path regression under fresh traffic, portal deployment, motion enablement and
-cost/TTL observation remain open. Cost Explorer access is not granted to the
-maintainer IAM user.
+because `pioneer` had not published after activation. Authenticated History,
+live-path regression, motion enablement and the hosted static deployment have
+since passed. The first moving-road observation and cost/TTL evidence remain open.
+Cost Explorer access is not granted to the maintainer IAM user.
 
 Authentication, assignment enforcement and controlled claiming now exist in the
 development AWS account and hosted pilot portal. Two controlled users passed
@@ -233,9 +282,10 @@ Known candidate paths were:
 C6-001 selected the nanoESP32-C6-N16 plus two external transceivers as the bounded
 dual-CAN WiFi pilot path. Pilot duplication must retain the recorded GPIO mapping,
 USB power, per-device credentials and one-active-publisher-per-vehicle rule.
-Authenticated C6 local administration, runtime OTA/rollback, extended soak and
-production wiring/enclosure approval remain deferred rather than implied by the
-pilot result.
+C6-PH-001 subsequently completed authenticated local administration, protected
+setup/fallback AP, backup/reset, local OTA failure recovery and cooperative WiFi
+reconnect. Extended soak, signed fleet rollback and production wiring/enclosure
+approval remain deferred rather than implied by that result.
 
 ## Validation status
 

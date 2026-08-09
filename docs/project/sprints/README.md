@@ -11,16 +11,18 @@
 ## Active implementation work
 
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
-- [FW-SEC-001 — Local firmware administration hardening](FW-SEC-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
-- [LTE-001 — LilyGO LTE resilience](LTE-001.md)
 
 ## Completed predecessors
 
+- [WIFI-001](WIFI-001.md) completed preferred Home-WiFi, Mobile fallback,
+  automatic Home return and protected-AP recovery on C6.
 - [NTF-001](NTF-001.md) completed the bounded charging/SOC email notification
   and authenticated per-vehicle portal-settings pilot on 2026-08-08; SMS remains
   a deferred channel.
+- [FW-SEC-001](FW-SEC-001.md) completed local administration hardening and
+  physical WROOM/LilyGO validation on 2026-08-09.
 - [C6-PH-001](C6-PH-001.md) completed N16 production hardening and XIAO
   compatibility validation on 2026-08-07.
 - [C6-001](C6-001.md) closed the bounded N16 dual-CAN WiFi/AWS pilot
@@ -33,3 +35,8 @@
 
 Completed delivery records are available through Git history rather than retained
 as parallel status documents in the working tree.
+
+## Parked work
+
+- [LTE-001](LTE-001.md) retains the functionally validated LilyGO A7670 baseline;
+  extended production qualification is parked while feature work focuses on C6.

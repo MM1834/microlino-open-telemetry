@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-07
+**Last reviewed:** 2026-08-09
 
 ## High priority
 
@@ -27,18 +27,9 @@ operation passed with fresh traffic. After road-test review, a repository update
 now samples Speed and signed power per active minute, records immediate zero
 transitions, suppresses continuous zero writes and averages both into the fixed
 API resolutions. Speed reception gaps are closed at zero in the portal instead
-of linearly interpolated. The AWS backend deployment passed; hosted-portal upload and the
-first moving-road-test/TTL/cost observation remain open. The existing live state and WebSocket path remain the
-release boundary and must not regress.
-
-### Harden local firmware administration — active
-
-**Active security sprint:** [FW-SEC-001 — Local Firmware Administration Hardening](../project/sprints/FW-SEC-001.md)
-
-**Objective:** Require a unique local device password, protect recovery AP and
-sensitive WebUI/OTA operations, and close secret-echo paths before hardware is
-issued to external pilot users. ESP32-WROOM and LilyGO now implement and physically
-pass the same local-administration boundary.
+of linearly interpolated. The AWS backend deployment and hosted portal upload
+passed. The first moving-road-test/TTL/cost observation remains open. The existing
+live state and WebSocket path remain the release boundary and must not regress.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 
@@ -95,30 +86,12 @@ is required by fleet growth.
 
 ## Medium priority
 
-### Harden LilyGO LTE resilience — repository implementation complete
-
-**Active work package:** [LTE-001 — LilyGO LTE Resilience](../project/sprints/LTE-001.md)
-
-The configurable APN path, bounded reconnect/backoff, modem recovery diagnostics
-and WiFi-first AWS IoT fallback are implemented. Focused repository tests and both
-LilyGO compile gates pass. Stationary round-trip and maintainer road tests passed,
-including loss of mobile coverage and a full power cycle. Long-duration soak,
-controlled weak-signal, SIM-loss and repeated transition-cycle qualification
-remain open before general production readiness.
-
 ### Simplify maintained firmware environments
 
 Maintain one firmware line per board. The standalone GPS test environment is
 retired and removed. Continue by stopping treatment of pre-AWS environments as
 separate product firmware generations. Preserve AWS IoT as a normal configurable
 feature while keeping local standalone operation.
-
-### Qualify LilyGO LTE/GPRS beyond the functional pilot path
-
-AWS IoT X.509 over LTE/TLS, WiFi preference/fallback and live CAN-to-portal data
-are functionally validated. Continue with long-running soak, weak-signal, modem
-recovery, watchdog and power-condition testing before declaring the path generally
-production-ready. ABRP remains WiFi-only.
 
 ### Revalidate the current repository revision
 
@@ -128,6 +101,13 @@ against the exact commit and environment.
 
 ## Completed reference
 
+- [WIFI-001](../project/sprints/WIFI-001.md) completed preferred Home-WiFi,
+  Mobile fallback, automatic Home return and protected-AP recovery on C6.
+- [NTF-001](../project/sprints/NTF-001.md) completed the bounded charging/SOC
+  email and authenticated portal-settings pilot; SMS is deferred.
+- [FW-SEC-001](../project/sprints/FW-SEC-001.md) completed the unique local
+  administration, protected recovery and authenticated OTA boundary on WROOM and
+  LilyGO. C6 carries its separately validated successor implementation.
 - [C6-PH-001](../project/sprints/C6-PH-001.md) completed N16 local administration,
   recovery/OTA and runtime hardening plus XIAO compatibility validation on
   2026-08-07. Extended soak and production hardware qualification remain backlog.
@@ -142,6 +122,12 @@ against the exact commit and environment.
   [`v1.0.0-rc.1`](../project/sprints/V1.0.0-RC.1.md).
 - DOC-001 is complete. Current owner pages now replace its intermediate migration
   and classification records.
+
+## Parked reference
+
+- [LTE-001](../project/sprints/LTE-001.md) preserves the functionally validated
+  LilyGO A7670 WiFi/LTE baseline. Extended production qualification is parked;
+  near-term firmware development is limited to the shared ESP32-C6 line.
 
 ## Completion policy
 

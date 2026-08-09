@@ -15,6 +15,7 @@ not duplicated in the current working tree.
 - [Active work](governance/WORK_ORDER.md)
 - [Architecture](architecture/README.md)
 - [Authentication architecture](architecture/authentication.md)
+- [Benutzer-, Fahrzeug- und Adapter-Onboarding](user/onboarding.md)
 - [API reference](api/README.md)
 - [Firmware overview](firmware/overview.md)
 - [ESP32-WROOM beta guide](beta/esp32-wroom-guide.md)

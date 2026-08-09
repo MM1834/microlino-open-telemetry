@@ -1,10 +1,12 @@
 # FW-SEC-001 — Local Firmware Administration Hardening
 
-> **Status:** Implemented and physically validated on WROOM and LilyGO
+> **Status:** Completed — implemented and physically validated on WROOM and LilyGO
 >
 > **Audience:** Firmware maintainer, device provisioner and pilot support
 >
 > **Started:** 2026-08-03
+>
+> **Completed:** 2026-08-09
 
 ## Objective
 
@@ -81,6 +83,15 @@ first-setup state may be open.
 - No shared default password and no credential committed to Git.
 - No external pilot handoff with an open AP or unauthenticated OTA/admin surface.
 - No claim that physical extraction is prevented without flash encryption.
+
+## Closure decision
+
+All repository and physical acceptance gates are satisfied for the defined WROOM
+and LilyGO boundary. The package is closed. Secure Boot, flash encryption, signed
+fleet rollback and other stronger physical-security controls remain separate
+backlog opportunities rather than incomplete FW-SEC-001 scope. ESP32-C6 local
+administration and recovery are covered by the completed C6-PH-001 successor
+package.
 
 ## Related records
 

@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-07
+**Last reviewed:** 2026-08-09
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -61,6 +61,45 @@ admin UI may expose inventory, invitation/claim state, roles, delivery health an
 bounded support actions, but must not reveal device credentials or plaintext user
 contact destinations by default. Every administrative mutation requires explicit
 authorization and an audit record.
+
+### Unified onboarding administration tool
+
+Replace the current combination of AWS CLI procedures, the B1 helper and the
+small portal claim form with one reviewed least-privilege administrator tool. It
+may be a separate portal surface backed by dedicated administrator APIs, but must
+not extend the firmware WebUI or expose AWS credentials to the browser.
+
+Required capability slices:
+
+- invite a Cognito user, show confirmation state and safely resend or cancel an
+  unconfirmed invitation;
+- display `sub`-based account identity without treating the email address as an
+  authorization key;
+- register and inspect the relationship between inventory `deviceId`, logical
+  `vehicleId`, IoT Thing, certificate ID and firmware/hardware profile;
+- show whether real telemetry state exists before enabling claim issuance, with a
+  clear explanation for the current `vehicle_not_provisionable`/404 condition;
+- issue, expire and revoke single-use claims while never logging or retaining the
+  plaintext proof after its one-time display;
+- show canonical ownership and access projections, detect legacy B1 records and
+  prevent a second active `OWNER`;
+- support reviewed email change on the same Cognito `sub` separately from a true
+  new-account ownership transfer;
+- implement B3 replacement, loss, recovery, retirement and ownership transfer
+  with certificate rotation and resumable lifecycle checkpoints;
+- provide a narrowly scoped test-data cleanup preview by topic class and time
+  window, including separate State/History counts, explicit confirmation and a
+  post-delete republish check;
+- terminate revoked live sessions and run REST/WebSocket isolation checks;
+- produce privacy-safe audit evidence and an exportable support summary without
+  email addresses, tokens, claim proofs, private keys, WiFi secrets or telemetry
+  values.
+
+The tool must plan read-only by default, require an explicit apply step for every
+mutation, use conditional writes, remain idempotent across retries and expose
+effective AWS state rather than trusting stale stack parameters. Destructive
+actions must resolve exact records first and must not offer an unrestricted
+free-form DynamoDB deletion surface.
 
 ## Portal roles and vehicle sharing
 
@@ -156,6 +195,33 @@ Reassess Device Shadows, ABRP over the shared LilyGO LTE/TLS transport and other
 external services only after the beta identity, authorization and connectivity
 foundations are reliable. SOC notification processing is tracked separately above
 because it is a plausible bounded pilot feature.
+
+## LilyGO cellular-path replacement
+
+Evaluate how the sustain-only LilyGO/A7670 path should eventually be replaced in
+the C6-centered hardware direction. WIFI-001 covers only flexible use of an
+external LTE/GSM WiFi hotspot as the immediate connectivity option; it does not
+select a new integrated modem, carrier board or cellular transport architecture.
+
+Any later replacement decision must compare external-hotspot operation with an
+integrated modem path, including power control, antenna placement, reconnect and
+coverage behaviour, TLS ownership, field recovery, enclosure/wiring burden and
+long-term module availability. Do not create a second C6 firmware architecture
+until hardware evidence justifies it.
+
+## Parked LilyGO A7670 qualification
+
+The functionally validated LilyGO WiFi/LTE path is retained as a sustain-only
+baseline. LTE-001 already covers configured APN use, bounded reconnect/backoff,
+modem recovery, AWS IoT X.509 fallback, return to preferred WiFi and successful
+field recovery after coverage loss and a full power cycle.
+
+Long-duration soak, controlled weak-signal thresholds, SIM removal/restore,
+repeated transition cycles and removal of the remaining bounded WiFi wait are
+parked. Do not resume this qualification or add LilyGO-only features without a
+new priority decision. Near-term firmware feature work belongs in the shared C6
+line; the existing LilyGO implementation remains available for maintenance and
+regression fixes.
 
 ## Telemetry service groups and bundled state envelopes
 
