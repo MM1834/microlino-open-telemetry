@@ -413,6 +413,8 @@ Resources:
 
           HISTORY_SIGNALS = {
               "display/soc": ("soc", history_core_interval),
+              "display/odometer_km": ("odometer", history_core_interval),
+              "display/odo": ("odometer", history_core_interval),
               "charging/is_charging": ("charging", history_core_interval),
               "charging/plugged": ("plugged", history_core_interval),
               "charging/power_signed": ("power", history_motion_interval),
@@ -440,6 +442,8 @@ Resources:
               if signal in ("charging", "plugged") and not isinstance(value, bool):
                   return False
               if signal not in ("charging", "plugged") and not isinstance(value, (int, Decimal)):
+                  return False
+              if signal == "odometer" and value == previous_value:
                   return False
               received_seconds = received_at // 1000
               bucket = received_seconds - (received_seconds % interval_seconds)
@@ -916,6 +920,121 @@ Resources:
   
               return vehicles
 
+          def query_history_signal(vehicle_id, signal, since_ms, until_ms):
+              lower = f"{signal}#{since_ms // 1000:010d}"
+              upper = f"{signal}#{until_ms // 1000:010d}"
+              items = []
+              last_evaluated_key = None
+              while True:
+                  kwargs = {
+                      "KeyConditionExpression": (
+                          Key("vehicleId").eq(vehicle_id)
+                          & Key("sampleKey").between(lower, upper)
+                      ),
+                      "ConsistentRead": False
+                  }
+                  if last_evaluated_key:
+                      kwargs["ExclusiveStartKey"] = last_evaluated_key
+                  result = history.query(**kwargs)
+                  items.extend(result.get("Items", []))
+                  last_evaluated_key = result.get("LastEvaluatedKey")
+                  if not last_evaluated_key:
+                      break
+              return sorted(items, key=lambda item: int(item.get("sampledAt", 0)))
+
+          def calculate_range_forecast(vehicle_id, since_ms, until_ms):
+              odometer = query_history_signal(
+                  vehicle_id, "odometer", since_ms, until_ms
+              )
+              soc = query_history_signal(vehicle_id, "soc", since_ms, until_ms)
+              charging = query_history_signal(
+                  vehicle_id, "charging", since_ms, until_ms
+              )
+              if len(odometer) < 2 or len(soc) < 2:
+                  return None
+
+              def value_at_or_before(items, timestamp):
+                  value = None
+                  for item in items:
+                      if int(item.get("sampledAt", 0)) > timestamp:
+                          break
+                      value = json_value(item.get("value"))
+                  return value
+
+              trips = []
+              current = []
+              for item in odometer:
+                  timestamp = int(item.get("sampledAt", 0))
+                  value = json_value(item.get("value"))
+                  if not isinstance(value, (int, float)):
+                      continue
+                  if current and timestamp - current[-1][0] > 45 * 60 * 1000:
+                      trips.append(current)
+                      current = []
+                  current.append((timestamp, float(value)))
+              if current:
+                  trips.append(current)
+
+              valid = []
+              for trip in trips:
+                  if len(trip) < 2:
+                      continue
+                  start_ts, start_odo = trip[0]
+                  end_ts, end_odo = trip[-1]
+                  distance = end_odo - start_odo
+                  start_soc = value_at_or_before(soc, start_ts)
+                  end_soc = value_at_or_before(soc, end_ts)
+                  charged = any(
+                      start_ts <= int(item.get("sampledAt", 0)) <= end_ts
+                      and json_value(item.get("value")) is True
+                      for item in charging
+                  )
+                  if (
+                      charged
+                      or not isinstance(start_soc, (int, float))
+                      or not isinstance(end_soc, (int, float))
+                  ):
+                      continue
+                  soc_used = float(start_soc) - float(end_soc)
+                  km_per_soc = distance / soc_used if soc_used > 0 else 0
+                  if (
+                      distance < 3
+                      or soc_used < 1
+                      or km_per_soc < 0.5
+                      or km_per_soc > 3.0
+                  ):
+                      continue
+                  valid.append({
+                      "endedAt": end_ts,
+                      "distanceKm": distance,
+                      "socUsed": soc_used,
+                  })
+
+              selected = []
+              selected_distance = 0.0
+              for trip in reversed(valid):
+                  if len(selected) >= 10 or selected_distance >= 150:
+                      break
+                  selected.append(trip)
+                  selected_distance += trip["distanceKm"]
+              if not selected:
+                  return None
+
+              total_distance = sum(item["distanceKm"] for item in selected)
+              total_soc = sum(item["socUsed"] for item in selected)
+              historical = total_distance / total_soc
+              confidence = min(1.0, total_distance / 100.0, total_soc / 20.0)
+              effective = confidence * historical + (1.0 - confidence) * 1.4
+              return {
+                  "effectiveKmPerSoc": round(effective, 4),
+                  "historicalKmPerSoc": round(historical, 4),
+                  "confidence": round(confidence, 2),
+                  "distanceKm": round(total_distance, 1),
+                  "socUsed": round(total_soc, 1),
+                  "tripCount": len(selected),
+                  "windowDays": 30,
+              }
+
           def load_history(vehicle_id, since_ms, until_ms, resolution_seconds):
               signals = ("soc", "charging", "plugged", "speed", "power")
               buckets = {}
@@ -1040,13 +1159,18 @@ Resources:
                   until_ms = int(time.time() * 1000)
                   since_ms = until_ms - hours * 3600000
                   points = load_history(vehicle_id, since_ms, until_ms, resolution_seconds)
+                  forecast_since_ms = until_ms - 30 * 24 * 3600000
+                  range_forecast = calculate_range_forecast(
+                      vehicle_id, forecast_since_ms, until_ms
+                  )
                   return response(200, {
                       "vehicleId": vehicle_id,
                       "hours": hours,
                       "resolutionSeconds": resolution_seconds,
                       "retentionDays": HISTORY_RETENTION_DAYS,
                       "count": len(points),
-                      "points": points
+                      "points": points,
+                      "rangeForecast": range_forecast
                   })
   
               return response(404, {

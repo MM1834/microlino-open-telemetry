@@ -35,11 +35,16 @@ same non-enumerating 404 response.
 ### `GET /api/vehicles/{vehicleId}/history?hours=24|168|720`
 
 Requires the same JWT and ACTIVE assignment as the snapshot route. It returns a
-bounded SOC, charging, plugged and speed series. Supported response resolutions are 5
+bounded SOC, charging, plugged, speed and signed-power series. Supported response resolutions are 5
 minutes for 24 hours, 30 minutes for 7 days and 2 hours for 30 days. Other ranges
 return HTTP 400; unknown or unassigned vehicles return the non-enumerating 404.
 
-This route is present in the repository but is not yet claimed as deployed.
+The chart route is deployed. A 2026-08-11 extension adds the
+nullable `rangeForecast` object, calculated from raw 30-day SOC, changed-odometer
+and charging history. Its fields are `effectiveKmPerSoc`,
+`historicalKmPerSoc`, `confidence`, `distanceKm`, `socUsed`, `tripCount` and
+`windowDays`. The backend extension is deployed; the corresponding static portal
+upload remains separate.
 
 ## Authentication
 

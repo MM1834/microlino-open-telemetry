@@ -20,17 +20,20 @@ async function render(hours=24){
   const vehicleId=getVehicleId();
   let samples=[];
   let resolutionSeconds=null;
+  let rangeForecast=null;
   try{
     if(window.MOTHistorySource?.getHistory){
       const result=await window.MOTHistorySource.getHistory(hours);
       samples=Array.isArray(result?.points)?result.points:[];
       resolutionSeconds=result?.resolutionSeconds||null;
+      rangeForecast=result?.rangeForecast||null;
     }else if(window.MOTHistoryDB){
       samples=await window.MOTHistoryDB.getSamples(vehicleId,Date.now()-hours*3600000);
     }
   }catch(error){
     console.error("MOT history request failed",error);
   }
+  window.dispatchEvent(new CustomEvent("mot-range-forecast",{detail:rangeForecast}));
 
   renderSeries({
     canvasId:"soc-history-chart",

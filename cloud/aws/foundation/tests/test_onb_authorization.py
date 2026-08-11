@@ -322,6 +322,36 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         self.assertEqual(-40, power_point["powerMin"])
         self.assertEqual(120, power_point["powerMax"])
 
+    def test_range_forecast_uses_valid_recent_trips_and_blends_small_sample(self):
+        def item(signal, seconds, value):
+            return {
+                "vehicleId": "alpha",
+                "sampleKey": f"{signal}#{seconds:010d}",
+                "signal": signal,
+                "sampledAt": seconds * 1000,
+                "receivedAt": seconds * 1000,
+                "value": value,
+            }
+
+        self.history.items.extend([
+            item("soc", 1_700_000_000, 80),
+            item("odometer", 1_700_000_000, 1000),
+            item("soc", 1_700_000_600, 72),
+            item("odometer", 1_700_000_600, 1010),
+            item("soc", 1_700_004_000, 70),
+            item("odometer", 1_700_004_000, 1020),
+            item("soc", 1_700_004_600, 63),
+            item("odometer", 1_700_004_600, 1030),
+        ])
+        forecast = self.module.calculate_range_forecast(
+            "alpha", 1_699_999_000_000, 1_700_005_000_000
+        )
+        self.assertEqual(20.0, forecast["distanceKm"])
+        self.assertEqual(15.0, forecast["socUsed"])
+        self.assertEqual(2, forecast["tripCount"])
+        self.assertEqual(0.2, forecast["confidence"])
+        self.assertAlmostEqual(1.3867, forecast["effectiveKmPerSoc"], places=4)
+
 
 class LiveAuthorizationTests(unittest.TestCase):
     def setUp(self):
@@ -461,7 +491,15 @@ class IngestAuthorizationTests(unittest.TestCase):
         self.assertEqual(300, module.HISTORY_SIGNALS["charging/plugged"][1])
         self.assertEqual(900, module.HISTORY_SIGNALS["display/speed_kmh"][1])
         self.assertEqual(900, module.HISTORY_SIGNALS["charging/power_signed"][1])
-        self.assertNotIn("display/odometer_km", module.HISTORY_SIGNALS)
+        self.assertEqual(300, module.HISTORY_SIGNALS["display/odometer_km"][1])
+        self.assertTrue(module.store_history(
+            "alpha", "display/odometer_km", 1234, "number",
+            1_700_000_301_000, 1_700_000_001_000, 1233
+        ))
+        self.assertFalse(module.store_history(
+            "alpha", "display/odometer_km", 1234, "number",
+            1_700_000_601_000, 1_700_000_301_000, 1234
+        ))
         self.assertTrue(module.store_history(
             "alpha", "charging/plugged", True, "boolean", 1_700_000_301_000
         ))

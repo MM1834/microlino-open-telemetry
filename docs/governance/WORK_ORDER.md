@@ -31,6 +31,12 @@ of linearly interpolated. The AWS backend deployment and hosted portal upload
 passed. The first moving-road-test/TTL/cost observation remains open. The existing
 live state and WebSocket path remain the release boundary and must not regress.
 
+A 2026-08-11 follow-up adds changed-odometer history and an
+automatic personal range forecast with a fixed-SOC fallback and transparent
+journey basis. Local tests, responsive visual checks and the controlled AWS
+deployment pass. Hosted portal upload and live journey accumulation evidence
+remain part of the open HIS-001 work.
+
 ### Execute SPR-0005 beta readiness and portal onboarding
 
 **Active sprint:** [SPR-0005 — ESP32-WROOM Beta Readiness and Portal Onboarding](../project/sprints/SPR-0005.md)

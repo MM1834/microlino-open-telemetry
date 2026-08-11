@@ -19,6 +19,7 @@ async function update(telemetry,options={}){
     vehicleId,
     soc:readNumber(telemetry,["display/soc","display.soc","soc"]),
     rangeKm:readNumber(telemetry,["display/estimated_range_km","display/range","display.estimated_range_km","display.range","rangeKm"]),
+    odometerKm:readNumber(telemetry,["display/odometer_km","display/odo","display.odometer_km","display.odo","odometerKm"]),
     speedKmh:readNumber(telemetry,["display/speed_kmh","display/speed","display.speed_kmh","display.speed","speedKmh"]),
     powerDisplay:readNumber(telemetry,["charging/power_display","charging/power_signed","charging.power_display","charging.power_signed","powerDisplay"]),
     isCharging:readBool(telemetry,["charging/is_charging","charging.is_charging","isCharging"]),
@@ -41,7 +42,7 @@ async function update(telemetry,options={}){
 }
 
 function shouldStore(sample,now,intervalMs){
-  if(sample.soc===null&&sample.rangeKm===null&&sample.speedKmh===null) return false;
+  if(sample.soc===null&&sample.rangeKm===null&&sample.odometerKm===null&&sample.speedKmh===null) return false;
   if(!lastSample) return true;
   if(now-lastStoredTs>=intervalMs) return true;
   if(sample.soc!==lastSample.soc) return true;

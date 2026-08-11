@@ -220,6 +220,13 @@ portal source tree:
   refinement is deployed and read back. The static portal package was uploaded on
   2026-08-09 and accepted on smartphone and desktop. GPS remains live-only.
 
+On 2026-08-11 the controlled AWS stack also received changed-odometer history and
+a bounded 30-day personal range forecast. The in-place update reached
+`UPDATE_COMPLETE`; both updated Lambdas were active, Health returned 200, History
+remained JWT-protected by 401 and the daily-write alarm remained `OK` at 2,100.
+The matching shared `/dashboard/` and `/motbeta/` static source is repository-ready
+but its hosted upload and live journey accumulation evidence remain open.
+
 The hosted portal now uses a charging-first smartphone information hierarchy:
 vehicle selection and compact connection indicators, charging state/power, SOC
 and range, Speed, total mileage, location, detailed connectivity, engineering

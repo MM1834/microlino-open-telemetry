@@ -1,6 +1,6 @@
 # Telemetry History Pilot
 
-> **Status:** Pilot and minute-aggregated Speed update deployed
+> **Status:** Pilot, minute-aggregated Speed and range forecast backend deployed
 >
 > **Work package:** HIS-001
 >
@@ -46,6 +46,7 @@ existing ACTIVE user/vehicle assignment.
 | Plugged | `charging/plugged` | 5 minutes | 5 min / 30 min / 2 h |
 | Speed | `display/speed_kmh` | 1 active-driving minute plus one stop marker | averaged 5 min / 30 min / 2 h |
 | Signed power | `charging/power_signed` | 1 active minute plus one zero marker | averaged 5 min / 30 min / 2 h |
+| Odometer | `display/odometer_km` | changed values, at most once per core bucket | range forecast only |
 
 The stored cadences are deployment parameters rather than fixed code constants.
 Core and motion intervals can independently be 1, 5, 15, 30 or 60 minutes. The
@@ -67,7 +68,10 @@ to 31 days and CloudFormation prevents a larger pilot value. DynamoDB TTL deleti
 is asynchronous; expired records may remain briefly but the API time window never
 returns data older than the requested range.
 
-Core signals have a fixed ceiling of 864 items per vehicle/day. Speed and signed
+The original core signals have a fixed ceiling of 864 items per vehicle/day. The
+deployed odometer addition can add at most 288 changed-value writes per
+vehicle/day at the default cadence, but normally only writes while driving. Its
+alarm threshold must therefore be reviewed as part of deployment. Speed and signed
 power each add at most one write per active minute plus one zero marker per active
 period; continuous zero values add no writes. A physically impossible 24-hour
 upper bound is therefore about 3,744 items per vehicle/day plus transition markers. The deployed
@@ -88,6 +92,15 @@ plugged-state charts. Vehicle
 selection reloads history. No history request contains a user-selected vehicle
 without server-side authorization.
 
+The deployed range follow-up also returns `rangeForecast`. It is calculated
+from raw 30-day SOC, changed-odometer and charging rows before chart aggregation.
+At most ten recent valid journeys and roughly 150 km are used. The result contains
+effective and historical kilometres per SOC point, confidence, total distance,
+consumed SOC and journey count. Charging, tiny segments, odometer rollback and
+implausible 50–300 km full-range equivalents are rejected. Until 100 km and 20 SOC
+points have both accumulated, the historical rate is progressively blended with
+the configured 1.4 km/SOC-point baseline.
+
 ## Cost controls and activation gate
 
 - history is disabled by default;
@@ -95,7 +108,9 @@ without server-side authorization.
 - an explicit allowlist bounds the pilot cohort; an empty list is fail-closed;
 - DynamoDB uses pay per request, has no indexes and has PITR disabled for the MVP;
 - the 31-day TTL and fixed sampling buckets bound storage growth;
-- the API accepts only three fixed windows and performs five partition queries;
+- the API accepts only three fixed windows; the deployed charts perform five
+  partition queries and the range follow-up adds three bounded raw
+  signal queries;
 - `VehicleHistoryDailyWriteAlarm` defaults to 1,000 consumed writes/day;
 - `tools/aws/measure_history_pilot.sh` reports daily ingest invocations plus
   history read/write capacity.
