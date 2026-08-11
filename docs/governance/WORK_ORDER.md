@@ -8,22 +8,9 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-11
 
 ## High priority
-
-### Restore C6 ABRP and local onboarding parity
-
-**Active work package:** [C6-SVC-001 — C6 Local-Service Parity](../project/sprints/C6-SVC-001.md)
-
-**Objective:** Add runtime-selectable ABRP and the authenticated local onboarding
-wizard to the shared C6 line while preserving AWS coexistence and keeping the
-4 MB XIAO below a strict 85% OTA-app-slot gate.
-
-**Current status:** Shared ABRP runtime, C6 configuration/WebUI integration and the
-seven-step onboarding flow are implemented. All four C6 build variants and the
-automated test suite pass. The XIAO AWS image remains below the 85% flash gate;
-N16 hardware acceptance is the remaining release gate before any optional XIAO test.
 
 ### Execute HIS-001 bounded telemetry history pilot
 
@@ -120,6 +107,10 @@ against the exact commit and environment.
 
 ## Completed reference
 
+- [C6-SVC-001](../project/sprints/C6-SVC-001.md) completed shared ABRP and local
+  onboarding parity, N16-AWS OTA/runtime acceptance and the strict XIAO 4 MB
+  compatibility gate on 2026-08-11. XIAO vehicle/AWS hardware equivalence remains
+  explicitly outside that completion claim.
 - [WIFI-001](../project/sprints/WIFI-001.md) completed preferred Home-WiFi,
   Mobile fallback, automatic Home return and protected-AP recovery on C6.
 - [NTF-001](../project/sprints/NTF-001.md) completed the bounded charging/SOC

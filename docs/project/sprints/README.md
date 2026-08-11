@@ -10,13 +10,15 @@
 
 ## Active implementation work
 
-- [C6-SVC-001 — C6 local-service parity](C6-SVC-001.md)
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
 
 ## Completed predecessors
 
+- [C6-SVC-001](C6-SVC-001.md) completed shared ABRP and authenticated local
+  onboarding parity on C6, accepted the N16-AWS hardware path and retained XIAO
+  as an unflashed 4 MB compatibility build below the 85% OTA-slot gate.
 - [WIFI-001](WIFI-001.md) completed preferred Home-WiFi, Mobile fallback,
   automatic Home return and protected-AP recovery on C6.
 - [NTF-001](NTF-001.md) completed the bounded charging/SOC email notification

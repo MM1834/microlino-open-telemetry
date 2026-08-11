@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-11
 
 ## Purpose
 
@@ -142,6 +142,18 @@ restored. WIFI-001 hardware and repository qualification is complete. The XIAO w
 explicitly erased, re-provisioned with the current 4 MB partition layout and an
 empty valid LittleFS image, and verified in its clean protected-AP state for a
 separate onboarding exercise.
+
+C6-SVC-001 completed on 2026-08-11. The shared C6 line now includes runtime-
+selectable asynchronous ABRP and the authenticated seven-step local onboarding
+wizard in the same AWS-capable image. A freshly built N16-AWS image was installed
+through local OTA with configuration retained; the maintainer validated the local
+wizard, status and successful ABRP HTTP path on the running device. Garage
+conditions produced `GPS_DETECTED` without `GPS_FIX`, and the ABRP payload safely
+omitted stale/unavailable coordinates. All four C6 environments, both WROOM
+regression environments and 114 repository tests pass. The final XIAO-AWS OTA
+binary uses 80.85% of its application slot, below the strict 85% gate; it was not
+flashed and remains a compatibility target rather than an N16-equivalent hardware
+qualification.
 
 On 2026-08-09 the standard XIAO base/AWS profiles were corrected from an
 unintended external-U.FL selection to the onboard ceramic antenna used by the

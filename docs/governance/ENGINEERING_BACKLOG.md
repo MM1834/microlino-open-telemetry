@@ -160,11 +160,12 @@ termination review, strain-relieved wiring and enclosure qualification. Signed
 rollback remains a later remote/fleet-OTA concern. The XIAO remains a 4 MB
 compatibility target until it passes the same vehicle dual-CAN/AWS path.
 
-ABRP and local wizard parity moved into active
-[C6-SVC-001](../project/sprints/C6-SVC-001.md). Base/non-AWS C6 environments remain
-temporary regression and size-comparison gates until the AWS-capable image is
-validated without provisioned AWS credentials; they are not separate product
-firmware generations.
+[C6-SVC-001](../project/sprints/C6-SVC-001.md) completed shared ABRP and local
+wizard parity with N16-AWS hardware acceptance. Base/non-AWS C6 environments
+remain temporary regression and size-comparison gates until the AWS-capable image
+is validated without provisioned AWS credentials; they are not separate product
+firmware generations. The XIAO remains an unflashed 4 MB compatibility build at
+80.85% of its OTA app slot and still lacks N16-equivalent vehicle/AWS qualification.
 
 ## Decoder profiles and compatibility data
 
