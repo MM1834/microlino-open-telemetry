@@ -12,6 +12,18 @@
 
 ## High priority
 
+### Complete unified C6 environment hardware gate
+
+**Active work package:** [C6-ENV-001 — Unified C6 Build Environments](../project/sprints/C6-ENV-001.md)
+
+**Objective:** Maintain one AWS-capable environment per C6 board and prove that
+an unprovisioned device remains fully functional locally without AWS credentials.
+
+**Current status:** Repository consolidation, both canonical builds, the XIAO
+80.85% flash gate and 117 tests pass. The three deployed C6 devices are not
+modified; physical unprovisioned acceptance waits for a spare board or the next
+delivery.
+
 ### Execute HIS-001 bounded telemetry history pilot
 
 **Active work package:** [HIS-001 — Bounded Telemetry History Pilot](../project/sprints/HIS-001.md)

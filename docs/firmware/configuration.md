@@ -48,7 +48,7 @@ WiFi; `wifi2 set <ssid>|<password>` configures the second/mobile hotspot.
 reports selection state without secret echo. A restart applies configuration
 changes made through the console.
 
-The C6 AWS builds load the same four per-device credential files from
+The canonical C6 builds load the same four per-device credential files from
 `/aws` in LittleFS as WROOM and LilyGO. `aws status` reports credential and
 connection state without printing key material.
 

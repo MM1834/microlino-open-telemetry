@@ -18,7 +18,7 @@ FILES = (
 AWS_ENVIRONMENTS = {
     "esp32-wroom": ("esp32dev-aws",),
     "lilygo-t-a7670": ("T-A7670X-AWS",),
-    "esp32-c6": ("nanoesp32c6-n16-aws", "xiao-esp32c6-aws"),
+    "esp32-c6": ("nanoesp32c6-n16", "xiao-esp32c6"),
 }
 
 

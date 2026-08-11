@@ -95,10 +95,14 @@ PlatformIO currently exposes these environments:
 - `esp32dev-aws`
 - `lilygo-t-a7670`
 - `T-A7670X-AWS`
-- `nanoesp32c6-n16` — C6-001 qualification build;
-- `xiao-esp32c6` — C6-001 compatibility qualification build;
-- `nanoesp32c6-n16-aws` — N16 WiFi/AWS pilot build;
-- `xiao-esp32c6-aws` — XIAO WiFi/AWS compatibility build.
+- `nanoesp32c6-n16` — unified 16 MB C6 build with runtime-optional AWS;
+- `xiao-esp32c6` — unified 4 MB C6 build with runtime-optional AWS.
+
+C6-ENV-001 prepared this two-environment model after C6-SVC-001. Both C6 builds
+include LittleFS and AWS IoT but remain local when `/aws` credentials are absent.
+The repository gate can be completed without altering the deployed N16 and two
+XIAO units; physical no-credential acceptance waits for a spare board or the next
+delivery.
 
 C6-001 closed on 2026-08-06 as a bounded pilot qualification. One shared C6 source
 line and board-specific PlatformIO profiles provide two passive CAN inputs plus

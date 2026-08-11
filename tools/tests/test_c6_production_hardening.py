@@ -15,14 +15,23 @@ SHARED_SECURITY = (ROOT / "firmware/common/web/local_web_security.cpp").read_tex
 
 
 class C6ProductionHardeningTests(unittest.TestCase):
-    def test_xiao_standard_build_uses_internal_antenna(self) -> None:
+    def test_xiao_unified_build_uses_internal_antenna_and_aws_capability(self) -> None:
         xiao = PLATFORMIO.split("[env:xiao-esp32c6]", 1)[1].split("[env:", 1)[0]
         self.assertIn("MOT_XIAO_BOARD=1", xiao)
+        self.assertIn("MOT_AWS_IOT=1", xiao)
+        self.assertIn("board_build.filesystem = littlefs", xiao)
         self.assertNotIn("MOT_XIAO_EXTERNAL_ANTENNA", xiao)
         self.assertIn("#ifdef MOT_XIAO_EXTERNAL_ANTENNA", BOARD)
         self.assertIn("digitalWrite(14, HIGH)", BOARD)
         self.assertIn("digitalWrite(14, LOW)", BOARD)
         self.assertIn('WiFi antenna: internal ceramic', BOARD)
+
+    def test_c6_has_exactly_two_unified_board_environments(self) -> None:
+        self.assertEqual(PLATFORMIO.count("[env:"), 2)
+        self.assertIn("[env:nanoesp32c6-n16]", PLATFORMIO)
+        self.assertIn("[env:xiao-esp32c6]", PLATFORMIO)
+        self.assertNotIn("nanoesp32c6-n16-aws", PLATFORMIO)
+        self.assertNotIn("xiao-esp32c6-aws", PLATFORMIO)
 
     def test_device_id_uses_device_specific_efuse_bytes(self):
         source = (ROOT / "firmware/common/system/device_id.cpp").read_text()

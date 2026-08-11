@@ -23,7 +23,7 @@ def app_slot_size(partitions: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--environment", default="xiao-esp32c6-aws")
+    parser.add_argument("--environment", default="xiao-esp32c6")
     parser.add_argument("--partitions", type=Path, default=C6 / "partitions_4mb.csv")
     parser.add_argument("--max-percent", type=float, default=85.0)
     args = parser.parse_args()

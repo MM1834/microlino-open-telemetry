@@ -13,7 +13,7 @@ Current implemented slice:
 - board, flash, CAN and GPS pin diagnostics;
 - shared optional-GPS detection and NMEA fix-state handling;
 - bounded in-memory drive capture with on-demand summaries for known CAN IDs;
-- WiFi station configuration and optional per-device AWS IoT publication;
+- WiFi station configuration and optional runtime per-device AWS IoT publication;
 - protected device-specific setup/fallback AP and non-blocking reconnect;
 - authenticated local WebUI, backup/restore, factory reset and local OTA;
 - authenticated seven-step local device onboarding wizard;
@@ -21,8 +21,8 @@ Current implemented slice:
 - XIAO internal ceramic antenna by default, with explicit external-U.FL build
   selection for hardware fitted with a 2.4 GHz antenna.
 
-The maintained `xiao-esp32c6` and `xiao-esp32c6-aws` environments select the
-onboard ceramic antenna and print that selection at boot. For a dedicated unit
+The maintained `xiao-esp32c6` environment selects the onboard ceramic antenna
+and prints that selection at boot. For a dedicated unit
 with a connected external antenna, add `MOT_XIAO_EXTERNAL_ANTENNA=1` to that
 unit's build flags; do not distribute such an image to XIAO units without an
 antenna on the U.FL connector.
@@ -32,15 +32,20 @@ Build without flashing:
 ```sh
 pio run -e nanoesp32c6-n16
 pio run -e xiao-esp32c6
-pio run -e nanoesp32c6-n16-aws
-pio run -e xiao-esp32c6-aws
 ```
+
+Both canonical environments always include AWS IoT and LittleFS. Without a valid
+credential set under `/aws`, AWS remains disabled at runtime while local WebUI,
+CAN, GPS, OTA and ABRP continue normally. There are no separate C6 non-AWS or
+`-aws` firmware generations.
 
 GPS reception is physically validated separately on both boards. The N16 also
 passed simultaneous dual-CAN reception and a normal-road WiFi/AWS IoT run with a
 unique certificate and live portal ingestion. Local administration and OTA now
-use the same security and OTA core as WROOM. N16 runtime acceptance remains open;
-physical USB is the supported recovery path and signed-image rollback is not claimed.
+use the same security and OTA core as WROOM. The N16 AWS runtime and local-service
+path are accepted; physical operation of the unified image without provisioned
+AWS credentials remains the C6-ENV-001 rollout gate. Physical USB is the supported
+recovery path and signed-image rollback is not claimed.
 
 Default decoder assignment is Standard-CAN V1 - Pioneer on CAN1 and Display-CAN
 on CAN2. Both channels accept any registered decoder profile at runtime; these are
@@ -98,10 +103,10 @@ aws status
 ```
 
 `wifi clear` and `wifi2 clear` remove each profile independently. Restart after
-changing WiFi through the console. AWS builds load unique X.509 credential files from
-LittleFS `/aws`; credentials are not linked into the application image. The
-shared upload helper accepts `esp32-c6` and defaults to
-`nanoesp32c6-n16-aws`, with `xiao-esp32c6-aws` selectable explicitly.
+changing WiFi through the console. The canonical builds load unique X.509
+credential files from LittleFS `/aws`; credentials are not linked into the
+application image. The shared upload helper accepts `esp32-c6` and defaults to
+`nanoesp32c6-n16`, with `xiao-esp32c6` selectable explicitly.
 
 The C6 publisher sends Display-CAN, confirmed Pioneer pack voltage/current/power,
 plug/charge state, provisional cell extrema and valid GPS coordinates using the
@@ -121,4 +126,4 @@ enter the wizard after OTA. The wizard configures only the local adapter; portal
 accounts, vehicle ownership and certificate assignment remain external admin work.
 
 For the 4 MB XIAO, run `python3 tools/check_c6_flash_gate.py` after building
-`xiao-esp32c6-aws`. The maintained gate is 85% of one OTA application slot.
+`xiao-esp32c6`. The maintained gate is 85% of one OTA application slot.

@@ -26,14 +26,18 @@ class EnvironmentValidationTests(unittest.TestCase):
         )
         self.assertEqual(
             select_environment("esp32-c6", None),
-            "nanoesp32c6-n16-aws",
+            "nanoesp32c6-n16",
         )
 
-    def test_accepts_both_c6_aws_board_environments(self) -> None:
+    def test_accepts_both_unified_c6_board_environments(self) -> None:
         self.assertEqual(
-            select_environment("esp32-c6", "xiao-esp32c6-aws"),
-            "xiao-esp32c6-aws",
+            select_environment("esp32-c6", "xiao-esp32c6"),
+            "xiao-esp32c6",
         )
+
+    def test_rejects_retired_c6_aws_suffix(self) -> None:
+        with self.assertRaises(ValueError):
+            select_environment("esp32-c6", "xiao-esp32c6-aws")
 
     def test_rejects_non_aws_or_other_board_environment(self) -> None:
         with self.assertRaises(ValueError):

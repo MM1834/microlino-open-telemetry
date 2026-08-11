@@ -9,6 +9,8 @@ WEB = (C6 / "c6_web.cpp").read_text(encoding="utf-8")
 MAIN = (C6 / "main.cpp").read_text(encoding="utf-8")
 ABRP = (ROOT / "firmware/common/abrp/abrp_client.cpp").read_text(encoding="utf-8")
 WROOM_ADAPTER = (ROOT / "firmware/esp32-wroom/src/abrp/wroom_abrp.cpp").read_text(encoding="utf-8")
+AWS = (C6 / "c6_aws.cpp").read_text(encoding="utf-8")
+AWS_CLIENT = (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.cpp").read_text(encoding="utf-8")
 
 
 class C6ServiceParityTests(unittest.TestCase):
@@ -45,6 +47,13 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn('preferences.isKey("onboarded")', CONFIG)
         self.assertIn("validAdminPassword(c6Config.adminPassword)", CONFIG)
         self.assertIn("c6Config.onboardingComplete", WEB)
+
+    def test_unprovisioned_aws_runtime_is_fail_open_for_local_services(self) -> None:
+        setup = AWS.split("void c6AwsSetup()", 1)[1].split("void c6AwsLoop()", 1)[0]
+        self.assertIn("if (!motLoadAwsCredentials(credentials))", setup)
+        self.assertIn("return;", setup)
+        loop = AWS_CLIENT.split("void MotAwsIotClient::loop", 1)[1]
+        self.assertIn("if (!enabled()) return;", loop)
 
 
 if __name__ == "__main__":

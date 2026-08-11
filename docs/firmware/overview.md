@@ -26,14 +26,14 @@ third application target in the repository.
 | `esp32dev-aws` | ESP32-WROOM with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant |
 | `lilygo-t-a7670` | LilyGO with legacy WiFi/LTE MQTT path | Legacy build structure |
 | `T-A7670X-AWS` | LilyGO with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant; WiFi-preferred AWS with LTE/TLS fallback |
-| `nanoesp32c6-n16[-aws]` | Primary 16 MB dual-CAN C6 line | Maintained pilot/feature target |
-| `xiao-esp32c6[-aws]` | 4 MB C6 compatibility line | Same source with strict app-slot size gate |
+| `nanoesp32c6-n16` | Primary 16 MB dual-CAN C6 line with runtime-optional AWS | Maintained pilot/feature target |
+| `xiao-esp32c6` | 4 MB unified C6 line with runtime-optional AWS | Compatibility target with strict app-slot size gate |
 
 The standalone ESP32 GPS test environment was removed after GPS became a normal
-runtime capability of the WROOM firmware. The remaining target maintenance model
-is one firmware line per board, with AWS IoT and GPS as capabilities rather than
-generations. Pre-AWS environments remain as legacy regression paths pending the
-rest of that simplification.
+runtime capability of the WROOM firmware. C6 now has exactly one environment per
+board; both include AWS IoT and LittleFS, and remain local-only when no credentials
+are provisioned. WROOM and LilyGO retain their legacy pre-AWS environments pending
+a separate compatibility decision.
 
 ## Shared components
 
@@ -77,7 +77,7 @@ been built or tested on hardware.
 | Protected AP and authenticated WebUI | Present | Present | Present |
 | Local browser OTA | Present; opt-in | Present; opt-in | Present; opt-in |
 | Optional GPS | Board-profile UART | UART RX 16/TX 17 | L76K UART RX 22/TX 21 |
-| AWS IoT X.509 | AWS profiles, WiFi | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi/LTE |
+| AWS IoT X.509 | Canonical profiles, runtime-optional, WiFi | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi/LTE |
 | ABRP | Asynchronous WiFi, AWS-compatible | Shared client over WiFi | WiFi only |
 | Local onboarding wizard | Present | Present | Present |
 

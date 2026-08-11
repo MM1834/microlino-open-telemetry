@@ -10,6 +10,7 @@
 
 ## Active implementation work
 
+- [C6-ENV-001 — unified C6 build environments](C6-ENV-001.md)
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
