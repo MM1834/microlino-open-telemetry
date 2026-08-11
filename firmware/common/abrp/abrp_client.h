@@ -1,8 +1,25 @@
 #pragma once
+
 #include <Arduino.h>
+
+struct AbrpSettings {
+    bool enabled = false;
+    String apiKey;
+    String userToken;
+    uint32_t intervalMs = 60000;
+};
+
+struct AbrpLocation {
+    bool valid = false;
+    double latitude = 0.0;
+    double longitude = 0.0;
+};
+
+using AbrpLocationProvider = bool (*)(AbrpLocation &location);
 
 struct AbrpStatus {
     bool enabled = false;
+    bool inFlight = false;
     bool lastSuccess = false;
     int lastHttpCode = 0;
     String lastMessage;
@@ -11,9 +28,9 @@ struct AbrpStatus {
     String lastPayload;
 };
 
-void setupAbrp();
-void abrpLoop();
-bool abrpEnabled();
-bool sendAbrpTelemetryNow();
-String abrpStatusJson();
-AbrpStatus abrpStatus();
+void setupAbrp(const AbrpSettings &settings);
+void abrpLoop(const AbrpSettings &settings, AbrpLocationProvider locationProvider = nullptr);
+bool abrpEnabled(const AbrpSettings &settings);
+bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locationProvider = nullptr);
+String abrpStatusJson(const AbrpSettings &settings);
+AbrpStatus abrpStatus(const AbrpSettings &settings);

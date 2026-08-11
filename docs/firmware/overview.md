@@ -8,11 +8,12 @@
 
 ## Firmware targets
 
-MOT contains two board-specific applications sharing common telemetry, decoder,
+MOT contains three board-specific applications sharing common telemetry, decoder,
 configuration, AWS IoT and GPS components:
 
 - `firmware/esp32-wroom/`
 - `firmware/lilygo-t-a7670/`
+- `firmware/esp32-c6/`
 
 The WeAct ESP32 CAN485 is a hardware/transceiver option in the ESP32 family, not a
 third application target in the repository.
@@ -25,6 +26,8 @@ third application target in the repository.
 | `esp32dev-aws` | ESP32-WROOM with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant |
 | `lilygo-t-a7670` | LilyGO with legacy WiFi/LTE MQTT path | Legacy build structure |
 | `T-A7670X-AWS` | LilyGO with LittleFS and `MOT_AWS_IOT=1` | Intended maintained AWS variant; WiFi-preferred AWS with LTE/TLS fallback |
+| `nanoesp32c6-n16[-aws]` | Primary 16 MB dual-CAN C6 line | Maintained pilot/feature target |
+| `xiao-esp32c6[-aws]` | 4 MB C6 compatibility line | Same source with strict app-slot size gate |
 
 The standalone ESP32 GPS test environment was removed after GPS became a normal
 runtime capability of the WROOM firmware. The remaining target maintenance model
@@ -40,14 +43,15 @@ rest of that simplification.
 | `firmware/common/decoders` | Decoder registry, Display-CAN decoder and empty Standard-CAN template |
 | `firmware/common/config` | Configuration contract, keys and readiness model |
 | `firmware/common/api` | Shared telemetry JSON |
-| `firmware/common/abrp` | Optional ABRP client |
+| `firmware/common/abrp` | Optional asynchronous WiFi ABRP client shared by WROOM and C6 |
+| `firmware/common/onboarding` | Shared local onboarding steps and navigation |
 | `firmware/common/system` | Version and stable device identity helpers |
 | `firmware/shared-libs/MotAwsIot` | X.509 MQTT/TLS, presence, heartbeat and telemetry publishing |
 | `firmware/shared-libs/MotGps` | NMEA parsing and detected/fix state |
 
 ## Runtime assembly
 
-Both targets initialize configuration, networking, CAN/GPS, MQTT/AWS, local WebUI
+All targets initialize configuration, networking, CAN/GPS, MQTT/AWS, local WebUI
 and optional ABRP, then update the shared telemetry state in their main loop.
 Board-specific modules still own their transport and WebUI implementations.
 
@@ -66,19 +70,16 @@ flowchart LR
 “Present” means code/configuration exists; it does not mean the current commit has
 been built or tested on hardware.
 
-| Capability | ESP32-WROOM | LilyGO T-A7670G |
-|---|---|---|
-| TWAI receive at 500 kbit/s | Present, RX 27/TX 26 | Present, RX 32/TX 13 |
-| Display-CAN decoder | Shared, implemented | Shared, implemented |
-| Standard-CAN decoder | Shared empty template | Shared empty template |
-| WiFi and protected operational setup AP | Present | Present |
-| Authenticated local WebUI/config/readiness | Present | Present |
-| Local browser OTA | Present; disabled by default | Present; disabled by default |
-| Optional GPS | UART RX 16/TX 17 | L76K UART RX 22/TX 21 |
-| AWS IoT X.509 | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi preferred with LTE/TLS fallback |
-| Legacy MQTT | WiFi | WiFi with LTE candidate/fallback path |
-| LTE/GPRS | Not applicable | AWS IoT path functionally field-validated |
-| ABRP | Present | Present over WiFi only |
+| Capability | ESP32-C6 | ESP32-WROOM | LilyGO T-A7670G |
+|---|---|---|---|
+| TWAI receive at 500 kbit/s | Two controllers | One controller | One controller |
+| Decoder profiles | Shared | Shared | Shared |
+| Protected AP and authenticated WebUI | Present | Present | Present |
+| Local browser OTA | Present; opt-in | Present; opt-in | Present; opt-in |
+| Optional GPS | Board-profile UART | UART RX 16/TX 17 | L76K UART RX 22/TX 21 |
+| AWS IoT X.509 | AWS profiles, WiFi | `esp32dev-aws`, WiFi | `T-A7670X-AWS`, WiFi/LTE |
+| ABRP | Asynchronous WiFi, AWS-compatible | Shared client over WiFi | WiFi only |
+| Local onboarding wizard | Present | Present | Present |
 
 ## Security boundary
 

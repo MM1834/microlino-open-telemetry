@@ -11,6 +11,10 @@ struct C6Configuration {
     String wifi2Password;
     String adminPassword;
     String setupPassword;
+    bool abrpEnabled = false;
+    String abrpApiKey;
+    String abrpUserToken;
+    bool onboardingComplete = false;
     bool otaEnabled = false;
     uint32_t publishIntervalMs = 5000;
 };
@@ -26,6 +30,7 @@ bool c6ConfigSetWifi2(const String &ssid, const String &password);
 void c6ConfigClearWifi2();
 bool c6ConfigAdminConfigured();
 bool c6ConfigSetAdminPassword(const String &password);
+bool c6ConfigSetAbrpCredentials(const String &apiKey, const String &userToken);
 String c6ConfigRecoverAdminPassword();
 String c6ConfigExportJson(bool includeSecrets = false);
 bool c6ConfigImportJson(const String &json, String &error);

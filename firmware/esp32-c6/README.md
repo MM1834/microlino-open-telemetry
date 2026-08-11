@@ -16,6 +16,8 @@ Current implemented slice:
 - WiFi station configuration and optional per-device AWS IoT publication;
 - protected device-specific setup/fallback AP and non-blocking reconnect;
 - authenticated local WebUI, backup/restore, factory reset and local OTA;
+- authenticated seven-step local device onboarding wizard;
+- optional asynchronous WiFi ABRP service that can run alongside AWS IoT;
 - XIAO internal ceramic antenna by default, with explicit external-U.FL build
   selection for hardware fitted with a 2.4 GHz antenna.
 
@@ -104,3 +106,19 @@ shared upload helper accepts `esp32-c6` and defaults to
 The C6 publisher sends Display-CAN, confirmed Pioneer pack voltage/current/power,
 plug/charge state, provisional cell extrema and valid GPS coordinates using the
 same topic contract as the established devices.
+
+## ABRP and local onboarding
+
+ABRP is disabled by default. Configure and enable it under `/config`; its API key
+and user token are not rendered back into HTML, diagnostics or normal backup
+exports. `/api/abrp/test` queues an HTTPS send in a separate task so Dual-CAN and
+GPS processing continue. The power field uses fresh Standard-CAN vehicle power
+in kW when available and falls back to the Display-CAN 0.1 kW value.
+
+Freshly provisioned devices enter `/wizard`. Existing configured C6 installations
+without an onboarding key migrate as completed and therefore do not unexpectedly
+enter the wizard after OTA. The wizard configures only the local adapter; portal
+accounts, vehicle ownership and certificate assignment remain external admin work.
+
+For the 4 MB XIAO, run `python3 tools/check_c6_flash_gate.py` after building
+`xiao-esp32c6-aws`. The maintained gate is 85% of one OTA application slot.

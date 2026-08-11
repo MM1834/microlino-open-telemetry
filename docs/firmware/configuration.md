@@ -14,7 +14,7 @@ targets retain Display-CAN as the default for their available input.
 | `vehicleId` | Vehicle component in MQTT topic paths |
 | `mqttPrefix` | Root MQTT topic prefix |
 | `wifiSsid` / `wifiPass` | Preferred home-WiFi station credentials |
-| `wifi2Ssid` / `wifi2Pass` | C6 second/mobile-hotspot credentials; persistence implemented, runtime selection remains in WIFI-001 |
+| `wifi2Ssid` / `wifi2Pass` | C6 second/mobile-hotspot credentials |
 | `lteApn` / user / password | Mobile packet-data configuration |
 | `mqttHost` / `mqttPort` | MQTT broker endpoint |
 | `mqttUser` / `mqttPass` | MQTT credentials |
@@ -51,3 +51,9 @@ changes made through the console.
 The C6 AWS builds load the same four per-device credential files from
 `/aws` in LittleFS as WROOM and LilyGO. `aws status` reports credential and
 connection state without printing key material.
+
+C6 ABRP is independently enabled at runtime and may operate alongside AWS IoT.
+The API key and user token are stored in NVS, accepted only through authenticated
+same-origin configuration routes and omitted from normal backup exports and
+diagnostics. The local onboarding wizard records only its completion state; it is
+not portal/account onboarding.

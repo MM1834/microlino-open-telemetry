@@ -4,6 +4,7 @@
 #include <WebServer.h>
 
 #include "c6_aws.h"
+#include "c6_abrp.h"
 #include "c6_config.h"
 #include "c6_dual_can.h"
 #include "c6_gps.h"
@@ -11,6 +12,8 @@
 #include "decoders/decoder_profile.h"
 #include "system/device_id.h"
 #include "system/version.h"
+#include "onboarding/onboarding.h"
+#include "onboarding/onboarding_ui.h"
 #include "telemetry/telemetry.h"
 #include "web/local_ota.h"
 #include "web/local_web_security.h"
@@ -121,7 +124,8 @@ String diagnosticsJson()
     out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"homeConfigured\":" + String(c6NetworkHomeConfigured() ? "true" : "false") + ",\"mobileConfigured\":" + String(c6NetworkMobileConfigured() ? "true" : "false") + ",\"state\":\"" + c6NetworkStateName() + "\",\"profile\":\"" + c6NetworkProfileName() + "\",\"reason\":\"" + jsonEscape(c6NetworkReason()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
     out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
     out += ",\"gps\":{\"state\":\"" + jsonEscape(c6GpsState()) + "\",\"detected\":" + String(c6GpsDetected() ? "true" : "false") + ",\"fix\":" + String(c6GpsValid() ? "true" : "false") + ",\"chars\":" + String(static_cast<unsigned long long>(c6GpsChars())) + ",\"satellites\":" + String(c6GpsSatellites()) + "}";
-    out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"}";
+    out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"";
+    out += ",\"abrp\":" + c6AbrpStatusJson() + "}";
     return out;
 }
 
@@ -131,7 +135,9 @@ void statusPage()
     String out = header("MOT C6 Status");
     out += "<h1>Microlino Open Telemetry</h1><p>" MOT_VERSION " · " MOT_BOARD " · " + motDeviceId() + "</p>";
     out += "<div class='card'><h2>Runtime diagnostics</h2><pre id='diag'>Loading…</pre><button onclick='load()'>Refresh</button></div>";
-    out += "<p><a href='/config'>Configuration</a> · <a href='/update'>Local OTA</a> · <a href='/api/status'>JSON diagnostics</a></p>";
+    out += "<div class='card'><h2>ABRP</h2><pre id='abrp'>Loading…</pre><button onclick='testAbrp()'>Send test telemetry</button></div>";
+    out += "<p><a href='/config'>Configuration</a> · <a href='/wizard'>Onboarding wizard</a> · <a href='/update'>Local OTA</a> · <a href='/api/status'>JSON diagnostics</a></p>";
+    out += "<script>async function loadAbrp(){let r=await fetch('/api/abrp/status'),d=await r.json();document.getElementById('abrp').textContent=JSON.stringify(d,null,2)}async function testAbrp(){let r=await fetch('/api/abrp/test',{method:'POST'}),d=await r.json();document.getElementById('abrp').textContent=JSON.stringify(d,null,2)}loadAbrp()</script>";
     out += "<script>async function load(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('diag').textContent=JSON.stringify(d,null,2)}load()</script></body></html>";
     server.send(200, "text/html", out);
 }
@@ -143,6 +149,7 @@ void configPage()
     out += "<h1>Configuration</h1><form method='POST' action='/save'>";
     out += "<div class='card'><h2>Preferred home WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'><h2>Second / mobile hotspot</h2><label>SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'><label>Password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'></div>";
     out += "<div class='card'><h2>CAN decoder assignment</h2><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><select name='can2'>" + profileOptions(c6Config.can2Profile) + "</select></div>";
+    out += "<div class='card'><h2>ABRP</h2><label><input style='width:auto' type='checkbox' name='abrpEnabled'" + String(c6Config.abrpEnabled ? " checked" : "") + "> Enable ABRP</label><label>API key</label><input type='password' name='abrpApiKey' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><label>User token</label><input type='password' name='abrpUserToken' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><p class='muted'>ABRP uses WiFi and can run alongside AWS IoT. Credentials are never included in normal backups or diagnostics.</p></div>";
     out += "<div class='card'><h2>Runtime</h2><label>Telemetry interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button>Save &amp; reboot</button></form>";
     out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
     out += "<div class='card'><h2>Factory reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Erase all local configuration?')\"><button>Erase configuration &amp; reboot</button></form></div><p><a href='/status'>Status</a></p></body></html>";
@@ -167,6 +174,12 @@ void saveConfig()
     if (!server.arg("wifi2Password").isEmpty()) c6Config.wifi2Password = server.arg("wifi2Password");
     if (ssid2.isEmpty()) c6Config.wifi2Password = "";
     c6Config.can1Profile = can1; c6Config.can2Profile = can2;
+    c6Config.abrpEnabled = server.hasArg("abrpEnabled");
+    String abrpKey = c6Config.abrpApiKey;
+    String abrpToken = c6Config.abrpUserToken;
+    if (!server.arg("abrpApiKey").isEmpty()) abrpKey = server.arg("abrpApiKey");
+    if (!server.arg("abrpUserToken").isEmpty()) abrpToken = server.arg("abrpUserToken");
+    if (!c6ConfigSetAbrpCredentials(abrpKey, abrpToken)) { server.send(400, "text/plain", "Invalid ABRP credentials"); return; }
     c6Config.publishIntervalMs = interval; c6Config.otaEnabled = server.hasArg("otaEnabled");
     c6ConfigSave();
     server.send(200, "text/html", header("Saved") + "<h1>Configuration saved</h1><p>Rebooting.</p></body></html>");
@@ -196,16 +209,91 @@ void factoryReset()
     server.send(200, "text/html", header("Reset") + "<h1>Factory reset complete</h1><p>Rebooting into protected setup mode.</p></body></html>");
     scheduleReboot();
 }
+
+uint8_t requestedWizardStep()
+{
+    return onboardingClampStep(server.hasArg("step") ? server.arg("step").toInt() : 1);
+}
+
+void wizardPage()
+{
+    if (!requireAdmin()) return;
+    const uint8_t step = requestedWizardStep();
+    String out = header("MOT C6 Onboarding");
+    out += "<h1>Local device onboarding</h1><div class='card'>" + onboardingProgress(step);
+    switch (static_cast<OnboardingStep>(step - 1)) {
+        case OnboardingStep::Welcome:
+            out += "<h2>Welcome</h2><p>This local wizard configures the adapter. Cloud account and vehicle assignment remain portal administration tasks.</p>";
+            break;
+        case OnboardingStep::Hardware:
+            out += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>CAN channels: 2</li><li>GPS: " + htmlEscape(c6GpsState()) + "</li></ul>";
+            break;
+        case OnboardingStep::Connectivity:
+            out += "<h2>Connectivity</h2><p>Configure preferred Home WiFi and the optional second/mobile hotspot.</p><p>Current state: <b>" + htmlEscape(c6NetworkStateName()) + "</b> via " + htmlEscape(c6NetworkProfileName()) + "</p><p><a href='/config'><button type='button'>Open configuration</button></a></p>";
+            break;
+        case OnboardingStep::Vehicle:
+            out += "<h2>Vehicle and CAN</h2><p>CAN1: " + htmlEscape(decoderProfileName(c6Config.can1Profile)) + "<br>CAN2: " + htmlEscape(decoderProfileName(c6Config.can2Profile)) + "</p><p><a href='/config'><button type='button'>Edit decoder assignment</button></a></p>";
+            break;
+        case OnboardingStep::Services:
+            out += "<h2>Telemetry services</h2><p>AWS: " + htmlEscape(c6AwsStatus()) + "</p><p>ABRP: " + String(c6AbrpConfigured() ? "enabled and configured" : (c6Config.abrpEnabled ? "enabled but credentials missing" : "disabled")) + "</p><p><a href='/config'><button type='button'>Configure services</button></a></p>";
+            break;
+        case OnboardingStep::Validation:
+            out += "<h2>Validation</h2><button onclick='validateDevice()'>Run validation</button><pre id='validation'>Not checked yet.</pre><script>async function validateDevice(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('validation').textContent=JSON.stringify(d,null,2)}</script>";
+            break;
+        case OnboardingStep::Finish:
+            out += "<h2>Finish</h2><p>Completing onboarding disables automatic wizard launch. All settings remain editable.</p><form method='POST' action='/api/onboarding/complete'><button>Complete onboarding</button></form>";
+            break;
+    }
+    out += onboardingNavigation(step);
+    out += "<hr><form method='POST' action='/api/onboarding/restart'><button>Restart wizard</button></form></div><p><a href='/status'>Skip to status</a></p></body></html>";
+    server.send(200, "text/html", out);
+}
+
+void onboardingStatus()
+{
+    if (!requireAdmin()) return;
+    const uint8_t step = c6Config.onboardingComplete ? onboardingStepCount() : requestedWizardStep();
+    server.send(200, "application/json", "{\"complete\":" + String(c6Config.onboardingComplete ? "true" : "false") + ",\"step\":" + String(step) + ",\"stepId\":\"" + onboardingStepId(static_cast<OnboardingStep>(step - 1)) + "\",\"stepCount\":" + String(onboardingStepCount()) + "}");
+}
+
+void onboardingComplete()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6Config.onboardingComplete = true;
+    c6ConfigSave();
+    server.sendHeader("Location", "/status"); server.send(303);
+}
+
+void onboardingRestart()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6Config.onboardingComplete = false;
+    c6ConfigSave();
+    server.sendHeader("Location", "/wizard?step=1"); server.send(303);
+}
+
+void abrpTest()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    const bool queued = c6AbrpQueueTelemetry();
+    server.send(queued ? 202 : 503, "application/json", c6AbrpStatusJson());
+}
 }
 
 void c6WebSetup()
 {
     LocalWebSecurity::collectSecurityHeaders(server);
-    server.on("/", HTTP_GET, [] { c6ConfigAdminConfigured() ? statusPage() : setupPage(); });
+    server.on("/", HTTP_GET, [] { if (!c6ConfigAdminConfigured()) setupPage(); else if (!c6Config.onboardingComplete) wizardPage(); else statusPage(); });
     server.on("/setup", HTTP_GET, setupPage);
     server.on("/setup", HTTP_POST, setupSave);
     server.on("/status", HTTP_GET, statusPage);
     server.on("/api/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", diagnosticsJson()); });
+    server.on("/wizard", HTTP_GET, wizardPage);
+    server.on("/api/onboarding", HTTP_GET, onboardingStatus);
+    server.on("/api/onboarding/complete", HTTP_POST, onboardingComplete);
+    server.on("/api/onboarding/restart", HTTP_POST, onboardingRestart);
+    server.on("/api/abrp/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6AbrpStatusJson()); });
+    server.on("/api/abrp/test", HTTP_POST, abrpTest);
     server.on("/config", HTTP_GET, configPage);
     server.on("/save", HTTP_POST, saveConfig);
     server.on("/api/config/export", HTTP_GET, exportConfig);

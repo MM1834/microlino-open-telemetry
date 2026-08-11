@@ -39,6 +39,12 @@ void c6ConfigLoad()
     c6Config.wifi2Password = preferences.getString("pass2", "");
     c6Config.adminPassword = preferences.getString("otaPass", "");
     c6Config.setupPassword = preferences.getString("setupPass", "");
+    c6Config.abrpEnabled = preferences.getBool("abrpEn", false);
+    c6Config.abrpApiKey = preferences.getString("abrpKey", "");
+    c6Config.abrpUserToken = preferences.getString("abrpToken", "");
+    c6Config.onboardingComplete = preferences.isKey("onboarded")
+        ? preferences.getBool("onboarded", false)
+        : validAdminPassword(c6Config.adminPassword);
     c6Config.otaEnabled = preferences.getBool("otaEn", false);
     c6Config.publishIntervalMs = preferences.getUInt("pubMs", 5000);
     if (c6Config.publishIntervalMs < 1000) c6Config.publishIntervalMs = 1000;
@@ -117,6 +123,10 @@ void c6ConfigSave()
     preferences.putString("pass2", c6Config.wifi2Password);
     preferences.putString("otaPass", c6Config.adminPassword);
     preferences.putString("setupPass", c6Config.setupPassword);
+    preferences.putBool("abrpEn", c6Config.abrpEnabled);
+    preferences.putString("abrpKey", c6Config.abrpApiKey);
+    preferences.putString("abrpToken", c6Config.abrpUserToken);
+    preferences.putBool("onboarded", c6Config.onboardingComplete);
     preferences.putBool("otaEn", c6Config.otaEnabled);
     preferences.putUInt("pubMs", c6Config.publishIntervalMs);
     preferences.end();
@@ -133,6 +143,17 @@ bool c6ConfigSetAdminPassword(const String &value)
     password.trim();
     if (!validAdminPassword(password)) return false;
     c6Config.adminPassword = password;
+    return true;
+}
+
+bool c6ConfigSetAbrpCredentials(const String &apiKeyValue, const String &userTokenValue)
+{
+    String apiKey = apiKeyValue;
+    String userToken = userTokenValue;
+    apiKey.trim(); userToken.trim();
+    if (apiKey.length() > 192 || userToken.length() > 192) return false;
+    c6Config.abrpApiKey = apiKey;
+    c6Config.abrpUserToken = userToken;
     return true;
 }
 
@@ -158,6 +179,12 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["can2Profile"] = static_cast<int>(c6Config.can2Profile);
     doc["publishIntervalMs"] = c6Config.publishIntervalMs;
     doc["otaEnabled"] = c6Config.otaEnabled;
+    doc["abrpEnabled"] = c6Config.abrpEnabled;
+    doc["onboardingComplete"] = c6Config.onboardingComplete;
+    if (includeSecrets) {
+        doc["abrpApiKey"] = c6Config.abrpApiKey;
+        doc["abrpUserToken"] = c6Config.abrpUserToken;
+    }
     if (includeSecrets) doc["adminPassword"] = c6Config.adminPassword;
     String result;
     serializeJsonPretty(doc, result);
@@ -182,13 +209,18 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["can2Profile"].isNull()) candidate.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
     if (!doc["publishIntervalMs"].isNull()) candidate.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
+    if (!doc["abrpEnabled"].isNull()) candidate.abrpEnabled = doc["abrpEnabled"].as<bool>();
+    if (!doc["abrpApiKey"].isNull()) candidate.abrpApiKey = doc["abrpApiKey"].as<String>();
+    if (!doc["abrpUserToken"].isNull()) candidate.abrpUserToken = doc["abrpUserToken"].as<String>();
+    if (!doc["onboardingComplete"].isNull()) candidate.onboardingComplete = doc["onboardingComplete"].as<bool>();
     if (!doc["adminPassword"].isNull()) candidate.adminPassword = doc["adminPassword"].as<String>();
     candidate.wifiSsid.trim();
     candidate.wifi2Ssid.trim();
     if (candidate.wifiSsid.length() > 32 || candidate.wifiPassword.length() > 63 ||
         candidate.wifi2Ssid.length() > 32 || candidate.wifi2Password.length() > 63 ||
+        candidate.abrpApiKey.length() > 192 || candidate.abrpUserToken.length() > 192 ||
         candidate.publishIntervalMs < 1000 || candidate.publishIntervalMs > 3600000) {
-        error = "invalid WiFi or publish interval";
+        error = "invalid WiFi, ABRP credentials, or publish interval";
         return false;
     }
     const C6Configuration previous = c6Config;

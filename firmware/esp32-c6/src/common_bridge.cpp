@@ -7,5 +7,6 @@
 #include "../../common/decoders/decoder_standard_can_v2.cpp"
 #include "../../common/decoders/decoder_engine.cpp"
 #include "../../common/system/device_id.cpp"
+#include "../../common/abrp/abrp_client.cpp"
 #include "../../common/web/local_web_security.cpp"
 #include "../../common/web/local_ota.cpp"

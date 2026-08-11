@@ -10,7 +10,7 @@
 #include "telemetry/telemetry.h"
 #include "system/version.h"
 #include "system/device_id.h"
-#include "common/abrp/abrp_client.h"
+#include "abrp/wroom_abrp.h"
 #include "web/local_web_security.h"
 
 static unsigned long lastMqttPublishMs = 0;
@@ -59,7 +59,7 @@ void setup()
 
     setupNetwork();
     setupMqtt();
-    setupAbrp();
+    setupWroomAbrp();
     setupWebUi();
     setupCanInput();
     setupWroomGps();
@@ -75,7 +75,7 @@ void loop()
     wroomGpsLoop();
     mqttLoop();
     webUiLoop();
-    abrpLoop();
+    wroomAbrpLoop();
 
     if (millis() - lastSystemUpdateMs > 1000) {
         lastSystemUpdateMs = millis();

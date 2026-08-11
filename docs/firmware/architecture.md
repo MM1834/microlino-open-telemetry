@@ -21,6 +21,13 @@ flowchart LR
 The sequence follows each target's `main.cpp`. Network modules start a local AP and
 attempt configured connectivity within their own setup logic.
 
+## ESP32-C6 startup order
+
+```mermaid
+flowchart LR
+    Boot --> Telemetry --> Config --> DualCAN --> GPS --> Network --> WebUI --> AWS --> ABRP --> Ready
+```
+
 ## Runtime loops
 
 ESP32-WROOM processes CAN, GPS, MQTT, WebUI and ABRP, updates system telemetry each
@@ -28,6 +35,10 @@ second and publishes according to the configured interval.
 
 LilyGO processes modem, network, GPS, MQTT, ABRP, WebUI and CAN on every loop,
 updates system telemetry each second and yields with a short delay.
+
+C6 services both TWAI controllers, GPS, dual-profile WiFi, WebUI, AWS and ABRP on
+every loop. ABRP performs the bounded HTTPS request in a separate FreeRTOS task,
+so a slow endpoint does not suspend CAN receive processing.
 
 ## Shared data path
 

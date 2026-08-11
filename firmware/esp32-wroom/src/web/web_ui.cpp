@@ -3,7 +3,7 @@
 #include "../network/wifi_manager.h"
 #include "../ota/ota_web.h"
 
-#include "common/abrp/abrp_client.h"
+#include "abrp/wroom_abrp.h"
 
 #include <Arduino.h>
 #include <WebServer.h>
@@ -434,15 +434,15 @@ static void handleSave()
 static void handleAbrpStatus()
 {
     if (!requireAdmin()) return;
-    server.send(200, "application/json", abrpStatusJson());
+    server.send(200, "application/json", wroomAbrpStatusJson());
 }
 
 static void handleAbrpTest()
 {
     if (!requireAdmin()) return;
     if (!requireSameOrigin()) return;
-    bool ok = sendAbrpTelemetryNow();
-    server.send(ok ? 200 : 503, "application/json", abrpStatusJson());
+    const bool queued = queueWroomAbrpTelemetry();
+    server.send(queued ? 202 : 503, "application/json", wroomAbrpStatusJson());
 }
 
 static void handleConfigExport()

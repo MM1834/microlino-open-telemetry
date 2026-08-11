@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "c6_board.h"
+#include "c6_abrp.h"
 #include "c6_aws.h"
 #include "c6_can_scan.h"
 #include "c6_drive_capture.h"
@@ -188,6 +189,7 @@ void setup()
     c6NetworkSetup();
     c6WebSetup();
     c6AwsSetup();
+    c6AbrpSetup();
     c6DriveCaptureReset();
     Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status");
 }
@@ -199,6 +201,7 @@ void loop()
     c6NetworkLoop();
     c6WebLoop();
     c6AwsLoop();
+    c6AbrpLoop();
     pollSerialCommands();
 
     if (millis() - lastStatusMs >= 5000) {
