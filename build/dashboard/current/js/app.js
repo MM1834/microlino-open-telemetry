@@ -25,7 +25,8 @@
     onboardingRequired: false,
     onboardingExpanded: false,
     notificationBusy: false,
-    notificationVehicleId: null
+    notificationVehicleId: null,
+    rangeForecast: null
   };
 
 
@@ -458,11 +459,29 @@
     if (!Number.isFinite(soc)) return;
     setText('soc-main', `${soc.toFixed(0)}%`); setText('soc-battery', `${soc.toFixed(0)}%`);
     $('soc-ring')?.style.setProperty('--p', soc); $('soc-ring-2')?.style.setProperty('--p', soc);
-    if (!state.values.range) {
-      const maxRange = Number(vehicleCfg.defaultRangeKmAt100 || 140);
-      setText('range-main', `${Math.round(maxRange * soc / 100)} km`);
-    }
+    renderRangeForecast();
   }
+  function renderRangeForecast() {
+    const soc = Number(state.values['display/soc']);
+    const maxRange = Number(vehicleCfg.defaultRangeKmAt100 || 140);
+    if (!Number.isFinite(soc)) return;
+    const standardRange = Math.round(maxRange * soc / 100);
+    const forecast = state.rangeForecast;
+    const learned = Number(forecast?.effectiveKmPerSoc);
+    const hasForecast = Number.isFinite(learned) && Number(forecast?.tripCount) > 0;
+    const displayedRange = hasForecast ? Math.round(soc * learned) : standardRange;
+    setText('range-main', `${displayedRange} km`);
+    setText('range-forecast-main', `${displayedRange} km`);
+    setText('range-method', hasForecast ? 'Persönliche Prognose' : `Nach SoC · Basis ${maxRange} km`);
+    setText('range-soc-comparison', `Nach SoC: ${standardRange} km`);
+    setText('range-forecast-basis', hasForecast
+      ? `Basierend auf ${fmtNum(forecast.distanceKm, 0)} km · ${forecast.tripCount} ${Number(forecast.tripCount) === 1 ? 'Fahrt' : 'Fahrten'}`
+      : 'Noch keine ausreichende Fahrhistorie');
+  }
+  window.addEventListener('mot-range-forecast', event => {
+    state.rangeForecast = event.detail || null;
+    renderRangeForecast();
+  });
   function locationReceivedAtMs() {
     const latMeta =
       state.metadata['location/latitude'] ||
@@ -558,6 +577,29 @@
     setText('power-label', charging ? 'Ladeleistung' : 'Fahrzeugleistung');
     const flow = charging ? 'Laden' : regenerating ? 'Rekuperation' : discharging ? 'Verbrauch' : 'Bereit';
     setText('power-flow', flow);
+    setText('mobile-power-flow', flow);
+    setText('mobile-vehicle-power', Number.isFinite(powerW) ? `${fmtNum(Math.abs(powerW) / 1000, 2)} kW` : '-- kW');
+    const speed = Number(state.values['display/speed_kmh'] ?? state.values['display/speed']);
+    const moving = !charging && Number.isFinite(speed) && speed > 1;
+    $('overview')?.querySelector('.overview-charging')?.classList.toggle('is-driving', moving);
+    const powerKw = Number.isFinite(powerW) ? Math.abs(powerW) / 1000 : NaN;
+    document.querySelectorAll('[data-power-meter]').forEach(meter => {
+      const visible = Number.isFinite(powerKw) && (charging || moving);
+      meter.hidden = !visible;
+      if (!visible) return;
+      const mode = charging ? 'charging' : regenerating ? 'regeneration' : 'consumption';
+      const scaleMax = mode === 'charging' ? 3.5 : 20;
+      const level = mode === 'charging'
+        ? (powerKw <= 1.6 ? 'low' : powerKw <= 2.4 ? 'medium' : 'high')
+        : mode === 'regeneration'
+          ? (powerKw <= 5 ? 'low' : powerKw <= 10 ? 'medium' : 'high')
+          : (powerKw <= 3 ? 'low' : powerKw <= 10 ? 'medium' : 'high');
+      meter.dataset.mode = mode;
+      meter.dataset.level = level;
+      meter.setAttribute('aria-valuemax', String(scaleMax));
+      meter.setAttribute('aria-valuenow', powerKw.toFixed(2));
+      meter.querySelector('[data-power-meter-fill]')?.style.setProperty('--power-level', `${Math.min(100, powerKw / scaleMax * 100)}%`);
+    });
   }
   function renderChargingState() {
     const charging = state.values['charging/is_charging'] === true || Number(state.values['charging/is_charging']) === 1;
@@ -581,9 +623,9 @@
     }
     switch (key) {
       case 'display/soc': setSoc(val); break;
-      case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); break;
+      case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); updateBmsPowerFlow(); break;
       case 'display/odometer_km': case 'display/odo': setText('odo-main', `${fmtNum(val,1)} km`); break;
-      case 'display/estimated_range_km': case 'display/range': state.values.range = val; setText('range-main', `${fmtNum(val,0)} km`); break;
+      case 'display/estimated_range_km': case 'display/range': state.values.range = val; renderRangeForecast(); break;
       case 'charging/is_charging': renderChargingState(); updateBmsPowerFlow(); break;
       case 'charging/plugged': renderChargingState(); break;
       case 'charging/power_signed': case 'charging/power_display': {
@@ -698,6 +740,7 @@ function resetDashboardForVehicle(vehicleId) {
   state.deviceIp = '--';
   state.vehicleLastSeenMs = 0;
   state.vehicleLastSeenSource = '';
+  state.rangeForecast = null;
 
   setText('side-vehicle', vehicleId || '--');
   setText('side-topic', vehicleId ? `${baseTopic(vehicleId)}/#` : '--');
@@ -710,9 +753,16 @@ function resetDashboardForVehicle(vehicleId) {
   setText('speed-card', '--');
   setText('odo-main', '-- km');
   setText('range-main', '-- km');
+  setText('range-method', `Nach SoC · Basis ${Number(vehicleCfg.defaultRangeKmAt100 || 140)} km`);
+  setText('range-forecast-main', '-- km');
+  setText('range-forecast-basis', 'Noch keine ausreichende Fahrhistorie');
+  setText('range-soc-comparison', 'Nach SoC: -- km');
 
   setText('charging-main', 'Keine Daten');
   setText('charging-card', 'Keine Daten');
+  setText('mobile-power-flow', '--');
+  setText('mobile-vehicle-power', '-- kW');
+  $('overview')?.querySelector('.overview-charging')?.classList.remove('is-driving');
   setText('power', '-- kW');
   setText('voltage', '-- V');
   setText('charge-voltage', '-- V');

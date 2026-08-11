@@ -152,6 +152,29 @@ class DashboardOnboardingTests(unittest.TestCase):
         self.assertIn('id="onboarding-admin"', html)
         self.assertIn('id="admin-claim-output"', html)
 
+    def test_admin_claim_ui_follows_notifications_and_precedes_status(self) -> None:
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        css = (ROOT / "build/dashboard/current/css/dashboard.css").read_text()
+        self.assertLess(html.index('id="settings"'), html.index('id="onboarding-admin"'))
+        self.assertLess(html.index('id="onboarding-admin"'), html.index('class="card panel status-panel"'))
+        self.assertIn('#onboarding-admin{order:75}', css)
+        self.assertIn('.main>.status-panel{order:80;width:100%}', css)
+
+
+class DashboardRangeForecastTests(unittest.TestCase):
+    def test_shared_portal_renders_personal_forecast_and_soc_comparison(self) -> None:
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text()
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        history = (ROOT / "build/dashboard/current/js/history/history-chart.js").read_text()
+        self.assertIn('id="range-method"', html)
+        self.assertIn('id="range-forecast-main"', html)
+        self.assertIn('id="range-forecast-basis"', html)
+        self.assertIn('id="range-soc-comparison"', html)
+        self.assertIn("function renderRangeForecast()", app)
+        self.assertIn("Persönliche Prognose", app)
+        self.assertIn("Basierend auf ${fmtNum(forecast.distanceKm, 0)} km", app)
+        self.assertIn('new CustomEvent("mot-range-forecast"', history)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -179,6 +179,13 @@
 
 /* Mobile charging-first information architecture. */
 .mobile-connection-card{display:none}
+.range-method{display:block;margin-top:2px;color:var(--green);font-size:.72rem}
+.range-forecast{display:flex;flex-direction:column;align-items:center;gap:4px;margin:12px 0;padding:10px;border:1px solid rgba(158,176,199,.14);border-radius:12px;background:rgba(255,255,255,.025);text-align:center}
+.range-forecast label{color:var(--muted);font-size:.75rem}
+.range-forecast strong{font-size:1.55rem}
+.range-forecast span,.range-forecast small{color:var(--muted);font-size:.78rem}
+.overview-charging-stationary{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mobile-driving-flow{display:none}
 @media (max-width:900px){
   .sidebar{display:none}
   .main{display:flex;gap:14px}
@@ -199,6 +206,10 @@
   .hero-metrics{display:contents}
   .metric-card{width:100%;min-height:0;padding:18px}
   .overview-charging{order:20}
+  .overview-charging.is-driving .overview-charging-stationary{display:none}
+  .overview-charging.is-driving .mobile-driving-flow{display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .mobile-driving-flow small{color:var(--muted);font-size:1.05rem;margin-top:3px}
+  .mobile-driving-flow p{margin-top:8px}
   .overview-soc{order:21}
   .overview-speed{order:22}
   .overview-odometer{order:23}
@@ -224,7 +235,11 @@
   #cells{order:54}
   #history{order:60}
   #settings{order:70}
+  #onboarding-admin{order:75}
   .grid>.status-panel{order:80}
+  .main>.status-panel{order:80;width:100%}
+  #vehicle .speedo strong{position:absolute;top:48px;left:0;right:0;transform:none;text-align:center;line-height:1}
+  #vehicle .speedo span{bottom:30px;left:0;right:0;text-align:center}
   .hero-image-wrap{order:90;width:100%;min-height:180px;border:1px solid var(--line);box-shadow:var(--shadow)}
   .hero-title{order:91;width:100%;padding:18px;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(12,28,47,.92),rgba(6,17,30,.92));box-shadow:var(--shadow)}
   .hero-title h1{font-size:1.55rem}
@@ -238,4 +253,73 @@
   .overview-charging{padding-block:22px}
   .overview-charging .metric-icon{font-size:2rem}
   .overview-charging strong{font-size:2rem}
+}
+
+/* Keep the SoC value and label as one optically centered group. */
+.ring{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+}
+.ring span,.ring small{margin:0;line-height:1}
+.ring span{font-size:2.15rem}
+.ring small{font-size:1.05rem;font-weight:650}
+
+/* Make live power readable without increasing the overview-card height. */
+#charging-power-main,.mobile-driving-flow small{
+  font-size:1.4rem;
+  font-weight:750;
+  line-height:1.1;
+  margin-top:5px;
+}
+
+/* Mobile-only mode-specific live-power scales. */
+.overview-power-meter{display:none}
+@media (max-width:900px){
+  .overview-power-meter:not([hidden]){
+    display:block;
+    width:min(150px,58vw);
+    height:5px;
+    margin:5px auto -5px;
+    overflow:hidden;
+    border-radius:999px;
+    background:rgba(158,176,199,.18);
+  }
+  .overview-power-meter>span{
+    display:block;
+    width:var(--power-level,0%);
+    height:100%;
+    border-radius:inherit;
+    background:var(--green);
+    transition:width .25s ease,background-color .25s ease;
+  }
+  .overview-power-meter[data-mode="consumption"][data-level="medium"]>span{background:var(--amber)}
+  .overview-power-meter[data-mode="consumption"][data-level="high"]>span{background:var(--red)}
+  .overview-power-meter[data-mode="regeneration"][data-level="low"]>span,
+  .overview-power-meter[data-mode="charging"][data-level="low"]>span{background:#91f7a0}
+  .overview-power-meter[data-mode="regeneration"][data-level="medium"]>span,
+  .overview-power-meter[data-mode="charging"][data-level="medium"]>span{background:var(--green)}
+  .overview-power-meter[data-mode="regeneration"][data-level="high"]>span,
+  .overview-power-meter[data-mode="charging"][data-level="high"]>span{background:#138a35}
+  .overview-charging:has(.overview-power-meter:not([hidden])) p{margin-top:3px}
+}
+
+/* Align the desktop Battery and Vehicle cards around equal-size instruments. */
+@media (min-width:901px){
+  #battery,#vehicle{display:flex;flex-direction:column;overflow:hidden}
+  .battery-layout{display:flex;flex:1;flex-direction:column;align-items:center;gap:16px;min-width:0}
+  .battery-layout>.ring.big{order:1;--ring-size:180px;flex:0 0 auto}
+  .battery-values{order:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;margin-top:auto}
+  .battery-values>div{min-width:0;padding:10px;border:1px solid rgba(158,176,199,.14);border-radius:12px;background:rgba(255,255,255,.025)}
+  .battery-values label{display:block;margin:0 0 4px;font-size:.72rem;line-height:1.2}
+  .battery-values strong{display:block;font-size:1.05rem;line-height:1.2;overflow-wrap:anywhere}
+  #vehicle .speedo{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  #vehicle .speedo strong{line-height:1}
+  #vehicle .speedo span{position:static;line-height:1}
+  #vehicle .mini-grid{margin-top:auto}
+  #charging .mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #charging .mini-grid>div:last-child{grid-column:1/-1}
+  .cell-meta>span{display:flex;flex-direction:column;gap:3px}
 }

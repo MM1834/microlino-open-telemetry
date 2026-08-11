@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260809-mobile1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260811-range1" />
   <link rel="stylesheet" href="css/history.css">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -110,23 +110,6 @@
         </form>
       </section>
 
-      <section id="onboarding-admin" class="card onboarding-card" hidden>
-        <div>
-          <h1>Beta-Onboarding verwalten</h1>
-          <p>Erstellt einen einmaligen Claim für eine kontrollierte Fahrzeug-ID. Der Code wird nur hier angezeigt.</p>
-        </div>
-        <form id="admin-claim-form" class="onboarding-form" autocomplete="off">
-          <label for="admin-vehicle-id">Fahrzeug-ID</label>
-          <div class="onboarding-input-row">
-            <input id="admin-vehicle-id" name="vehicleId" required pattern="[a-z0-9][a-z0-9-]{0,63}" autocomplete="off" />
-            <button class="auth-button" type="submit">Claim erstellen</button>
-          </div>
-          <code id="admin-claim-output" class="claim-output" hidden></code>
-          <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
-          <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
-        </form>
-      </section>
-
       <section id="overview" class="hero card">
         <div class="hero-title">
           <h1 id="vehicle-name">Microlino Pioneer</h1>
@@ -134,9 +117,12 @@
           <a class="history-link" href="#history">History ansehen →</a>
         </div>
         <div class="hero-metrics">
-          <div class="metric-card soc-card overview-soc"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="soc-updated" class="muted">Stand: --</small></div>
+          <div class="metric-card soc-card overview-soc"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="range-method" class="range-method">Nach SoC · Basis 140 km</small><small id="soc-updated" class="muted">Stand: --</small></div>
           <div class="metric-card overview-speed"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
-          <div class="metric-card overview-charging"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><p>Ladestatus</p></div>
+          <div class="metric-card overview-charging">
+            <div class="overview-charging-stationary"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><span class="overview-power-meter" data-power-meter hidden role="progressbar" aria-label="Leistung" aria-valuemin="0" aria-valuemax="20"><span data-power-meter-fill></span></span><p>Ladestatus</p></div>
+            <div class="mobile-driving-flow" aria-live="polite"><span class="metric-icon green">↯</span><strong id="mobile-power-flow">--</strong><small id="mobile-vehicle-power">-- kW</small><span class="overview-power-meter" data-power-meter hidden role="progressbar" aria-label="Leistung" aria-valuemin="0" aria-valuemax="20"><span data-power-meter-fill></span></span><p>Leistungsfluss</p></div>
+          </div>
           <div class="metric-card overview-odometer"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Gesamtkilometer</p></div>
         </div>
 
@@ -174,11 +160,20 @@
       <section class="grid">
         <article id="battery" class="card panel battery-panel">
           <h2>▣ Batterie</h2>
-          <div class="battery-layout"><div><label>Spannung</label><strong id="voltage">-- V</strong><label>Strom</label><strong id="current">-- A</strong><label id="power-label">Fahrzeugleistung</label><strong id="power">-- kW</strong><label>Leistungsfluss</label><strong id="power-flow">--</strong></div><div class="ring big" id="soc-ring-2"><span id="soc-battery">--%</span><small>SoC</small></div></div>
+          <div class="battery-layout">
+            <div class="battery-values">
+              <div><label>Spannung</label><strong id="voltage">-- V</strong></div>
+              <div><label>Strom</label><strong id="current">-- A</strong></div>
+              <div><label id="power-label">Fahrzeugleistung</label><strong id="power">-- kW</strong></div>
+              <div><label>Leistungsfluss</label><strong id="power-flow">--</strong></div>
+            </div>
+            <div class="ring big" id="soc-ring-2"><span id="soc-battery">--%</span><small>SoC</small></div>
+          </div>
         </article>
         <article id="vehicle" class="card panel">
           <h2>▱ Fahrzeug</h2>
           <div class="speedo"><div class="speedo-arc"></div><strong id="speed-card">--</strong><span>km/h</span></div>
+          <div class="range-forecast" aria-live="polite"><label>Reichweitenprognose</label><strong id="range-forecast-main">-- km</strong><span id="range-forecast-basis">Noch keine ausreichende Fahrhistorie</span><small id="range-soc-comparison">Nach SoC: -- km</small></div>
           <div class="mini-grid"><div><label>Trip</label><strong id="trip">-- km</strong></div><div><label>Verbrauch</label><strong id="consumption">--</strong></div><div><label>Fahrzeit</label><strong id="drive-time">--</strong></div></div>
         </article>
         <article id="charging" class="card panel">
@@ -195,10 +190,6 @@
           <div class="cell-meta"><span>Min: <b id="cell-min">--</b></span><span>Max: <b id="cell-max">--</b></span><span>Δ: <b id="cell-delta">--</b></span></div>
           <small class="muted">Zwei plausible Standard-CAN-Werte; packweite Extrema noch nicht bestätigt.</small>
           <div id="cell-bars" class="cell-bars"></div>
-        </article>
-        <article class="card panel status-panel">
-          <h2>Status</h2>
-          <ul class="data-list"><li><span>Firmware</span><strong id="fw-version">--</strong></li><li><span>Device</span><strong id="device-id">--</strong></li><li><span>RSSI</span><strong id="rssi">-- dBm</strong></li><li><span>Uptime</span><strong id="uptime">--</strong></li></ul>
         </article>
       </section>
     
@@ -296,6 +287,28 @@
   </form>
 </section>
 
+<section id="onboarding-admin" class="card onboarding-card" hidden>
+  <div>
+    <h1>Beta-Onboarding verwalten</h1>
+    <p>Erstellt einen einmaligen Claim für eine kontrollierte Fahrzeug-ID. Der Code wird nur hier angezeigt.</p>
+  </div>
+  <form id="admin-claim-form" class="onboarding-form" autocomplete="off">
+    <label for="admin-vehicle-id">Fahrzeug-ID</label>
+    <div class="onboarding-input-row">
+      <input id="admin-vehicle-id" name="vehicleId" required pattern="[a-z0-9][a-z0-9-]{0,63}" autocomplete="off" />
+      <button class="auth-button" type="submit">Claim erstellen</button>
+    </div>
+    <code id="admin-claim-output" class="claim-output" hidden></code>
+    <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
+    <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
+  </form>
+</section>
+
+<section class="card panel status-panel">
+  <h2>Status</h2>
+  <ul class="data-list"><li><span>Firmware</span><strong id="fw-version">--</strong></li><li><span>Device</span><strong id="device-id">--</strong></li><li><span>RSSI</span><strong id="rssi">-- dBm</strong></li><li><span>Uptime</span><strong id="uptime">--</strong></li></ul>
+</section>
+
 </main>
   </div>
   <script src="config.js"></script>
@@ -305,10 +318,10 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
-  <script src="js/app.js?v=20260807-ntf1"></script>
+  <script src="js/app.js?v=20260811-range1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260809-1"></script>
+  <script src="js/history/history-chart.js?v=20260811-range1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>
