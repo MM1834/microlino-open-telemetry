@@ -18,9 +18,43 @@
   function createAuthManager(options = {}) {
     const config = options.config || {};
     const tokenStore = options.tokenStore || window.MOTTokenStore?.create();
+    const persistentTokenStore = options.persistentTokenStore || (() => {
+      try { return window.MOTTokenStore?.create({ storage: window.localStorage }); }
+      catch (_) { return null; }
+    })();
     const transactionStorage = options.transactionStorage || window.sessionStorage;
     let session = null;
     let lastError = null;
+    let refreshPromise = null;
+
+    function rememberDays() {
+      const days = Number(config.rememberDays ?? 30);
+      return Number.isFinite(days) && days > 0 ? Math.min(days, 30) : 30;
+    }
+
+    function clearStoredSessions() {
+      tokenStore?.clear();
+      persistentTokenStore?.clear();
+    }
+
+    function saveSession(nextSession, persistent = false) {
+      const stored = { ...nextSession, persistent: Boolean(persistent) };
+      if (persistent) {
+        tokenStore?.clear();
+        persistentTokenStore?.save({
+          refreshToken: stored.refreshToken,
+          refreshExpiresAt: stored.refreshExpiresAt,
+          tokenType: stored.tokenType,
+          scope: stored.scope,
+          persistent: true
+        });
+      } else {
+        persistentTokenStore?.clear();
+        tokenStore?.save(stored);
+      }
+      session = stored;
+      return stored;
+    }
 
     function requiredConfiguration() {
       return ['clientId', 'authorizeEndpoint', 'tokenEndpoint', 'redirectUri'];
@@ -145,13 +179,17 @@
         if (!callback.state || callback.state !== transaction.state) {
           throw new Error('Authentication callback state validation failed');
         }
-        session = await exchangeCode(callback.code, transaction);
-        tokenStore.save(session);
+        const exchanged = await exchangeCode(callback.code, transaction);
+        const persistent = Boolean(transaction.remember && exchanged.refreshToken && persistentTokenStore);
+        if (persistent) {
+          exchanged.refreshExpiresAt = Date.now() + rememberDays() * 86400000;
+        }
+        saveSession(exchanged, persistent);
         lastError = null;
         return true;
       } catch (error) {
         session = null;
-        tokenStore.clear();
+        clearStoredSessions();
         lastError = error;
         throw error;
       } finally {
@@ -162,21 +200,35 @@
 
     async function restoreSession() {
       if (isCallback()) await handleCallback();
-      session = tokenStore.load();
-      if (session && tokenStore.isExpired(session)) {
+      session = tokenStore?.load() || persistentTokenStore?.load();
+      if (session?.persistent && persistentTokenStore?.isRefreshExpired(session)) {
         session = null;
-        tokenStore.clear();
+        persistentTokenStore.clear();
+      } else if (session && (!session.accessToken || tokenStore.isExpired(session))) {
+        if (session.persistent && session.refreshToken) {
+          try { await refresh(); }
+          catch (error) {
+            lastError = error;
+            if (error.permanent) {
+              session = null;
+              clearStoredSessions();
+            }
+          }
+        } else {
+          session = null;
+          tokenStore.clear();
+        }
       }
-      return Boolean(session?.accessToken);
+      return Boolean(session?.accessToken) && !tokenStore.isExpired(session);
     }
 
-    async function login() {
+    async function login(options = {}) {
       assertConfigured();
       const verifier = window.MOTPkce.createVerifier();
       const challenge = await window.MOTPkce.createChallenge(verifier);
       const state = window.MOTPkce.createState();
       const nonce = window.MOTPkce.createNonce();
-      saveTransaction({ verifier, state, nonce, createdAt: Date.now() });
+      saveTransaction({ verifier, state, nonce, remember: Boolean(options.remember), createdAt: Date.now() });
 
       const url = new URL(config.authorizeEndpoint);
       url.search = new URLSearchParams({
@@ -195,7 +247,7 @@
     async function logout() {
       session = null;
       lastError = null;
-      tokenStore.clear();
+      clearStoredSessions();
       clearTransaction();
       if (!config.logoutEndpoint || !config.clientId || !config.logoutUri) return;
       const url = new URL(config.logoutEndpoint);
@@ -206,18 +258,71 @@
       window.location.assign(url.toString());
     }
 
+    async function refresh() {
+      if (refreshPromise) return refreshPromise;
+      if (!session?.persistent || !session.refreshToken || persistentTokenStore?.isRefreshExpired(session)) {
+        const error = new Error('No valid persistent refresh session is available');
+        error.permanent = true;
+        throw error;
+      }
+      refreshPromise = (async () => {
+        const body = new URLSearchParams({
+          grant_type: 'refresh_token',
+          client_id: config.clientId,
+          refresh_token: session.refreshToken
+        });
+        const response = await fetch(config.tokenEndpoint, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+          cache: 'no-store'
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.access_token) {
+          const message = payload.error_description || payload.error || `HTTP ${response.status}`;
+          const error = new Error(`Cognito token refresh failed: ${message}`);
+          error.permanent = response.status === 400 && ['invalid_grant', 'invalid_client', 'unauthorized_client'].includes(payload.error);
+          throw error;
+        }
+        const expiresIn = Number(payload.expires_in || 3600);
+        return saveSession({
+          ...session,
+          accessToken: payload.access_token,
+          idToken: payload.id_token || session.idToken || null,
+          refreshToken: payload.refresh_token || session.refreshToken,
+          tokenType: payload.token_type || session.tokenType || 'Bearer',
+          scope: payload.scope || session.scope || normalizeScopes().join(' '),
+          expiresAt: Date.now() + Math.max(1, expiresIn) * 1000,
+          obtainedAt: Date.now()
+        }, true);
+      })();
+      try { return await refreshPromise; }
+      finally { refreshPromise = null; }
+    }
+
     return Object.freeze({
       restoreSession,
       login,
       logout,
-      async refresh() {
-        throw new Error('Refresh-token rotation is outside SPR-0004B.3 Phase 2');
-      },
+      refresh,
       async getAccessToken() {
         if (!session || tokenStore.isExpired(session)) {
-          session = null;
-          tokenStore.clear();
-          return null;
+          if (session?.persistent && session.refreshToken) {
+            try { await refresh(); }
+            catch (error) {
+              lastError = error;
+              if (error.permanent) {
+                session = null;
+                clearStoredSessions();
+                return null;
+              }
+              throw error;
+            }
+          } else {
+            session = null;
+            tokenStore.clear();
+            return null;
+          }
         }
         return session.accessToken;
       },
@@ -237,7 +342,9 @@
           missingConfiguration: missingConfiguration(),
           authenticated: Boolean(session?.accessToken) && !tokenStore.isExpired(session),
           expiresAt: session?.expiresAt || null,
-          implementationPhase: 'SPR-0004B.3-phase-2-pkce'
+          persistent: Boolean(session?.persistent),
+          refreshExpiresAt: session?.refreshExpiresAt || null,
+          implementationPhase: 'AUTH-PERSIST-001'
         };
       }
     });

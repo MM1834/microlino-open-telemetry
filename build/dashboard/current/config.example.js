@@ -39,7 +39,8 @@ window.MOT_CONFIG = {
     logoutEndpoint: "https://YOUR_DOMAIN.auth.eu-north-1.amazoncognito.com/logout",
     redirectUri: "https://YOUR_DASHBOARD_URL/callback",
     logoutUri: "https://YOUR_DASHBOARD_URL/",
-    scopes: ["openid", "email", "profile"]
+    scopes: ["openid", "email", "profile"],
+    rememberDays: 30
   },
 
   vehicle: {

@@ -20,7 +20,7 @@
     return Object.freeze({
       load,
       save(session) {
-        if (!session || typeof session !== 'object' || !session.accessToken) {
+        if (!session || typeof session !== 'object' || (!session.accessToken && !session.refreshToken)) {
           throw new Error('A valid authentication session is required');
         }
         storage.setItem(key, JSON.stringify(session));
@@ -28,6 +28,10 @@
       clear() { storage.removeItem(key); },
       isExpired(session = load(), clockSkewSeconds = 30) {
         const expiresAt = Number(session?.expiresAt || 0);
+        return !expiresAt || Date.now() >= expiresAt - (clockSkewSeconds * 1000);
+      },
+      isRefreshExpired(session = load(), clockSkewSeconds = 30) {
+        const expiresAt = Number(session?.refreshExpiresAt || 0);
         return !expiresAt || Date.now() >= expiresAt - (clockSkewSeconds * 1000);
       }
     });

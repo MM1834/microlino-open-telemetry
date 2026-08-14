@@ -23,7 +23,8 @@ window.MOT_CONFIG = {
     logoutEndpoint: "https://mot-dev-002581114110-eu-north-1.auth.eu-north-1.amazoncognito.com/logout",
     redirectUri: "https://www.microlino-open-telemetry.ch/motbeta/callback/",
     logoutUri: "https://www.microlino-open-telemetry.ch/motbeta/",
-    scopes: ["openid", "email", "profile"]
+    scopes: ["openid", "email", "profile"],
+    rememberDays: 30
   },
   vehicle: {
     name: "Microlino Pioneer",

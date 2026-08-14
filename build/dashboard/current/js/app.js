@@ -34,6 +34,7 @@
     const container = $('auth-controls');
     const loginButton = $('auth-login');
     const logoutButton = $('auth-logout');
+    const rememberWrap = $('auth-remember-wrap');
     const status = $('auth-status');
     if (!container || !auth) return;
 
@@ -41,6 +42,7 @@
     const authenticated = auth.isAuthenticated();
     loginButton.hidden = authenticated;
     logoutButton.hidden = !authenticated;
+    if (rememberWrap) rememberWrap.hidden = authenticated;
     loginButton.disabled = state.authBusy || !auth.isConfigured();
     logoutButton.disabled = state.authBusy;
 
@@ -149,7 +151,7 @@
     if (!auth || state.authBusy) return;
     state.authBusy = true;
     renderAuthState('Weiterleitung…');
-    try { await auth.login(); }
+    try { await auth.login({ remember: Boolean($('auth-remember')?.checked) }); }
     catch (error) {
       state.authBusy = false;
       console.error('MOT login failed:', error);

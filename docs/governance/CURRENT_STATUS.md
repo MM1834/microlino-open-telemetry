@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-11
+**Last reviewed:** 2026-08-14
 
 ## Purpose
 
@@ -31,6 +31,12 @@ firmware's local WebUI.
 The local WebUI remains the device-local setup, diagnostics, recovery and OTA
 interface. The portal is the user-facing service for accounts, vehicle access and
 future fleet functions.
+
+AUTH-PERSIST-001 completed on 2026-08-14. The hosted portal now offers an
+unchecked trusted-device opt-in that can renew its one-hour access session through
+the existing 30-day Cognito refresh-token lifetime. Only refresh state is retained
+persistently; the default remains browser-session-only, logout clears both storage
+classes, and hosted desktop and smartphone acceptance passed.
 
 Future firmware feature development is now centered on the dual-CAN ESP32-C6
 line, with the 16 MB nanoESP32-C6-N16 as the primary target. The 4 MB XIAO remains
@@ -200,6 +206,13 @@ board, with AWS IoT and optional GPS treated as configurable capabilities. The
 remaining environment simplification is still planned.
 
 ## Portal and AWS backend
+
+AUTH-PERSIST-001 adds an unchecked `Angemeldet bleiben` option to the repository
+portal. The existing session-only PKCE path remains the default. An opted-in
+trusted device persists only its refresh token and a maximum 30-day local expiry,
+renews the one-hour access token through Cognito and clears both stores on logout
+or permanent refresh rejection. Hosted desktop and smartphone close/reopen,
+default-session regression and explicit logout acceptance passed on 2026-08-14.
 
 NTF-001 has an additive notification pilot stack with separate preferences,
 charging-session state and expiring event storage, an isolated IoT/Lambda path,

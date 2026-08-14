@@ -18,7 +18,7 @@ Public facade:
 - `login()`
 - `logout()`
 - `restoreSession()`
-- `refresh()` — reserved contract; not implemented in Phase 2
+- `refresh()` — renews an opted-in persistent session through Cognito
 - `getAccessToken()`
 - `isAuthenticated()`
 - `isConfigured()`
@@ -40,9 +40,11 @@ It uses the browser Web Crypto API and therefore requires HTTPS or localhost.
 
 ### `token-store.js`
 
-Owns persisted token response data and expiry metadata. The default storage is
-`sessionStorage`, so closing the browser session removes the login state. It
-contains no Cognito redirects and no API calls.
+Owns token response data and expiry metadata. The default remains
+`sessionStorage`, so closing the browser removes a normal login. When the user
+explicitly selects `Angemeldet bleiben`, a second store retains only the refresh
+token and its bounded local expiry in `localStorage`; access and ID tokens are not
+persisted there. The module contains no Cognito redirects and no API calls.
 
 ### `app.js`
 
@@ -63,7 +65,8 @@ to API requests. It does not own Cognito state or token persistence.
 4. Cognito redirects to the exact configured dashboard URI with `code` and
    `state`.
 5. AuthManager validates state and exchanges the code with the verifier.
-6. Tokens and expiry metadata are stored for the browser session.
+6. Tokens and expiry metadata are stored for the browser session. With explicit
+   trusted-device opt-in, only refresh-token state is additionally persisted.
 7. Callback parameters are removed from the visible URL.
 8. The AWS provider starts and requests the Vehicle API with the access token.
 
@@ -84,11 +87,15 @@ to API requests. It does not own Cognito state or token persistence.
   responsibilities.
 - The browser receives no AWS IoT device credentials.
 
-## Phase 2 boundary
+## Persistent-login boundary
 
-Refresh-token rotation, roles and user-to-vehicle permissions remain outside
-this sprint. An expired access token causes the local session to be cleared and
-requires a new explicit login.
+AUTH-PERSIST-001 uses the existing public Cognito app client's 30-day refresh
+token to renew one-hour access tokens. The checkbox is unchecked by default, so
+existing users retain session-only behaviour. Logout and permanent refresh-token
+rejection clear both stores. Temporary connectivity failures retain the refresh
+record for a later retry. This controlled beta implementation does not claim
+`HttpOnly` protection; a public-production review should compare it with a
+backend-for-frontend cookie session.
 
 ## Current authorization limitation
 

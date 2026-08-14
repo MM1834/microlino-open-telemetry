@@ -17,6 +17,9 @@
 
 ## Completed predecessors
 
+- [AUTH-PERSIST-001](AUTH-PERSIST-001.md) completed the optional bounded
+  trusted-device portal login and passed hosted desktop/smartphone acceptance on
+  2026-08-14 without changing the default session-only path.
 - [C6-SVC-001](C6-SVC-001.md) completed shared ABRP and authenticated local
   onboarding parity on C6, accepted the N16-AWS hardware path and retained XIAO
   as an unflashed 4 MB compatibility build below the 85% OTA-slot gate.

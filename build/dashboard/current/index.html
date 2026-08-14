@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260811-range1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260814-persist1" />
   <link rel="stylesheet" href="css/history.css">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -87,6 +87,7 @@
         <div class="top-spacer"></div>
         <div id="auth-controls" class="auth-controls" hidden>
           <span id="auth-status" class="auth-status" aria-live="polite">Nicht angemeldet</span>
+          <label id="auth-remember-wrap" class="auth-remember"><input id="auth-remember" type="checkbox" /><span>Angemeldet bleiben</span></label>
           <button id="auth-login" class="auth-button" type="button">Anmelden</button>
           <button id="vehicle-add" class="auth-button" type="button" hidden>Fahrzeug hinzufügen</button>
           <button id="auth-logout" class="auth-button" type="button" hidden>Abmelden</button>
@@ -313,12 +314,12 @@
   </div>
   <script src="config.js"></script>
   <script src="js/auth/pkce.js"></script>
-  <script src="js/auth/token-store.js"></script>
-  <script src="js/auth/auth-manager.js?v=20260803-1"></script>
+  <script src="js/auth/token-store.js?v=20260814-persist1"></script>
+  <script src="js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
-  <script src="js/app.js?v=20260811-range1"></script>
+  <script src="js/app.js?v=20260814-persist1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260811-range1"></script>
