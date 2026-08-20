@@ -42,6 +42,12 @@ class OnboardingTemplateTests(unittest.TestCase):
         self.assertIn("secrets.compare_digest", HANDLER)
         self.assertNotIn("print(", HANDLER)
 
+    def test_claim_read_only_vehicles_are_server_enforced(self):
+        self.assertIn("ClaimReadOnlyVehicleIds:", TEMPLATE)
+        self.assertIn("CLAIM_READ_ONLY_VEHICLE_IDS: !Ref ClaimReadOnlyVehicleIds", TEMPLATE)
+        self.assertIn("onboarding_read_only", HANDLER)
+        self.assertIn("dynamodb.Table(ACCESS_TABLE)", HANDLER)
+
 
 if __name__ == "__main__":
     unittest.main()

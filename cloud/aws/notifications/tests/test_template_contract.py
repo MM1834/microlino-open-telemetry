@@ -7,6 +7,11 @@ PREFERENCE_API = (Path(__file__).resolve().parents[1] / "preference_api.py").rea
 
 
 class TemplateContractTests(unittest.TestCase):
+    def test_read_only_vehicle_ids_reach_preference_api(self):
+        self.assertIn("ReadOnlyVehicleIds:", TEMPLATE)
+        self.assertIn("READ_ONLY_VEHICLE_IDS: !Ref ReadOnlyVehicleIds", TEMPLATE)
+        self.assertIn("notifications_read_only", PREFERENCE_API)
+
     def test_notification_stack_is_additive_and_authorized(self):
         self.assertIn("PreferenceTable:", TEMPLATE)
         self.assertIn("SessionTable:", TEMPLATE)

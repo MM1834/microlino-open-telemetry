@@ -25,6 +25,11 @@ OWNERSHIP_TABLE = os.environ.get("OWNERSHIP_TABLE", "")
 ACCESS_TABLE = os.environ.get("ACCESS_TABLE", "")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "")
 STATE_TABLE = os.environ.get("STATE_TABLE", "")
+CLAIM_READ_ONLY_VEHICLE_IDS = {
+    item.strip()
+    for item in os.environ.get("CLAIM_READ_ONLY_VEHICLE_IDS", "").split(",")
+    if item.strip()
+}
 
 dynamodb = boto3.resource("dynamodb")
 ddb_client = boto3.client("dynamodb")
@@ -73,6 +78,18 @@ def _hash(claim_id: str, salt: str, proof: str) -> str:
 
 def _ddb(item: dict) -> dict:
     return {key: serializer.serialize(value) for key, value in item.items()}
+
+
+def _claim_read_only(user_sub: str) -> bool:
+    table = dynamodb.Table(ACCESS_TABLE)
+    for vehicle_id in CLAIM_READ_ONLY_VEHICLE_IDS:
+        item = table.get_item(
+            Key={"userSub": user_sub, "vehicleId": vehicle_id},
+            ConsistentRead=True,
+        ).get("Item", {})
+        if item.get("status") == "ACTIVE":
+            return True
+    return False
 
 
 def _audit(entity_id: str, event_type: str, now: int, **values) -> dict:
@@ -158,6 +175,8 @@ def issue_claim(event: dict, claims: dict) -> dict:
 
 def consume_claim(event: dict, claims: dict) -> dict:
     user_sub = str(claims.get("sub", ""))
+    if user_sub and _claim_read_only(user_sub):
+        return _json(403, {"error": "onboarding_read_only"})
     supplied = str(_body(event).get("claim", ""))
     if not user_sub or supplied.count(".") != 1:
         return _json(409, {"error": "claim_invalid_or_unavailable"})

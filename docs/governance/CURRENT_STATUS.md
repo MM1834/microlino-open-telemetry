@@ -19,6 +19,34 @@ revision.
 
 ## Current product direction
 
+SES-001 has a deployed and DKIM-verified MOT domain identity for Cognito
+invitation, verification and recovery mail. A direct message from
+`MOT Portal <support@microlino-open-telemetry.ch>` reached the controlled demo
+mailbox. AWS granted transactional production access, and a reviewed Change Set
+changed only the user pool email configuration to SES `DEVELOPER` mode without
+replacement. Cognito accepted a renewed demo invitation from the MOT sender;
+receipt and the first-password flow pass, while password-recovery acceptance
+remains open. SOC and journey notification mail continues through SNS and does
+not inherit the Cognito SES sender.
+
+DEMO-001 completed on 2026-08-20 as an isolated static portal demonstration. The
+invited `demo@microlino-open-telemetry.ch` Cognito identity has access only to
+`demo-pioneer`, which contains 24 sanitized frozen State records, 1,398 History
+records tiered to the portal's three query resolutions and one fixed location at
+`47.46268167287872, 8.180829969601682`. Device/network identifiers and source GPS
+are excluded, the demo is forced offline and no live ingest path was added. The
+password remains entirely in Cognito's first-login flow. First-login and hosted
+portal acceptance passed for the demo alongside normal user accounts. The
+Notification Preference API is server-side read-only for `demo-pioneer`:
+arbitrary destination changes now return 403 before persistence or SNS subscribe,
+while GET exposes disabled settings. Live runtime checks passed and no demo
+preference record exists. The matching disabled portal presentation passed hosted
+acceptance. Claim consumption is likewise deployed
+read-only for accounts with ACTIVE access to `demo-pioneer`: a direct Lambda test
+with the demo subject returned 403 before claim processing. Administrator claim
+issuance and normal beta accounts remain unchanged; the hosted portal hides
+**Fahrzeug hinzufügen** for demo identities.
+
 HIS-SIGN-001 has a repository-complete portal refinement for historical net
 power. It displays consumption as negative and charging/regeneration as positive,
 using a symmetric axis and explicit zero line while preserving stored History and

@@ -188,6 +188,32 @@ class ClaimHandlerTests(unittest.TestCase):
         self.assertEqual("owners", self.client.transactions[0][1]["Put"]["TableName"])
         self.assertEqual("access", self.client.transactions[0][2]["Put"]["TableName"])
 
+    def test_demo_owner_cannot_consume_claim(self):
+        self.module.CLAIM_READ_ONLY_VEHICLE_IDS = {"demo-pioneer"}
+        self.module.dynamodb = Resource({
+            "access": {
+                "user-a": {"vehicleId": "demo-pioneer", "status": "ACTIVE"},
+            }
+        })
+        result = self.module.handler(event(
+            "POST /api/onboarding/claim", {"claim": f"{'A' * 24}.{'B' * 32}"}
+        ), None)
+        self.assertEqual(403, result["statusCode"])
+        self.assertEqual("onboarding_read_only", json.loads(result["body"])["error"])
+        self.assertFalse(self.client.transactions)
+
+    def test_inactive_demo_assignment_does_not_lock_claims(self):
+        self.module.CLAIM_READ_ONLY_VEHICLE_IDS = {"demo-pioneer"}
+        self.module.dynamodb = Resource({
+            "access": {
+                "user-a": {"vehicleId": "demo-pioneer", "status": "REVOKED"},
+            }
+        })
+        result = self.module.handler(event(
+            "POST /api/onboarding/claim", {"claim": "invalid"}
+        ), None)
+        self.assertEqual(409, result["statusCode"])
+
     def test_bad_proof_is_generic_and_audited_with_attempt(self):
         now = 2_000_000_000
         claim_id = "A" * 24

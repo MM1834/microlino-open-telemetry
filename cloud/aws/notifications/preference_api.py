@@ -14,6 +14,11 @@ preferences = dynamodb.Table(os.environ["PREFERENCE_TABLE_NAME"])
 access = dynamodb.Table(os.environ["ACCESS_TABLE_NAME"])
 sns = boto3.client("sns")
 email_topic_arn = os.environ["EMAIL_TOPIC_ARN"]
+read_only_vehicle_ids = {
+    item.strip()
+    for item in os.environ.get("READ_ONLY_VEHICLE_IDS", "").split(",")
+    if item.strip()
+}
 
 EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PHONE = re.compile(r"^\+[1-9][0-9]{7,14}$")
@@ -52,6 +57,7 @@ def public(item):
             "emailEnabled": False, "smsEnabled": False,
             "journeyEmailEnabled": False,
             "emailConfirmed": False, "smsConfirmed": False,
+            "readOnly": False,
         }
     result = {
         key: item.get(key) for key in (
@@ -61,6 +67,7 @@ def public(item):
         )
     }
     result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
+    result["readOnly"] = False
     result["threshold"] = int(result.get("threshold") or 80)
     result["updatedAt"] = int(result.get("updatedAt") or 0)
     return result
@@ -111,6 +118,13 @@ def handler(event, context):
         return response(401, {"error": "unauthorized"})
     if not vehicle_id or not authorized(user_sub, vehicle_id):
         return response(404, {"error": "vehicle_not_found"})
+    if vehicle_id in read_only_vehicle_ids:
+        if method == "GET":
+            result = public(None)
+            result["readOnly"] = True
+            return response(200, result)
+        if method == "PUT":
+            return response(403, {"error": "notifications_read_only"})
     key = {"vehicleId": vehicle_id, "userSub": user_sub}
     if method == "GET":
         item = preferences.get_item(Key=key, ConsistentRead=True).get("Item")

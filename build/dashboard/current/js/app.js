@@ -26,6 +26,7 @@
     onboardingExpanded: false,
     notificationBusy: false,
     notificationVehicleId: null,
+    notificationReadOnly: false,
     rangeForecast: null
   };
 
@@ -63,7 +64,8 @@
     if (!panel) return;
     state.onboardingRequired = Boolean(required);
     const authenticated = Boolean(auth?.isAuthenticated());
-    const canClaim = authenticated && Boolean(state.dataProvider?.claimVehicle);
+    const demoReadOnly = String(state.selectedVehicleId || '').startsWith('demo-');
+    const canClaim = authenticated && Boolean(state.dataProvider?.claimVehicle) && !demoReadOnly;
     const visible = canClaim && (state.onboardingRequired || state.onboardingExpanded);
     panel.hidden = !visible;
     if (form) form.hidden = !visible;
@@ -82,7 +84,8 @@
   }
 
   function toggleOnboarding() {
-    if (state.onboardingRequired || !auth?.isAuthenticated()) return;
+    if (state.onboardingRequired || !auth?.isAuthenticated()
+      || String(state.selectedVehicleId || '').startsWith('demo-')) return;
     state.onboardingExpanded = !state.onboardingExpanded;
     renderOnboarding(false, '');
     if (state.onboardingExpanded) $('onboarding-claim')?.focus();
@@ -90,7 +93,8 @@
 
   async function submitOnboarding(event) {
     event.preventDefault();
-    if (state.onboardingBusy || !state.dataProvider?.claimVehicle) return;
+    if (state.onboardingBusy || !state.dataProvider?.claimVehicle
+      || String(state.selectedVehicleId || '').startsWith('demo-')) return;
     const input = $('onboarding-claim');
     const claim = String(input?.value || '').trim();
     if (!claim) {
@@ -840,6 +844,7 @@ function renderNotificationPreferences(preferences = null, message = '') {
   if (panel.hidden) return;
   $('notification-vehicle').textContent = state.selectedVehicleId;
   if (preferences) {
+    state.notificationReadOnly = preferences.readOnly === true;
     $('notification-enabled').checked = preferences.enabled === true;
     $('notification-threshold').value = Number(preferences.threshold || 80);
     $('notification-email-enabled').checked = preferences.emailEnabled === true;
@@ -853,11 +858,13 @@ function renderNotificationPreferences(preferences = null, message = '') {
       : '';
     updateEmailConfirmationHelp();
   }
-  const disabled = state.notificationBusy;
+  const disabled = state.notificationBusy || state.notificationReadOnly;
   ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
     'notification-journey-email-enabled', 'notification-email',
     'notification-save'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
-  $('notification-status').textContent = message;
+  $('notification-status').textContent = state.notificationReadOnly
+    ? 'Demo-Zugang: Benachrichtigungen sind deaktiviert.'
+    : message;
 }
 
 function updateEmailConfirmationHelp() {
@@ -891,7 +898,7 @@ async function loadNotificationPreferences(force = false) {
 
 async function saveNotificationPreferences(event) {
   event.preventDefault();
-  if (state.notificationBusy || !state.dataProvider?.saveNotificationPreferences) return;
+  if (state.notificationBusy || state.notificationReadOnly || !state.dataProvider?.saveNotificationPreferences) return;
   if ($('notification-journey-email-enabled').checked && !$('notification-email-enabled').checked) {
     renderNotificationPreferences(null, 'Für Fahrtzusammenfassungen zuerst den E-Mail-Kanal aktivieren.');
     return;

@@ -10,6 +10,7 @@
 
 ## Active implementation work
 
+- [SES-001 — Cognito domain email delivery](SES-001.md)
 - [C6-ENV-001 — unified C6 build environments](C6-ENV-001.md)
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
 - [HIS-SIGN-001 — signed net-power History presentation](HIS-SIGN-001.md)
@@ -19,6 +20,9 @@
 
 ## Completed predecessors
 
+- [DEMO-001](DEMO-001.md) deployed the isolated frozen demo dataset, enforced
+  server-side read-only notification and onboarding boundaries, and passed hosted
+  acceptance on 2026-08-20.
 - [NTF-FIX-001](NTF-FIX-001.md) reconciled stale stored email-confirmation state
   with authoritative SNS subscription state and passed hosted portal acceptance
   on 2026-08-20.

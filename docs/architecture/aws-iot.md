@@ -119,6 +119,7 @@ authorized history endpoint. It is not yet deployed or AWS-validated. See
 ## Related documents
 
 - [AWS IoT target ADR](../adr/ADR-0004-aws-iot-target-architecture.md)
+- [Email delivery and domain operations](../administrator/aws/email-delivery.md)
 - [Authentication](authentication.md)
 - [Credential handling](../security/aws-iot-credentials.md)
 - [Active work](../governance/WORK_ORDER.md)

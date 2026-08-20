@@ -42,7 +42,7 @@ class FakeSns:
         ))}
 
 
-def load_module(preference_item=None):
+def load_module(preference_item=None, read_only_vehicle_ids=""):
     preference = FakeTable(preference_item)
     access = FakeTable({"status": "ACTIVE"})
     sns = FakeSns()
@@ -61,6 +61,7 @@ def load_module(preference_item=None):
         "PREFERENCE_TABLE_NAME": "preferences",
         "ACCESS_TABLE_NAME": "access",
         "EMAIL_TOPIC_ARN": "arn:email",
+        "READ_ONLY_VEHICLE_IDS": read_only_vehicle_ids,
     })
     try:
         module.__spec__.loader.exec_module(module)
@@ -74,18 +75,41 @@ def load_module(preference_item=None):
     return module, preference, sns
 
 
-def event(method="GET", body=None):
+def event(method="GET", body=None, vehicle_id="pioneer"):
     return {
         "requestContext": {
             "http": {"method": method},
             "authorizer": {"jwt": {"claims": {"sub": "user-a"}}},
         },
-        "pathParameters": {"vehicleId": "pioneer"},
+        "pathParameters": {"vehicleId": vehicle_id},
         "body": json.dumps(body) if body is not None else None,
     }
 
 
 class JourneyPreferenceApiTests(unittest.TestCase):
+    def test_read_only_vehicle_get_is_disabled_without_preference_lookup(self):
+        module, preference, sns = load_module(
+            {"emailEnabled": True, "email": "old@example.com"},
+            read_only_vehicle_ids="demo-pioneer",
+        )
+        result = module.handler(event(vehicle_id="demo-pioneer"), None)
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertTrue(body["readOnly"])
+        self.assertFalse(body["emailEnabled"])
+        self.assertEqual([], sns.subscriptions)
+
+    def test_read_only_vehicle_put_cannot_subscribe_or_write(self):
+        module, preference, sns = load_module(read_only_vehicle_ids="demo-pioneer")
+        result = module.handler(event("PUT", {
+            "enabled": True, "threshold": 80, "emailEnabled": True,
+            "email": "victim@example.com",
+        }, vehicle_id="demo-pioneer"), None)
+        self.assertEqual(403, result["statusCode"])
+        self.assertEqual("notifications_read_only", json.loads(result["body"])["error"])
+        self.assertEqual({}, preference.item)
+        self.assertEqual([], sns.subscriptions)
+
     def test_default_is_off(self):
         module, _, _ = load_module()
         result = module.handler(event(), None)

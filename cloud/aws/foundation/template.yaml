@@ -101,6 +101,30 @@ Parameters:
     Description: >
       Allowed post-logout redirect URLs for the dashboard app client.
 
+  CognitoEmailSendingAccount:
+    Type: String
+    Default: COGNITO_DEFAULT
+    AllowedValues: [COGNITO_DEFAULT, DEVELOPER]
+    Description: >
+      Keep COGNITO_DEFAULT until the declared SES identity is verified and SES
+      production access is approved; then switch to DEVELOPER.
+
+  CognitoEmailDomain:
+    Type: String
+    Default: microlino-open-telemetry.ch
+    AllowedPattern: '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'
+    Description: Domain identity used for Cognito invitation and recovery email.
+
+  CognitoEmailFrom:
+    Type: String
+    Default: MOT Portal <support@microlino-open-telemetry.ch>
+    AllowedPattern: '^.{1,128} <[^\s@]+@[^\s@]+\.[^\s@]+>$'
+
+  CognitoEmailReplyTo:
+    Type: String
+    Default: support@microlino-open-telemetry.ch
+    AllowedPattern: '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+
 Conditions:
   CognitoSelfRegistrationIsEnabled: !Equals
     - !Ref CognitoSelfRegistrationEnabled
@@ -108,6 +132,9 @@ Conditions:
   TelemetryHistoryIsEnabled: !Equals
     - !Ref EnableTelemetryHistory
     - "true"
+  CognitoUsesSes: !Equals
+    - !Ref CognitoEmailSendingAccount
+    - DEVELOPER
 
 Resources:
   DashboardUserPool:
@@ -129,6 +156,13 @@ Resources:
           - CognitoSelfRegistrationIsEnabled
           - false
           - true
+      EmailConfiguration: !If
+        - CognitoUsesSes
+        - EmailSendingAccount: DEVELOPER
+          From: !Ref CognitoEmailFrom
+          ReplyToEmailAddress: !Ref CognitoEmailReplyTo
+          SourceArn: !Sub "arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${CognitoEmailDomain}"
+        - !Ref AWS::NoValue
       Policies:
         PasswordPolicy:
           MinimumLength: 12
@@ -149,6 +183,24 @@ Resources:
         project: !Ref ProjectName
         environment: !Ref Environment
         component: identity
+
+  CognitoEmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref CognitoEmailDomain
+      DkimAttributes:
+        SigningEnabled: true
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+      FeedbackAttributes:
+        EmailForwardingEnabled: true
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+        - Key: component
+          Value: identity-email
 
 
   DashboardUserPoolClient:
@@ -1720,6 +1772,23 @@ Resources:
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${VehicleWebSocketApi}/*"
 
 Outputs:
+  CognitoEmailIdentityName:
+    Description: SES domain identity for Cognito invitation and recovery email.
+    Value: !Ref CognitoEmailIdentity
+
+  CognitoEmailDkimName1:
+    Value: !GetAtt CognitoEmailIdentity.DkimDNSTokenName1
+  CognitoEmailDkimValue1:
+    Value: !GetAtt CognitoEmailIdentity.DkimDNSTokenValue1
+  CognitoEmailDkimName2:
+    Value: !GetAtt CognitoEmailIdentity.DkimDNSTokenName2
+  CognitoEmailDkimValue2:
+    Value: !GetAtt CognitoEmailIdentity.DkimDNSTokenValue2
+  CognitoEmailDkimName3:
+    Value: !GetAtt CognitoEmailIdentity.DkimDNSTokenName3
+  CognitoEmailDkimValue3:
+    Value: !GetAtt CognitoEmailIdentity.DkimDNSTokenValue3
+
   CognitoUserPoolId:
     Description: Cognito user pool for dashboard users.
     Value: !Ref DashboardUserPool

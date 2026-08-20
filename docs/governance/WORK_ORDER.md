@@ -12,6 +12,19 @@
 
 ## High priority
 
+### Complete Cognito SES sender rollout
+
+**Active work package:** [SES-001 — Cognito Domain Email Delivery](../project/sprints/SES-001.md)
+
+**Objective:** Send administrator-controlled Cognito account mail from the
+DKIM-authenticated MOT domain with a monitored, reply-capable support identity.
+
+**Current status:** SES identity, Hosttech DKIM publication, direct delivery and
+AWS transactional production access pass. Cognito is deployed in `DEVELOPER`
+mode using the verified MOT sender, and a renewed demo invitation was accepted
+for delivery. Receipt and the first-password flow pass; validate password-recovery
+delivery before closing the sprint.
+
 ### Correct the net-power History sign presentation
 
 **Active portal sprint:** [HIS-SIGN-001 — Signed Net Power History](../project/sprints/HIS-SIGN-001.md)
