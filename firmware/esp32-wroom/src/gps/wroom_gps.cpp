@@ -1,6 +1,7 @@
 #include "wroom_gps.h"
 
 #include <MotGps.h>
+#include "../app_config.h"
 
 #ifndef MOT_GPS_RX_PIN
 #define MOT_GPS_RX_PIN 16
@@ -18,6 +19,10 @@ MotGps gps;
 
 void setupWroomGps()
 {
+    if (!config.gpsEnabled) {
+        Serial.println("ESP32-WROOM GPS: disabled by configuration");
+        return;
+    }
     MotGpsConfig config;
     config.rxPin = MOT_GPS_RX_PIN;
     config.txPin = MOT_GPS_TX_PIN;
@@ -34,7 +39,7 @@ void setupWroomGps()
     Serial.println("ESP32-WROOM GPS: optional L76K receiver configured");
 }
 
-void wroomGpsLoop() { gps.loop(); }
+void wroomGpsLoop() { if (config.gpsEnabled) gps.loop(); }
 bool wroomGpsStarted() { return gps.started(); }
 bool wroomGpsSeen() { return gps.seen(); }
 bool wroomGpsDetected() { return gps.status().detected; }

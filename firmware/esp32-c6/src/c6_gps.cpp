@@ -1,6 +1,7 @@
 #include "c6_gps.h"
 
 #include <MotGps.h>
+#include "c6_config.h"
 
 #ifndef MOT_GPS_RX_PIN
 #define MOT_GPS_RX_PIN -1
@@ -18,6 +19,10 @@ MotGps gps;
 
 void c6GpsSetup()
 {
+    if (!c6Config.gpsEnabled) {
+        Serial.println("ESP32-C6 GPS: disabled by configuration");
+        return;
+    }
     MotGpsConfig config;
     config.rxPin = MOT_GPS_RX_PIN;
     config.txPin = MOT_GPS_TX_PIN;
@@ -36,6 +41,7 @@ void c6GpsSetup()
 
 void c6GpsLoop()
 {
+    if (!c6Config.gpsEnabled) return;
     gps.loop();
 }
 

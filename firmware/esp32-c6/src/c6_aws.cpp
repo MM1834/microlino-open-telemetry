@@ -4,6 +4,7 @@
 #include "c6_gps.h"
 #include "c6_network.h"
 #include "system/device_id.h"
+#include "system/version.h"
 #include "telemetry/telemetry.h"
 
 #ifdef MOT_AWS_IOT
@@ -19,7 +20,7 @@ MotAwsRuntime runtime()
     MotAwsRuntime value;
     value.deviceId = motDeviceId();
     value.deviceName = motHostname();
-    value.firmwareVersion = "C6-001-AWS";
+    value.firmwareVersion = MOT_VERSION;
     value.networkMode = "WiFi STA";
     value.transport = "WiFi";
     value.ipAddress = c6NetworkIp();
@@ -42,13 +43,12 @@ void publishTelemetry()
         client.publishInt("display/estimated_range_km", telemetry.display.estimatedRangeKm);
     }
     if (freshBmsCurrent && freshBmsStatus) {
-        client.publishBool("charging/is_charging",
-                           telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f);
+        client.publishBool("charging/is_charging", telemetryIsCharging());
         client.publishBool("charging/plugged", telemetry.bms.plugged);
         client.publishInt("charging/power_signed",
                           static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f)));
     } else if (telemetry.charging.valid) {
-        client.publishBool("charging/is_charging", telemetry.charging.isCharging);
+        client.publishBool("charging/is_charging", telemetryIsCharging());
         client.publishBool("charging/plugged", telemetry.charging.plugged);
         client.publishInt("charging/power_signed", telemetry.charging.powerSigned);
     }
@@ -90,7 +90,7 @@ void c6AwsSetup()
 
 void c6AwsLoop()
 {
-    client.loop(runtime(), c6NetworkOnline());
+    client.loop(runtime(), c6NetworkTransportReady());
     if (client.connected() && millis() - lastPublishMs >= c6Config.publishIntervalMs) {
         lastPublishMs = millis();
         publishTelemetry();
@@ -103,11 +103,18 @@ String c6AwsStatus()
     return String(status.connected ? "connected" : "disconnected") +
            " credentials=" + (status.credentialsLoaded ? "yes" : "no") +
            " publishes=" + String(status.publishCount) +
+           " attempts=" + String(status.connectAttempts) +
+           " failures=" + String(status.consecutiveConnectFailures) +
+           " totalFailures=" + String(status.totalConnectFailures) +
+           " lastConnectMs=" + String(status.lastConnectDurationMs) +
+           " retryMs=" + String(status.reconnectDelayMs) +
            " message=" + status.message;
 }
+bool c6AwsConnected() { return client.connected(); }
 
 #else
 void c6AwsSetup() { Serial.println("AWS IoT: not included in this build"); }
 void c6AwsLoop() {}
 String c6AwsStatus() { return "not included in this build"; }
+bool c6AwsConnected() { return true; }
 #endif

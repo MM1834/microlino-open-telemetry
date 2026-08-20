@@ -68,3 +68,4 @@ extern MotTelemetry telemetry;
 
 void telemetryInit();
 void telemetryUpdateSystemRuntime();
+bool telemetryIsCharging();

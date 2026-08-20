@@ -115,6 +115,20 @@ void handleSerialCommand(String command)
         Serial.println("AWS IoT: " + c6AwsStatus());
         return;
     }
+    if (normalized == "abrp status") {
+        Serial.println("ABRP: " + c6AbrpStatusJson());
+        return;
+    }
+    if (normalized == "abrp send") {
+        Serial.println(c6AbrpQueueTelemetry() ? "ABRP: test queued" : "ABRP: test not queued; check status");
+        return;
+    }
+    if (normalized == "abrp enable" || normalized == "abrp disable") {
+        const bool enabled = normalized == "abrp enable";
+        c6ConfigSetAbrpEnabled(enabled);
+        Serial.printf("ABRP: %s (saved; credentials unchanged)\n", enabled ? "enabled" : "disabled");
+        return;
+    }
     if (normalized == "setup status") {
         Serial.println("Setup AP: " + c6NetworkApSsid());
         if (c6ConfigAdminConfigured()) {
@@ -134,7 +148,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status");
+        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | abrp status | abrp send | abrp enable | abrp disable");
         return;
     }
 
@@ -191,7 +205,7 @@ void setup()
     c6AwsSetup();
     c6AbrpSetup();
     c6DriveCaptureReset();
-    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status");
+    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | abrp status | abrp send | abrp enable | abrp disable");
 }
 
 void loop()

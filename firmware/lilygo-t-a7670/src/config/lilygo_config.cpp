@@ -91,6 +91,7 @@ void LilygoConfigurationManager::load()
     }
     config.otaPassword = getStringOrDefault("otaPassword", "");
     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
+    config.gpsEnabled = prefs.getBool("gpsEn", true);
     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
     config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
     config.onboardingComplete = prefs.getBool("onboarded", false);
@@ -122,6 +123,7 @@ void LilygoConfigurationManager::save()
     prefs.putBool("otaEnabled", config.otaEnabled);
     prefs.putString("otaPassword", config.otaPassword);
     prefs.putBool("abrpEnabled", config.abrpEnabled);
+    prefs.putBool("gpsEn", config.gpsEnabled);
     prefs.putString("abrpApiKey", config.abrpApiKey);
     prefs.putString("abrpUserToken", config.abrpUserToken);
     prefs.putUChar("canProfile", static_cast<uint8_t>(config.canProfile));
@@ -152,6 +154,7 @@ String LilygoConfigurationManager::exportJson(bool includeSecrets) const
     doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE] = config.mqttServiceEnabled;
     doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE] = config.awsServiceEnabled;
     doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE] = config.abrpEnabled;
+    doc[ConfigKeys::GPS_ENABLED] = config.gpsEnabled;
     doc[ConfigKeys::MQTT_HOST] = config.mqttHost;
     doc[ConfigKeys::MQTT_PORT] = config.mqttPort;
     doc[ConfigKeys::OTA_ENABLED] = config.otaEnabled;
@@ -217,6 +220,7 @@ bool LilygoConfigurationManager::importJson(const String& json, String& error)
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].isNull()) config.mqttServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].as<bool>();
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].isNull()) config.awsServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].as<bool>();
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].isNull()) config.abrpEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].as<bool>();
+    if (!doc[ConfigKeys::GPS_ENABLED].isNull()) config.gpsEnabled = doc[ConfigKeys::GPS_ENABLED].as<bool>();
 
     setStringIfPresent(doc, ConfigKeys::MQTT_HOST, config.mqttHost);
     if (!doc[ConfigKeys::MQTT_PORT].isNull()) config.mqttPort = doc[ConfigKeys::MQTT_PORT].as<uint16_t>();

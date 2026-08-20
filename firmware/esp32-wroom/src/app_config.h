@@ -24,6 +24,7 @@ struct AppConfig {
     String abrpApiKey;
     String abrpUserToken;
     bool abrpServiceEnabled = false;
+    bool gpsEnabled = true;
 
     DecoderProfile can1Profile = DECODER_PROFILE_DISPLAY_CAN;
     DecoderProfile can2Profile = DECODER_PROFILE_DISABLED;

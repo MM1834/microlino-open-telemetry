@@ -26,6 +26,47 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn("c6AbrpLoop();", MAIN)
         self.assertIn("c6AwsLoop();", MAIN)
 
+    def test_abrp_rejects_stale_wifi_and_bounds_connect(self) -> None:
+        self.assertIn("WiFi.localIP() == IPAddress(0, 0, 0, 0)", ABRP)
+        self.assertIn("http.setConnectTimeout(5000)", ABRP)
+
+    def test_abrp_releases_tls_objects_before_task_deletion(self) -> None:
+        self.assertIn("void performSend", ABRP)
+        task = ABRP.split("void sendTask", 1)[1].split("\n}", 1)[0]
+        self.assertLess(task.index("performSend(*input)"), task.index("vTaskDelete(nullptr)"))
+        self.assertIn("MIN_FREE_HEAP_BYTES", ABRP)
+        self.assertIn("lowMemorySkips", ABRP)
+
+    def test_abrp_prefers_fresh_standard_can_charging_state(self) -> None:
+        telemetry = (ROOT / "firmware/common/telemetry/telemetry.cpp").read_text(encoding="utf-8")
+        lilygo_abrp = (ROOT / "firmware/lilygo-t-a7670/src/abrp/lilygo_abrp.cpp").read_text(encoding="utf-8")
+        self.assertIn('addBool("is_charging", telemetryIsCharging())', ABRP)
+        self.assertIn('"is_charging\\":" + String(telemetryIsCharging()', lilygo_abrp)
+        self.assertIn("freshBmsStatus", telemetry)
+        self.assertIn("telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f", telemetry)
+        self.assertIn(": telemetry.charging.isCharging", telemetry)
+
+    def test_c6_abrp_yields_to_primary_aws_transport(self) -> None:
+        c6_abrp = (C6 / "c6_abrp.cpp").read_text(encoding="utf-8")
+        self.assertIn("c6AwsConnected()", c6_abrp)
+        self.assertIn("c6NetworkTransportReady()", c6_abrp)
+
+    def test_serial_recovery_can_disable_abrp_without_erasing_credentials(self) -> None:
+        self.assertIn('normalized == "abrp disable"', MAIN)
+        self.assertIn('normalized == "abrp send"', MAIN)
+        self.assertIn("c6ConfigSetAbrpEnabled(enabled)", MAIN)
+        setter = CONFIG.split("void c6ConfigSetAbrpEnabled", 1)[1].split("\n}", 1)[0]
+        self.assertIn('preferences.putBool("abrpEn", enabled)', setter)
+        self.assertNotIn("abrpApiKey", setter)
+        self.assertNotIn("abrpUserToken", setter)
+
+    def test_aws_connect_failure_is_bounded_and_backed_off(self) -> None:
+        self.assertIn("secureClient_.setHandshakeTimeout(5)", AWS_CLIENT)
+        self.assertIn("mqtt_.setSocketTimeout(5)", AWS_CLIENT)
+        self.assertIn("MAX_RECONNECT_INTERVAL_MS", (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.h").read_text())
+        self.assertIn("consecutiveConnectFailures", AWS_CLIENT)
+        self.assertIn("totalConnectFailures", AWS_CLIENT)
+
     def test_c6_persists_service_state_but_redacts_secrets(self) -> None:
         self.assertIn('preferences.putBool("abrpEn"', CONFIG)
         self.assertIn('preferences.putString("abrpKey"', CONFIG)

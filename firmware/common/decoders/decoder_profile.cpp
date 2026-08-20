@@ -12,14 +12,14 @@ static const DecoderProfileDescriptor PROFILES[] = {
         DECODER_PROFILE_STANDARD_CAN_V1_PIONEER,
         "standard-can-v1-pioneer",
         "Standard-CAN V1 - Pioneer",
-        "Verified Pioneer pack voltage, current, traction/regeneration power and plugged/charging state; provisional cell pair.",
+        "Verified Pioneer BMS decoder; provisional cell pair.",
         true
     },
     {
         DECODER_PROFILE_STANDARD_CAN_V2,
         "standard-can-v2",
         "Standard-CAN V2",
-        "Provisional second Standard-CAN profile; decoded signals require vehicle verification.",
+        "Independent provisional V2 decoder.",
         true
     },
     {

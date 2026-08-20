@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include <esp_heap_caps.h>
+#include <esp_system.h>
 
 #include "c6_aws.h"
 #include "c6_abrp.h"
@@ -23,6 +25,23 @@ WebServer server(80);
 LocalOtaOptions otaOptions;
 bool rebootPending = false;
 uint32_t rebootAtMs = 0;
+
+const char *resetReasonText()
+{
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON: return "power_on";
+        case ESP_RST_EXT: return "external";
+        case ESP_RST_SW: return "software";
+        case ESP_RST_PANIC: return "panic";
+        case ESP_RST_INT_WDT: return "interrupt_watchdog";
+        case ESP_RST_TASK_WDT: return "task_watchdog";
+        case ESP_RST_WDT: return "watchdog";
+        case ESP_RST_DEEPSLEEP: return "deep_sleep";
+        case ESP_RST_BROWNOUT: return "brownout";
+        case ESP_RST_SDIO: return "sdio";
+        default: return "unknown";
+    }
+}
 
 String htmlEscape(String value)
 {
@@ -121,7 +140,8 @@ String diagnosticsJson()
 {
     String out = "{\"deviceId\":\"" + motDeviceId() + "\",\"board\":\"" MOT_BOARD "\",\"firmware\":\"" MOT_VERSION "\"";
     out += ",\"uptimeSec\":" + String(millis() / 1000UL);
-    out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"homeConfigured\":" + String(c6NetworkHomeConfigured() ? "true" : "false") + ",\"mobileConfigured\":" + String(c6NetworkMobileConfigured() ? "true" : "false") + ",\"state\":\"" + c6NetworkStateName() + "\",\"profile\":\"" + c6NetworkProfileName() + "\",\"reason\":\"" + jsonEscape(c6NetworkReason()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
+    out += ",\"runtime\":{\"resetReason\":\"" + String(resetReasonText()) + "\",\"freeHeap\":" + String(ESP.getFreeHeap()) + ",\"minFreeHeap\":" + String(ESP.getMinFreeHeap()) + ",\"largestFreeBlock\":" + String(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)) + "}";
+    out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"transportReady\":" + String(c6NetworkTransportReady() ? "true" : "false") + ",\"linkWeak\":" + String(c6NetworkLinkWeak() ? "true" : "false") + ",\"weakForMs\":" + String(c6NetworkWeakForMs()) + ",\"transitions\":" + String(c6NetworkTransitionCount()) + ",\"lastTransitionAgeMs\":" + String(c6NetworkLastTransitionAgeMs()) + ",\"disconnects\":" + String(c6NetworkDisconnectCount()) + ",\"lastDisconnectReason\":" + String(c6NetworkLastDisconnectReason()) + ",\"lastDisconnectName\":\"" + jsonEscape(c6NetworkLastDisconnectReasonName()) + "\",\"lastDisconnectAgeMs\":" + String(c6NetworkLastDisconnectAgeMs()) + ",\"lastDisconnectManagerInitiated\":" + String(c6NetworkLastDisconnectWasManagerInitiated() ? "true" : "false") + ",\"homeConfigured\":" + String(c6NetworkHomeConfigured() ? "true" : "false") + ",\"mobileConfigured\":" + String(c6NetworkMobileConfigured() ? "true" : "false") + ",\"state\":\"" + c6NetworkStateName() + "\",\"profile\":\"" + c6NetworkProfileName() + "\",\"reason\":\"" + jsonEscape(c6NetworkReason()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"bssid\":\"" + c6NetworkBssid() + "\",\"channel\":" + String(c6NetworkChannel()) + ",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
     out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
     out += ",\"gps\":{\"state\":\"" + jsonEscape(c6GpsState()) + "\",\"detected\":" + String(c6GpsDetected() ? "true" : "false") + ",\"fix\":" + String(c6GpsValid() ? "true" : "false") + ",\"chars\":" + String(static_cast<unsigned long long>(c6GpsChars())) + ",\"satellites\":" + String(c6GpsSatellites()) + "}";
     out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"";
@@ -149,6 +169,9 @@ void configPage()
     out += "<h1>Configuration</h1><form method='POST' action='/save'>";
     out += "<div class='card'><h2>Preferred home WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'><h2>Second / mobile hotspot</h2><label>SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'><label>Password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'></div>";
     out += "<div class='card'><h2>CAN decoder assignment</h2><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><select name='can2'>" + profileOptions(c6Config.can2Profile) + "</select></div>";
+    if (c6GpsDetected() || !c6Config.gpsEnabled) {
+        out += "<div class='card'><h2>GPS</h2><input type='hidden' name='gpsControlPresent' value='1'><label><input style='width:auto' type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><p class='muted'>Default: enabled. Disabling stops GPS initialization, decoding and telemetry after reboot.</p></div>";
+    }
     out += "<div class='card'><h2>ABRP</h2><label><input style='width:auto' type='checkbox' name='abrpEnabled'" + String(c6Config.abrpEnabled ? " checked" : "") + "> Enable ABRP</label><label>API key</label><input type='password' name='abrpApiKey' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><label>User token</label><input type='password' name='abrpUserToken' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><p class='muted'>ABRP uses WiFi and can run alongside AWS IoT. Credentials are never included in normal backups or diagnostics.</p></div>";
     out += "<div class='card'><h2>Runtime</h2><label>Telemetry interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button>Save &amp; reboot</button></form>";
     out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
@@ -174,6 +197,7 @@ void saveConfig()
     if (!server.arg("wifi2Password").isEmpty()) c6Config.wifi2Password = server.arg("wifi2Password");
     if (ssid2.isEmpty()) c6Config.wifi2Password = "";
     c6Config.can1Profile = can1; c6Config.can2Profile = can2;
+    if (server.hasArg("gpsControlPresent")) c6Config.gpsEnabled = server.hasArg("gpsEnabled");
     c6Config.abrpEnabled = server.hasArg("abrpEnabled");
     String abrpKey = c6Config.abrpApiKey;
     String abrpToken = c6Config.abrpUserToken;
@@ -227,6 +251,7 @@ void wizardPage()
             break;
         case OnboardingStep::Hardware:
             out += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>CAN channels: 2</li><li>GPS: " + htmlEscape(c6GpsState()) + "</li></ul>";
+            if (c6GpsDetected() || !c6Config.gpsEnabled) out += "<form method='POST' action='/api/gps/toggle'><label><input type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><button>Save &amp; reboot</button></form>";
             break;
         case OnboardingStep::Connectivity:
             out += "<h2>Connectivity</h2><p>Configure preferred Home WiFi and the optional second/mobile hotspot.</p><p>Current state: <b>" + htmlEscape(c6NetworkStateName()) + "</b> via " + htmlEscape(c6NetworkProfileName()) + "</p><p><a href='/config'><button type='button'>Open configuration</button></a></p>";
@@ -264,6 +289,16 @@ void onboardingComplete()
     server.sendHeader("Location", "/status"); server.send(303);
 }
 
+void gpsToggle()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    if (!c6GpsDetected() && c6Config.gpsEnabled) { server.send(404, "text/plain", "GPS module not detected"); return; }
+    c6Config.gpsEnabled = server.hasArg("gpsEnabled");
+    c6ConfigSave();
+    server.send(200, "text/html", header("GPS saved") + "<h1>GPS setting saved</h1><p>Rebooting.</p></body></html>");
+    scheduleReboot();
+}
+
 void onboardingRestart()
 {
     if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
@@ -292,6 +327,7 @@ void c6WebSetup()
     server.on("/api/onboarding", HTTP_GET, onboardingStatus);
     server.on("/api/onboarding/complete", HTTP_POST, onboardingComplete);
     server.on("/api/onboarding/restart", HTTP_POST, onboardingRestart);
+    server.on("/api/gps/toggle", HTTP_POST, gpsToggle);
     server.on("/api/abrp/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6AbrpStatusJson()); });
     server.on("/api/abrp/test", HTTP_POST, abrpTest);
     server.on("/config", HTTP_GET, configPage);

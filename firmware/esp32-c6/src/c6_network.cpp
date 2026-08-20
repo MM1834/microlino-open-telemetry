@@ -14,6 +14,9 @@ constexpr uint32_t CONNECT_TIMEOUT_MS = 15000;
 constexpr uint32_t RETRY_INTERVAL_MS = 30000;
 constexpr uint32_t HOME_SCAN_INTERVAL_MS = 60000;
 constexpr uint32_t STABLE_INTERVAL_MS = 10000;
+constexpr uint32_t WEAK_LINK_GRACE_MS = 20000;
+constexpr int HOME_WEAK_RSSI_DBM = -88;
+constexpr int HOME_RECOVER_RSSI_DBM = -80;
 
 WifiProfile targetProfile = WifiProfile::NONE;
 WifiProfile activeProfile = WifiProfile::NONE;
@@ -21,6 +24,14 @@ uint32_t attemptStartedMs = 0;
 uint32_t connectedSinceMs = 0;
 uint32_t nextRetryMs = 0;
 uint32_t lastHomeScanMs = 0;
+uint32_t weakLinkSinceMs = 0;
+uint32_t transitionCount = 0;
+uint32_t lastTransitionMs = 0;
+volatile uint32_t disconnectCount = 0;
+volatile uint32_t lastDisconnectMs = 0;
+volatile uint8_t lastDisconnectReason = 0;
+volatile bool lastDisconnectWasManagerInitiated = false;
+volatile bool managerDisconnectPending = false;
 bool attempting = false;
 bool scanRunning = false;
 bool apActive = false;
@@ -92,6 +103,7 @@ void beginProfile(WifiProfile profile, const char *reason)
     if (!configured(profile)) return;
     if (scanRunning) { WiFi.scanDelete(); scanRunning = false; }
     WiFi.mode(apActive ? WIFI_AP_STA : WIFI_STA);
+    managerDisconnectPending = WiFi.status() == WL_CONNECTED;
     WiFi.disconnect(false, false);
     WiFi.begin(ssid(profile).c_str(), password(profile).c_str());
     targetProfile = profile;
@@ -99,7 +111,10 @@ void beginProfile(WifiProfile profile, const char *reason)
     attempting = true;
     attemptStartedMs = millis();
     connectedSinceMs = 0;
+    weakLinkSinceMs = 0;
     previouslyOnline = false;
+    transitionCount++;
+    lastTransitionMs = attemptStartedMs;
     lastReason = reason;
     Serial.printf("WiFi: trying %s profile (SSID length=%u), reason=%s\n", profileName(profile),
                   static_cast<unsigned>(ssid(profile).length()), reason);
@@ -107,10 +122,12 @@ void beginProfile(WifiProfile profile, const char *reason)
 
 void scheduleRetry(const char *reason)
 {
+    managerDisconnectPending = WiFi.status() == WL_CONNECTED;
     WiFi.disconnect(false, false);
     attempting = false;
     targetProfile = WifiProfile::NONE;
     activeProfile = WifiProfile::NONE;
+    weakLinkSinceMs = 0;
     nextRetryMs = millis() + RETRY_INTERVAL_MS;
     lastReason = reason;
     startFallbackAp();
@@ -141,19 +158,36 @@ void pollHomeScan(uint32_t now)
     if (count == WIFI_SCAN_RUNNING) return;
     scanRunning = false;
     bool homeVisible = false;
+    int homeRssi = -127;
     if (count > 0) {
         for (int i = 0; i < count; ++i) {
-            if (WiFi.SSID(i) == c6Config.wifiSsid) { homeVisible = true; break; }
+            if (WiFi.SSID(i) == c6Config.wifiSsid) {
+                homeVisible = true;
+                homeRssi = max(homeRssi, static_cast<int>(WiFi.RSSI(i)));
+            }
         }
     }
     WiFi.scanDelete();
-    if (homeVisible) beginProfile(WifiProfile::HOME, "home visible");
+    if (homeVisible) {
+        // Home is preferred independent of Mobile's apparent link quality. A
+        // hotspot can retain WiFi and DHCP while its cellular uplink is down.
+        // The bounded Home timeout still returns to Mobile if association fails.
+        const String reason = "home visible (best " + String(homeRssi) + " dBm)";
+        beginProfile(WifiProfile::HOME, reason.c_str());
+    }
     else lastReason = "home not visible";
 }
 }
 
 void c6NetworkSetup()
 {
+    WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
+        disconnectCount = disconnectCount + 1;
+        lastDisconnectMs = millis();
+        lastDisconnectReason = info.wifi_sta_disconnected.reason;
+        lastDisconnectWasManagerInitiated = managerDisconnectPending;
+        managerDisconnectPending = false;
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     WiFi.persistent(false);
     WiFi.setSleep(false);
     WiFi.setAutoReconnect(false);
@@ -182,6 +216,26 @@ void c6NetworkLoop()
             if (!mdnsStarted) mdnsStarted = MDNS.begin(motHostname().c_str());
         }
         previouslyOnline = true;
+        const int rssi = WiFi.RSSI();
+        const bool homeProfile = activeProfile == WifiProfile::HOME;
+        if (homeProfile && !weakLinkSinceMs && rssi <= HOME_WEAK_RSSI_DBM) {
+            weakLinkSinceMs = now;
+            lastReason = "home link weak (" + String(rssi) + " dBm)";
+        }
+        if (homeProfile && weakLinkSinceMs) {
+            if (rssi >= HOME_RECOVER_RSSI_DBM) {
+                weakLinkSinceMs = 0;
+                lastReason = "home link recovered";
+            }
+            else if (now - weakLinkSinceMs >= WEAK_LINK_GRACE_MS) {
+                // RSSI alone does not mean that the link is unusable. Keep a
+                // working Home association and fall back to Mobile only after
+                // the station actually disconnects or cannot obtain an IP.
+                if (!lastReason.startsWith("home connected but weak")) {
+                    lastReason = "home connected but weak (" + String(rssi) + " dBm)";
+                }
+            }
+        }
         if (apActive && now - connectedSinceMs >= STABLE_INTERVAL_MS) stopFallbackAp();
         pollHomeScan(now);
         return;
@@ -191,6 +245,7 @@ void c6NetworkLoop()
         lastReason = String(profileName(activeProfile)) + " lost";
         Serial.printf("WiFi: %s connection lost\n", profileName(activeProfile));
         activeProfile = WifiProfile::NONE;
+        weakLinkSinceMs = 0;
         attempting = false;
         nextRetryMs = now;
     }
@@ -210,6 +265,38 @@ void c6NetworkLoop()
 }
 
 bool c6NetworkOnline() { return stationOnline(); }
+bool c6NetworkLinkWeak()
+{
+    return stationOnline() && activeProfile == WifiProfile::HOME && weakLinkSinceMs != 0;
+}
+bool c6NetworkTransportReady() { return c6NetworkOnline(); }
+uint32_t c6NetworkWeakForMs()
+{
+    return weakLinkSinceMs ? millis() - weakLinkSinceMs : 0;
+}
+uint32_t c6NetworkTransitionCount() { return transitionCount; }
+uint32_t c6NetworkLastTransitionAgeMs()
+{
+    return lastTransitionMs ? millis() - lastTransitionMs : 0;
+}
+String c6NetworkBssid() { return c6NetworkOnline() ? WiFi.BSSIDstr() : String(); }
+int c6NetworkChannel() { return c6NetworkOnline() ? WiFi.channel() : 0; }
+uint32_t c6NetworkDisconnectCount() { return disconnectCount; }
+uint8_t c6NetworkLastDisconnectReason() { return lastDisconnectReason; }
+String c6NetworkLastDisconnectReasonName()
+{
+    return lastDisconnectReason
+        ? String(WiFi.disconnectReasonName(static_cast<wifi_err_reason_t>(lastDisconnectReason)))
+        : String("none");
+}
+uint32_t c6NetworkLastDisconnectAgeMs()
+{
+    return lastDisconnectMs ? millis() - lastDisconnectMs : 0;
+}
+bool c6NetworkLastDisconnectWasManagerInitiated()
+{
+    return lastDisconnectWasManagerInitiated;
+}
 String c6NetworkIp() { return c6NetworkOnline() ? WiFi.localIP().toString() : String(); }
 int c6NetworkRssi() { return c6NetworkOnline() ? WiFi.RSSI() : 0; }
 String c6NetworkProfileName() { return profileName(activeProfile); }
@@ -228,6 +315,7 @@ String c6NetworkStatus()
 {
     String value = c6NetworkStateName() + " profile=" + c6NetworkProfileName();
     if (c6NetworkOnline()) value += " ip=" + c6NetworkIp() + " rssi=" + String(c6NetworkRssi()) + " dBm";
+    if (c6NetworkLinkWeak()) value += " weakForMs=" + String(c6NetworkWeakForMs());
     if (apActive) value += " ap=" + motFallbackApSsid();
     value += " reason=" + lastReason;
     return value;

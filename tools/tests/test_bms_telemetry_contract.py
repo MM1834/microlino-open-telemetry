@@ -8,14 +8,25 @@ ROOT = Path(__file__).resolve().parents[2]
 class BmsTelemetryContractTests(unittest.TestCase):
     def test_confirmed_pioneer_decoder_scale_and_filters_are_present(self) -> None:
         source = (ROOT / "firmware/common/decoders/decoder_standard_can_bms.h").read_text()
-        self.assertIn("CURRENT_SCALE_A = 0.3f", source)
-        self.assertIn("MAX_CHARGE_POWER_W = 12000.0f", source)
-        self.assertIn("MAX_DISCHARGE_POWER_W = 25000.0f", source)
+        pioneer = (ROOT / "firmware/common/decoders/decoder_standard_can_v1_pioneer.cpp").read_text()
+        self.assertIn("PIONEER_RULES", pioneer)
+        self.assertIn("0.3f,     // confirmed amperes per raw unit", pioneer)
+        self.assertIn("12000.0f", pioneer)
+        self.assertIn("25000.0f", pioneer)
         self.assertIn("data[6] == 0x20", source)
         self.assertIn("frame.id == 0x18D", source)
         self.assertIn("telemetry.bms.vehiclePowerW = -powerW", source)
         self.assertIn("telemetry.bms.isRegenerating", source)
         self.assertIn("telemetry.bms.isDischarging", source)
+
+    def test_v2_decoder_is_independent_and_explicitly_provisional(self) -> None:
+        source = (ROOT / "firmware/common/decoders/decoder_standard_can_v2.cpp").read_text()
+        mechanism = (ROOT / "firmware/common/decoders/decoder_standard_can_bms.h").read_text()
+
+        self.assertIn("V2_PROVISIONAL_RULES", source)
+        self.assertIn("MotStandardCanBms::handleFrame(frame, V2_PROVISIONAL_RULES)", source)
+        self.assertNotIn("PIONEER_RULES", source)
+        self.assertNotIn("V2_PROVISIONAL_RULES", mechanism)
 
     def test_all_device_publishers_use_the_same_bms_topics(self) -> None:
         publishers = (

@@ -263,3 +263,88 @@ standard base/AWS profiles now explicitly select the internal antenna and report
 the selection at boot. External U.FL remains an opt-in build flag only for a unit
 with a connected 2.4 GHz antenna. N16 profiles and WIFI-001 network policy are
 unaffected.
+
+## Post-completion weak-Home hardening
+
+On 2026-08-14 an N16 runtime diagnostic showed Home still associated with an IP at
+`-91 dBm` while both AWS MQTT and ABRP HTTPS failed. Dual-CAN continued with zero
+controller errors, so the evidence did not indicate a device reset. Source review
+found that station health required only `WL_CONNECTED` plus a non-zero IP; the
+manager could therefore remain indefinitely on an application-unusable Home link.
+It also returned from Mobile for any visible Home SSID, regardless of RSSI.
+
+The repository follow-up adds a 20-second weak-Home gate at `-88 dBm`, an
+independent `-80 dBm` Home-return threshold, protected-AP retention until a station
+is non-weak, and explicit transport readiness for AWS/ABRP. AWS connect waits are
+reduced to five seconds with exponential backoff capped at five minutes. Runtime
+diagnostics now include weak-link duration, transition count, reset reason and
+heap evidence. The complete 126-test repository suite and both unified C6 builds
+pass. N16 hardware acceptance with weak Home and the Mobile hotspot disabled is
+still required before this follow-up is called physically validated.
+
+On 2026-08-15 the same N16 remained continuously alive with stable heap and
+error-free Dual-CAN while brief Home reachability gaps and repeated AWS reconnects
+continued with ABRP disabled. REV3 therefore leaves the selected RSSI policy
+unchanged and adds BSSID/channel, disconnect reason/count, manager-initiated
+classification, transition age and cumulative AWS failure diagnostics. This is a
+diagnostic build pending evidence from the installed mesh environment.
+
+### REV4 correction — 2026-08-15
+
+REV3 field evidence then showed that the RSSI policy itself created the outage:
+with Home still associated and locally reachable near `-91 dBm`, the manager
+intentionally disconnected it, attempted an unavailable Mobile profile and
+entered the fallback AP. It repeated this cycle, reaching 62 transitions and 93
+disconnect events in roughly 37 minutes. The mesh also selected different BSSIDs,
+which explained why a nearby laptop could report a much stronger signal.
+
+REV4 keeps the weak-link threshold as diagnostics but never abandons an associated
+Home link solely because of RSSI. Actual station/IP loss still triggers the
+bounded Home→Mobile→AP sequence, and Mobile continues to scan for a usable Home
+network. `transportReady` now represents actual station/IP connectivity. On the
+N16 hardware test, AWS connected and published over Home at about `-85 dBm` while
+Mobile was unavailable; no RSSI-forced transition occurred. Focused policy tests
+and both unified C6 builds pass.
+
+### Mesh-node removal observation — 2026-08-15
+
+A controlled removal of the garage mesh node was not a conclusive roaming test:
+the remaining ground-floor node was initially below usable range. The N16 lost
+Home, exhausted its bounded Home and Mobile attempts, exposed the protected
+fallback AP and later recovered to Home at approximately `-70` to `-76 dBm`.
+AWS reconnected and ABRP returned HTTP 200 without a reset or cumulative TLS heap
+loss. This confirms the normal loss/fallback/recovery path, but does not prove a
+seamless BSSID handover between mesh nodes. Mesh roaming remains an
+infrastructure-specific follow-up and is not a WIFI-001 firmware release gate.
+
+### REV5 Home-priority correction — 2026-08-18
+
+Further field evidence exposed a separate policy error rather than a WiFi or ABRP
+hang. The N16 remained correctly associated with Mobile at `-44 dBm`, but the
+hotspot had no cellular uplink. Home was visible at approximately `-85 dBm`; the
+REV4 `-80 dBm` return threshold therefore kept Mobile selected. AWS accumulated
+six connect failures while heap, Dual-CAN and GPS remained healthy.
+
+REV5 restores the original ordered-profile contract: while Mobile is active, any
+visible configured Home SSID triggers a preferred association attempt. RSSI and
+the strongest observed matching BSSID remain diagnostics only. If Home cannot be
+joined, the existing 15-second timeout returns to Mobile, so the change neither
+adds Internet probing nor reintroduces RSSI-driven disconnection of an established
+Home link. Repository build and test evidence is recorded before N16 OTA field
+acceptance at the unchanged failure location.
+
+Repository validation passes with 131 tests. Both unified C6 environments build
+from the shared source: N16 uses 1,344,266 application bytes (25.6%) and its OTA
+file is 1,397,312 bytes with SHA-256
+`0d287bdc53476d06976581a3647ed1e94eb8cc6cbdaff138f1450e5a37659551`;
+XIAO uses 1,332,534 application bytes (78.2%) and its OTA file is 1,386,496 bytes
+with SHA-256
+`bb488c0651d3675720b69aca9b124916585700cc0b3a1c21c635f65a5ac1a79c`.
+
+N16 OTA and field acceptance then passed on 2026-08-18. After a real drive the
+device returned from Mobile to Home while the garage door was still open. Runtime
+diagnostics identified the intentional manager transition (`ASSOC_LEAVE`,
+`lastDisconnectManagerInitiated=true`), Home BSSID `2A:0B:8B:B8:3F:2B` on channel
+11 and `-71 dBm`. AWS was connected with zero cumulative failures in that boot,
+ABRP returned HTTP 200, both CAN controllers remained error-free and GPS retained
+a seven-satellite fix. This closes the REV5 Mobile-to-Home field gate.

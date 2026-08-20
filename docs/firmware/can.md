@@ -68,8 +68,12 @@ independent plugged/charging signal.
 
 `standard-can-v1-pioneer` now decodes the physically confirmed `0x18D` pack
 voltage, current scale, derived power and plug/charge states. It also exposes the
-observed but still provisional `0x4AD` cell pair. `standard-can-v2` uses the same
-evidence-backed byte layout while remaining unverified on a V2 vehicle.
+observed but still provisional `0x4AD` cell pair. `standard-can-v2` has an
+independent decoder implementation. Its initial `0x18D`/`0x4AD` rules preserve
+the same evidence-backed pilot layout, but its constants and handlers are
+separate so V2 validation can change them without affecting Pioneer vehicles.
+The 0.3 A current scale, power sign and plug/charge interpretation remain
+provisional on V2 until independently measured on that vehicle generation.
 
 | CAN ID | Provisional Standard-CAN V2 values | Evidence status |
 |---:|---|---|

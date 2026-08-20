@@ -2,6 +2,7 @@
 
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
 #include <math.h>
 #include <time.h>
 
@@ -12,6 +13,8 @@ constexpr char ABRP_URL[] = "https://api.iternio.com/1/tlm/send";
 constexpr uint32_t MIN_INTERVAL_MS = 15000;
 constexpr uint32_t DEFAULT_INTERVAL_MS = 60000;
 constexpr uint32_t HTTP_TIMEOUT_MS = 7000;
+constexpr uint32_t MIN_FREE_HEAP_BYTES = 96000;
+constexpr uint32_t MIN_LARGEST_BLOCK_BYTES = 64000;
 
 struct AbrpTaskInput {
     String apiKey;
@@ -83,7 +86,10 @@ String telemetryJson(time_t now, AbrpLocationProvider locationProvider)
     addNumber("power", freshBmsPower
         ? telemetry.bms.vehiclePowerW / 1000.0
         : telemetry.charging.powerSigned / 10.0, 2);
-    addBool("is_charging", telemetry.charging.isCharging);
+    // Prefer the verified Standard-CAN decoder whenever both status and current
+    // are fresh, matching the AWS publication path. The Display-CAN estimate is
+    // only a compatibility fallback for vehicles without Standard-CAN data.
+    addBool("is_charging", telemetryIsCharging());
 
     AbrpLocation location;
     if (locationProvider != nullptr && locationProvider(location) && location.valid) {
@@ -105,20 +111,18 @@ void finishAttempt(bool success, int httpCode, const String &message)
     unlockStatus();
 }
 
-void sendTask(void *parameter)
+void performSend(const AbrpTaskInput &input)
 {
-    AbrpTaskInput *input = static_cast<AbrpTaskInput *>(parameter);
     String url = ABRP_URL;
-    url += "?api_key=" + urlEncode(input->apiKey);
-    url += "&token=" + urlEncode(input->userToken);
-    url += "&tlm=" + urlEncode(input->payload);
+    url += "?api_key=" + urlEncode(input.apiKey);
+    url += "&token=" + urlEncode(input.userToken);
+    url += "&tlm=" + urlEncode(input.payload);
 
     HTTPClient http;
+    http.setConnectTimeout(5000);
     http.setTimeout(HTTP_TIMEOUT_MS);
     if (!http.begin(url)) {
         finishAttempt(false, 0, "http.begin failed");
-        delete input;
-        vTaskDelete(nullptr);
         return;
     }
 
@@ -134,7 +138,21 @@ void sendTask(void *parameter)
         Serial.printf("ABRP: send failed, %s\n", message.c_str());
     }
     http.end();
+}
+
+void sendTask(void *parameter)
+{
+    AbrpTaskInput *input = static_cast<AbrpTaskInput *>(parameter);
+    // Keep all HTTP/TLS objects in a nested function. It must return before the
+    // FreeRTOS task deletes itself, otherwise C++ destructors are skipped and
+    // the TLS allocation is leaked on every ABRP transmission.
+    performSend(*input);
     delete input;
+
+    lockStatus();
+    currentStatus.heapAfter = ESP.getFreeHeap();
+    currentStatus.largestFreeBlock = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    unlockStatus();
     vTaskDelete(nullptr);
 }
 }
@@ -170,6 +188,10 @@ String abrpStatusJson(const AbrpSettings &settings)
     json += "\"lastMessage\":\"" + jsonEscape(state.lastMessage) + "\",";
     json += "\"lastSendMs\":" + String(state.lastSendMs) + ',';
     json += "\"lastAttemptMs\":" + String(state.lastAttemptMs) + ',';
+    json += "\"heapBefore\":" + String(state.heapBefore) + ',';
+    json += "\"heapAfter\":" + String(state.heapAfter) + ',';
+    json += "\"largestFreeBlock\":" + String(state.largestFreeBlock) + ',';
+    json += "\"lowMemorySkips\":" + String(state.lowMemorySkips) + ',';
     json += "\"lastPayload\":\"" + jsonEscape(state.lastPayload) + "\"}";
     return json;
 }
@@ -193,13 +215,31 @@ bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locat
         finishAttempt(false, 0, "ABRP disabled or credentials missing");
         return false;
     }
-    if (WiFi.status() != WL_CONNECTED) {
+    if (WiFi.status() != WL_CONNECTED || WiFi.localIP() == IPAddress(0, 0, 0, 0)) {
         finishAttempt(false, 0, "WiFi not connected");
         return false;
     }
     const time_t now = time(nullptr);
     if (!validUnixTime(now)) {
         finishAttempt(false, 0, "ABRP waiting for valid system time");
+        return false;
+    }
+
+    const uint32_t freeHeap = ESP.getFreeHeap();
+    const uint32_t largestBlock = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    if (freeHeap < MIN_FREE_HEAP_BYTES || largestBlock < MIN_LARGEST_BLOCK_BYTES) {
+        lockStatus();
+        currentStatus.inFlight = false;
+        currentStatus.lastSuccess = false;
+        currentStatus.lastHttpCode = 0;
+        currentStatus.lastMessage = "ABRP deferred: insufficient TLS heap";
+        currentStatus.heapBefore = freeHeap;
+        currentStatus.heapAfter = freeHeap;
+        currentStatus.largestFreeBlock = largestBlock;
+        currentStatus.lowMemorySkips++;
+        unlockStatus();
+        lastQueuedMs = nowMs;
+        Serial.printf("ABRP: deferred freeHeap=%u largestBlock=%u\n", freeHeap, largestBlock);
         return false;
     }
 
@@ -217,6 +257,8 @@ bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locat
     currentStatus.lastAttemptMs = nowMs;
     currentStatus.lastPayload = input->payload;
     currentStatus.lastMessage = "Queued";
+    currentStatus.heapBefore = freeHeap;
+    currentStatus.largestFreeBlock = largestBlock;
     unlockStatus();
     lastQueuedMs = nowMs;
 

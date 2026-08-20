@@ -1,6 +1,6 @@
 # GPS
 
-> **Status:** Source-confirmed optional capability; hardware behaviour unverified
+> **Status:** Source-confirmed optional capability; C6-N16 enable/disable physically validated
 >
 > **Audience:** Firmware developer, hardware reviewer and beta-support author
 
@@ -33,6 +33,22 @@ GPS is optional in the shared readiness model and does not block basic readiness
 ESP32-WROOM beta devices may therefore be delivered with or without GPS using the
 same intended firmware line.
 
+All maintained firmware targets persist a `gpsEnabled` setting. It defaults to
+`true`, preserving existing installations. After checksum-valid NMEA has identified
+a receiver, Configuration and the local onboarding wizard expose an authenticated
+GPS switch. The control also remains visible while disabled so the receiver can be
+re-enabled. Disabling takes effect after reboot and stops UART initialization,
+parsing and GPS telemetry. It only removes module power on hardware with a supported
+power/wakeup control line; an externally powered C6 or WROOM receiver remains
+electrically powered.
+
+The complete control path was physically accepted on a nanoESP32-C6-N16 with
+`C6-001-REV6-AWS` on 2026-08-20. Both Configuration and the onboarding wizard
+successfully disabled and re-enabled GPS. While disabled, Runtime Diagnostics
+reported `GPS_DISABLED`, zero received characters and no fix. The exported
+configuration included `gpsEnabled`; the common import path restores the same
+persisted setting.
+
 Location MQTT topics are emitted only while the current fix is valid. Retained AWS
 coordinates may remain as last-known values when a fix disappears; consumers use
 receive metadata/freshness rather than presence alone.
@@ -43,7 +59,7 @@ receive metadata/freshness rather than presence alone.
 - receiver present without fix;
 - first fix and loss/recovery;
 - coordinate, speed, satellite, HDOP and age accuracy;
-- ESP32 with/without GPS beta UI;
+- WROOM, XIAO and LilyGO physical enable/disable UI regression;
 - LilyGO GPS interaction with modem and power conditions.
 
 ## Related documents

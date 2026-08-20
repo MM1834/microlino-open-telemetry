@@ -25,6 +25,10 @@ struct AbrpStatus {
     String lastMessage;
     uint32_t lastSendMs = 0;
     uint32_t lastAttemptMs = 0;
+    uint32_t heapBefore = 0;
+    uint32_t heapAfter = 0;
+    uint32_t largestFreeBlock = 0;
+    uint32_t lowMemorySkips = 0;
     String lastPayload;
 };
 

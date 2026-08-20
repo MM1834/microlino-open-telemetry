@@ -99,7 +99,10 @@ bool MotAwsIotClient::begin(const MotAwsCredentials& credentials) {
     secureClient_.setCACert(credentials.rootCa.c_str());
     secureClient_.setCertificate(credentials.certificate.c_str());
     secureClient_.setPrivateKey(credentials.privateKey.c_str());
-    secureClient_.setHandshakeTimeout(30);
+    // A weak but still associated WiFi link must not stall the firmware's
+    // cooperative network/CAN/GPS loop for tens of seconds.
+    secureClient_.setHandshakeTimeout(5);
+    secureClient_.setTimeout(5000);
     return configure(credentials, secureClient_);
 }
 
@@ -129,7 +132,7 @@ bool MotAwsIotClient::configure(
     );
     mqtt_.setBufferSize(1024);
     mqtt_.setKeepAlive(45);
-    mqtt_.setSocketTimeout(30);
+    mqtt_.setSocketTimeout(5);
 
     status_.message = "AWS IoT configured";
     return true;
@@ -180,6 +183,7 @@ bool MotAwsIotClient::connect() {
         ESP.getFreeHeap()
     );
 
+    const uint32_t connectStartedMs = millis();
     const bool ok = mqtt_.connect(
         credentials_.thingName.c_str(),
         willTopic.c_str(),
@@ -188,10 +192,18 @@ bool MotAwsIotClient::connect() {
         "false"
     );
 
+    status_.lastConnectDurationMs = millis() - connectStartedMs;
     status_.mqttState = mqtt_.state();
     status_.connected = ok;
 
     if (!ok) {
+        status_.consecutiveConnectFailures++;
+        status_.totalConnectFailures++;
+        reconnectDelayMs_ = min(MAX_RECONNECT_INTERVAL_MS,
+                                reconnectDelayMs_ > MAX_RECONNECT_INTERVAL_MS / 2
+                                    ? MAX_RECONNECT_INTERVAL_MS
+                                    : reconnectDelayMs_ * 2);
+        status_.reconnectDelayMs = reconnectDelayMs_;
         status_.message =
             "AWS IoT connect failed rc=" + String(mqtt_.state());
         Serial.println(status_.message);
@@ -199,6 +211,9 @@ bool MotAwsIotClient::connect() {
     }
 
     status_.reconnectCount++;
+    status_.consecutiveConnectFailures = 0;
+    reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
+    status_.reconnectDelayMs = reconnectDelayMs_;
     status_.message = "AWS IoT connected";
     Serial.printf(
         "AWS IoT: connected freeHeap=%u will=%s\n",
@@ -224,13 +239,16 @@ void MotAwsIotClient::loop(
         status_.connected = false;
         status_.message = "AWS IoT waiting for network";
         previousConnected_ = false;
+        lastReconnectAttemptMs_ = 0;
+        reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
+        status_.reconnectDelayMs = reconnectDelayMs_;
         return;
     }
 
     if (!mqtt_.connected()) {
         const uint32_t now = millis();
         if (!lastReconnectAttemptMs_ ||
-            now - lastReconnectAttemptMs_ >= RECONNECT_INTERVAL_MS) {
+            now - lastReconnectAttemptMs_ >= reconnectDelayMs_) {
             lastReconnectAttemptMs_ = now;
             connect();
         }

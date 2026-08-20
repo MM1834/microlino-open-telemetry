@@ -5,14 +5,14 @@
 #define MOT_NAME "Microlino Open Telemetry"
 #define MOT_SHORT_NAME "MOT"
 #define MOT_SPRINT "C6-001"
-#define MOT_REVISION "REV1"
+#define MOT_REVISION "REV6"
 
 #ifdef MOT_AWS_IOT
 #define MOT_BUILD_VARIANT "AWS"
-#define MOT_VERSION "C6-001-REV1-AWS"
+#define MOT_VERSION "C6-001-REV6-AWS"
 #else
 #define MOT_BUILD_VARIANT "MQTT"
-#define MOT_VERSION "C6-001-REV1-MQTT"
+#define MOT_VERSION "C6-001-REV6-MQTT"
 #endif
 
 #ifndef MOT_BOARD

@@ -39,6 +39,10 @@ struct MotAwsStatus {
     uint32_t heartbeatCount = 0;
     uint32_t birthCount = 0;
     uint32_t reconnectCount = 0;
+    uint32_t consecutiveConnectFailures = 0;
+    uint32_t totalConnectFailures = 0;
+    uint32_t lastConnectDurationMs = 0;
+    uint32_t reconnectDelayMs = 0;
     String message;
 };
 
@@ -89,6 +93,7 @@ public:
 private:
     static constexpr time_t MIN_VALID_UTC = 1700000000;
     static constexpr uint32_t RECONNECT_INTERVAL_MS = 10000;
+    static constexpr uint32_t MAX_RECONNECT_INTERVAL_MS = 300000;
     static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 30000;
 
     WiFiClientSecure secureClient_;
@@ -98,6 +103,7 @@ private:
     MotAwsRuntime runtime_;
 
     uint32_t lastReconnectAttemptMs_ = 0;
+    uint32_t reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
     uint32_t lastHeartbeatMs_ = 0;
     bool previousConnected_ = false;
 

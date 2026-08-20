@@ -9,6 +9,9 @@ Microlino Open Telemetry supports several ESP32-based hardware variants: a class
 The Muse Lab nanoESP32-C6-N16 has completed a bounded dual-CAN WiFi/AWS pilot
 qualification. It is not yet a production-approved custom MOT module.
 
+The current remote-pilot assembly and validation reference is documented in
+[MOT ESP32-C6 Gen.2 pilot assembly](mot-esp32-c6-gen2-wiring.md).
+
 ![Installed ESP32 system](../assets/images/hardware/system-esp32-installed.png)
 
 ## Supported platforms

@@ -149,39 +149,36 @@ static String wizardPage()
 
     switch (step) {
         case 1:
-            s += "<h2>Welcome</h2><p>This assistant guides you through the existing MOT configuration. It does not create a second configuration store.</p>";
-            s += "<p>You can leave the wizard at any time and continue later.</p>";
+            s += "<h2>Welcome</h2><p>Configure this MOT device. You can continue later.</p>";
             break;
         case 2:
             s += "<h2>Detected hardware</h2><ul>";
             s += "<li>Board: <b>" + String(caps.board) + "</b></li>";
             s += "<li>WiFi: available</li><li>GPS module: <b id='wizard-gps-hardware'>checking…</b></li><li>CAN1: available</li><li>CAN2: reserved</li>";
-            s += "</ul><p class='muted'>GPS is reported as detected only after a checksum-valid NMEA sentence has been received. Runtime checks continue in the validation step.</p>";
+            s += "</ul>";
             s += "<script>fetch('/api/gps').then(r=>r.json()).then(g=>{const labels={GPS_DISABLED:'disabled',GPS_NOT_DETECTED:'not detected',GPS_DETECTED:'detected',GPS_FIX:'detected with fix'};document.getElementById('wizard-gps-hardware').textContent=labels[g.state]||'unknown';}).catch(()=>{document.getElementById('wizard-gps-hardware').textContent='unknown';});</script>";
+            if (wroomGpsDetected() || !config.gpsEnabled) s += "<form method='POST' action='/save'><input type='hidden' name='gpsOnly' value='1'><label><input type='checkbox' name='gpsEnabled'" + String(config.gpsEnabled ? " checked" : "") + "> GPS enabled</label><button>Save &amp; reboot</button></form>";
             break;
         case 3:
-            s += "<h2>Network</h2><p>Configure the WiFi network used outside AP setup mode.</p>";
+            s += "<h2>Network</h2>";
             s += "<p><a href='/config?return=/wizard?step=3'><button type='button'>Open network configuration</button></a></p>";
-            s += "<p class='muted'>Save & Reboot returns the device with the stored network settings.</p>";
             break;
         case 4:
-            s += "<h2>Vehicle and CAN profile</h2><p>Set vehicle name, vehicle ID and the decoder profile for CAN1.</p>";
+            s += "<h2>Vehicle and CAN profile</h2>";
             s += "<p><a href='/config?return=/wizard?step=4'><button type='button'>Open vehicle configuration</button></a></p>";
-            s += "<p class='muted'>CAN2 remains reserved and is not enabled by onboarding.</p>";
             break;
         case 5:
-            s += "<h2>Telemetry services</h2><p>Enable and configure only the services you use: MQTT, AWS IoT and ABRP.</p>";
+            s += "<h2>Telemetry services</h2>";
             s += "<p><a href='/config?return=/wizard?step=5'><button type='button'>Open service configuration</button></a></p>";
-            s += "<p class='muted'>The build determines whether AWS IoT is available. Empty credentials keep optional services inactive.</p>";
             break;
         case 6:
-            s += "<h2>Validation</h2><p>Run the existing system-health diagnostics before finishing onboarding.</p>";
+            s += "<h2>Validation</h2>";
             s += "<button type='button' onclick='runWizardValidation()'>Run validation</button><pre id='wizard-validation'>Not checked yet.</pre>";
-            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');o.textContent='Checking…';try{const r=await fetch('/api/system-health');const d=await r.json();const g=d.gps||{},m=d.mqtt||{},aws=m.mode==='AWS_IOT_X509',transport=aws?'AWS IoT':'Legacy MQTT',transportState=!m.enabled?'DISABLED':(m.mqttOk?'OK':'WAITING');o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\n${transport}: ${transportState}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS state: ${g.state||'UNKNOWN'}\nGPS UART: ${g.started?'STARTED':'NOT STARTED'}\nGPS module: ${g.detected?'DETECTED':'NOT DETECTED'}\nGPS UART activity: ${g.seen?(g.detected?'VALID NMEA':'UNVALIDATED / NOISE POSSIBLE'):'NONE'}\nGPS fix: ${g.valid?'VALID':(g.detected?'NO FIX':'N/A')}\n\nOpen the Status page for full diagnostics.`;}catch(e){o.textContent='Validation failed: '+e.message;}}</script>";
+            s += "<script>async function runWizardValidation(){const o=document.getElementById('wizard-validation');try{const d=await(await fetch('/api/system-health')).json(),g=d.gps||{},m=d.mqtt||{};o.textContent=`WiFi: ${d.wifiOk?'OK':'WAITING'}\nTelemetry: ${!m.enabled?'DISABLED':m.mqttOk?'OK':'WAITING'}\nCAN: ${d.canOk?'OK':'WAITING'}\nGPS: ${g.state||'UNKNOWN'}`;}catch(e){o.textContent=e.message}}</script>";
             s += "<p><a href='/status?return=/wizard?step=6'>Open full status</a></p>";
             break;
         default:
-            s += "<h2>Finish</h2><p>Configuration remains managed by the normal MOT configuration pages. Completing onboarding only disables the automatic wizard launch.</p>";
+            s += "<h2>Finish</h2><p>Settings remain available in Config.</p>";
             s += "<form method='POST' action='/api/onboarding/complete'><button type='submit'>Complete onboarding</button></form>";
             break;
     }
@@ -301,6 +298,7 @@ static void handleConfig()
     s += "<label><input style='width:auto' type='checkbox' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label><br>";
     s += "<label><input style='width:auto' type='checkbox' name='svcAbrp' value='1'" + String(config.abrpServiceEnabled ? " checked" : "") + "> ABRP</label>";
     s += "<p class='muted'>Services are independently configurable. AWS availability depends on the selected build target and provisioned credentials.</p></div>";
+    if (wroomGpsDetected() || !config.gpsEnabled) s += "<div class='card'><h2>GPS</h2><input type='hidden' name='gpsControlPresent' value='1'><label><input style='width:auto' type='checkbox' name='gpsEnabled'" + String(config.gpsEnabled ? " checked" : "") + "> GPS enabled</label></div>";
 
     s += "<div class='card'><h2>MQTT</h2>";
     s += "<p class='muted'>MQTT is optional. Leave host empty to disable MQTT without connection errors.</p>";
@@ -369,6 +367,15 @@ static void handleSave()
 {
     if (!requireAdmin()) return;
     if (!requireSameOrigin()) return;
+    if (server.hasArg("gpsOnly")) {
+        config.gpsEnabled = server.hasArg("gpsEnabled");
+        appConfigManager.save();
+        server.sendHeader("Location", "/wizard?step=2");
+        server.send(303);
+        rebootPending = true;
+        rebootAtMs = millis() + 1000;
+        return;
+    }
     String requestedAdminPassword = server.arg("otaPass");
     requestedAdminPassword.trim();
     if (!requestedAdminPassword.isEmpty() && !isValidLocalAdminPassword(requestedAdminPassword)) {
@@ -403,6 +410,7 @@ static void handleSave()
     config.awsServiceEnabled = server.hasArg("svcAws");
     config.mqttServiceEnabled = server.hasArg("svcMqtt");
     config.abrpServiceEnabled = server.hasArg("svcAbrp");
+    if (server.hasArg("gpsControlPresent")) config.gpsEnabled = server.hasArg("gpsEnabled");
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;

@@ -3,11 +3,20 @@
 #include <Arduino.h>
 #include <MotGps.h>
 #include "board_config.h"
+#include "../config/lilygo_config.h"
 
 static MotGps gps;
 
 void setupL76kGps()
 {
+    if (!config.gpsEnabled) {
+        Serial.println("L76K GPS: disabled by configuration");
+#ifdef GPS_WAKEUP_PIN
+        pinMode(GPS_WAKEUP_PIN, OUTPUT);
+        digitalWrite(GPS_WAKEUP_PIN, LOW);
+#endif
+        return;
+    }
     Serial.println("Using external L76K GPS through MotGps");
 
 #ifdef GPS_WAKEUP_PIN
@@ -28,6 +37,7 @@ void setupL76kGps()
 
 void l76kGpsLoop()
 {
+    if (!config.gpsEnabled) return;
     gps.loop();
 }
 

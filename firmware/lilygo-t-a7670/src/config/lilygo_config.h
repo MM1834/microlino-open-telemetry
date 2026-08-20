@@ -23,6 +23,7 @@ struct LilygoConfig {
     bool otaEnabled = false;
     String otaPassword;
     bool abrpEnabled = false;
+    bool gpsEnabled = true;
     DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN;
     bool onboardingComplete = false;
     String abrpApiKey;

@@ -11,6 +11,7 @@ constexpr char SERVICES[] = "services";
 constexpr char MQTT_SERVICE[] = "mqtt";
 constexpr char AWS_SERVICE[] = "aws";
 constexpr char ABRP_SERVICE[] = "abrp";
+constexpr char GPS_ENABLED[] = "gpsEnabled";
 
 constexpr char DEVICE_NAME[] = "deviceName";
 constexpr char VEHICLE_NAME[] = "vehicleName";

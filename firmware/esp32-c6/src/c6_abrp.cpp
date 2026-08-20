@@ -2,7 +2,9 @@
 
 #include "abrp/abrp_client.h"
 #include "c6_config.h"
+#include "c6_aws.h"
 #include "c6_gps.h"
+#include "c6_network.h"
 
 namespace {
 AbrpSettings settings()
@@ -26,7 +28,15 @@ bool location(AbrpLocation &value)
 }
 
 void c6AbrpSetup() { setupAbrp(settings()); }
-void c6AbrpLoop() { abrpLoop(settings(), location); }
-bool c6AbrpQueueTelemetry() { return queueAbrpTelemetry(settings(), location); }
+void c6AbrpLoop()
+{
+    // AWS is the primary telemetry transport. Do not start a second TLS
+    // session while MQTT is reconnecting or recovering memory.
+    if (c6NetworkTransportReady() && c6AwsConnected()) abrpLoop(settings(), location);
+}
+bool c6AbrpQueueTelemetry()
+{
+    return c6NetworkTransportReady() && c6AwsConnected() && queueAbrpTelemetry(settings(), location);
+}
 String c6AbrpStatusJson() { return abrpStatusJson(settings()); }
 bool c6AbrpConfigured() { return abrpEnabled(settings()); }

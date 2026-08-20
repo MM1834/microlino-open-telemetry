@@ -40,6 +40,7 @@ void c6ConfigLoad()
     c6Config.adminPassword = preferences.getString("otaPass", "");
     c6Config.setupPassword = preferences.getString("setupPass", "");
     c6Config.abrpEnabled = preferences.getBool("abrpEn", false);
+    c6Config.gpsEnabled = preferences.getBool("gpsEn", true);
     c6Config.abrpApiKey = preferences.getString("abrpKey", "");
     c6Config.abrpUserToken = preferences.getString("abrpToken", "");
     c6Config.onboardingComplete = preferences.isKey("onboarded")
@@ -124,6 +125,7 @@ void c6ConfigSave()
     preferences.putString("otaPass", c6Config.adminPassword);
     preferences.putString("setupPass", c6Config.setupPassword);
     preferences.putBool("abrpEn", c6Config.abrpEnabled);
+    preferences.putBool("gpsEn", c6Config.gpsEnabled);
     preferences.putString("abrpKey", c6Config.abrpApiKey);
     preferences.putString("abrpToken", c6Config.abrpUserToken);
     preferences.putBool("onboarded", c6Config.onboardingComplete);
@@ -157,6 +159,14 @@ bool c6ConfigSetAbrpCredentials(const String &apiKeyValue, const String &userTok
     return true;
 }
 
+void c6ConfigSetAbrpEnabled(bool enabled)
+{
+    c6Config.abrpEnabled = enabled;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("abrpEn", enabled);
+    preferences.end();
+}
+
 String c6ConfigRecoverAdminPassword()
 {
     c6Config.adminPassword = LocalWebSecurity::generateRecoveryPassword();
@@ -180,6 +190,7 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["publishIntervalMs"] = c6Config.publishIntervalMs;
     doc["otaEnabled"] = c6Config.otaEnabled;
     doc["abrpEnabled"] = c6Config.abrpEnabled;
+    doc["gpsEnabled"] = c6Config.gpsEnabled;
     doc["onboardingComplete"] = c6Config.onboardingComplete;
     if (includeSecrets) {
         doc["abrpApiKey"] = c6Config.abrpApiKey;
@@ -210,6 +221,7 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["publishIntervalMs"].isNull()) candidate.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
     if (!doc["abrpEnabled"].isNull()) candidate.abrpEnabled = doc["abrpEnabled"].as<bool>();
+    if (!doc["gpsEnabled"].isNull()) candidate.gpsEnabled = doc["gpsEnabled"].as<bool>();
     if (!doc["abrpApiKey"].isNull()) candidate.abrpApiKey = doc["abrpApiKey"].as<String>();
     if (!doc["abrpUserToken"].isNull()) candidate.abrpUserToken = doc["abrpUserToken"].as<String>();
     if (!doc["onboardingComplete"].isNull()) candidate.onboardingComplete = doc["onboardingComplete"].as<bool>();

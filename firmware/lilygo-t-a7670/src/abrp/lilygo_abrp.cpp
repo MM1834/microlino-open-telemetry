@@ -99,7 +99,7 @@ static String buildPayload()
     json += "\"power\":" + String(telemetry.charging.powerSigned);
 
     addComma();
-    json += "\"is_charging\":" + String(telemetry.charging.isCharging ? "true" : "false");
+    json += "\"is_charging\":" + String(telemetryIsCharging() ? "true" : "false");
 
     if (l76kGpsValid()) {
         addComma();

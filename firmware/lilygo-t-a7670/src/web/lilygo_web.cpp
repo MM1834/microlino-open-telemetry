@@ -170,6 +170,7 @@ static void handleConfig()
     s += "<label><input type='checkbox' style='width:auto' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label>";
     s += "<label><input type='checkbox' style='width:auto' name='abrpEnabled' value='1'" + String(config.abrpEnabled ? " checked" : "") + "> ABRP</label>";
     s += "<p class='muted'>Each service is optional. GPS and CAN data are shared telemetry sources.</p></div>";
+    if (l76kGpsDetected() || !config.gpsEnabled) s += "<div class='card'><h2>GPS</h2><input type='hidden' name='gpsControlPresent' value='1'><label><input type='checkbox' style='width:auto' name='gpsEnabled'" + String(config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><p class='muted'>Default: enabled. Disabling stops GPS initialization, decoding and telemetry after reboot.</p></div>";
 
     s += "<label>WiFi SSID</label><input name='wifiSsid' value='" + config.wifiSsid + "'>";
     s += "<label>WiFi Password</label><input name='wifiPass' type='password' autocomplete='new-password' placeholder='Leave blank to keep stored value'>";
@@ -235,6 +236,7 @@ static void handleConfigSave()
 
     config.awsServiceEnabled = server.hasArg("svcAws");
     config.mqttServiceEnabled = server.hasArg("svcMqtt");
+    if (server.hasArg("gpsControlPresent")) config.gpsEnabled = server.hasArg("gpsEnabled");
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = (uint16_t)server.arg("mqttPort").toInt();
     if (config.mqttPort == 0) config.mqttPort = 1883;
@@ -543,6 +545,7 @@ static void handleWizard()
         case 2:
             html += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>LTE modem: available</li><li>GPS module: <span id=\"wizard-gps-hardware\">checking…</span></li><li>CAN1: available</li><li>CAN2: reserved</li></ul>";
             html += "<script>fetch('/api/lilygo/gps').then(r=>r.json()).then(g=>{const labels={GPS_DISABLED:'disabled',GPS_NOT_DETECTED:'not detected',GPS_DETECTED:'detected',GPS_FIX:'detected with fix'};document.getElementById('wizard-gps-hardware').textContent=labels[g.state]||'unknown';}).catch(()=>{document.getElementById('wizard-gps-hardware').textContent='unknown';});</script>";
+            if (l76kGpsDetected() || !config.gpsEnabled) html += "<form method='POST' action='/api/gps/toggle'><label><input type='checkbox' name='gpsEnabled'" + String(config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><button>Save &amp; reboot</button></form>";
             html += "<p class='muted'>Runtime checks are performed in the validation step.</p>";
             break;
         case 3:
@@ -598,6 +601,16 @@ static void handleOnboardingRestart()
     server.send(303, "text/plain", "");
 }
 
+static void handleGpsToggle()
+{
+    if (!l76kGpsDetected() && config.gpsEnabled) { server.send(404, "text/plain", "GPS module not detected"); return; }
+    config.gpsEnabled = server.hasArg("gpsEnabled");
+    lilygoConfigManager.save();
+    server.send(200, "text/html", "<!doctype html><html><body><h2>GPS setting saved.</h2><p>Device will reboot.</p></body></html>");
+    rebootPending = true;
+    rebootAtMs = millis() + 1000;
+}
+
 void setupLilygoWeb()
 {
     const char* headerKeys[] = {"Origin", "Referer"};
@@ -613,6 +626,7 @@ void setupLilygoWeb()
     server.on("/api/onboarding", HTTP_GET, []() { if (requireAdmin()) handleOnboardingStatus(); });
     server.on("/api/onboarding/complete", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleOnboardingComplete(); });
     server.on("/api/onboarding/restart", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleOnboardingRestart(); });
+    server.on("/api/gps/toggle", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleGpsToggle(); });
     server.on("/config", HTTP_GET, []() {
         if (!config.localAdminConfigured() || requireAdmin()) handleConfig();
     });

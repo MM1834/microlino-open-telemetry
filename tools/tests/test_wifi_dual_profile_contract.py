@@ -41,7 +41,19 @@ class WifiDualProfileContractTests(unittest.TestCase):
         self.assertIn("HOME_SCAN_INTERVAL_MS", NETWORK)
         self.assertIn("WiFi.scanNetworks(true, true)", NETWORK)
         self.assertIn("WiFi.scanComplete()", NETWORK)
-        self.assertIn('beginProfile(WifiProfile::HOME, "home visible")', NETWORK)
+        scan = NETWORK.split("void pollHomeScan", 1)[1].split("\n}\n}", 1)[0]
+        self.assertIn('if (homeVisible)', scan)
+        self.assertIn('beginProfile(WifiProfile::HOME, reason.c_str())', scan)
+        self.assertNotIn('homeRssi >= HOME_RECOVER_RSSI_DBM', scan)
+        self.assertNotIn('home visible but weak', scan)
+
+    def test_weak_but_connected_home_is_diagnostic_not_forced_offline(self) -> None:
+        self.assertIn("HOME_WEAK_RSSI_DBM", NETWORK)
+        self.assertIn("WEAK_LINK_GRACE_MS", NETWORK)
+        self.assertIn('"home connected but weak ("', NETWORK)
+        self.assertNotIn('beginProfile(WifiProfile::MOBILE, "home link persistently weak")', NETWORK)
+        self.assertNotIn('scheduleRetry("home link persistently weak")', NETWORK)
+        self.assertIn("bool c6NetworkTransportReady() { return c6NetworkOnline(); }", NETWORK)
 
     def test_stale_connected_status_without_ip_is_treated_as_offline(self) -> None:
         self.assertIn("WiFi.status() == WL_CONNECTED", NETWORK)
@@ -68,6 +80,14 @@ class WifiDualProfileContractTests(unittest.TestCase):
         self.assertIn("c6NetworkReason()", WEB)
         self.assertIn("c6NetworkHomeConfigured()", WEB)
         self.assertIn("c6NetworkMobileConfigured()", WEB)
+        self.assertIn('\\"transportReady\\"', WEB)
+        self.assertIn('\\"weakForMs\\"', WEB)
+        self.assertIn('\\"transitions\\"', WEB)
+        self.assertIn('\\"bssid\\"', WEB)
+        self.assertIn('\\"channel\\"', WEB)
+        self.assertIn('\\"disconnects\\"', WEB)
+        self.assertIn('\\"lastDisconnectName\\"', WEB)
+        self.assertIn("ARDUINO_EVENT_WIFI_STA_DISCONNECTED", NETWORK)
 
 
 if __name__ == "__main__":

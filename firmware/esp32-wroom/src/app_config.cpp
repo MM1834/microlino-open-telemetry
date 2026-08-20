@@ -74,6 +74,7 @@ void AppConfigurationManager::load()
     config.abrpApiKey = prefs.getString("abrpKey", "");
     config.abrpUserToken = prefs.getString("abrpToken", "");
     config.abrpServiceEnabled = prefs.isKey("svcAbrp") ? prefs.getBool("svcAbrp", false) : (!config.abrpApiKey.isEmpty() && !config.abrpUserToken.isEmpty());
+    config.gpsEnabled = prefs.getBool("gpsEn", true);
     config.can1Profile = decoderProfileNormalize(prefs.getUChar("can1", DECODER_PROFILE_DISPLAY_CAN));
     config.can2Profile = decoderProfileNormalize(prefs.getUChar("can2", DECODER_PROFILE_DISABLED), DECODER_PROFILE_DISABLED);
     config.otaEnabled = prefs.getBool("otaEn", false);
@@ -105,6 +106,7 @@ void AppConfigurationManager::save()
     prefs.putString("abrpKey", config.abrpApiKey);
     prefs.putString("abrpToken", config.abrpUserToken);
     prefs.putBool("svcAbrp", config.abrpServiceEnabled);
+    prefs.putBool("gpsEn", config.gpsEnabled);
     prefs.putUChar("can1", config.can1Profile);
     prefs.putUChar("can2", config.can2Profile);
     prefs.putBool("otaEn", config.otaEnabled);
@@ -178,6 +180,7 @@ String AppConfigurationManager::exportJson(bool includeSecrets) const
     doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE] = config.mqttServiceEnabled;
     doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE] = config.awsServiceEnabled;
     doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE] = config.abrpServiceEnabled;
+    doc[ConfigKeys::GPS_ENABLED] = config.gpsEnabled;
 
     doc[ConfigKeys::MQTT_HOST] = config.mqttHost;
     doc[ConfigKeys::MQTT_PORT] = config.mqttPort;
@@ -243,6 +246,7 @@ bool AppConfigurationManager::importJson(const String& json, String& error)
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].isNull()) config.mqttServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::MQTT_SERVICE].as<bool>();
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].isNull()) config.awsServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].as<bool>();
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].isNull()) config.abrpServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].as<bool>();
+    if (!doc[ConfigKeys::GPS_ENABLED].isNull()) config.gpsEnabled = doc[ConfigKeys::GPS_ENABLED].as<bool>();
 
     setStringIfPresent(doc, ConfigKeys::MQTT_HOST, config.mqttHost);
     if (!doc[ConfigKeys::MQTT_PORT].isNull()) config.mqttPort = doc[ConfigKeys::MQTT_PORT].as<uint16_t>();

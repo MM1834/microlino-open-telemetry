@@ -8,13 +8,15 @@
 
 namespace MotStandardCanBms {
 
-static constexpr float CURRENT_SCALE_A = 0.3f;
-static constexpr uint16_t MIN_PACK_VOLTAGE_MV = 40000;
-static constexpr uint16_t MAX_PACK_VOLTAGE_MV = 65000;
-static constexpr float MAX_CHARGE_POWER_W = 12000.0f;
-static constexpr float MAX_DISCHARGE_POWER_W = 25000.0f;
-static constexpr float CHARGING_CURRENT_THRESHOLD_A = 2.0f;
-static constexpr float DRIVE_CURRENT_THRESHOLD_A = 2.0f;
+struct DecoderRules {
+    float currentScaleA;
+    uint16_t minPackVoltageMv;
+    uint16_t maxPackVoltageMv;
+    float maxChargePowerW;
+    float maxDischargePowerW;
+    float chargingCurrentThresholdA;
+    float driveCurrentThresholdA;
+};
 
 inline uint16_t readLe16(const uint8_t *data)
 {
@@ -22,16 +24,16 @@ inline uint16_t readLe16(const uint8_t *data)
            (static_cast<uint16_t>(data[1]) << 8);
 }
 
-inline void decode18d(const uint8_t *data)
+inline void decode18d(const uint8_t *data, const DecoderRules &rules)
 {
     const int16_t currentRaw = static_cast<int16_t>(readLe16(&data[1]));
     const uint16_t voltageMv = readLe16(&data[3]);
-    const float currentA = currentRaw * CURRENT_SCALE_A;
+    const float currentA = currentRaw * rules.currentScaleA;
     const float powerW = currentA * (voltageMv / 1000.0f);
     const bool voltagePlausible =
-        voltageMv >= MIN_PACK_VOLTAGE_MV && voltageMv <= MAX_PACK_VOLTAGE_MV;
+        voltageMv >= rules.minPackVoltageMv && voltageMv <= rules.maxPackVoltageMv;
     const bool currentPlausible = voltagePlausible &&
-        powerW <= MAX_CHARGE_POWER_W && powerW >= -MAX_DISCHARGE_POWER_W;
+        powerW <= rules.maxChargePowerW && powerW >= -rules.maxDischargePowerW;
 
     telemetry.bms.statusByte = data[6];
     telemetry.bms.plugged = data[6] == 0x20;
@@ -51,21 +53,20 @@ inline void decode18d(const uint8_t *data)
         telemetry.bms.packCurrentRaw = currentRaw;
         telemetry.bms.packCurrentA = currentA;
         telemetry.bms.packPowerW = powerW;
-        // The Pioneer field uses the battery convention: positive current flows
-        // into the pack (charge/regen), negative current discharges the pack.
-        // Vehicle power keeps MOT's existing convention: traction/consumption is
-        // positive and energy returned to the battery is negative.
+        // A profile's signed current scale normalizes positive current as flow
+        // into the pack. Vehicle power then keeps MOT's canonical convention:
+        // traction/consumption positive, charge/regeneration negative.
         telemetry.bms.vehiclePowerW = -powerW;
         telemetry.bms.isRegenerating =
-            !telemetry.bms.plugged && currentA > DRIVE_CURRENT_THRESHOLD_A;
+            !telemetry.bms.plugged && currentA > rules.driveCurrentThresholdA;
         telemetry.bms.isDischarging =
-            currentA < -DRIVE_CURRENT_THRESHOLD_A;
+            currentA < -rules.driveCurrentThresholdA;
         telemetry.bms.packCurrentLastUpdateMs = millis();
 
         telemetry.charging.valid = true;
         telemetry.charging.plugged = telemetry.bms.plugged;
         telemetry.charging.isCharging =
-            telemetry.bms.plugged && currentA > CHARGING_CURRENT_THRESHOLD_A;
+            telemetry.bms.plugged && currentA > rules.chargingCurrentThresholdA;
         telemetry.charging.powerSigned =
             static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f));
         telemetry.charging.lastUpdateMs = millis();
@@ -95,10 +96,10 @@ inline void decode4ad(const uint8_t *data)
     telemetry.bms.cellVoltagesLastUpdateMs = millis();
 }
 
-inline void handleFrame(const MotCanFrame &frame)
+inline void handleFrame(const MotCanFrame &frame, const DecoderRules &rules)
 {
     if (frame.extended || frame.dlc < 8) return;
-    if (frame.id == 0x18D) decode18d(frame.data);
+    if (frame.id == 0x18D) decode18d(frame.data, rules);
     else if (frame.id == 0x4AD) decode4ad(frame.data);
 }
 
