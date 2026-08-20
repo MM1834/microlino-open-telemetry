@@ -69,6 +69,7 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub "${ProjectName}-${Environment}-notification-email"
+      DisplayName: Microlino Open Telemetry
       Tags:
         - {Key: project, Value: !Ref ProjectName}
         - {Key: environment, Value: !Ref Environment}
@@ -91,7 +92,7 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Scan]
                 Resource: !GetAtt SessionTable.Arn
               - Effect: Allow
                 Action: [dynamodb:Query]
@@ -109,7 +110,7 @@ Resources:
       FunctionName: !Sub "${ProjectName}-${Environment}-notifications"
       Runtime: python3.12
       Handler: handler.handler
-      Timeout: 10
+      Timeout: 30
       MemorySize: 128
       Role: !GetAtt NotificationRole.Arn
       Environment:
@@ -148,6 +149,24 @@ Resources:
         Actions:
           - Lambda: {FunctionArn: !GetAtt NotificationFunction.Arn}
 
+  JourneyFinalizerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Finalize stopped JNY-001 journeys after the stability window.
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt NotificationFunction.Arn
+          Id: JourneyFinalizer
+
+  JourneyFinalizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref NotificationFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt JourneyFinalizerRule.Arn
+
   PreferenceApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -168,10 +187,10 @@ Resources:
                 Action: [dynamodb:GetItem]
                 Resource: !Ref AccessTableArn
               - Effect: Allow
-                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem]
                 Resource: !GetAtt PreferenceTable.Arn
               - Effect: Allow
-                Action: [sns:Subscribe]
+                Action: [sns:Subscribe, sns:GetSubscriptionAttributes]
                 Resource: !Ref EmailTopic
 
   PreferenceApiFunction:

@@ -56,6 +56,12 @@ class NotificationStateTests(unittest.TestCase):
         self.assertEqual(state, same)
         self.assertIsNone(crossing)
 
+    def test_unchanged_soc_is_write_throttled(self):
+        state = ChargingSessionState(previous_soc=80, last_soc_at=100)
+        same, crossing = self.update(state, "display/soc", 80, 200)
+        self.assertEqual(state, same)
+        self.assertIsNone(crossing)
+
     def test_invalid_soc_is_ignored(self):
         state = self.charging_session()
         for value in (-1, 101, True, "80"):

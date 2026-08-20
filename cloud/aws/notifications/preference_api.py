@@ -50,17 +50,57 @@ def public(item):
         return {
             "enabled": False, "threshold": 80,
             "emailEnabled": False, "smsEnabled": False,
+            "journeyEmailEnabled": False,
             "emailConfirmed": False, "smsConfirmed": False,
         }
     result = {
         key: item.get(key) for key in (
             "vehicleId", "enabled", "threshold", "emailEnabled", "smsEnabled",
-            "email", "phoneE164", "emailConfirmed", "smsConfirmed", "updatedAt"
+            "journeyEmailEnabled", "email", "phoneE164", "emailConfirmed",
+            "smsConfirmed", "updatedAt"
         )
     }
+    result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
     result["threshold"] = int(result.get("threshold") or 80)
     result["updatedAt"] = int(result.get("updatedAt") or 0)
     return result
+
+
+def reconcile_email_confirmation(key, item):
+    """Refresh the portal flag from the authoritative SNS subscription state."""
+    if not item or item.get("emailEnabled") is not True:
+        return item
+    subscription_arn = str(item.get("emailSubscriptionArn", "")).strip()
+    if not subscription_arn or subscription_arn.lower().startswith("pending"):
+        return item
+    try:
+        attributes = sns.get_subscription_attributes(
+            SubscriptionArn=subscription_arn
+        ).get("Attributes", {})
+        confirmed = attributes.get("PendingConfirmation") == "false"
+    except Exception as error:
+        code = getattr(error, "response", {}).get("Error", {}).get("Code", "")
+        if code not in ("NotFound", "NotFoundException"):
+            raise
+        confirmed = False
+    if item.get("emailConfirmed") is confirmed:
+        return item
+    try:
+        preferences.update_item(
+            Key=key,
+            UpdateExpression="SET emailConfirmed=:confirmed",
+            ConditionExpression="emailSubscriptionArn=:subscription",
+            ExpressionAttributeValues={
+                ":confirmed": confirmed,
+                ":subscription": subscription_arn,
+            },
+        )
+    except Exception as error:
+        code = getattr(error, "response", {}).get("Error", {}).get("Code", "")
+        if code != "ConditionalCheckFailedException":
+            raise
+        return preferences.get_item(Key=key, ConsistentRead=True).get("Item", {})
+    return {**item, "emailConfirmed": confirmed}
 
 
 def handler(event, context):
@@ -73,7 +113,8 @@ def handler(event, context):
         return response(404, {"error": "vehicle_not_found"})
     key = {"vehicleId": vehicle_id, "userSub": user_sub}
     if method == "GET":
-        return response(200, public(preferences.get_item(Key=key, ConsistentRead=True).get("Item")))
+        item = preferences.get_item(Key=key, ConsistentRead=True).get("Item")
+        return response(200, public(reconcile_email_confirmation(key, item)))
     if method != "PUT":
         return response(405, {"error": "method_not_allowed"})
     try:
@@ -90,17 +131,24 @@ def handler(event, context):
         str(body.get("phoneE164", previous.get("phoneE164", ""))).strip()
     )
     email_enabled = body.get("emailEnabled") is True
+    journey_email_requested = body.get(
+        "journeyEmailEnabled", previous.get("journeyEmailEnabled", False)
+    ) is True
+    journey_email_enabled = journey_email_requested and email_enabled
     sms_enabled = body.get("smsEnabled") is True
     if email_enabled and not EMAIL.fullmatch(email):
         return response(400, {"error": "invalid_email"})
     if sms_enabled and not PHONE.fullmatch(phone):
         return response(400, {"error": "invalid_phone"})
+    if "journeyEmailEnabled" in body and journey_email_requested and not email_enabled:
+        return response(400, {"error": "journey_email_requires_email"})
 
     item = {
         **key,
         "enabled": body.get("enabled") is True,
         "threshold": threshold,
         "emailEnabled": email_enabled,
+        "journeyEmailEnabled": journey_email_enabled,
         "smsEnabled": sms_enabled,
         "email": email,
         "phoneE164": phone,

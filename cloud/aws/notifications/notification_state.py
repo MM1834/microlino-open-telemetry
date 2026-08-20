@@ -4,6 +4,9 @@ from dataclasses import dataclass, replace
 from typing import Optional
 
 
+UNCHANGED_SOC_REFRESH_MS = 5 * 60 * 1000
+
+
 @dataclass(frozen=True)
 class ChargingSessionState:
     session_id: Optional[str] = None
@@ -68,6 +71,11 @@ def apply_update(
 
     current_soc = float(value)
     previous_soc = state.previous_soc
+    if (
+        previous_soc == current_soc
+        and received_at - state.last_soc_at < UNCHANGED_SOC_REFRESH_MS
+    ):
+        return state, None
     updated = replace(state, previous_soc=current_soc, last_soc_at=received_at)
     if (
         not state.plugged
