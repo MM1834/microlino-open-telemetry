@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-14
+**Last reviewed:** 2026-08-20
 
 ## Purpose
 
@@ -18,6 +18,14 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+HIS-SIGN-001 has a repository-complete portal refinement for historical net
+power. It displays consumption as negative and charging/regeneration as positive,
+using a symmetric axis and explicit zero line while preserving stored History and
+API semantics. Existing `xrpioneer2` records need no migration; read-only AWS
+checks confirmed that the vehicle is History-enabled and actively owned by the
+confirmed `xruser` account. Local desktop and smartphone acceptance passed;
+hosted upload and acceptance remain open.
 
 MOT has promoted the reviewed REL-001 repository pilot through `develop` to
 `main` and opened the consolidated `v1.0.0-rc.1` release candidate. WROOM evidence,
@@ -37,6 +45,51 @@ unchecked trusted-device opt-in that can renew its one-hour access session throu
 the existing 30-day Cognito refresh-token lifetime. Only refresh state is retained
 persistently; the default remains browser-session-only, logout clears both storage
 classes, and hosted desktop and smartphone acceptance passed.
+
+NTF-FIX-001 completed on 2026-08-20. It corrects the stale portal email
+confirmation flag by reconciling authenticated preference reads with the
+authoritative SNS subscription state. The controlled `xrpioneer2` record changed
+from false to true while SNS remained confirmed; stack and Lambda health checks
+passed, followed by hosted portal acceptance after reload.
+
+JNY-001 is active as a separate journey-summary and energy-email pilot. Its
+default-off preference API is deployed and the first hosted checkbox is visible.
+The deployed backend now adds stable delayed completion, an explicitly labelled
+estimate from existing power telemetry, idempotent email delivery and automatic
+priority for a future firmware counter. Its reviewed additive Change Set reached
+`UPDATE_COMPLETE`; the operational portal text is hosted and the first physical
+journey emails were received with plausible telemetry-estimate values.
+Firmware-counter work is
+still gated on measured flash, RAM and runtime-heap impact for the priority
+nanoESP32-C6-N16 target; XIAO 4 MB fit is optional and non-blocking.
+
+The first JNY-001 road observation identified and corrected a post-stop charging
+edge: plugging in during the stability window no longer invalidates the completed
+journey. That intermediate resume rule was later superseded by the authoritative
+hard Standard-CAN charge boundary described below. Subsequent physical journey
+email delivery passed.
+
+JNY-001 now also retains the latest per-vehicle completion decision and exclusion
+reason after active journey data is cleared. This diagnostic increment was
+deployed in place on 2026-08-16 after the first legacy `xrpioneer2` observation
+could not be explained retrospectively from the former cleared state. Successful
+later completion clears an older exclusion reason.
+
+Standard-CAN plug/charge is now treated as an authoritative hard JNY-001 journey
+boundary rather than charging activity inside a drive. This prevents later
+legacy speed noise from reopening a stopped journey, permits immediate finalizing
+when charging begins and leaves subsequent real movement to start a new journey.
+The in-place 2026-08-17 deployment passed its 33 local notification tests and AWS
+runtime checks. Basic end-to-end journey email delivery is physically validated;
+the hard charge-boundary variant still needs a repeat observation. Multi-journey
+energy calibration, firmware-counter comparison and cost evidence remain open.
+
+JNY-001 also has a deployed 30-minute inactivity fallback for journeys whose
+terminal speed or charging signal cannot reach AWS because coverage disappears.
+It closes the journey at the last relevant received signal, cancels the pending
+offline marker if telemetry returns and explicitly labels timeout-based emails.
+The 2026-08-18 in-place deployment passed 35 notification tests and AWS runtime
+checks. A physical no-coverage garage observation remains open.
 
 Future firmware feature development is now centered on the dual-CAN ESP32-C6
 line, with the 16 MB nanoESP32-C6-N16 as the primary target. The 4 MB XIAO remains
@@ -152,6 +205,21 @@ restored. WIFI-001 hardware and repository qualification is complete. The XIAO w
 explicitly erased, re-provisioned with the current 4 MB partition layout and an
 empty valid LittleFS image, and verified in its clean protected-AP state for a
 separate onboarding exercise.
+
+The later REV5 N16 correction restores unconditional Home priority when its SSID
+is visible, avoiding retention of a strong Mobile-hotspot WLAN whose cellular
+uplink is unavailable. A real drive passed Mobile-to-Home return, AWS reconnect,
+ABRP HTTP 200, error-free Dual-CAN and valid GPS; the focused 131-test suite and
+both unified C6 builds pass.
+
+REV6 adds one persistent, default-enabled GPS control across C6, WROOM and LilyGO.
+Authenticated Configuration and Wizard surfaces offer it only after receiver
+detection, while retaining the control when disabled. The C6-N16 OTA build passed
+physical disable/re-enable acceptance on 2026-08-20, including `GPS_DISABLED`
+runtime diagnostics and configuration export/import coverage. All four maintained
+production build targets and the focused source contracts pass; the 4 MB WROOM
+AWS image remains within its existing OTA application partition with minimal
+remaining margin.
 
 C6-SVC-001 completed on 2026-08-11. The shared C6 line now includes runtime-
 selectable asynchronous ABRP and the authenticated seven-step local onboarding

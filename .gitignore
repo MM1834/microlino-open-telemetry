@@ -69,3 +69,6 @@ build/aws/
 # Local portal upload packages
 build/portal/
 build/dashboard/packages/
+
+# Local analysis and exported working files
+/outputs/

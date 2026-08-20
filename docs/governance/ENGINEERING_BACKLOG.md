@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-18
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -62,6 +62,32 @@ bounded support actions, but must not reveal device credentials or plaintext use
 contact destinations by default. Every administrative mutation requires explicit
 authorization and an audit record.
 
+### Pilot handoff and vehicle presentation
+
+Turn the controlled beta onboarding procedure into a short user-facing handoff
+flow while preserving the administrator security boundary. The pilot package
+should include a one-page setup guide, a protected support route and an explicit
+handoff checklist for local AP setup, administrator password, WiFi, CAN1 profile,
+first AWS publication, account invitation, claim consumption, History enablement
+and notification opt-in.
+
+Add a user-editable portal display name or alias for each authorized vehicle.
+Changing it must not alter `vehicleId`, Thing name, device identity, certificate
+scope or authorization records. Until this exists, keep the readable name in the
+protected inventory and show the stable `vehicleId` where ambiguity matters.
+
+Improve onboarding feedback so an administrator can distinguish, without exposing
+telemetry values, between an unknown inventory record, missing first publication,
+an existing owner and a claim that is ready to issue. Review the generic Cognito
+invitation/verification mail text and brand it only through supported, maintained
+configuration rather than instructions that could weaken account verification.
+
+Define a repeatable acceptance-test cleanup for temporary pilot accounts and test
+adapters. It must preview and separately handle Cognito identity, ownership/access,
+claims, notification subscriptions/preferences, History, live State, inventory,
+Thing/certificate and local device configuration. A factory reset alone must never
+be described as cloud-account or ownership cleanup.
+
 ### Unified onboarding administration tool
 
 Replace the current combination of AWS CLI procedures, the B1 helper and the
@@ -100,6 +126,38 @@ mutation, use conditional writes, remain idempotent across retries and expose
 effective AWS state rather than trusting stale stack parameters. Destructive
 actions must resolve exact records first and must not offer an unrestricted
 free-form DynamoDB deletion surface.
+
+### User-controlled vehicle deactivation and deletion lifecycle
+
+Add an authenticated owner workflow that clearly separates reversible visibility
+from authorization revocation and irreversible data deletion. The current portal
+does not let a user deactivate, unlink or delete a vehicle; controlled beta
+operators can only revoke an access projection. A `REVOKED` assignment removes the
+vehicle from the normal list but does not delete ownership, telemetry, History,
+notification settings, the IoT Thing or device credentials.
+
+Required product semantics:
+
+- **Hide:** a per-user presentation preference that removes a vehicle from the
+  default selector without changing ownership, live access or device ingestion;
+- **Deactivate/unlink:** an owner-confirmed, reversible lifecycle transition that
+  removes REST/WebSocket access and notification delivery, terminates live
+  sessions and defines whether the device may continue ingesting telemetry;
+- **Delete data:** a separately confirmed request with an explicit preview for
+  current state, History, locations, notification preferences/events and audit
+  retention; never infer this from hiding, logout, factory reset or unlinking;
+- **Retire device/vehicle:** an administrator-reviewed B3 operation that deactivates
+  certificates, preserves required audit evidence and prevents silent identity
+  reuse;
+- **Restore:** a conditional, audited reactivation path that rejects a new owner,
+  retired identity or unresolved transfer instead of overwriting lifecycle state.
+
+The portal must explain consequences and retention before confirmation, require
+recent authentication for destructive requests, use generic non-enumerating
+errors, and remain safe under retries. Ownership, access, device ingestion,
+History allowlisting and notification delivery must use one coherent lifecycle
+contract so a vehicle cannot disappear from the selector while continuing
+unexpected emails or remain visible through an existing WebSocket connection.
 
 ## Portal roles and vehicle sharing
 
@@ -167,6 +225,96 @@ a runtime-optional capability. Physical operation without provisioned credential
 remains the rollout gate because all three current C6 boards are deployed. The
 XIAO remains a 4 MB compatibility target and still lacks N16-equivalent vehicle/AWS
 qualification.
+
+### Pilot-adapter power and status indication
+
+Evaluate a low-current indicator for the next ESP32-C6 adapter carrier or custom
+PCB. A simple power LED may be connected to the regulated supply through a
+dimensioned series resistor and therefore does not require a GPIO. If field
+diagnostics justify a controllable status LED, reserve and validate a suitable
+GPIO separately without conflicting with dual CAN, GPS, USB boot/diagnostics or
+future peripheral assignments. Measure the standby-current impact and define the
+LED meanings before adding it to unattended pilot hardware.
+
+## ESP32-C6 operating power modes
+
+**Priority:** High. Define and qualify an explicit energy-management policy for
+the nanoESP32-C6-N16 vehicle adapter before treating it as an unattended
+installation. The policy must distinguish at least these states:
+
+- **Driving/active:** CAN, GPS, WiFi, AWS and local diagnostics operate normally.
+- **Charging:** the vehicle's separate 12-V board-network battery is expected to
+  be replenished and more energy is available, so live telemetry and connectivity
+  may remain active at a higher duty cycle. Charging must be detected from
+  authoritative, debounced signals rather than assumed merely from the presence
+  of 12 V.
+- **True parked standby:** protect the separate 12-V board-network battery from
+  long-term discharge by putting the ESP32-C6 and controllable peripherals into
+  an appropriately low-power state. GPS, WiFi and any external mobile hotspot or
+  modem must not remain fully active without a measured reason.
+
+Define wake sources and failure behaviour for vehicle/CAN activity, charging,
+timer-based reporting, local service access and manual recovery. Measure the
+complete adapter current in every state, including both CAN transceivers, the
+L76K main and backup rails, the 12-V-to-5-V converter's quiescent current and any
+external connectivity hardware. Establish battery-protection thresholds,
+transition debounce, maximum wake duration and a fail-safe mode for missing or
+contradictory CAN signals. Verify that sleep/wake transitions preserve
+configuration, do not create CAN traffic, do not lose completed telemetry and do
+not cause reconnect storms.
+
+## Vehicle adapter position and cable layout
+
+Select and document the installation position as a combined RF, electrical,
+thermal and serviceability decision. Compare at least the short-cable position
+near the vehicle connector with a remotely placed adapter using an optional
+longer OBD-II connection cable.
+
+The evaluation must cover GPS sky visibility, WiFi reach to the driver's mobile
+hotspot or home network, reception for any external mobile-network device,
+shielding by metal/bodywork, antenna separation, temperature, moisture,
+accessibility, secure mounting and strain relief. For a longer OBD-II cable,
+retain separately twisted CAN-H/CAN-L pairs for both buses, control stub length,
+verify conductor assignment and voltage drop under peak load, and avoid routing
+along interference sources. Record the selected cable length and adapter position
+as part of pilot-installation evidence rather than assuming one position suits
+all vehicles.
+
+## Vehicle adapter power supply
+
+Turn the existing pilot wiring guidance into a qualified unattended power-input
+design for the separate 12-V board-network battery. Select and validate an
+automotive-suitable 12-V-to-5-V stage with input fuse, reverse-polarity and
+transient protection, adequate peak-current margin, low quiescent current and
+defined undervoltage behaviour. Measure the actual vehicle voltage range during
+standby, wake, driving and charging instead of relying on nominal 12 V.
+
+Define connector pinning, wire gauge, fuse placement, grounding, isolation or
+common-ground requirements and the interaction with USB servicing. Prevent
+backfeed between external 5 V and USB VBUS using a reviewed disconnect or
+power-mux arrangement. Qualification must include cold start, brownout, repeated
+power cycling, charging-voltage operation, standby drain and recovery after an
+undervoltage cutoff. Keep this hardware work aligned with the operating-power-mode
+policy above; an efficient converter alone does not provide battery protection.
+
+## Optional local power display
+
+Evaluate a small local display on the ESP32-C6 pilot module as a non-essential
+enthusiast extension. The initial use case is a directly visible signed power
+display for traction consumption, regeneration and charging power, using the
+already decoded Pioneer Standard-CAN battery/vehicle power values without another
+CAN interface or cloud dependency.
+
+Prefer a small SPI TFT for a responsive display at a bounded refresh rate. An
+ePaper display may be reconsidered for slow-changing parked or charging summaries,
+but is not the preferred technology for rapidly changing driving power because of
+its update latency, flashing and ghosting. Before implementation, verify free and
+boot-safe GPIOs for each board profile, SPI/GPS/Dual-CAN pin coexistence, available
+3.3 V regulator margin, display-backlight load, decoupling, cable length, EMC,
+strain relief and enclosure placement. Keep display updates cooperative so CAN,
+GPS, WiFi, AWS and local services do not regress. Treat the nanoESP32-C6-N16 as
+the likely evaluation target; do not assume the pin-constrained XIAO can support
+the same option.
 
 ## Decoder profiles and compatibility data
 

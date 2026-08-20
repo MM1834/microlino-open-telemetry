@@ -12,11 +12,16 @@
 
 - [C6-ENV-001 — unified C6 build environments](C6-ENV-001.md)
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
+- [HIS-SIGN-001 — signed net-power History presentation](HIS-SIGN-001.md)
+- [JNY-001 — journey summary and energy email pilot](JNY-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
 
 ## Completed predecessors
 
+- [NTF-FIX-001](NTF-FIX-001.md) reconciled stale stored email-confirmation state
+  with authoritative SNS subscription state and passed hosted portal acceptance
+  on 2026-08-20.
 - [AUTH-PERSIST-001](AUTH-PERSIST-001.md) completed the optional bounded
   trusted-device portal login and passed hosted desktop/smartphone acceptance on
   2026-08-14 without changing the default session-only path.

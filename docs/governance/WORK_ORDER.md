@@ -8,9 +8,21 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-11
+**Last reviewed:** 2026-08-20
 
 ## High priority
+
+### Correct the net-power History sign presentation
+
+**Active portal sprint:** [HIS-SIGN-001 — Signed Net Power History](../project/sprints/HIS-SIGN-001.md)
+
+**Objective:** Display consumption as negative and charging/regeneration as
+positive without rewriting stored History or changing firmware/API semantics.
+
+**Current status:** Repository implementation and responsive local acceptance
+pass. `xrpioneer2` is already History-enabled and actively assigned to the
+confirmed `xruser` account, so existing data is covered without migration. Hosted
+desktop and smartphone acceptance after portal upload remains open.
 
 ### Complete unified C6 environment hardware gate
 
@@ -48,6 +60,27 @@ automatic personal range forecast with a fixed-SOC fallback and transparent
 journey basis. Local tests, responsive visual checks and the controlled AWS
 deployment pass. Hosted portal upload and live journey accumulation evidence
 remain part of the open HIS-001 work.
+
+### Execute JNY-001 journey summary and energy email pilot
+
+**Active work package:** [JNY-001 — Journey Summary and Energy Email Pilot](../project/sprints/JNY-001.md)
+
+**Objective:** Add an optional qualifying-journey email centered on consumed net
+battery energy, while preserving explicit user consent, bounded AWS cost and
+measured firmware resource margins.
+
+**Current status:** The deployed preference API and hosted portal expose the
+default-off `journeyEmailEnabled` opt-in. The repository backend now implements
+a backward-compatible telemetry estimate, stable delayed journey completion,
+idempotent email delivery and an additive firmware-counter priority path. The
+backend and matching portal wording are deployed, and physical journey emails
+with plausible telemetry-estimate values were received. The new hard
+Standard-CAN charge boundary needs a repeat road observation. An independent
+30-minute inactivity fallback for a missing terminal signal is also deployed;
+its physical no-coverage garage observation remains open. Multi-journey energy
+calibration and cost evidence remain open. Before firmware counters are
+implemented, exact flash/RAM/heap impact must
+still be measured on nanoESP32-C6-N16; XIAO fit remains non-blocking.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 
@@ -119,6 +152,9 @@ against the exact commit and environment.
 
 ## Completed reference
 
+- [NTF-FIX-001](../project/sprints/NTF-FIX-001.md) reconciled the stored
+  notification email-confirmation state with SNS and passed hosted portal
+  acceptance on 2026-08-20.
 - [C6-SVC-001](../project/sprints/C6-SVC-001.md) completed shared ABRP and local
   onboarding parity, N16-AWS OTA/runtime acceptance and the strict XIAO 4 MB
   compatibility gate on 2026-08-11. XIAO vehicle/AWS hardware equivalence remains
