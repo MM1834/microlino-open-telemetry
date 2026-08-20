@@ -76,8 +76,14 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn('id="notification-form"', html)
         self.assertIn('id="notification-threshold"', html)
         self.assertIn('id="notification-email"', html)
+        self.assertIn('id="notification-journey-email-enabled"', html)
+        self.assertIn("Zusammenfassung geeigneter Fahrten per E-Mail", html)
         self.assertIn('id="notification-sms-enabled" type="checkbox" disabled', html)
         self.assertIn("Persönlich · fahrzeugbezogen", html)
+        self.assertIn("AWS Notifications", html)
+        self.assertIn("Confirm subscription", html)
+        self.assertIn("prüfen Sie deshalb auch den Spam-Ordner", html)
+        self.assertIn('id="notification-email-confirmation-help"', html)
 
     def test_provider_uses_separate_notification_api(self) -> None:
         provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text(
@@ -97,6 +103,11 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn("state.selectedVehicleId", app)
         self.assertIn("getNotificationPreferences", app)
         self.assertIn("saveNotificationPreferences", app)
+        self.assertIn("journeyEmailEnabled: $('notification-journey-email-enabled').checked", app)
+        self.assertIn("Für Fahrtzusammenfassungen zuerst den E-Mail-Kanal aktivieren.", app)
+        self.assertIn("email.dataset.confirmedEmail", app)
+        self.assertIn("help.hidden = stillConfirmed", app)
+        self.assertIn("addEventListener('input', updateEmailConfirmationHelp)", app)
 
 
 class DashboardFreshnessTests(unittest.TestCase):
@@ -174,6 +185,20 @@ class DashboardRangeForecastTests(unittest.TestCase):
         self.assertIn("Persönliche Prognose", app)
         self.assertIn("Basierend auf ${fmtNum(forecast.distanceKm, 0)} km", app)
         self.assertIn('new CustomEvent("mot-range-forecast"', history)
+
+
+class DashboardHistoryPowerSignTests(unittest.TestCase):
+    def test_history_uses_vehicle_facing_power_sign_without_rewriting_data(self) -> None:
+        history = (ROOT / "build/dashboard/current/js/history/history-chart.js").read_text()
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        self.assertIn("power:historyDisplayPower(signedPower)", history)
+        self.assertIn("const value=-Number(signedPower)", history)
+        self.assertIn("includeZero:true", history)
+        self.assertIn("zeroBaseline:true", history)
+        self.assertIn("symmetricAroundZero:true", history)
+        self.assertIn('formatSignedPower(value)', history)
+        self.assertIn("− Verbrauch · + Laden/Rekuperation", html)
+        self.assertNotIn("Positiver Anzeigewert", html)
 
 
 if __name__ == "__main__":

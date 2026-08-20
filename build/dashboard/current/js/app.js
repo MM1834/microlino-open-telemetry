@@ -843,15 +843,34 @@ function renderNotificationPreferences(preferences = null, message = '') {
     $('notification-enabled').checked = preferences.enabled === true;
     $('notification-threshold').value = Number(preferences.threshold || 80);
     $('notification-email-enabled').checked = preferences.emailEnabled === true;
+    $('notification-journey-email-enabled').checked = preferences.journeyEmailEnabled === true;
     $('notification-email').value = preferences.email || '';
     $('notification-email-state').textContent = preferences.emailConfirmed
       ? 'E-Mail-Adresse bestätigt'
       : (preferences.emailEnabled ? 'Bestätigung ausstehend' : 'E-Mail deaktiviert');
+    $('notification-email').dataset.confirmedEmail = preferences.emailConfirmed === true
+      ? String(preferences.email || '').trim().toLowerCase()
+      : '';
+    updateEmailConfirmationHelp();
   }
   const disabled = state.notificationBusy;
   ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
-    'notification-email', 'notification-save'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
+    'notification-journey-email-enabled', 'notification-email',
+    'notification-save'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
   $('notification-status').textContent = message;
+}
+
+function updateEmailConfirmationHelp() {
+  const email = $('notification-email');
+  const help = $('notification-email-confirmation-help');
+  if (!email || !help) return;
+  const confirmedEmail = email.dataset.confirmedEmail || '';
+  const currentEmail = String(email.value || '').trim().toLowerCase();
+  const stillConfirmed = Boolean(confirmedEmail) && currentEmail === confirmedEmail;
+  help.hidden = stillConfirmed;
+  if (confirmedEmail && !stillConfirmed) {
+    $('notification-email-state').textContent = 'Neue E-Mail-Adresse muss bestätigt werden';
+  }
 }
 
 async function loadNotificationPreferences(force = false) {
@@ -873,6 +892,10 @@ async function loadNotificationPreferences(force = false) {
 async function saveNotificationPreferences(event) {
   event.preventDefault();
   if (state.notificationBusy || !state.dataProvider?.saveNotificationPreferences) return;
+  if ($('notification-journey-email-enabled').checked && !$('notification-email-enabled').checked) {
+    renderNotificationPreferences(null, 'Für Fahrtzusammenfassungen zuerst den E-Mail-Kanal aktivieren.');
+    return;
+  }
   state.notificationBusy = true;
   renderNotificationPreferences(null, 'Wird gespeichert…');
   try {
@@ -880,6 +903,7 @@ async function saveNotificationPreferences(event) {
       enabled: $('notification-enabled').checked,
       threshold: Number($('notification-threshold').value),
       emailEnabled: $('notification-email-enabled').checked,
+      journeyEmailEnabled: $('notification-journey-email-enabled').checked,
       email: String($('notification-email').value || '').trim(),
       smsEnabled: false
     });
@@ -977,6 +1001,7 @@ function startDataProvider() {
   $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
   $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
   $('notification-form')?.addEventListener('submit', saveNotificationPreferences);
+  $('notification-email')?.addEventListener('input', updateEmailConfirmationHelp);
   async function bootstrap() {
     initStatic();
     resetDashboardForVehicle(state.selectedVehicleId);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260814-persist1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260814-journey-email1" />
   <link rel="stylesheet" href="css/history.css">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -223,7 +223,7 @@
     </div>
     <div class="history-mini">
       <h3>Ø Nettoleistung</h3>
-      <div class="history-series-status">Positiver Anzeigewert · Richtung: Verbrauch, Laden oder Rekuperation</div>
+      <div class="history-series-status">− Verbrauch · + Laden/Rekuperation</div>
       <div class="history-chart-wrap">
         <div id="power-history-empty" class="history-empty">Noch keine Leistungs-History vorhanden.</div>
         <canvas id="power-history-chart"></canvas>
@@ -258,7 +258,7 @@
   <form id="notification-form" class="notification-form">
     <label class="settings-toggle">
       <input id="notification-enabled" type="checkbox" />
-      <span>Benachrichtigung für dieses Fahrzeug aktivieren</span>
+      <span>Ladeziel-Benachrichtigung aktivieren</span>
     </label>
     <label>
       Ziel-SOC
@@ -269,18 +269,27 @@
     </label>
     <label class="settings-toggle">
       <input id="notification-email-enabled" type="checkbox" />
-      <span>E-Mail senden</span>
+      <span>E-Mail-Kanal aktivieren</span>
     </label>
     <label>
       E-Mail-Adresse
       <input id="notification-email" type="email" autocomplete="email" />
     </label>
     <div id="notification-email-state" class="connection-detail"></div>
+    <fieldset class="journey-notification-setting">
+      <legend>Fahrtzusammenfassung</legend>
+      <label class="settings-toggle">
+        <input id="notification-journey-email-enabled" type="checkbox" aria-describedby="notification-journey-state" />
+        <span>Zusammenfassung geeigneter Fahrten per E-Mail</span>
+      </label>
+      <small id="notification-journey-state" class="connection-detail">Aktiv für geeignete Fahrten · Energiequelle wird in der E-Mail ausgewiesen.</small>
+    </fieldset>
     <label class="settings-toggle disabled-setting" title="Für den AWS-Free-Plan zurückgestellt">
       <input id="notification-sms-enabled" type="checkbox" disabled />
       <span>SMS senden – derzeit nicht verfügbar</span>
     </label>
-    <p class="muted settings-note">Die Meldung ist rein informativ und steuert den Ladevorgang nicht. Eine neue E-Mail-Adresse muss über die zugesandte SNS-Mail bestätigt werden.</p>
+    <p id="notification-email-confirmation-help" class="muted settings-note"><strong>Bestätigung erforderlich:</strong> Nach dem Speichern sendet <em>AWS Notifications</em> eine technische Bestätigungsmail. Öffnen Sie diese und wählen Sie <em>Confirm subscription</em>. Die AWS-Mail erwähnt MOT möglicherweise nicht; prüfen Sie deshalb auch den Spam-Ordner. Ohne Bestätigung bleiben E-Mail-Benachrichtigungen inaktiv.</p>
+    <p class="muted settings-note">Die Meldung ist rein informativ und steuert den Ladevorgang nicht.</p>
     <div class="settings-actions">
       <button id="notification-save" class="auth-button" type="submit">Speichern</button>
       <span id="notification-status" class="connection-detail" aria-live="polite"></span>
@@ -319,10 +328,10 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
-  <script src="js/app.js?v=20260814-persist1"></script>
+  <script src="js/app.js?v=20260820-sns-help1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260811-range1"></script>
+  <script src="js/history/history-chart.js?v=20260816-sign1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>

@@ -68,7 +68,12 @@ async function render(hours=24){
     .filter(s=>s.power!==null&&s.power!==undefined&&Number.isFinite(Number(s.power)))
     .map(s=>{
       const signedPower=Number(s.power)/10;
-      return {...s,power:Math.abs(signedPower),_signedPower:signedPower,_powerMode:powerMode(signedPower,s)};
+      return {
+        ...s,
+        power:historyDisplayPower(signedPower),
+        _signedPower:signedPower,
+        _powerMode:powerMode(signedPower,s)
+      };
     })
     .sort((a,b)=>a.ts-b.ts);
   const powerSamples=closeInactiveGaps(
@@ -83,13 +88,17 @@ async function render(hours=24){
     field:"power",
     label:"Ø Nettoleistung",
     unit:"kW",
-    min:0,
+    min:null,
     max:null,
     color:"#f59e0b",
     decimals:1,
     rangeHours:hours,
+    includeZero:true,
+    axisStep:5,
+    zeroBaseline:true,
+    symmetricAroundZero:true,
     latestPoint:powerSource[powerSource.length-1],
-    formatValue:(value,point)=>`${point?._powerMode||"Leistung"} ${Number(value).toFixed(1)}`
+    formatValue:(value,point)=>`${point?._powerMode||"Leistung"} ${formatSignedPower(value)}`
   });
 
   renderSeries({
@@ -168,7 +177,7 @@ function closeInactiveGaps(samples,field,resolutionSeconds){
       }
       const restartTs=current.ts-1000;
       const lastClosed=closed[closed.length-1];
-      if(Number(current[field])>0&&restartTs>lastClosed.ts){
+      if(Number(current[field])!==0&&restartTs>lastClosed.ts){
         closed.push({ts:restartTs,[field]:0,_syntheticGap:true});
       }
     }
@@ -209,6 +218,17 @@ function powerMode(signedPower,sample){
   return sample.charging===true||Number(sample.charging)>=0.5?"Laden":"Rekuperation";
 }
 
+function historyDisplayPower(signedPower){
+  const value=-Number(signedPower);
+  return Object.is(value,-0)?0:value;
+}
+
+function formatSignedPower(value){
+  const numeric=Number(value);
+  if(Math.abs(numeric)<0.05) return "0.0";
+  return `${numeric>0?"+":"−"}${Math.abs(numeric).toFixed(1)}`;
+}
+
 function draw(canvas,points,o){
   const ctx=canvas.getContext("2d");
   const dpr=window.devicePixelRatio||1;
@@ -224,8 +244,23 @@ function draw(canvas,points,o){
   const PW=w-L-R,PH=h-T-B;
   const vals=points.map(p=>Number(p[o.field]));
   const minY=o.min ?? Math.min(...vals);
+  let chartMinY=o.includeZero?Math.min(minY,0):minY;
   let maxY=o.max ?? Math.max(...vals,1);
-  if(maxY<=minY) maxY=minY+1;
+  if(o.includeZero) maxY=Math.max(maxY,0);
+  if(o.axisStep){
+    chartMinY=Math.floor(chartMinY/o.axisStep)*o.axisStep;
+    maxY=Math.ceil(maxY/o.axisStep)*o.axisStep;
+  }
+  if(o.symmetricAroundZero){
+    const extent=Math.max(Math.abs(chartMinY),Math.abs(maxY),o.axisStep||1);
+    chartMinY=-extent;
+    maxY=extent;
+  }
+  if(maxY<=chartMinY){
+    const fallback=o.axisStep||1;
+    chartMinY=o.includeZero?-fallback:chartMinY;
+    maxY=chartMinY+fallback*2;
+  }
   if(o.field==="speedKmh"||o.field==="speed") maxY=Math.max(20,Math.ceil(maxY/10)*10);
 
   ctx.strokeStyle="rgba(148,163,184,.25)";
@@ -239,13 +274,23 @@ function draw(canvas,points,o){
     ctx.moveTo(L,y);
     ctx.lineTo(w-R,y);
     ctx.stroke();
-    ctx.fillText((maxY-(i*(maxY-minY)/4)).toFixed(0),6,y+4);
+    ctx.fillText((maxY-(i*(maxY-chartMinY)/4)).toFixed(0),6,y+4);
   }
 
   const minTs=points[0].ts;
   const maxTs=points[points.length-1].ts||minTs+1;
   const x=ts=>L+((ts-minTs)/Math.max(1,maxTs-minTs))*PW;
-  const y=v=>T+(1-(v-minY)/(maxY-minY))*PH;
+  const y=v=>T+(1-(v-chartMinY)/(maxY-chartMinY))*PH;
+
+  if(o.zeroBaseline&&chartMinY<=0&&maxY>=0){
+    const zeroY=y(0);
+    ctx.beginPath();
+    ctx.moveTo(L,zeroY);
+    ctx.lineTo(w-R,zeroY);
+    ctx.strokeStyle="rgba(226,232,240,.65)";
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+  }
 
   const gradient=ctx.createLinearGradient(0,T,0,h-B);
   gradient.addColorStop(0,o.color+"55");
@@ -256,8 +301,9 @@ function draw(canvas,points,o){
     const px=x(p.ts), py=y(Number(p[o.field]));
     if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
   });
-  ctx.lineTo(x(points[points.length-1].ts),h-B);
-  ctx.lineTo(x(points[0].ts),h-B);
+  const fillBaseline=o.zeroBaseline?y(0):h-B;
+  ctx.lineTo(x(points[points.length-1].ts),fillBaseline);
+  ctx.lineTo(x(points[0].ts),fillBaseline);
   ctx.closePath();
   ctx.fillStyle=gradient;
   ctx.fill();
@@ -354,5 +400,5 @@ function formatResolution(seconds){
   return seconds<3600?`${Math.round(seconds/60)} min`:`${Math.round(seconds/3600)} h`;
 }
 
-window.MOTHistoryChart={init,render,closeInactiveGaps};
+window.MOTHistoryChart={init,render,closeInactiveGaps,historyDisplayPower,formatSignedPower};
 })();

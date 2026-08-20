@@ -52,12 +52,14 @@ Charging uses a finer 0–3.5 kW scale with light green through 1.6 kW, green th
 the numeric value and flow label remain the authoritative reading.
 
 The live battery card presents charging power as a positive magnitude and changes
-its label to `Ladeleistung` while charging. History presents the magnitude of the
-signed average net power and labels the newest point as consumption, charging or
-regeneration. Consumption and regeneration within one aggregation interval can
-therefore partly cancel. The underlying signed vehicle-power topic and stored
-History value remain negative for energy entering the battery, so this display
-formatting does not alter aggregation semantics. The Speed chart marks its newest
+its label to `Ladeleistung` while charging. History uses a vehicle-facing signed
+display: consumption is negative, while charging and regeneration are positive.
+The chart uses a symmetric Y-axis and emphasized zero line and labels the newest
+point with its power-flow direction. Consumption and regeneration within one
+aggregation interval can partly cancel. The underlying signed vehicle-power topic
+and stored History value remain positive for vehicle consumption and negative for
+energy entering the battery; only the portal representation is inverted. Existing
+records require no migration. The Speed chart marks its newest
 measurement as not current after the expected sampling interval; this can mean
 either standstill suppression or an offline device and is not by itself a
 connectivity diagnosis.
@@ -76,3 +78,24 @@ detail-card layout is unchanged by this desktop-only rule.
 - Temperatures
 - Cells
 - Location
+
+## Journey email preference
+
+The notification settings include a separate, default-off opt-in for qualifying
+journey summaries. It reuses the configured email channel and cannot be enabled
+without that channel. The repository UI describes delivery for qualifying
+journeys and notes that each email identifies either `Telemetrie-Schätzung` or
+`Firmware-Zähler` as its energy source. Existing devices use the estimate path;
+future firmware counters can take priority without changing the preference.
+
+Journey completion normally follows ten minutes of stable standstill. For the
+accepted Pioneer Standard-CAN decoder, a confirmed plug or charging signal is a
+hard boundary that immediately seals the preceding drive; later legacy speed
+noise cannot reopen it. The latest per-vehicle completion decision and exclusion
+reason remain in backend diagnostics after active journey state is cleared.
+
+If coverage disappears before the final speed or charging signal reaches AWS,
+the backend finalizes the journey after 30 minutes without relevant telemetry.
+It uses the last received signal as the endpoint and labels the email as a
+telemetry timeout, so unobserved distance inside a garage is not presented as
+measured journey data.
