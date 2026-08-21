@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
   <link rel="stylesheet" href="css/dashboard.css?v=20260814-journey-email1" />
-  <link rel="stylesheet" href="css/history.css">
+  <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
   <link rel="stylesheet" href="css/location-map.css">
@@ -203,6 +203,7 @@
     <button class="active" data-history-range="24">24h</button>
     <button data-history-range="168">7d</button>
     <button data-history-range="720">30d</button>
+    <span id="history-request-status" class="history-request-status" aria-live="polite"></span>
   </div>
   <div class="history-split">
     <div class="history-mini">
@@ -229,18 +230,15 @@
         <canvas id="power-history-chart"></canvas>
       </div>
     </div>
-    <div class="history-mini">
-      <h3>Ladezustand</h3>
-      <div class="history-chart-wrap">
-        <div id="charging-history-empty" class="history-empty">Noch keine Lade-History vorhanden.</div>
-        <canvas id="charging-history-chart"></canvas>
+    <div class="history-mini history-binary-card">
+      <h3>Ladezustand &amp; Ladekabel</h3>
+      <div class="history-series-status history-binary-legend" aria-hidden="true">
+        <span class="history-legend-item"><i class="history-legend-line is-charging"></i>Lädt</span>
+        <span class="history-legend-item"><i class="history-legend-line is-plugged"></i>Kabel angeschlossen</span>
       </div>
-    </div>
-    <div class="history-mini">
-      <h3>Ladekabel</h3>
       <div class="history-chart-wrap">
-        <div id="plugged-history-empty" class="history-empty">Noch keine Plugged-History vorhanden.</div>
-        <canvas id="plugged-history-chart"></canvas>
+        <div id="charging-history-empty" class="history-empty">Noch keine Lade-/Kabel-History vorhanden.</div>
+        <canvas id="charging-history-chart" aria-label="Ladezustand und Ladekabel als Ein-Aus-Stufenlinien"></canvas>
       </div>
     </div>
   </div>
@@ -328,10 +326,10 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
-  <script src="js/app.js?v=20260820-sns-help1"></script>
+  <script src="js/app.js?v=20260821-history-resilience1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260816-sign1"></script>
+  <script src="js/history/history-chart.js?v=20260821-history-resilience1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>

@@ -4,6 +4,9 @@ let currentRangeHours=24;
 const RANGE_STORAGE_KEY="mot-history-range";
 const RANGE_STORAGE_TTL_MS=7*24*60*60*1000;
 const ALLOWED_RANGES=[24,168,720];
+let latestRenderRequest=0;
+let inFlightHistory=null;
+let inFlightHistoryKey="";
 
 async function init(){
   if(!document.getElementById("soc-history-chart")) return;
@@ -15,24 +18,46 @@ async function init(){
   window.addEventListener("mot-history-cleared",()=>render(currentRangeHours));
 }
 
-async function render(hours=24){
+async function render(hours=currentRangeHours){
+  const requestedHours=Number(hours);
+  hours=ALLOWED_RANGES.includes(requestedHours)?requestedHours:currentRangeHours;
   currentRangeHours=hours;
+  updateRangeButtons(hours);
   const vehicleId=getVehicleId();
+  const requestId=++latestRenderRequest;
+  const requestKey=`${vehicleId}|${hours}`;
   let samples=[];
   let resolutionSeconds=null;
   let rangeForecast=null;
+  let pendingHistory=null;
   try{
-    if(window.MOTHistorySource?.getHistory){
-      const result=await window.MOTHistorySource.getHistory(hours);
+    if(!inFlightHistory||inFlightHistoryKey!==requestKey){
+      inFlightHistoryKey=requestKey;
+      inFlightHistory=loadHistory(vehicleId,hours);
+    }
+    pendingHistory=inFlightHistory;
+    const result=await pendingHistory;
+    if(inFlightHistory===pendingHistory){
+      inFlightHistory=null;
+      inFlightHistoryKey="";
+    }
+    if(requestId!==latestRenderRequest) return false;
+    if(result){
       samples=Array.isArray(result?.points)?result.points:[];
       resolutionSeconds=result?.resolutionSeconds||null;
       rangeForecast=result?.rangeForecast||null;
-    }else if(window.MOTHistoryDB){
-      samples=await window.MOTHistoryDB.getSamples(vehicleId,Date.now()-hours*3600000);
     }
   }catch(error){
+    if(inFlightHistory===pendingHistory){
+      inFlightHistory=null;
+      inFlightHistoryKey="";
+    }
+    if(requestId!==latestRenderRequest) return false;
     console.error("MOT history request failed",error);
+    updateRequestStatus("History-Aktualisierung fehlgeschlagen · letzte Daten bleiben sichtbar",true);
+    return false;
   }
+  updateRequestStatus("",false);
   window.dispatchEvent(new CustomEvent("mot-range-forecast",{detail:rangeForecast}));
 
   renderSeries({
@@ -101,33 +126,7 @@ async function render(hours=24){
     formatValue:(value,point)=>`${point?._powerMode||"Leistung"} ${formatSignedPower(value)}`
   });
 
-  renderSeries({
-    canvasId:"charging-history-chart",
-    emptyId:"charging-history-empty",
-    samples,
-    field:"charging",
-    label:"Laden",
-    unit:"",
-    min:0,
-    max:1,
-    color:"#a855f7",
-    rangeHours:hours,
-    formatValue:value=>Number(value)>=0.5?"Ja":"Nein"
-  });
-
-  renderSeries({
-    canvasId:"plugged-history-chart",
-    emptyId:"plugged-history-empty",
-    samples,
-    field:"plugged",
-    label:"Kabel angeschlossen",
-    unit:"",
-    min:0,
-    max:1,
-    color:"#ec4899",
-    rangeHours:hours,
-    formatValue:value=>Number(value)>=0.5?"Ja":"Nein"
-  });
+  renderBinaryHistory(samples,hours);
 
   const meta=document.getElementById("soc-history-meta");
   if(meta){
@@ -136,6 +135,25 @@ async function render(hours=24){
     const resolution=resolutionSeconds?` · Auflösung ${formatResolution(resolutionSeconds)}`:"";
     meta.textContent=`${samples.length} Punkte · ${vehicleId} · letzte ${Math.round(hours/24)}d${resolution} · Laden ${charging} · Kabel ${plugged} Intervalle`;
   }
+  return true;
+}
+
+async function loadHistory(vehicleId,hours){
+  if(window.MOTHistorySource?.getHistory){
+    return window.MOTHistorySource.getHistory(hours);
+  }
+  if(window.MOTHistoryDB){
+    const points=await window.MOTHistoryDB.getSamples(vehicleId,Date.now()-hours*3600000);
+    return {points};
+  }
+  return {points:[]};
+}
+
+function updateRequestStatus(message,isError){
+  const status=document.getElementById("history-request-status");
+  if(!status) return;
+  status.textContent=message;
+  status.classList.toggle("is-error",Boolean(isError));
 }
 
 function renderSeries(o){
@@ -154,6 +172,112 @@ function renderSeries(o){
   if(empty) empty.style.display="none";
   canvas.style.display="block";
   draw(canvas,points,o);
+}
+
+function renderBinaryHistory(samples,rangeHours){
+  const canvas=document.getElementById("charging-history-chart");
+  const empty=document.getElementById("charging-history-empty");
+  if(!canvas) return;
+  const series=[
+    binarySeries(samples,"charging","Lädt","#a855f7",[]),
+    binarySeries(samples,"plugged","Kabel","#ec4899",[8,5])
+  ].filter(item=>item.points.length);
+  if(!series.length){
+    if(empty) empty.style.display="block";
+    canvas.style.display="none";
+    return;
+  }
+  if(empty) empty.style.display="none";
+  canvas.style.display="block";
+  drawBinaryHistory(canvas,series,rangeHours);
+}
+
+function binarySeries(samples,field,label,color,dash){
+  const points=samples
+    .filter(sample=>sample[field]!==null&&sample[field]!==undefined)
+    .map(sample=>({ts:Number(sample.ts),value:Number(sample[field])>=0.5?1:0}))
+    .filter(point=>Number.isFinite(point.ts))
+    .sort((a,b)=>a.ts-b.ts);
+  return {field,label,color,dash,points};
+}
+
+function binaryStepPath(points,endTs){
+  if(!points.length) return [];
+  const path=[{ts:points[0].ts,value:points[0].value}];
+  for(let i=1;i<points.length;i++){
+    const previous=points[i-1];
+    const current=points[i];
+    path.push({ts:current.ts,value:previous.value});
+    path.push({ts:current.ts,value:current.value});
+  }
+  const last=points[points.length-1];
+  if(Number.isFinite(endTs)&&endTs>last.ts) path.push({ts:endTs,value:last.value});
+  return path;
+}
+
+function drawBinaryHistory(canvas,series,rangeHours){
+  const ctx=canvas.getContext("2d");
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.clientWidth||600;
+  const h=canvas.clientHeight||220;
+  canvas.width=w*dpr;
+  canvas.height=h*dpr;
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const L=42,R=18,T=28,B=28;
+  const PW=w-L-R,PH=h-T-B;
+  const timestamps=series.flatMap(item=>item.points.map(point=>point.ts));
+  const minTs=Math.min(...timestamps);
+  const lastTs=Math.max(...timestamps);
+  const maxTs=lastTs>minTs?lastTs:minTs+1;
+  const x=ts=>L+((ts-minTs)/Math.max(1,maxTs-minTs))*PW;
+  const y=value=>T+(1-Number(value))*PH;
+
+  ctx.strokeStyle="rgba(148,163,184,.25)";
+  ctx.lineWidth=1;
+  ctx.fillStyle="rgba(148,163,184,.9)";
+  ctx.font="12px system-ui";
+  ctx.textAlign="left";
+  [[1,"Ein"],[0,"Aus"]].forEach(([value,label])=>{
+    const py=y(value);
+    ctx.beginPath();
+    ctx.moveTo(L,py);
+    ctx.lineTo(w-R,py);
+    ctx.stroke();
+    ctx.fillText(label,6,py+4);
+  });
+
+  series.forEach(item=>{
+    const path=binaryStepPath(item.points,maxTs);
+    ctx.beginPath();
+    path.forEach((point,index)=>{
+      const px=x(point.ts),py=y(point.value);
+      if(index===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    });
+    ctx.strokeStyle=item.color;
+    ctx.lineWidth=item.dash.length?2.5:3;
+    ctx.setLineDash(item.dash);
+    ctx.lineJoin="miter";
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  const latest=series.map(item=>{
+    const point=item.points[item.points.length-1];
+    return `${item.label}: ${point.value?"Ja":"Nein"}`;
+  }).join(" · ");
+  ctx.fillStyle="rgba(226,232,240,.95)";
+  ctx.font="13px system-ui";
+  ctx.textAlign="right";
+  ctx.fillText(latest,w-R,17);
+
+  ctx.fillStyle="rgba(148,163,184,.9)";
+  ctx.font="11px system-ui";
+  ctx.textAlign="left";
+  ctx.fillText(formatAxisTime(minTs,rangeHours),L,h-8);
+  ctx.textAlign="right";
+  ctx.fillText(formatAxisTime(lastTs,rangeHours),w-R,h-8);
 }
 
 function closeInactiveGaps(samples,field,resolutionSeconds){
@@ -400,5 +524,5 @@ function formatResolution(seconds){
   return seconds<3600?`${Math.round(seconds/60)} min`:`${Math.round(seconds/3600)} h`;
 }
 
-window.MOTHistoryChart={init,render,closeInactiveGaps,historyDisplayPower,formatSignedPower};
+window.MOTHistoryChart={init,render,closeInactiveGaps,binaryStepPath,historyDisplayPower,formatSignedPower};
 })();

@@ -55,6 +55,22 @@ checks confirmed that the vehicle is History-enabled and actively owned by the
 confirmed `xruser` account. Local desktop and smartphone acceptance passed;
 hosted upload and acceptance remain open.
 
+HIS-BIN-001 has hosted acceptance for a combined charging/plugged History card.
+The two independently reported binary series now use solid and dashed step lines,
+holding state horizontally and changing only through vertical edges so missing
+points cannot create diagonal transitions. A follow-up repository fix makes
+parameterless automatic refreshes retain the selected range and resynchronize the
+active button, preventing a selected 7d view from silently requesting 24h. Hosted
+7d acceptance passes. The 30d follow-up identified confirmed 10-second Vehicle API
+timeouts, account throttling and an unintended full History reload from every
+five-second vehicle poll. The repository fix removes poll-driven reloads,
+coalesces overlapping requests, retains visible charts on refresh failure and
+raises the Vehicle API to 256 MB/25 seconds. Local regression coverage passes;
+the live capacity update is active and a direct authorized 30d request returned
+HTTP 200 with 51 points in 4.995 seconds. Hosted 24h/7d/30d testing passed across
+different users on desktop and smartphone. The reviewed CloudFormation
+reconciliation reached `UPDATE_COMPLETE`; HIS-BIN-001 is complete.
+
 MOT has promoted the reviewed REL-001 repository pilot through `develop` to
 `main` and opened the consolidated `v1.0.0-rc.1` release candidate. WROOM evidence,
 secure portal onboarding and the LilyGO AWS/LTE functional

@@ -802,8 +802,8 @@ Resources:
       Description: Read-only beta API for MOT multi-vehicle current state.
       Runtime: python3.12
       Handler: index.handler
-      Timeout: 10
-      MemorySize: 128
+      Timeout: 25
+      MemorySize: 256
       Role: !GetAtt VehicleApiRole.Arn
       Environment:
         Variables:

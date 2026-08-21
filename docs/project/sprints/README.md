@@ -13,6 +13,7 @@
 - [SES-001 — Cognito domain email delivery](SES-001.md)
 - [C6-ENV-001 — unified C6 build environments](C6-ENV-001.md)
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
+- [HIS-BIN-001 — combined binary charging History](HIS-BIN-001.md)
 - [HIS-SIGN-001 — signed net-power History presentation](HIS-SIGN-001.md)
 - [JNY-001 — journey summary and energy email pilot](JNY-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)

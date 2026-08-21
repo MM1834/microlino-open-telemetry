@@ -601,6 +601,12 @@ class TemplateStructureTests(unittest.TestCase):
         self.assertIn("VehicleHistoryDailyWriteAlarm:", template)
         self.assertIn('RouteKey: "GET /api/vehicles/{vehicleId}/history"', template)
 
+    def test_vehicle_api_has_capacity_for_thirty_day_history(self):
+        template = TEMPLATE.read_text(encoding="utf-8")
+        vehicle_api = template.split("  VehicleApiFunction:", 1)[1].split("  VehicleApiLogGroup:", 1)[0]
+        self.assertIn("      Timeout: 25", vehicle_api)
+        self.assertIn("      MemorySize: 256", vehicle_api)
+
 
 if __name__ == "__main__":
     unittest.main()

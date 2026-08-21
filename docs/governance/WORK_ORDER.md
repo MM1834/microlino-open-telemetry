@@ -8,9 +8,26 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-20
+**Last reviewed:** 2026-08-21
 
 ## High priority
+
+### Combine binary charging History
+
+**Completed portal sprint:** [HIS-BIN-001 — Combined Binary Charging History](../project/sprints/HIS-BIN-001.md)
+
+**Objective:** Combine charging and plugged state in one compact chart and render
+both as discrete steps without diagonal interpolation across missing samples.
+
+**Current status:** The combined chart passed hosted desktop/smartphone
+acceptance. The 7-day refresh correction also passed hosted acceptance. A 30-day
+follow-up found confirmed Vehicle API timeouts/throttling and an unintended full
+History reload every five seconds. The repository fix removes that polling load,
+retains the last successful charts on transient failures and increases Vehicle API
+runtime capacity. Hosted 24h/7d/30d testing passed across different users on
+desktop and smartphone. The live Vehicle API runs at 256 MB/25 seconds, a direct
+authorized 30-day request passed with 51 points, and the reviewed CloudFormation
+reconciliation reached `UPDATE_COMPLETE`. The sprint is closed.
 
 ### Complete Cognito SES sender rollout
 

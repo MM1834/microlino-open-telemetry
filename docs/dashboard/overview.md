@@ -7,6 +7,10 @@ For the AWS backend it renders authorized SOC, Speed, signed-power, charging and
 plugged history for 24 hours, 7 days and 30 days. Speed and power gaps are closed
 at zero in the chart rather than linearly interpolated across missing reception.
 Legacy MQTT retains browser-local history as a fallback.
+AWS History is loaded on entry, range selection and actual vehicle changes rather
+than on the five-second live-state poll. Concurrent same-range requests are
+coalesced, stale responses are ignored, and a transient API failure leaves the
+last successfully rendered charts visible with a warning.
 
 The overview range card uses an automatic personal forecast when the backend has
 enough valid distance/SOC evidence. The vehicle card explains the basis as driven
@@ -63,6 +67,13 @@ records require no migration. The Speed chart marks its newest
 measurement as not current after the expected sampling interval; this can mean
 either standstill suppression or an offline device and is not by itself a
 connectivity diagnosis.
+
+Charging and plugged History share one binary chart. Charging is a solid purple
+step line and cable connection a dashed pink step line. Each reported state is
+held horizontally until its next reported state and changes only through a
+vertical edge at that timestamp. Missing samples therefore never create a
+misleading diagonal transition, and the two independently reported values remain
+visible when they overlap.
 
 On desktop, Battery and Vehicle use equal 180-pixel central instruments. Battery
 places voltage, current, vehicle/charging power and power flow in a bounded 2×2

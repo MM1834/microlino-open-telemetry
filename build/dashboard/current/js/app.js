@@ -973,9 +973,9 @@ function startDataProvider() {
 
           if (selected !== previous) {
             resetDashboardForVehicle(selected);
+            window.MOTHistoryChart?.render?.();
           }
         }
-        window.MOTHistoryChart?.render?.();
         loadNotificationPreferences().catch(error => console.error('Notification settings failed:', error));
       },
       onOnboardingRequired: required => renderOnboarding(required),
