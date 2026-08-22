@@ -13,6 +13,7 @@ struct C6Configuration {
     String setupPassword;
     bool abrpEnabled = false;
     bool gpsEnabled = true;
+    bool offlineCacheEnabled = false;
     String abrpApiKey;
     String abrpUserToken;
     bool onboardingComplete = false;
@@ -33,6 +34,7 @@ bool c6ConfigAdminConfigured();
 bool c6ConfigSetAdminPassword(const String &password);
 bool c6ConfigSetAbrpCredentials(const String &apiKey, const String &userToken);
 void c6ConfigSetAbrpEnabled(bool enabled);
+void c6ConfigSetOfflineCacheEnabled(bool enabled);
 String c6ConfigRecoverAdminPassword();
 String c6ConfigExportJson(bool includeSecrets = false);
 bool c6ConfigImportJson(const String &json, String &error);

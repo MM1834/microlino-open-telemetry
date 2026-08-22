@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 
 #include "c6_dual_can.h"
+#include "c6_offline_cache.h"
 #include "web/local_web_security.h"
 
 namespace {
@@ -41,6 +42,7 @@ void c6ConfigLoad()
     c6Config.setupPassword = preferences.getString("setupPass", "");
     c6Config.abrpEnabled = preferences.getBool("abrpEn", false);
     c6Config.gpsEnabled = preferences.getBool("gpsEn", true);
+    c6Config.offlineCacheEnabled = preferences.getBool("cacheEn", false);
     c6Config.abrpApiKey = preferences.getString("abrpKey", "");
     c6Config.abrpUserToken = preferences.getString("abrpToken", "");
     c6Config.onboardingComplete = preferences.isKey("onboarded")
@@ -126,6 +128,7 @@ void c6ConfigSave()
     preferences.putString("setupPass", c6Config.setupPassword);
     preferences.putBool("abrpEn", c6Config.abrpEnabled);
     preferences.putBool("gpsEn", c6Config.gpsEnabled);
+    preferences.putBool("cacheEn", c6Config.offlineCacheEnabled);
     preferences.putString("abrpKey", c6Config.abrpApiKey);
     preferences.putString("abrpToken", c6Config.abrpUserToken);
     preferences.putBool("onboarded", c6Config.onboardingComplete);
@@ -167,6 +170,16 @@ void c6ConfigSetAbrpEnabled(bool enabled)
     preferences.end();
 }
 
+void c6ConfigSetOfflineCacheEnabled(bool enabled)
+{
+    const bool wasEnabled = c6Config.offlineCacheEnabled;
+    c6Config.offlineCacheEnabled = enabled;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("cacheEn", enabled);
+    preferences.end();
+    if (wasEnabled && !enabled) c6OfflineCachePurge();
+}
+
 String c6ConfigRecoverAdminPassword()
 {
     c6Config.adminPassword = LocalWebSecurity::generateRecoveryPassword();
@@ -191,6 +204,7 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["otaEnabled"] = c6Config.otaEnabled;
     doc["abrpEnabled"] = c6Config.abrpEnabled;
     doc["gpsEnabled"] = c6Config.gpsEnabled;
+    doc["offlineCacheEnabled"] = c6Config.offlineCacheEnabled;
     doc["onboardingComplete"] = c6Config.onboardingComplete;
     if (includeSecrets) {
         doc["abrpApiKey"] = c6Config.abrpApiKey;
@@ -222,6 +236,7 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
     if (!doc["abrpEnabled"].isNull()) candidate.abrpEnabled = doc["abrpEnabled"].as<bool>();
     if (!doc["gpsEnabled"].isNull()) candidate.gpsEnabled = doc["gpsEnabled"].as<bool>();
+    if (!doc["offlineCacheEnabled"].isNull()) candidate.offlineCacheEnabled = doc["offlineCacheEnabled"].as<bool>();
     if (!doc["abrpApiKey"].isNull()) candidate.abrpApiKey = doc["abrpApiKey"].as<String>();
     if (!doc["abrpUserToken"].isNull()) candidate.abrpUserToken = doc["abrpUserToken"].as<String>();
     if (!doc["onboardingComplete"].isNull()) candidate.onboardingComplete = doc["onboardingComplete"].as<bool>();
@@ -243,11 +258,13 @@ bool c6ConfigImportJson(const String &json, String &error)
         return false;
     }
     c6ConfigSave();
+    if (previous.offlineCacheEnabled && !c6Config.offlineCacheEnabled) c6OfflineCachePurge();
     return true;
 }
 
 void c6ConfigFactoryReset()
 {
+    c6OfflineCachePurge();
     preferences.begin(PREFERENCES_NAMESPACE, false);
     preferences.clear();
     preferences.end();

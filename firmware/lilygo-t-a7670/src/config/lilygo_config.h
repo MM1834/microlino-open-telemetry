@@ -18,13 +18,15 @@ struct LilygoConfig {
     String mqttUser;
     String mqttPass;
     String deviceName;
-    String vehicleId = "pioneer";
+    String vehicleId = "pioneer-lilygo";
     String mqttPrefix = "mot";
     bool otaEnabled = false;
     String otaPassword;
     bool abrpEnabled = false;
     bool gpsEnabled = true;
-    DecoderProfile canProfile = DECODER_PROFILE_DISPLAY_CAN;
+    bool offlineCacheEnabled = false;
+    DecoderProfile canProfile = DECODER_PROFILE_STANDARD_CAN_V1_PIONEER;
+    DecoderProfile can2Profile = DECODER_PROFILE_DISPLAY_CAN;
     bool onboardingComplete = false;
     String abrpApiKey;
     String abrpUserToken;

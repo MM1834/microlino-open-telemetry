@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-18
+**Last reviewed:** 2026-08-20
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -26,6 +26,22 @@ an approved implementation.
 Design fleet provisioning, certificate rotation, revocation, device replacement
 and ownership transfer. Continue to prohibit a shared operational certificate for
 multiple deployed devices.
+
+## GPS-derived UTC for offline History cache
+
+Validate and harden the existing GPS system-time path as an optional independent
+UTC source for the SOC/Speed offline cache. `MotGps` already accepts valid GNSS
+date/time, calls `settimeofday()` and thereby feeds the same system clock consumed
+by the cache. GPS remains recommended rather than required: NTP and uninterrupted-
+power operation are valid for no-GPS adapters such as B025.
+
+The Pioneer offline cold-start proof passes: GNSS set system UTC before any
+network connection and the resulting SOC/Speed cache replay completed. Remaining
+hardening requires rejection of stale or implausible receiver time plus
+deterministic precedence and drift handling between
+NTP and GPS, and cold-start/outage tests. The cache interface may receive only
+validated UTC and validity metadata. Coordinates, routes and raw location fixes
+must never enter the local journal or History Backfill envelope.
 
 ## Notification follow-ups
 

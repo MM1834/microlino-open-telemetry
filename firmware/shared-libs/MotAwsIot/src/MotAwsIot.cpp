@@ -4,7 +4,37 @@
 #include <LittleFS.h>
 #include <WiFi.h>
 #include <esp_system.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/x509_crt.h>
 #include <time.h>
+
+static String certificateSha256(const String& pem) {
+    mbedtls_x509_crt certificate;
+    mbedtls_x509_crt_init(&certificate);
+    const int parsed = mbedtls_x509_crt_parse(
+        &certificate,
+        reinterpret_cast<const unsigned char*>(pem.c_str()),
+        pem.length() + 1);
+    if (parsed != 0 || certificate.raw.p == nullptr) {
+        mbedtls_x509_crt_free(&certificate);
+        return "parse-failed";
+    }
+
+    unsigned char digest[32] = {};
+    const int hashed = mbedtls_sha256(
+        certificate.raw.p,
+        certificate.raw.len,
+        digest,
+        0);
+    mbedtls_x509_crt_free(&certificate);
+    if (hashed != 0) return "hash-failed";
+
+    char hex[65] = {};
+    for (size_t i = 0; i < sizeof(digest); ++i) {
+        snprintf(hex + (i * 2), 3, "%02x", digest[i]);
+    }
+    return String(hex);
+}
 
 static bool readRequiredFile(
     const String& path,
@@ -96,6 +126,9 @@ bool motLoadAwsCredentials(
 MotAwsIotClient::MotAwsIotClient() : mqtt_(secureClient_) {}
 
 bool MotAwsIotClient::begin(const MotAwsCredentials& credentials) {
+    Serial.printf(
+        "AWS IoT certificate SHA-256: %s\n",
+        certificateSha256(credentials.certificate).c_str());
     secureClient_.setCACert(credentials.rootCa.c_str());
     secureClient_.setCertificate(credentials.certificate.c_str());
     secureClient_.setPrivateKey(credentials.privateKey.c_str());
@@ -197,6 +230,10 @@ bool MotAwsIotClient::connect() {
     status_.connected = ok;
 
     if (!ok) {
+        char tlsError[128] = {};
+        const int tlsErrorCode = secureClient_.lastError(
+            tlsError,
+            sizeof(tlsError));
         status_.consecutiveConnectFailures++;
         status_.totalConnectFailures++;
         reconnectDelayMs_ = min(MAX_RECONNECT_INTERVAL_MS,
@@ -207,6 +244,10 @@ bool MotAwsIotClient::connect() {
         status_.message =
             "AWS IoT connect failed rc=" + String(mqtt_.state());
         Serial.println(status_.message);
+        Serial.printf(
+            "AWS IoT TLS diagnostic: code=%d detail=%s\n",
+            tlsErrorCode,
+            tlsError[0] ? tlsError : "none");
         return false;
     }
 
@@ -335,6 +376,15 @@ bool MotAwsIotClient::publishLastSeenUtc() {
         static_cast<long long>(time(nullptr))
     );
     return publish("system/last_seen_utc", value, true);
+}
+
+void MotAwsIotClient::setMessageCallback(MotAwsMessageCallback callback) {
+    mqtt_.setCallback(callback);
+}
+
+bool MotAwsIotClient::subscribe(const char* suffix, uint8_t qos) {
+    if (!mqtt_.connected() || suffix == nullptr || *suffix == '\0') return false;
+    return mqtt_.subscribe(topic(suffix).c_str(), qos);
 }
 
 const char* MotAwsIotClient::resetReasonText() {

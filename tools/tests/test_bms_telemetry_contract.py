@@ -14,6 +14,10 @@ class BmsTelemetryContractTests(unittest.TestCase):
         self.assertIn("12000.0f", pioneer)
         self.assertIn("25000.0f", pioneer)
         self.assertIn("data[6] == 0x20", source)
+        self.assertLess(
+            source.index("telemetry.charging.plugged = telemetry.bms.plugged"),
+            source.index("if (currentPlausible)"),
+        )
         self.assertIn("frame.id == 0x18D", source)
         self.assertIn("telemetry.bms.vehiclePowerW = -powerW", source)
         self.assertIn("telemetry.bms.isRegenerating", source)
@@ -27,6 +31,20 @@ class BmsTelemetryContractTests(unittest.TestCase):
         self.assertIn("MotStandardCanBms::handleFrame(frame, V2_PROVISIONAL_RULES)", source)
         self.assertNotIn("PIONEER_RULES", source)
         self.assertNotIn("V2_PROVISIONAL_RULES", mechanism)
+
+    def test_standard_can_prevents_display_plugged_override(self) -> None:
+        configurations = (
+            ROOT / "firmware/lilygo-t-a7670/src/can/lilygo_can.cpp",
+            ROOT / "firmware/esp32-c6/src/c6_dual_can.cpp",
+        )
+        for path in configurations:
+            with self.subTest(path=path):
+                source = path.read_text()
+                self.assertIn("standardCanConfigured", source)
+                self.assertIn("DECODER_PROFILE_DISPLAY_CAN", source)
+                self.assertIn("frame.id == 0x604", source)
+        lilygo = configurations[0].read_text()
+        self.assertIn("suppressedDisplayPlugged", lilygo)
 
     def test_all_device_publishers_use_the_same_bms_topics(self) -> None:
         publishers = (

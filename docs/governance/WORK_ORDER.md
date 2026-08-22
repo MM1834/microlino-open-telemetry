@@ -167,6 +167,19 @@ is required by fleet growth.
 
 ## Medium priority
 
+### Execute the bounded LilyGO mobile dual-CAN pilot
+
+**Active work package:** [LG-CAN2-001 — LilyGO Mobile Dual-CAN Pilot](../project/sprints/LG-CAN2-001.md)
+
+Retain the three available LTE-capable LilyGO adapters for flexible field pilots
+by adding an Adafruit MCP2515 receive-only CAN2 input. Repository implementation
+and the `T-A7670X-AWS` build pass at 77.4% of each enlarged OTA slot. Controlled
+USB partition migration and bench discovery pass; simultaneous dual-bus vehicle
+reception remains a hardware gate and WiFi/LTE switching passed on a road test.
+The measured OTA margin supports a bounded, default-off 128 KiB SOC/Speed cache
+follow-up under the separate `pioneer-lilygo` identity. This sustain-only package
+does not change the C6 strategic target.
+
 ### Simplify maintained firmware environments
 
 Maintain one firmware line per board. The standalone GPS test environment is

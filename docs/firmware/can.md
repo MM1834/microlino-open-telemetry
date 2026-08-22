@@ -4,16 +4,31 @@
 >
 > **Audience:** Firmware developer and hardware reviewer
 
-MOT uses the ESP32 TWAI controller in 500 kbit/s normal mode with an accept-all
-filter. Application code reads received frames; no vehicle-control transmission
-workflow is implemented.
+MOT uses 500 kbit/s CAN inputs with accept-all filters. Native ESP32 CAN inputs
+initialize in `TWAI_MODE_LISTEN_ONLY`; the LilyGO pilot's external MCP2515 CAN2
+uses its corresponding controller listen-only mode. Application code only reads frames; no transmission or
+vehicle-control workflow is implemented. Listen-only also prevents the controller
+from contributing ACK or active error bits.
+
+This is a firmware safety property, not a security boundary. Firmware that an
+attacker can replace could reconfigure TWAI and drive any physically connected
+transceiver TXD input. Pilot and production hardware should therefore implement
+the independent receive-only interlock described in
+[CAN receive-only hardware design](../hardware/can-receive-only-design.md).
 
 ## Board pin configuration
 
 | Target | CAN RX | CAN TX | Source |
 |---|---:|---:|---|
 | ESP32-WROOM | GPIO27 | GPIO26 | `include/board_config.h`, PlatformIO flags |
-| LilyGO T-A7670G | GPIO32 | GPIO13 | `include/board_config.h` |
+| LilyGO T-A7670G | GPIO36 | GPIO13 | `include/board_config.h` |
+
+LilyGO CAN2 is an Adafruit MCP2515 FeatherWing on SCK 14, MOSI 32, MISO 39,
+CS 18 and INT 34. LilyGO follows the C6 logical assignment: native TWAI CAN1 is
+Standard-CAN and MCP2515 CAN2 is Display-CAN. Each has an independent decoder profile. The FeatherWing's
+`TERM` link must be open and `SLNT` tied to 3.3 V; see
+[LG-CAN2-001](../project/sprints/LG-CAN2-001.md).
+Standalone wiring must also tie the FeatherWing `RST` pad to 3.3 V.
 
 Previous documentation incorrectly assigned GPIO32/13 to ESP32-WROOM. Physical
 beta wiring must be checked against the actual board/transceiver before power-up.
@@ -63,6 +78,12 @@ value, not by itself proof of active charging. The current threshold-derived
 `charging.isCharging` and inferred sign logic remain provisional compatibility
 behaviour and must be replaced or confirmed using controlled traces and an
 independent plugged/charging signal.
+
+Display-CAN `0x604` may provide `charging.plugged` only on a display-only
+installation. If either configured input uses Standard-CAN V1 Pioneer or V2, the
+dual-CAN input layer suppresses `0x604` for this field. Standard-CAN `bms.plugged` is
+then authoritative and supplies the canonical `charging.plugged` value; CAN input
+processing order cannot overwrite it with Display-CAN state.
 
 ## Standard-CAN profiles
 

@@ -129,7 +129,8 @@ cat > "$OUT_DIR/policy.json" <<EOF
       "Action": "iot:Subscribe",
       "Resource": [
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/commands/*",
-        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/configuration/*"
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/configuration/*",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/history/backfill/ack/v1"
       ]
     },
     {
@@ -137,7 +138,8 @@ cat > "$OUT_DIR/policy.json" <<EOF
       "Action": "iot:Receive",
       "Resource": [
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/commands/*",
-        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/configuration/*"
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/configuration/*",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/history/backfill/ack/v1"
       ]
     }
   ]

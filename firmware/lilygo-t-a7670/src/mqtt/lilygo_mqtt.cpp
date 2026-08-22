@@ -10,6 +10,7 @@
 #include "modem/lilygo_modem.h"
 #include "gps/l76k_gps.h"
 #include "telemetry/telemetry.h"
+#include "cache/lilygo_offline_cache.h"
 
 static const unsigned long MQTT_PUBLISH_INTERVAL_MS = 5000;
 static unsigned long lastPublishMs = 0;
@@ -47,6 +48,7 @@ static const char* mqttStateText(int state)
 static MotAwsCredentials awsCredentials;
 static MotAwsIotClient awsClient;
 static bool ntpSyncRequested = false;
+static bool freshLivePublished = false;
 
 enum class AwsTransport { NONE, WIFI, LTE };
 static AwsTransport activeAwsTransport = AwsTransport::NONE;
@@ -139,6 +141,7 @@ void setupLilygoMqtt()
         );
         return;
     }
+    awsClient.setMessageCallback(lilygoOfflineCacheHandleAwsMessage);
 
     Serial.printf(
         "AWS IoT: WiFi-priority LTE/TLS fallback enabled endpoint=%s port=%u "
@@ -163,12 +166,13 @@ void lilygoMqttLoop()
         transportAvailable
     );
 
-    if (!awsClient.connected()) return;
-
-    if (millis() - lastPublishMs >= MQTT_PUBLISH_INTERVAL_MS) {
+    freshLivePublished = false;
+    if (awsClient.connected() && millis() - lastPublishMs >= MQTT_PUBLISH_INTERVAL_MS) {
         lastPublishMs = millis();
         publishLilygoTelemetry();
+        freshLivePublished = true;
     }
+    lilygoOfflineCacheLoop(awsClient, awsClient.connected(), freshLivePublished);
 }
 
 void publishLilygoTelemetry()

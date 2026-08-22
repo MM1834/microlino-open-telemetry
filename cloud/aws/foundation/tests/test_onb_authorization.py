@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import sys
@@ -70,11 +71,20 @@ class FakeManagement:
         self.deletes.append(kwargs["ConnectionId"])
 
 
+class FakeIotData:
+    def __init__(self):
+        self.publications = []
+
+    def publish(self, **kwargs):
+        self.publications.append(kwargs)
+
+
 class FakeBoto3(types.ModuleType):
     def __init__(self, tables, management=None):
         super().__init__("boto3")
         self.tables = tables
         self.management = management or FakeManagement()
+        self.iot_data = FakeIotData()
 
     def resource(self, name):
         assert name == "dynamodb"
@@ -82,8 +92,11 @@ class FakeBoto3(types.ModuleType):
         return types.SimpleNamespace(Table=lambda table_name: tables[table_name])
 
     def client(self, name, **_kwargs):
-        assert name == "apigatewaymanagementapi"
-        return self.management
+        if name == "apigatewaymanagementapi":
+            return self.management
+        if name == "iot-data":
+            return self.iot_data
+        raise AssertionError(name)
 
 
 def load_lambda(resource_name, tables, environment, management=None):
@@ -417,6 +430,35 @@ class LiveAuthorizationTests(unittest.TestCase):
 
 
 class IngestAuthorizationTests(unittest.TestCase):
+    def test_backfill_topics_never_reach_live_state_or_websocket(self):
+        state = VehicleStateTable()
+        connections = ConnectionTable([
+            {"connectionId": "active", "userSub": "user-a", "expiresAt": 1100},
+        ])
+        management = FakeManagement()
+        module = load_lambda(
+            "StateIngestFunction",
+            {
+                "state": state, "connections": connections,
+                "access": AccessTable({("user-a", "alpha"): "ACTIVE"}),
+                "history": VehicleHistoryTable(),
+            },
+            {
+                "TABLE_NAME": "state", "CONNECTION_TABLE_NAME": "connections",
+                "ACCESS_TABLE_NAME": "access", "WEBSOCKET_API_ID": "api",
+                "WEBSOCKET_STAGE": "$default", "AWS_REGION": "eu-north-1",
+                "HISTORY_TABLE_NAME": "history", "HISTORY_ENABLED": "true",
+                "HISTORY_VEHICLE_ALLOWLIST": "alpha",
+            },
+            management,
+        )
+        for suffix in ("history/backfill/v1", "history/backfill/ack/v1"):
+            result = module.handler({"mqttTopic": f"mot/alpha/{suffix}"}, None)
+            self.assertEqual(
+                {"accepted": False, "reason": "history_backfill_isolated"}, result
+            )
+        self.assertEqual([], management.posts)
+
     def test_fanout_drops_expired_and_revoked_connections(self):
         connections = ConnectionTable([
             {"connectionId": "active", "userSub": "user-a", "expiresAt": 1100},
@@ -581,11 +623,68 @@ class IngestAuthorizationTests(unittest.TestCase):
         self.assertEqual([-80, 0], [item["value"] for item in history.items])
 
 
+class OfflineHistoryBackfillTests(unittest.TestCase):
+    def load(self, history):
+        return load_lambda(
+            "OfflineHistoryBackfillFunction",
+            {"history": history},
+            {
+                "HISTORY_TABLE_NAME": "history",
+                "VEHICLE_ALLOWLIST": "cache-b025-n16-01",
+                "RETENTION_DAYS": "31",
+                "MAX_BATCH_SAMPLES": "60",
+                "MAX_SAMPLE_AGE_SECONDS": "2678400",
+            },
+        )
+
+    @staticmethod
+    def event(envelope, topic="mot/cache-b025-n16-01/history/backfill/v1"):
+        return {
+            "mqttTopic": topic,
+            "receivedAt": 1_800_000_000_000,
+            "payloadBase64": base64.b64encode(
+                json.dumps(envelope).encode("utf-8")
+            ).decode("ascii"),
+        }
+
+    def test_accepts_only_allowlisted_soc_speed_and_deduplicates(self):
+        history = VehicleHistoryTable()
+        module = self.load(history)
+        envelope = {
+            "version": 1,
+            "vehicleId": "cache-b025-n16-01",
+            "batchId": "boot-0001",
+            "samples": [
+                {"signal": "soc", "sampledAt": 1_799_999_700_000, "value": 72},
+                {"signal": "speed", "sampledAt": 1_799_999_760_000, "value": 34.5},
+            ],
+        }
+        first = module.handler(self.event(envelope), None)
+        second = module.handler(self.event(envelope), None)
+        self.assertEqual((2, 0), (first["stored"], first["duplicates"]))
+        self.assertEqual((0, 2), (second["stored"], second["duplicates"]))
+        self.assertEqual(2, len(history.items))
+
+    def test_rejects_wrong_vehicle_without_writing(self):
+        history = VehicleHistoryTable()
+        module = self.load(history)
+        envelope = {
+            "version": 1, "vehicleId": "other", "batchId": "boot-0001",
+            "samples": [{"signal": "soc", "sampledAt": 1_799_999_700_000, "value": 72}],
+        }
+        result = module.handler(
+            self.event(envelope, "mot/other/history/backfill/v1"), None
+        )
+        self.assertFalse(result["accepted"])
+        self.assertEqual([], history.items)
+
+
 class TemplateStructureTests(unittest.TestCase):
     def test_inline_python_compiles(self):
         for resource in (
             "StateIngestFunction", "VehicleApiFunction",
             "LiveAuthorizerFunction", "LiveHandlerFunction",
+            "OfflineHistoryBackfillFunction",
         ):
             compile(inline_code(resource), resource, "exec")
 
@@ -596,6 +695,11 @@ class TemplateStructureTests(unittest.TestCase):
         self.assertIn("HistoryVehicleAllowlist:", template)
         self.assertIn("HistoryCoreIntervalSeconds:", template)
         self.assertIn("HistoryMotionIntervalSeconds:", template)
+        self.assertIn("EnableOfflineHistoryBackfill:", template)
+        self.assertIn("OfflineHistoryBackfillVehicleAllowlist:", template)
+        self.assertIn("OfflineHistoryBackfillIsEnabled:", template)
+        self.assertIn("FROM 'mot/+/history/backfill/v1'", template)
+        self.assertIn('"history/backfill/ack/v1"', template)
         self.assertIn('Default: ""', template)
         self.assertIn("MaxValue: 31", template)
         self.assertIn("VehicleHistoryDailyWriteAlarm:", template)

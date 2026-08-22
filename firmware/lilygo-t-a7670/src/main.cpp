@@ -13,6 +13,7 @@
 #include "abrp/lilygo_abrp.h"
 #include "can/lilygo_can.h"
 #include "web/local_web_security.h"
+#include "cache/lilygo_offline_cache.h"
 
 static unsigned long lastSystemUpdateMs = 0;
 static String serialCommand;
@@ -57,6 +58,7 @@ void setup()
     Serial.printf("CAN: RX GPIO%d, TX GPIO%d\n", CAN_RX_PIN, CAN_TX_PIN);
 
     lilygoConfigManager.load();
+    lilygoOfflineCacheSetup();
     setupLilygoModem();
     setupL76kGps();
     setupLilygoCan();

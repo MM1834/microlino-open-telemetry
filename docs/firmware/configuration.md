@@ -20,6 +20,7 @@ targets retain Display-CAN as the default for their available input.
 | `mqttUser` / `mqttPass` | MQTT credentials |
 | `otaEnabled` / `otaPassword` | OTA configuration |
 | `abrpEnabled` | Enables optional ABRP integration |
+| `offlineCacheEnabled` | C6-only, default-off SOC/active-Speed outage cache |
 | ABRP API key/token | ABRP credentials |
 | `can1Profile` / `can2Profile` | Independent decoder assignment for each physical CAN input |
 
@@ -57,3 +58,19 @@ The API key and user token are stored in NVS, accepted only through authenticate
 same-origin configuration routes and omitted from normal backup exports and
 diagnostics. The local onboarding wizard records only its completion state; it is
 not portal/account onboarding.
+
+Both C6 targets expose an authenticated `Offline History cache` option. It is
+off by default and records only SOC plus active one-minute Speed/terminal zero
+while AWS IoT is disconnected and trustworthy UTC has previously been obtained.
+It never stores GPS/location. XIAO is capped at 128 KiB and N16 at 256 KiB;
+reaching the cap stops new writes instead of rotating flash. Disabling the option
+or factory reset purges queued records. Configuration export includes only the
+boolean setting, never cached telemetry.
+
+GPS hardware is recommended, but not required, for cache deployments. The C6 GPS
+service already validates GNSS date/time and sets the shared system UTC clock;
+the cache reads that clock exactly as it reads NTP-derived time. This allows a
+GPS-equipped adapter to become timestamp-capable without WiFi in principle, while
+no-GPS hardware relies on NTP and uninterrupted power. Physical offline-cold-start
+acceptance and stale-time hardening remain open. The cache never writes GPS
+coordinates or routes into its journal or Backfill envelope.

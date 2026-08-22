@@ -40,6 +40,8 @@ secrets/aws-iot/*
 !/firmware/lilygo-t-a7670/data/aws/.gitkeep
 /firmware/esp32-wroom/data/aws/**
 !/firmware/esp32-wroom/data/aws/.gitkeep
+/firmware/esp32-c6/data/aws/**
+!/firmware/esp32-c6/data/aws/.gitkeep
 
 # Local working packages
 *.zip

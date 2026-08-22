@@ -11,6 +11,7 @@
 #include "c6_dual_can.h"
 #include "c6_gps.h"
 #include "c6_network.h"
+#include "c6_offline_cache.h"
 #include "decoders/decoder_profile.h"
 #include "system/device_id.h"
 #include "system/version.h"
@@ -145,6 +146,7 @@ String diagnosticsJson()
     out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
     out += ",\"gps\":{\"state\":\"" + jsonEscape(c6GpsState()) + "\",\"detected\":" + String(c6GpsDetected() ? "true" : "false") + ",\"fix\":" + String(c6GpsValid() ? "true" : "false") + ",\"chars\":" + String(static_cast<unsigned long long>(c6GpsChars())) + ",\"satellites\":" + String(c6GpsSatellites()) + "}";
     out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"";
+    out += ",\"offlineCache\":" + c6OfflineCacheStatusJson();
     out += ",\"abrp\":" + c6AbrpStatusJson() + "}";
     return out;
 }
@@ -173,6 +175,7 @@ void configPage()
         out += "<div class='card'><h2>GPS</h2><input type='hidden' name='gpsControlPresent' value='1'><label><input style='width:auto' type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><p class='muted'>Default: enabled. Disabling stops GPS initialization, decoding and telemetry after reboot.</p></div>";
     }
     out += "<div class='card'><h2>ABRP</h2><label><input style='width:auto' type='checkbox' name='abrpEnabled'" + String(c6Config.abrpEnabled ? " checked" : "") + "> Enable ABRP</label><label>API key</label><input type='password' name='abrpApiKey' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><label>User token</label><input type='password' name='abrpUserToken' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><p class='muted'>ABRP uses WiFi and can run alongside AWS IoT. Credentials are never included in normal backups or diagnostics.</p></div>";
+    out += "<div class='card'><h2>Offline History cache</h2><label><input style='width:auto' type='checkbox' name='offlineCacheEnabled'" + String(c6Config.offlineCacheEnabled ? " checked" : "") + "> Cache SOC and active Speed during Internet loss</label><p class='muted'>Default: disabled. Samples are recorded only with trustworthy UTC. No GPS/location is stored. Disabling or factory reset deletes queued samples; physical flash access may still expose unencrypted remnants.</p><pre>" + htmlEscape(c6OfflineCacheStatusJson()) + "</pre></div>";
     out += "<div class='card'><h2>Runtime</h2><label>Telemetry interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button>Save &amp; reboot</button></form>";
     out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
     out += "<div class='card'><h2>Factory reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Erase all local configuration?')\"><button>Erase configuration &amp; reboot</button></form></div><p><a href='/status'>Status</a></p></body></html>";
@@ -199,12 +202,14 @@ void saveConfig()
     c6Config.can1Profile = can1; c6Config.can2Profile = can2;
     if (server.hasArg("gpsControlPresent")) c6Config.gpsEnabled = server.hasArg("gpsEnabled");
     c6Config.abrpEnabled = server.hasArg("abrpEnabled");
+    const bool offlineCacheEnabled = server.hasArg("offlineCacheEnabled");
     String abrpKey = c6Config.abrpApiKey;
     String abrpToken = c6Config.abrpUserToken;
     if (!server.arg("abrpApiKey").isEmpty()) abrpKey = server.arg("abrpApiKey");
     if (!server.arg("abrpUserToken").isEmpty()) abrpToken = server.arg("abrpUserToken");
     if (!c6ConfigSetAbrpCredentials(abrpKey, abrpToken)) { server.send(400, "text/plain", "Invalid ABRP credentials"); return; }
     c6Config.publishIntervalMs = interval; c6Config.otaEnabled = server.hasArg("otaEnabled");
+    c6ConfigSetOfflineCacheEnabled(offlineCacheEnabled);
     c6ConfigSave();
     server.send(200, "text/html", header("Saved") + "<h1>Configuration saved</h1><p>Rebooting.</p></body></html>");
     scheduleReboot();

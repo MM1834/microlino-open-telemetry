@@ -47,6 +47,123 @@ with the demo subject returned 403 before claim processing. Administrator claim
 issuance and normal beta accounts remain unchanged; the hosted portal hides
 **Fahrzeug hinzufügen** for demo identities.
 
+CACHE-001 closed on 2026-08-21 after delivering an optional, default-off
+SOC/Speed store-and-forward pilot. Its minimal `mot-test` AWS lane is deployed
+and passed synthetic original-
+timestamp and duplicate-replay checks without writing operational State. The
+shared C6 journal/replay implementation, authenticated control, 155 repository
+tests and both canonical builds pass; XIAO remains a build-only compatibility
+target. Physical testing has started on the dedicated no-GPS B025
+nanoESP32-C6-N16, not the productive adapter. Its separate certificate is
+installed and its 256 KiB cache is enabled. Physical SOC, Speed, hard-power and
+in-flight-ACK-loss recovery all pass. Cost Explorer reported USD 0 for IoT,
+Lambda, DynamoDB and CloudWatch during the intensive test period; a conservative
+24-byte-record/16-KiB-physical-write bound supports decades of N16 flash life at
+two fully offline driving hours per day.
+
+The first B025 hotspot acceptance also closed a least-privilege test-policy gap:
+AWS IoT requires `iot:RetainPublish` separately from `iot:Publish` for the
+firmware's retained Last Will and Birth metadata. The isolated policy now allows
+it only on the permitted status, system and live telemetry test paths. The device certificate fingerprint
+matches AWS, and B025 remains connected after publishing all Birth fields.
+
+The first physical CACHE-001 SOC outage/reconnect path now passes on B025. During
+an iPhone hotspot loss, both CAN controllers continued with zero errors and three
+SOC samples entered the bounded journal. Reconnection restored live publication,
+the backend acknowledged exactly one three-sample batch with original timestamps,
+and the local cache emptied with no drops, corruption, duplicates or rejection.
+Hard-power recovery evidence is recorded below; write-amplification and cost
+evidence remain open.
+
+The next physical return drive closed moving-Speed replay: seven non-zero
+minute/transition samples and terminal zero transitions were retained through a
+hotspot outage and acknowledged with their original timestamps after reconnect.
+The isolated table and local counters show no loss, corruption, duplicate or
+rejection. The maintainer confirmed that the three terminal-zero transitions
+occurred during the final parking manoeuvre; no additional zero followed the
+definitive stop and charging start. Continuous-standstill suppression therefore
+passes without a debounce change.
+
+B025 now also passes full-power journal recovery. Seven queued records survived
+a cold power interruption with the hotspot disabled; LittleFS recovered with no
+corruption or drop, CAN resumed with zero errors and the invalid cold-start clock
+created no sample. Hotspot/NTP recovery added one correctly timed SOC sample
+before AWS connected, then one acknowledged eight-record batch emptied the
+journal. Original timestamps are preserved and all 85 isolated physical test
+records have unique logical signal/timestamp keys.
+
+In-flight acknowledgement recovery also passes. A test-only, default-true
+CloudFormation switch temporarily suppressed ACK delivery after AWS stored an
+eight-record batch. B025 remained at nine pending records and was hard-powered
+off. With ACK delivery restored, reboot plus fresh CAN publication replayed the
+same batch; DynamoDB created no rows, reported eight duplicates and accepted the
+ninth record separately. Final cache state is empty with `duplicates=8` and no
+drop, corruption or rejection. The stack is `UPDATE_COMPLETE` and the fault
+injection switch is restored to `true`.
+
+The production History-backfill backend is now deployed additively and enabled
+only for B025's `cache-b025-n16-01` vehicle identity. The reviewed Change Sets
+contained no replacements. The general live ingest explicitly rejects both the
+Backfill request and ACK suffix before State or WebSocket work; a direct AWS test
+created zero State rows. A marked two-record production smoke batch stored SOC
+and Speed in History, the stack is `UPDATE_COMPLETE`, and no error was observed.
+B025 now uses its separate production Thing `mot-esp32c6-4085d9` and exact
+`cache-b025-n16-01` namespace. Firmware/LittleFS upload, hotspot recovery, 11
+Birth fields and the first real production replay pass. During a mobile outage
+both CAN buses continued without errors; one real SOC 87 sample was acknowledged
+into History and the local journal returned to `pending=0`, `replayed=1` without
+drop, corruption, duplicate or rejection. Synthetic smoke rows were removed,
+leaving only the physical replay in B025's History partition.
+B025 subsequently completed the longer practical charge-and-drive scenario with
+continuous USB power and intermittent HOME/mobile connectivity; the maintainer
+confirmed that all expected data appeared in portal History. GPS is recommended
+but optional cache hardware. Code inspection confirms that C6 already sets system
+UTC automatically from valid GNSS date/time and the cache consumes that shared
+clock without location data. Physical offline-cold-start acceptance and stale-
+time hardening remain open; no coordinate is cached or backfilled.
+The physical GPS clock gate passes on Pioneer: after a network-free cold
+start, GNSS set system UTC before any AWS attempt, nine SOC/Speed records were
+subsequently replayed when HOME returned, and the journal emptied without loss or
+rejection. Two bucket collisions were safely deduplicated. Stale/implausible GPS
+time and GPS-versus-NTP precedence remain hardening items rather than blockers for
+the validated pilot path. A targeted History review confirmed four offline SOC
+samples at 20:10, 20:15, 20:20 and 20:25 CEST, all received together at 20:25:24
+only after HOME WiFi returned. This closes CACHE-001; GPS clock plausibility and
+GPS/NTP precedence remain a separate backlog item.
+Provisioned N16 inventory B021 through B024 subsequently received the identical
+verified application image after individual 16 MB and byte-identical partition-
+table checks. All four retained their unique AWS credentials and mounted
+LittleFS with an empty 256 KiB cache disabled by default; NVS, filesystem and
+credential partitions were not rewritten.
+The matching XIAO compatibility build passes 30 focused contracts and the strict
+flash gate at 82.40% of its 1,703,936-byte OTA slot, leaving 44,249 bytes to the
+85% ceiling. The current 4 MB layout provides dual OTA slots and 640 KiB
+LittleFS with a 128 KiB cache ceiling. OTA rollout is valid only after confirming
+that a target already uses this layout; an unknown older layout needs read-back
+inspection and possibly one controlled USB migration.
+Gino's existing XIAO identity `mot-esp32c6-a3bd10`/`ginopioneer` is now also
+cloud-ready for optional Backfill. A reviewed no-replacement Change Set added
+`ginopioneer` to the effective Backfill allowlist, and IoT policy version 2 grants
+only the exact Backfill-ACK Subscribe/Receive path in that vehicle namespace.
+The stack is `UPDATE_COMPLETE`; the device-side cache remains default-off and no
+test row was inserted into Gino's History.
+B025 is also assigned to the confirmed `news@muehlberg.ch` portal account through
+an `ACTIVE/OWNER` UserVehicleAccess record after an empty conflict check. The
+current module, Thing and vehicle namespace were reused unchanged; the portal can
+therefore display its live State and the retained real SOC replay immediately.
+
+The existing productive Pioneer N16 `MOT-80A2DA` is now the second controlled
+CACHE-001 rollout. Its partition table matched the target byte-for-byte, allowing
+an application-only upgrade without rewriting LittleFS, credentials or NVS. It
+returned online as the unchanged Thing `mot-esp32c6-daa280`/vehicle `pioneer` on
+`C6-001-REV7-AWS`; cache mount and explicit enablement pass. The least-privilege
+ACK policy and operational Backfill allowlist now cover Pioneer, while physical
+CAN outage/replay acceptance now passes: six five-minute/terminal SOC samples from
+an offline charging period were stored with their original times and acknowledged
+together without loss. One later retry was deduplicated as designed. The cache is
+empty and mounted with no drop, corruption or rejection, so provisioned inventory
+N16 adapters may proceed through the same controlled upgrade process.
+
 HIS-SIGN-001 has a repository-complete portal refinement for historical net
 power. It displays consumption as negative and charging/regeneration as positive,
 using a symmetric axis and explicit zero line while preserving stored History and
@@ -142,6 +259,28 @@ fork. ESP32-WROOM and LilyGO remain supported at their validated baseline but ar
 no longer feature-development targets. WIFI-001 uses a second C6 WiFi profile for
 an external LTE/GSM hotspot; replacement of LilyGO's onboard cellular path remains
 an open hardware/architecture evaluation.
+
+LG-CAN2-001 is active as a bounded sustain-only extension for the three available
+LilyGO adapters. Repository support for an Adafruit MCP2515 receive-only CAN2,
+independent CAN profiles, authenticated diagnostics and a two-slot 4 MB partition
+layout is complete. Controlled USB migration and MCP2515 bench discovery pass;
+the first road test passed WiFi/LTE switching, mobile outage recovery and cold
+restart. A bounded follow-up adds the proven SOC/Speed store-and-forward contract,
+default-off with a 128 KiB ceiling and no location data, under the separated
+`pioneer-lilygo` vehicle namespace. Both LilyGO environments build; the AWS image
+occupies 78.2% of its enlarged OTA slot. TERM-open and SLNT-high hardware
+interlocks remain mandatory. Simultaneous dual-bus vehicle reception, cache
+outage/replay and OTA-after-migration remain physical gates, so this does not
+change the C6 product direction.
+
+The separated LilyGO namespace is operationally prepared in AWS. Thing metadata
+and least-privilege IoT policy version 5 now use only `pioneer-lilygo`, including
+the exact Backfill ACK subscribe/receive path. The confirmed portal owner has an
+additional ACTIVE/OWNER assignment, and additive History and Backfill allowlist
+deployment completed without resource replacement. The final firmware and rebuilt
+LittleFS credentials were flashed with verified hashes while retaining NVS; boot
+confirmed both CAN channels and the `pioneer-lilygo` credential namespace. Physical
+outage/replay acceptance remains open.
 
 The repository-owned public landing page under `build/landing/current/` was
 deployed to the hosted root by the maintainer on 2026-08-05 and successfully
@@ -264,6 +403,13 @@ runtime diagnostics and configuration export/import coverage. All four maintaine
 production build targets and the focused source contracts pass; the 4 MB WROOM
 AWS image remains within its existing OTA application partition with minimal
 remaining margin.
+
+REV7 closes the remaining CAN receive-only firmware inconsistency: LilyGO now
+uses `TWAI_MODE_LISTEN_ONLY`, matching C6 and WROOM. A focused repository contract
+guards all maintained targets against normal-mode regression and against adding
+an application `twai_transmit` call. The accompanying hardware recommendation
+keeps each transceiver TXD recessive and disconnected from ESP CAN_TX unless an
+explicit, normally open service jumper is deliberately enabled.
 
 C6-SVC-001 completed on 2026-08-11. The shared C6 line now includes runtime-
 selectable asynchronous ABRP and the authenticated seven-step local onboarding

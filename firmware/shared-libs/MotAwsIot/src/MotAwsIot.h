@@ -46,6 +46,8 @@ struct MotAwsStatus {
     String message;
 };
 
+using MotAwsMessageCallback = void (*)(char*, uint8_t*, unsigned int);
+
 bool motLoadAwsCredentials(
     MotAwsCredentials& credentials,
     const char* basePath = "/aws"
@@ -86,6 +88,8 @@ public:
         bool retained = true
     );
     bool publishLastSeenUtc();
+    void setMessageCallback(MotAwsMessageCallback callback);
+    bool subscribe(const char* suffix, uint8_t qos = 1);
 
     const MotAwsCredentials& credentials() const;
     const MotAwsStatus& status() const;

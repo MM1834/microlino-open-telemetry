@@ -38,6 +38,9 @@ inline void decode18d(const uint8_t *data, const DecoderRules &rules)
     telemetry.bms.statusByte = data[6];
     telemetry.bms.plugged = data[6] == 0x20;
     telemetry.bms.statusLastUpdateMs = millis();
+    // Standard-CAN is authoritative for V1/V2 plugged state. Keep the
+    // canonical charging field synchronized even if current is implausible.
+    telemetry.charging.plugged = telemetry.bms.plugged;
 
     if (voltagePlausible) {
         telemetry.bms.packStatusValid = true;
@@ -64,7 +67,6 @@ inline void decode18d(const uint8_t *data, const DecoderRules &rules)
         telemetry.bms.packCurrentLastUpdateMs = millis();
 
         telemetry.charging.valid = true;
-        telemetry.charging.plugged = telemetry.bms.plugged;
         telemetry.charging.isCharging =
             telemetry.bms.plugged && currentA > rules.chargingCurrentThresholdA;
         telemetry.charging.powerSigned =

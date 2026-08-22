@@ -62,6 +62,31 @@ Parameters:
     MinValue: 1
     Description: Alarm when history table writes exceed this daily pilot budget.
 
+  EnableOfflineHistoryBackfill:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Enables additive SOC/Speed offline replay. Live state remains independent.
+
+  OfflineHistoryBackfillVehicleAllowlist:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[a-z0-9][a-z0-9_-]{0,63}(,[a-z0-9][a-z0-9_-]{0,63})*$'
+    Description: Comma-separated replay pilot vehicles. Empty means no accepted backfill.
+
+  OfflineHistoryBackfillMaxSamples:
+    Type: Number
+    Default: 60
+    MinValue: 1
+    MaxValue: 120
+
+  OfflineHistoryBackfillMaxAgeSeconds:
+    Type: Number
+    Default: 2678400
+    MinValue: 300
+    MaxValue: 2678400
+    Description: Maximum original sample age, capped at the 31-day History horizon.
+
 
   ApiAllowedOrigin:
     Type: String
@@ -132,6 +157,9 @@ Conditions:
   TelemetryHistoryIsEnabled: !Equals
     - !Ref EnableTelemetryHistory
     - "true"
+  OfflineHistoryBackfillIsEnabled: !And
+    - !Condition TelemetryHistoryIsEnabled
+    - !Equals [!Ref EnableOfflineHistoryBackfill, "true"]
   CognitoUsesSes: !Equals
     - !Ref CognitoEmailSendingAccount
     - DEVELOPER
@@ -643,6 +671,8 @@ Resources:
               received_at = int(event.get("receivedAt") or time.time() * 1000)
               vehicle_id = parts[1]
               topic_suffix = "/".join(parts[2:])
+              if topic_suffix in ("history/backfill/v1", "history/backfill/ack/v1"):
+                  return {"accepted": False, "reason": "history_backfill_isolated"}
               category = parts[2]
               value_type, value, payload_text, payload_bytes = decode_payload(event.get("payloadBase64"))
 
@@ -754,6 +784,209 @@ Resources:
         Actions:
           - Lambda:
               FunctionArn: !GetAtt StateIngestFunction.Arn
+
+  OfflineHistoryBackfillRole:
+    Type: AWS::IAM::Role
+    Condition: OfflineHistoryBackfillIsEnabled
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-history-backfill-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: bounded-history-backfill
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt VehicleHistoryTable.Arn
+              - Effect: Allow
+                Action: [iot:Publish]
+                Resource: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topic/mot/*/history/backfill/ack/v1"
+
+  OfflineHistoryBackfillFunction:
+    Type: AWS::Lambda::Function
+    Condition: OfflineHistoryBackfillIsEnabled
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-history-backfill"
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt OfflineHistoryBackfillRole.Arn
+      Environment:
+        Variables:
+          HISTORY_TABLE_NAME: !Ref VehicleHistoryTable
+          VEHICLE_ALLOWLIST: !Ref OfflineHistoryBackfillVehicleAllowlist
+          RETENTION_DAYS: !Ref HistoryRetentionDays
+          MAX_BATCH_SAMPLES: !Ref OfflineHistoryBackfillMaxSamples
+          MAX_SAMPLE_AGE_SECONDS: !Ref OfflineHistoryBackfillMaxAgeSeconds
+      Code:
+        ZipFile: |
+          import base64
+          import json
+          import os
+          import re
+          import time
+          from decimal import Decimal, InvalidOperation
+          import boto3
+          from botocore.exceptions import ClientError
+
+          table = boto3.resource("dynamodb").Table(os.environ["HISTORY_TABLE_NAME"])
+          iot_data = boto3.client("iot-data")
+          allowlist = {v.strip() for v in os.environ.get("VEHICLE_ALLOWLIST", "").split(",") if v.strip()}
+          retention_days = min(31, max(1, int(os.environ.get("RETENTION_DAYS", "31"))))
+          max_samples = min(120, max(1, int(os.environ.get("MAX_BATCH_SAMPLES", "60"))))
+          max_age = min(31 * 86400, max(300, int(os.environ.get("MAX_SAMPLE_AGE_SECONDS", "2678400"))))
+          batch_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+          intervals = {"soc": 300, "speed": 60}
+
+          class Rejected(ValueError):
+              pass
+
+          def parse_topic(topic):
+              parts = str(topic or "").split("/")
+              if len(parts) != 5 or parts[0] != "mot" or "/".join(parts[2:]) != "history/backfill/v1":
+                  raise Rejected("invalid_topic")
+              if not allowlist or parts[1] not in allowlist:
+                  raise Rejected("vehicle_not_allowed")
+              return parts[1]
+
+          def decode(encoded):
+              try:
+                  raw = base64.b64decode(encoded or "", validate=True)
+                  if not raw or len(raw) > 8192:
+                      raise Rejected("invalid_payload_size")
+                  value = json.loads(raw.decode("utf-8"), parse_float=Decimal)
+              except Rejected:
+                  raise
+              except Exception as error:
+                  raise Rejected("invalid_payload") from error
+              if not isinstance(value, dict):
+                  raise Rejected("invalid_envelope")
+              return value
+
+          def number(value, signal):
+              if isinstance(value, bool):
+                  raise Rejected("invalid_sample_value")
+              try:
+                  result = Decimal(str(value))
+              except (InvalidOperation, TypeError, ValueError) as error:
+                  raise Rejected("invalid_sample_value") from error
+              if not result.is_finite() or (signal == "soc" and not 0 <= result <= 100) or (signal == "speed" and not 0 <= result <= 200):
+                  raise Rejected("invalid_sample_value")
+              return result
+
+          def validate(envelope, vehicle_id, now_ms):
+              if envelope.get("version") != 1 or envelope.get("vehicleId") != vehicle_id:
+                  raise Rejected("invalid_envelope")
+              batch_id = str(envelope.get("batchId", ""))
+              if not batch_pattern.fullmatch(batch_id):
+                  raise Rejected("invalid_batch_id")
+              samples = envelope.get("samples")
+              if not isinstance(samples, list) or not 1 <= len(samples) <= max_samples:
+                  raise Rejected("invalid_sample_count")
+              minimum = now_ms - max_age * 1000
+              maximum = now_ms + 60000
+              previous = 0
+              validated = []
+              for sample in samples:
+                  if not isinstance(sample, dict) or set(sample) != {"signal", "sampledAt", "value"}:
+                      raise Rejected("invalid_sample")
+                  signal = sample.get("signal")
+                  sampled_at = sample.get("sampledAt")
+                  if signal not in intervals or isinstance(sampled_at, bool) or not isinstance(sampled_at, int):
+                      raise Rejected("invalid_sample")
+                  if sampled_at < minimum or sampled_at > maximum or sampled_at < previous:
+                      raise Rejected("invalid_sample_timestamp")
+                  previous = sampled_at
+                  validated.append((signal, sampled_at, number(sample.get("value"), signal)))
+              return batch_id, validated
+
+          def publish_ack(vehicle_id, payload):
+              iot_data.publish(topic=f"mot/{vehicle_id}/history/backfill/ack/v1", qos=1, retain=False,
+                               payload=json.dumps(payload, separators=(",", ":")).encode())
+
+          def handler(event, context):
+              vehicle_id = ""
+              batch_id = ""
+              try:
+                  received_at = int(event.get("receivedAt") or time.time() * 1000)
+                  vehicle_id = parse_topic(event.get("mqttTopic"))
+                  envelope = decode(event.get("payloadBase64"))
+                  candidate = str(envelope.get("batchId", ""))
+                  if batch_pattern.fullmatch(candidate):
+                      batch_id = candidate
+                  batch_id, samples = validate(envelope, vehicle_id, received_at)
+                  stored = duplicates = 0
+                  for index, (signal, sampled_at, value) in enumerate(samples):
+                      seconds = sampled_at // 1000
+                      bucket = seconds if signal == "speed" and value == 0 else seconds - seconds % intervals[signal]
+                      try:
+                          table.put_item(Item={"vehicleId": vehicle_id, "sampleKey": f"{signal}#{bucket:010d}",
+                              "signal": signal, "sampledAt": sampled_at, "receivedAt": received_at,
+                              "value": value, "valueType": "number", "source": "offline-backfill-v1",
+                              "batchId": batch_id, "batchIndex": index,
+                              "expiresAt": seconds + retention_days * 86400},
+                              ConditionExpression="attribute_not_exists(sampleKey)")
+                          stored += 1
+                      except ClientError as error:
+                          if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                              raise
+                          duplicates += 1
+                  result = {"version": 1, "batchId": batch_id, "accepted": True,
+                            "sampleCount": len(samples), "stored": stored, "duplicates": duplicates}
+                  publish_ack(vehicle_id, result)
+                  print(json.dumps({"eventType": "cache_backfill_accepted", **result}))
+                  return result
+              except Rejected as error:
+                  result = {"version": 1, "batchId": batch_id, "accepted": False, "reason": str(error)}
+                  if vehicle_id:
+                      publish_ack(vehicle_id, result)
+                  print(json.dumps({"eventType": "cache_backfill_rejected", **result}))
+                  return result
+
+  OfflineHistoryBackfillLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: OfflineHistoryBackfillIsEnabled
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OfflineHistoryBackfillFunction}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  OfflineHistoryBackfillInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: OfflineHistoryBackfillIsEnabled
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OfflineHistoryBackfillFunction
+      Principal: iot.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:rule/${ProjectName}_${Environment}_history_backfill"
+
+  OfflineHistoryBackfillRule:
+    Type: AWS::IoT::TopicRule
+    Condition: OfflineHistoryBackfillIsEnabled
+    DependsOn: [OfflineHistoryBackfillInvokePermission, OfflineHistoryBackfillLogGroup]
+    Properties:
+      RuleName: !Sub "${ProjectName}_${Environment}_history_backfill"
+      TopicRulePayload:
+        AwsIotSqlVersion: "2016-03-23"
+        RuleDisabled: false
+        Sql: >
+          SELECT topic() AS mqttTopic,
+                 timestamp() AS receivedAt,
+                 encode(*, 'base64') AS payloadBase64
+          FROM 'mot/+/history/backfill/v1'
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt OfflineHistoryBackfillFunction.Arn
 
 
   VehicleApiRole:

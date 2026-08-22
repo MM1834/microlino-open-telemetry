@@ -18,9 +18,13 @@
 - [JNY-001 — journey summary and energy email pilot](JNY-001.md)
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
+- [LG-CAN2-001 — LilyGO mobile dual-CAN pilot](LG-CAN2-001.md)
 
 ## Completed predecessors
 
+- [CACHE-001](CACHE-001.md) delivered the optional bounded SOC/Speed offline
+  cache, isolated and production Backfill paths, physical N16 power/replay
+  acceptance and GPS-derived UTC cold-start proof on 2026-08-21.
 - [DEMO-001](DEMO-001.md) deployed the isolated frozen demo dataset, enforced
   server-side read-only notification and onboarding boundaries, and passed hosted
   acceptance on 2026-08-20.

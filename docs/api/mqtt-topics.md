@@ -112,6 +112,25 @@ Telemetry helpers currently publish retained values for most telemetry/system
 suffixes. Heartbeat is non-retained. Consumers should use received metadata and
 presence/last-seen fields rather than equating a retained value with fresh data.
 
+## CACHE-001 offline History backfill
+
+The isolated CACHE-001 test lane uses a separate namespace and is not consumed by
+the operational `mot/#` rule:
+
+```text
+mot-test/<testVehicleId>/history/backfill/v1
+mot-test/<testVehicleId>/history/backfill/ack/v1
+```
+
+The non-retained version-1 backfill envelope contains one stable `batchId` and an
+oldest-first `samples` array. Each closed sample object contains only `signal`,
+`sampledAt` in UTC milliseconds and numeric `value`; accepted signals are `soc`
+and `speed`. The backend enforces vehicle/topic agreement, sample ordering, age,
+future skew, numeric ranges, payload size and at most 60 samples. Firmware emits
+at most eight samples per replay batch and deletes them only after the matching
+authenticated acknowledgement. Duplicate batches are harmless. Backfill writes
+History only and has no State or WebSocket route.
+
 ## Decoder limitation
 
 Pioneer Standard-CAN publishes only the evidence-bounded fields above. V2 uses

@@ -107,6 +107,20 @@ The repository now contains a disabled-by-default bounded history side path and 
 authorized history endpoint. It is not yet deployed or AWS-validated. See
 [Telemetry history pilot](telemetry-history.md).
 
+## Isolated offline-cache test lane
+
+CACHE-001 has a separate CloudFormation stack `mot-cachetest`. It listens only to
+the exact `mot-test/cache-xiao-01/history/backfill/v1` topic and owns a separate
+on-demand table with three-day TTL, one bounded Lambda, short-retention logs, an
+error alarm and a dedicated Thing/policy. It has no Cognito, portal API, live
+State table or WebSocket resources.
+
+A synthetic 2026-08-20 smoke test stored one SOC and one Speed point; replaying
+the identical batch stored no additional rows and reported two duplicates. A
+consistent read of the operational State table returned zero rows for the test
+vehicle. Device certificate attachment and the physical no-GPS XIAO outage test
+remain pending.
+
 ## Not currently implemented
 
 - deployed account invitation/device-claim backend (B1/B2 exist locally only);

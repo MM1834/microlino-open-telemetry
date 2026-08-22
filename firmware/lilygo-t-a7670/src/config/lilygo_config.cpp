@@ -56,12 +56,14 @@ bool LilygoConfig::localAdminConfigured() const
 void LilygoConfigurationManager::normalize()
 {
     config.deviceName = normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
-    config.vehicleId = normalizeIdentifier(config.vehicleId, "pioneer");
+    config.vehicleId = normalizeIdentifier(config.vehicleId, "pioneer-lilygo");
     config.mqttPrefix = normalizeTopicPrefix(config.mqttPrefix);
     config.mqttPort = normalizePort(config.mqttPort);
     config.lteApn.trim();
     config.lteUser.trim();
-    config.canProfile = decoderProfileNormalize(config.canProfile);
+    config.canProfile = decoderProfileNormalize(
+        config.canProfile, DECODER_PROFILE_STANDARD_CAN_V1_PIONEER);
+    config.can2Profile = decoderProfileNormalize(config.can2Profile, DECODER_PROFILE_DISPLAY_CAN);
 }
 
 void LilygoConfigurationManager::load()
@@ -79,7 +81,7 @@ void LilygoConfigurationManager::load()
     config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
     config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
     config.deviceName = getStringOrDefault("deviceName", "");
-    config.vehicleId = getStringOrDefault("vehicleId", "pioneer");
+    config.vehicleId = getStringOrDefault("vehicleId", "pioneer-lilygo");
     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
     const bool securityV1 = prefs.getBool("securityV1", false);
     config.otaEnabled = securityV1 && prefs.getBool("otaEnabled", false);
@@ -92,10 +94,33 @@ void LilygoConfigurationManager::load()
     config.otaPassword = getStringOrDefault("otaPassword", "");
     config.abrpEnabled = prefs.isKey("abrpEnabled") ? prefs.getBool("abrpEnabled", false) : false;
     config.gpsEnabled = prefs.getBool("gpsEn", true);
+    config.offlineCacheEnabled = prefs.getBool("cacheEn", false);
     config.abrpApiKey = getStringOrDefault("abrpApiKey", "");
     config.abrpUserToken = getStringOrDefault("abrpUserToken", "");
     config.onboardingComplete = prefs.getBool("onboarded", false);
-    config.canProfile = decoderProfileNormalize(prefs.isKey("canProfile") ? prefs.getUChar("canProfile", DECODER_PROFILE_DISPLAY_CAN) : DECODER_PROFILE_DISPLAY_CAN);
+    const bool vehicleIdentityV1 = prefs.getBool("lgVehicleV1", false);
+    if (!vehicleIdentityV1) {
+        if (config.vehicleId == "pioneer") config.vehicleId = "pioneer-lilygo";
+        prefs.putString("vehicleId", config.vehicleId);
+        prefs.putBool("lgVehicleV1", true);
+    }
+    const bool dualCanMapV1 = prefs.getBool("dualCanMapV1", false);
+    if (!dualCanMapV1) {
+        // LG-CAN2-001 changes the physical mapping to match the C6 pilot:
+        // native TWAI CAN1 = Standard CAN, MCP2515 CAN2 = Display CAN.
+        config.canProfile = DECODER_PROFILE_STANDARD_CAN_V1_PIONEER;
+        config.can2Profile = DECODER_PROFILE_DISPLAY_CAN;
+        prefs.putUChar("canProfile", static_cast<uint8_t>(config.canProfile));
+        prefs.putUChar("can2Profile", static_cast<uint8_t>(config.can2Profile));
+        prefs.putBool("dualCanMapV1", true);
+    } else {
+        config.canProfile = decoderProfileNormalize(
+            prefs.getUChar("canProfile", DECODER_PROFILE_STANDARD_CAN_V1_PIONEER),
+            DECODER_PROFILE_STANDARD_CAN_V1_PIONEER);
+        config.can2Profile = decoderProfileNormalize(
+            prefs.getUChar("can2Profile", DECODER_PROFILE_DISPLAY_CAN),
+            DECODER_PROFILE_DISPLAY_CAN);
+    }
     prefs.end();
 
     normalize();
@@ -124,9 +149,11 @@ void LilygoConfigurationManager::save()
     prefs.putString("otaPassword", config.otaPassword);
     prefs.putBool("abrpEnabled", config.abrpEnabled);
     prefs.putBool("gpsEn", config.gpsEnabled);
+    prefs.putBool("cacheEn", config.offlineCacheEnabled);
     prefs.putString("abrpApiKey", config.abrpApiKey);
     prefs.putString("abrpUserToken", config.abrpUserToken);
     prefs.putUChar("canProfile", static_cast<uint8_t>(config.canProfile));
+    prefs.putUChar("can2Profile", static_cast<uint8_t>(config.can2Profile));
     prefs.putBool("onboarded", config.onboardingComplete);
     prefs.end();
 }
@@ -155,10 +182,12 @@ String LilygoConfigurationManager::exportJson(bool includeSecrets) const
     doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE] = config.awsServiceEnabled;
     doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE] = config.abrpEnabled;
     doc[ConfigKeys::GPS_ENABLED] = config.gpsEnabled;
+    doc["offlineCacheEnabled"] = config.offlineCacheEnabled;
     doc[ConfigKeys::MQTT_HOST] = config.mqttHost;
     doc[ConfigKeys::MQTT_PORT] = config.mqttPort;
     doc[ConfigKeys::OTA_ENABLED] = config.otaEnabled;
     doc[ConfigKeys::CAN1_PROFILE] = static_cast<int>(config.canProfile);
+    doc[ConfigKeys::CAN2_PROFILE] = static_cast<int>(config.can2Profile);
     doc[ConfigKeys::ONBOARDING_COMPLETE] = config.onboardingComplete;
 
     if (includeSecrets) {
@@ -221,6 +250,7 @@ bool LilygoConfigurationManager::importJson(const String& json, String& error)
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].isNull()) config.awsServiceEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::AWS_SERVICE].as<bool>();
     if (!doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].isNull()) config.abrpEnabled = doc[ConfigKeys::SERVICES][ConfigKeys::ABRP_SERVICE].as<bool>();
     if (!doc[ConfigKeys::GPS_ENABLED].isNull()) config.gpsEnabled = doc[ConfigKeys::GPS_ENABLED].as<bool>();
+    if (!doc["offlineCacheEnabled"].isNull()) config.offlineCacheEnabled = doc["offlineCacheEnabled"].as<bool>();
 
     setStringIfPresent(doc, ConfigKeys::MQTT_HOST, config.mqttHost);
     if (!doc[ConfigKeys::MQTT_PORT].isNull()) config.mqttPort = doc[ConfigKeys::MQTT_PORT].as<uint16_t>();
@@ -233,6 +263,11 @@ bool LilygoConfigurationManager::importJson(const String& json, String& error)
 
     if (!doc[ConfigKeys::CAN1_PROFILE].isNull()) config.canProfile = decoderProfileNormalize(doc[ConfigKeys::CAN1_PROFILE].as<int>());
     else if (!doc[ConfigKeys::LEGACY_CAN_PROFILE].isNull()) config.canProfile = decoderProfileNormalize(doc[ConfigKeys::LEGACY_CAN_PROFILE].as<int>());
+    if (!doc[ConfigKeys::CAN2_PROFILE].isNull()) {
+        config.can2Profile = decoderProfileNormalize(
+            doc[ConfigKeys::CAN2_PROFILE].as<int>(),
+            DECODER_PROFILE_STANDARD_CAN_V1_PIONEER);
+    }
 
     if (!doc[ConfigKeys::ONBOARDING_COMPLETE].isNull()) config.onboardingComplete = doc[ConfigKeys::ONBOARDING_COMPLETE].as<bool>();
 

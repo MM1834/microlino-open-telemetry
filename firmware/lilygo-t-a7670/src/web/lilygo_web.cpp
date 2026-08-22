@@ -19,6 +19,7 @@
 #include "telemetry/telemetry.h"
 #include "config/configuration_readiness.h"
 #include "lte/lilygo_lte_client.h"
+#include "cache/lilygo_offline_cache.h"
 
 static WebServer server(80);
 static bool rebootPending = false;
@@ -127,6 +128,7 @@ static void handleRoot()
     s += "<div class='card'><h2>Telemetry Transport (AWS IoT / Legacy MQTT)</h2>";
     s += "<button onclick='loadMqtt()'>Refresh</button>";
     s += "<pre id='mqtt'>Loading...</pre></div>";
+    s += "<div class='card'><h2>Offline History cache</h2><pre id='cache'>Loading...</pre></div>";
 
     s += "<div class='card'><h2>ABRP</h2>";
     s += "<button onclick='loadAbrp()'>Refresh</button>";
@@ -140,10 +142,11 @@ static void handleRoot()
     s += "async function loadCan(){const r=await fetch('/api/lilygo/can');document.getElementById('can').textContent=JSON.stringify(await r.json(),null,2)}";
     s += "async function loadTelemetry(){const r=await fetch('/api/telemetry');document.getElementById('telemetry').textContent=JSON.stringify(await r.json(),null,2)}";
     s += "async function loadMqtt(){const r=await fetch('/api/lilygo/mqtt');document.getElementById('mqtt').textContent=JSON.stringify(await r.json(),null,2)}";
+    s += "async function loadCache(){const r=await fetch('/api/lilygo/cache');document.getElementById('cache').textContent=JSON.stringify(await r.json(),null,2)}";
     s += "async function loadAbrp(){const r=await fetch('/api/lilygo/abrp');document.getElementById('abrp').textContent=JSON.stringify(await r.json(),null,2)}";
     s += "async function testAbrp(){const r=await fetch('/api/lilygo/abrp/test',{method:'POST'});document.getElementById('abrp').textContent=JSON.stringify(await r.json(),null,2)}";
-    s += "loadNetwork();loadModem();loadGps();loadCan();loadTelemetry();loadMqtt();loadAbrp();";
-    s += "setInterval(loadNetwork,5000);setInterval(loadGps,3000);setInterval(loadCan,3000);setInterval(loadTelemetry,3000);setInterval(loadMqtt,5000);setInterval(loadAbrp,10000);";
+    s += "loadNetwork();loadModem();loadGps();loadCan();loadTelemetry();loadMqtt();loadCache();loadAbrp();";
+    s += "setInterval(loadNetwork,5000);setInterval(loadGps,3000);setInterval(loadCan,3000);setInterval(loadTelemetry,3000);setInterval(loadMqtt,5000);setInterval(loadCache,5000);setInterval(loadAbrp,10000);";
     s += "</script></body></html>";
 
     server.send(200, "text/html", s);
@@ -162,13 +165,17 @@ static void handleConfig()
     s += "<label>Vehicle ID</label><input name='vehicleId' value='" + config.vehicleId + "'>";
     s += "<label>MQTT Prefix</label><input name='mqttPrefix' value='" + config.mqttPrefix + "'>";
     s += "<div class='card'><h2>CAN channels</h2><h3>CAN 1</h3><p>Available · ESP32 TWAI</p>";
-    s += "<label>Decoder profile</label><select name='canProfile'>" + profileOptions(config.canProfile) + "</select>";
-    s += "<p class='muted'>Display-CAN is the single-CAN default. Standard-CAN V1 - Pioneer decodes the verified battery energy-flow fields; Standard-CAN V2 uses the same provisional layout pending validation on a V2 vehicle.</p><hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on LilyGO T-A7670 hardware.</p></div>";
+    s += "<label>Decoder profile</label><select name='can1Profile'>" + profileOptions(config.canProfile) + "</select>";
+    s += "<p class='muted'>CAN1/TWAI is wired to Standard-CAN, matching the C6 mapping.</p><hr><h3>CAN 2</h3><p>Adafruit MCP2515 FeatherWing · SPI · Display-CAN · receive-only</p>";
+    s += "<label>Decoder profile</label><select name='can2Profile'>" + profileOptions(config.can2Profile) + "</select>";
+    s += "<p class='muted'>Hardware requirement: TERM open and SLNT tied to 3.3 V. Default mapping: CAN1 Standard-CAN V1 - Pioneer, CAN2 Display-CAN.</p></div>";
 
     s += "<div class='card'><h2>Services</h2>";
     s += "<label><input type='checkbox' style='width:auto' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label>";
     s += "<label><input type='checkbox' style='width:auto' name='svcMqtt' value='1'" + String(config.mqttServiceEnabled ? " checked" : "") + "> MQTT</label>";
     s += "<label><input type='checkbox' style='width:auto' name='abrpEnabled' value='1'" + String(config.abrpEnabled ? " checked" : "") + "> ABRP</label>";
+    s += "<label><input type='checkbox' style='width:auto' name='offlineCacheEnabled' value='1'" + String(config.offlineCacheEnabled ? " checked" : "") + "> Offline SOC/Speed History cache (128 KiB)</label>";
+    s += "<p class='muted'>Default: disabled. Stores only SOC and active Speed with trustworthy UTC; no location. Replays only after a fresh live AWS publication.</p>";
     s += "<p class='muted'>Each service is optional. GPS and CAN data are shared telemetry sources.</p></div>";
     if (l76kGpsDetected() || !config.gpsEnabled) s += "<div class='card'><h2>GPS</h2><input type='hidden' name='gpsControlPresent' value='1'><label><input type='checkbox' style='width:auto' name='gpsEnabled'" + String(config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><p class='muted'>Default: enabled. Disabling stops GPS initialization, decoding and telemetry after reboot.</p></div>";
 
@@ -225,7 +232,8 @@ static void handleConfigSave()
     config.deviceName = server.arg("deviceName");
     config.vehicleId = server.arg("vehicleId");
     config.mqttPrefix = server.arg("mqttPrefix");
-    config.canProfile = decoderProfileNormalize(server.arg("canProfile").toInt());
+    config.canProfile = decoderProfileNormalize(server.arg("can1Profile").toInt());
+    config.can2Profile = decoderProfileNormalize(server.arg("can2Profile").toInt());
 
     config.wifiSsid = server.arg("wifiSsid");
     if (!server.arg("wifiPass").isEmpty()) config.wifiPass = server.arg("wifiPass");
@@ -236,6 +244,8 @@ static void handleConfigSave()
 
     config.awsServiceEnabled = server.hasArg("svcAws");
     config.mqttServiceEnabled = server.hasArg("svcMqtt");
+    config.offlineCacheEnabled = server.hasArg("offlineCacheEnabled");
+    if (previous.offlineCacheEnabled && !config.offlineCacheEnabled) lilygoOfflineCachePurge();
     if (server.hasArg("gpsControlPresent")) config.gpsEnabled = server.hasArg("gpsEnabled");
     config.mqttHost = server.arg("mqttHost");
     config.mqttPort = (uint16_t)server.arg("mqttPort").toInt();
@@ -358,6 +368,7 @@ static void handleStatusJson()
     json += "\"gps\":" + l76kGpsStatusJson() + ",";
     json += "\"can\":" + lilygoCanStatusJson() + ",";
     json += "\"mqtt\":" + lilygoMqttStatusJson() + ",";
+    json += "\"offlineCache\":" + lilygoOfflineCacheStatusJson() + ",";
     json += "\"abrp\":" + lilygoAbrpStatusJson() + ",";
     json += "\"telemetry\":" + telemetryToJson(telemetry);
     json += "}";
@@ -419,6 +430,11 @@ static void handleLteMqttTraceClear()
 static void handleMqtt()
 {
     server.send(200, "application/json", lilygoMqttStatusJson());
+}
+
+static void handleOfflineCache()
+{
+    server.send(200, "application/json", lilygoOfflineCacheStatusJson());
 }
 
 static void handleMqttDebug()
@@ -543,7 +559,7 @@ static void handleWizard()
             html += "<p>You can leave the wizard at any time and continue later.</p>";
             break;
         case 2:
-            html += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>LTE modem: available</li><li>GPS module: <span id=\"wizard-gps-hardware\">checking…</span></li><li>CAN1: available</li><li>CAN2: reserved</li></ul>";
+            html += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>LTE modem: available</li><li>GPS module: <span id=\"wizard-gps-hardware\">checking…</span></li><li>CAN1: ESP32 TWAI</li><li>CAN2: Adafruit MCP2515 FeatherWing (check validation diagnostics)</li></ul>";
             html += "<script>fetch('/api/lilygo/gps').then(r=>r.json()).then(g=>{const labels={GPS_DISABLED:'disabled',GPS_NOT_DETECTED:'not detected',GPS_DETECTED:'detected',GPS_FIX:'detected with fix'};document.getElementById('wizard-gps-hardware').textContent=labels[g.state]||'unknown';}).catch(()=>{document.getElementById('wizard-gps-hardware').textContent='unknown';});</script>";
             if (l76kGpsDetected() || !config.gpsEnabled) html += "<form method='POST' action='/api/gps/toggle'><label><input type='checkbox' name='gpsEnabled'" + String(config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><button>Save &amp; reboot</button></form>";
             html += "<p class='muted'>Runtime checks are performed in the validation step.</p>";
@@ -552,7 +568,7 @@ static void handleWizard()
             html += "<h2>Connectivity</h2><p>Configure WiFi and the mobile-network parameters required by your SIM.</p><p><a href='/config?return=/wizard?step=3'><button type='button'>Open connectivity configuration</button></a></p>";
             break;
         case 4:
-            html += "<h2>Vehicle and CAN profile</h2><p>Set the vehicle ID and select the decoder profile used by CAN1.</p><p><a href='/config?return=/wizard?step=4'><button type='button'>Open vehicle configuration</button></a></p>";
+            html += "<h2>Vehicle and CAN profiles</h2><p>Set the vehicle ID and select independent decoder profiles for CAN1 and CAN2.</p><p><a href='/config?return=/wizard?step=4'><button type='button'>Open vehicle configuration</button></a></p>";
             break;
         case 5:
             html += "<h2>Telemetry services</h2><p>Configure MQTT and ABRP using the existing service settings.</p><p><a href='/config?return=/wizard?step=5'><button type='button'>Open service configuration</button></a></p>";
@@ -581,7 +597,7 @@ static void handleOnboardingStatus()
                   ",\"step\":\"" + String(onboardingStepId(static_cast<OnboardingStep>(step - 1))) +
                   "\",\"stepNumber\":" + String(step) +
                   ",\"stepCount\":" + String(onboardingStepCount()) +
-                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":true,\"gps\":" + String(l76kGpsDetected() ? "true" : "false") + ",\"gpsState\":\"" + String(l76kGpsStateName()) + "\",\"canChannels\":1}";
+                  ",\"board\":\"" MOT_BOARD "\",\"wifi\":true,\"lte\":true,\"gps\":" + String(l76kGpsDetected() ? "true" : "false") + ",\"gpsState\":\"" + String(l76kGpsStateName()) + "\",\"canChannels\":2}";
     server.send(200, "application/json", json);
 }
 
@@ -649,6 +665,7 @@ void setupLilygoWeb()
     server.on("/api/lilygo/abrp", HTTP_GET, []() { if (requireAdmin()) handleAbrp(); });
     server.on("/api/lilygo/abrp/test", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleAbrpTest(); });
     server.on("/api/lilygo/mqtt", HTTP_GET, []() { if (requireAdmin()) handleMqtt(); });
+    server.on("/api/lilygo/cache", HTTP_GET, []() { if (requireAdmin()) handleOfflineCache(); });
     server.on("/api/lilygo/lte/mqtt-trace", HTTP_GET, []() { if (requireAdmin()) handleLteMqttTrace(); });
     server.on("/api/lilygo/lte/mqtt-trace/clear", HTTP_POST, []() { if (requireAdmin() && requireSameOrigin()) handleLteMqttTraceClear(); });
     server.on("/api/lilygo/mqtt/debug", HTTP_GET, []() { if (requireAdmin()) handleMqttDebug(); });

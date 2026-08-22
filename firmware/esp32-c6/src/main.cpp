@@ -9,6 +9,7 @@
 #include "c6_dual_can.h"
 #include "c6_gps.h"
 #include "c6_network.h"
+#include "c6_offline_cache.h"
 #include "c6_web.h"
 #include "telemetry/telemetry.h"
 
@@ -115,6 +116,21 @@ void handleSerialCommand(String command)
         Serial.println("AWS IoT: " + c6AwsStatus());
         return;
     }
+    if (normalized == "cache status") {
+        Serial.println("Offline cache: " + c6OfflineCacheStatusJson());
+        return;
+    }
+    if (normalized == "cache enable" || normalized == "cache disable") {
+        const bool enabled = normalized == "cache enable";
+        c6ConfigSetOfflineCacheEnabled(enabled);
+        Serial.printf("Offline cache: %s\n", enabled ? "enabled" : "disabled and purged");
+        return;
+    }
+    if (normalized == "cache purge") {
+        c6OfflineCachePurge();
+        Serial.println("Offline cache: queued samples purged");
+        return;
+    }
     if (normalized == "abrp status") {
         Serial.println("ABRP: " + c6AbrpStatusJson());
         return;
@@ -148,7 +164,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | abrp status | abrp send | abrp enable | abrp disable");
+        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable");
         return;
     }
 
@@ -195,6 +211,7 @@ void setup()
     c6BoardSetup();
     telemetryInit();
     c6ConfigLoad();
+    c6OfflineCacheSetup();
 
     if (!c6DualCanSetup()) {
         Serial.println("Dual-CAN startup incomplete");
@@ -205,7 +222,7 @@ void setup()
     c6AwsSetup();
     c6AbrpSetup();
     c6DriveCaptureReset();
-    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | abrp status | abrp send | abrp enable | abrp disable");
+    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable");
 }
 
 void loop()

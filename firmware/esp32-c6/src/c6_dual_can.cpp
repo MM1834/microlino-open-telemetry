@@ -16,6 +16,14 @@ struct Channel {
 
 Channel channels[2];
 
+bool standardCanConfigured()
+{
+    return channels[0].status.profile == DECODER_PROFILE_STANDARD_CAN_V1_PIONEER ||
+           channels[0].status.profile == DECODER_PROFILE_STANDARD_CAN_V2 ||
+           channels[1].status.profile == DECODER_PROFILE_STANDARD_CAN_V1_PIONEER ||
+           channels[1].status.profile == DECODER_PROFILE_STANDARD_CAN_V2;
+}
+
 bool startChannel(size_t index, int controller, int rxPin, int txPin, DecoderProfile profile)
 {
     twai_general_config_t general = TWAI_GENERAL_CONFIG_DEFAULT(
@@ -80,7 +88,11 @@ void receiveChannel(size_t index)
     }
     c6CanScanObserve(index, frame);
     c6DriveCaptureObserve(index, frame);
-    decoderEngineHandleFrame(frame, channel.status.profile);
+    if (!(standardCanConfigured() &&
+          channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&
+          frame.id == 0x604)) {
+        decoderEngineHandleFrame(frame, channel.status.profile);
+    }
 }
 
 }  // namespace

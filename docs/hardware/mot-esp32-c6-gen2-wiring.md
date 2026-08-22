@@ -18,6 +18,8 @@ voraus. Bei Unsicherheit den Adapter nicht mit dem Fahrzeug verbinden.
 
 ![MOT ESP32-C6 Gen.2 wiring](../assets/images/diagrams/mot-esp32-c6-gen2-wiring.svg)
 
+[Druckfähiges Dual-TWAI-Verdrahtungsdiagramm (PDF)](../assets/pdfs/hardware/nanoesp32-c6-n16-dual-twai-verkabelung.pdf)
+
 ## Benötigte Teile
 
 | Anzahl | Bauteil | Mindestanforderung |
@@ -42,9 +44,9 @@ Spannungsfestigkeit allein macht einen Step-down noch nicht automotive-tauglich.
 | Funktion | Anschluss N16 | Anschluss Modul |
 |---|---:|---|
 | CAN1 empfangen | GPIO0 | CAN1 RXD |
-| CAN1 senden | GPIO1 | CAN1 TXD |
+| CAN1 senden, optional | GPIO1 | Über offenen TX-Enable-Jumper an CAN1 TXD |
 | CAN2 empfangen | GPIO2 | CAN2 RXD |
-| CAN2 senden | GPIO3 | CAN2 TXD |
+| CAN2 senden, optional | GPIO3 | Über offenen TX-Enable-Jumper an CAN2 TXD |
 | GPS empfangen | GPIO20 | GPS TX |
 | GPS senden | GPIO21 | GPS RX |
 | GPS-Zeitimpuls | nicht anschließen | GPS PPS offen lassen |
@@ -53,8 +55,11 @@ Spannungsfestigkeit allein macht einen Step-down noch nicht automotive-tauglich.
 | Bezugsmasse | GND | GND beider CAN-Module, GPS und Fahrzeug-Signalmasse |
 
 RX und TX werden nur beim GPS gekreuzt: N16-RX erhält GPS-TX und N16-TX geht an
-GPS-RX. Bei den CAN-Modulen werden die gleichnamigen Logiksignale verbunden:
-N16-CAN-TX an TXD und N16-CAN-RX an RXD.
+GPS-RX. CAN-RXD wird direkt mit dem jeweiligen N16-RX verbunden. CAN-TXD bleibt
+im normalen Pilotbetrieb vom N16 getrennt, wird am Transceiver definiert auf 3,3 V
+gehalten und darf nur über einen bewusst geschlossenen TX-Enable-Jumper mit dem
+jeweiligen N16-TX verbunden werden. Details und Bauteilwerte stehen in
+[CAN receive-only hardware design](can-receive-only-design.md).
 
 Nur 3,3-V-CAN-Transceiver wie SN65HVD230 oder nachweislich gleichwertige Module
 verwenden. Übliche 5-V-TJA1050-/MCP2551-Breakouts sind kein direkter Ersatz.
