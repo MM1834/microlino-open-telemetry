@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260814-journey-email1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260824-power-freshness1" />
   <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -123,6 +123,7 @@
           <div class="metric-card overview-charging">
             <div class="overview-charging-stationary"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><span class="overview-power-meter" data-power-meter hidden role="progressbar" aria-label="Leistung" aria-valuemin="0" aria-valuemax="20"><span data-power-meter-fill></span></span><p>Ladestatus</p></div>
             <div class="mobile-driving-flow" aria-live="polite"><span class="metric-icon green">↯</span><strong id="mobile-power-flow">--</strong><small id="mobile-vehicle-power">-- kW</small><span class="overview-power-meter" data-power-meter hidden role="progressbar" aria-label="Leistung" aria-valuemin="0" aria-valuemax="20"><span data-power-meter-fill></span></span><p>Leistungsfluss</p></div>
+            <small id="power-updated" class="metric-freshness muted" aria-live="polite" hidden></small>
           </div>
           <div class="metric-card overview-odometer"><span class="metric-icon">⌁</span><strong id="odo-main">-- km</strong><p>Gesamtkilometer</p></div>
         </div>
@@ -224,6 +225,7 @@
     </div>
     <div class="history-mini">
       <h3>Ø Nettoleistung</h3>
+      <div id="power-history-status" class="history-series-status" aria-live="polite"></div>
       <div class="history-series-status">− Verbrauch · + Laden/Rekuperation</div>
       <div class="history-chart-wrap">
         <div id="power-history-empty" class="history-empty">Noch keine Leistungs-History vorhanden.</div>
@@ -341,10 +343,10 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
-  <script src="js/app.js?v=20260824-ntf2"></script>
+  <script src="js/app.js?v=20260824-power-freshness1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260821-history-resilience1"></script>
+  <script src="js/history/history-chart.js?v=20260824-power-freshness1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>

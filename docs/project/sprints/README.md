@@ -22,6 +22,9 @@
 
 ## Completed predecessors
 
+- [PWR-FRESH-001](PWR-FRESH-001.md) marks stale charging/power overview values
+  and net-power History measurements without hiding retained data; hosted desktop
+  and smartphone acceptance passed on 2026-08-24.
 - [NTF-002](NTF-002.md) completed the qualified charging-stop email path with
   independent per-vehicle SOC target, durable 45+60-second validation and
   physical `pioneer` acceptance on 2026-08-24; SMS remains deferred.

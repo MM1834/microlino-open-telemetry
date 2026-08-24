@@ -191,6 +191,10 @@
 .range-forecast span,.range-forecast small{color:var(--muted);font-size:.78rem}
 .overview-charging-stationary{display:flex;flex-direction:column;align-items:center;justify-content:center}
 .mobile-driving-flow{display:none}
+.metric-freshness{margin-top:7px;font-size:.72rem;line-height:1.25;text-align:center}
+.overview-charging.is-data-stale .overview-charging-stationary,
+.overview-charging.is-data-stale .mobile-driving-flow{opacity:.46;filter:saturate(.25)}
+.overview-charging.is-data-stale .metric-freshness{color:var(--amber);opacity:1;filter:none}
 @media (max-width:900px){
   .sidebar{display:none}
   .main{display:flex;gap:14px}

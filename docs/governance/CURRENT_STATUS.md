@@ -19,6 +19,16 @@ revision.
 
 ## Current product direction
 
+PWR-FRESH-001 completed a portal refinement for the adaptive charging/power
+overview card and net-power History. It uses authoritative per-topic `receivedAt`
+metadata and the existing 120-second freshness boundary. Depending on the visible
+mode it evaluates charging/plugged state, vehicle/pack power or both; stale
+contents are dimmed and annotated with the local time of the last measurement
+while the retained value remains visible. Net-power History applies the same
+wording to its last real sample before gap-closing zeroes. The full 185
+portal/tool tests and JavaScript syntax validation pass. Hosted desktop and
+smartphone acceptance passed on 2026-08-24; the sprint is closed.
+
 SES-001 has a deployed and DKIM-verified MOT domain identity for Cognito
 invitation, verification and recovery mail. A direct message from
 `MOT Portal <support@microlino-open-telemetry.ch>` reached the controlled demo

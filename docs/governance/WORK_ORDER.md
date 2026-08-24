@@ -8,9 +8,22 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-21
+**Last reviewed:** 2026-08-24
 
 ## High priority
+
+### Mark stale charging and power values
+
+**Completed portal sprint:** [PWR-FRESH-001 — Charging and Power Freshness](../project/sprints/PWR-FRESH-001.md)
+
+**Objective:** Keep retained charging and power values visible while making it
+immediately clear in the overview and net-power History when their source topics
+have stopped updating.
+
+**Current status:** Mode-specific timestamps dim stale contents after the existing
+120-second boundary and show `Nicht aktuell · letzter Messpunkt hh:mm`. All 185
+portal/tool tests pass and hosted desktop and smartphone acceptance completed on
+2026-08-24. The sprint is closed.
 
 ### Detect charging interruption and prepare controlled SMS
 

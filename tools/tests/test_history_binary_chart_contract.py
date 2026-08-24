@@ -47,6 +47,15 @@ class HistoryBinaryChartContractTests(unittest.TestCase):
         self.assertEqual(1, vehicle_callback.count("MOTHistoryChart?.render?.()"))
         self.assertIn("if (selected !== previous)", vehicle_callback)
 
+    def test_net_power_history_reports_last_real_measurement_freshness(self) -> None:
+        self.assertIn('id="power-history-status"', HTML)
+        self.assertIn("updatePowerStatus(powerSource,resolutionSeconds)", HISTORY)
+        self.assertIn('document.getElementById("power-history-status")', HISTORY)
+        self.assertIn("Nicht aktuell · letzter Messpunkt ${time} (Stillstand oder offline)", HISTORY)
+        status_call = HISTORY.index("updatePowerStatus(powerSource,resolutionSeconds)")
+        gap_call = HISTORY.index("const powerSamples=closeInactiveGaps")
+        self.assertLess(status_call, gap_call)
+
 
 if __name__ == "__main__":
     unittest.main()

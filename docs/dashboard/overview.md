@@ -3,6 +3,13 @@
 ![Desktop Home](../assets/images/dashboard/desktop-home.png)
 
 The dashboard provides current and live telemetry through the configured provider.
+The adaptive charging/power overview card evaluates the authoritative timestamp
+of the topics used by its current mode. After the existing 120-second freshness
+boundary, the retained charging or power presentation is dimmed and annotated
+with `Nicht aktuell · letzter Messpunkt hh:mm`; a fresh update clears the marker.
+The net-power History card uses the same current/stale wording. Its timestamp is
+derived from the last real power sample rather than synthetic zeroes used only to
+close inactive chart gaps.
 For the AWS backend it renders authorized SOC, Speed, signed-power, charging and
 plugged history for 24 hours, 7 days and 30 days. Speed and power gaps are closed
 at zero in the chart rather than linearly interpolated across missing reception.

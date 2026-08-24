@@ -198,6 +198,16 @@
     'display/speed_kmh',
     'display/odometer_km'
   ];
+  const CHARGING_FRESHNESS_KEYS = [
+    'charging/is_charging',
+    'charging/plugged'
+  ];
+  const POWER_FRESHNESS_KEYS = [
+    'bms/vehicle_power_w',
+    'bms/pack_power_w',
+    'charging/power_signed',
+    'charging/power_display'
+  ];
 
   function setText(id, value) {
     const el = $(id);
@@ -350,6 +360,52 @@
     setText('soc-updated', `Stand: ${relativeTime(receivedAt)} · ${stateLabel}`);
   }
 
+  function latestTopicTimestamp(keys) {
+    return keys.reduce((latest, key) => Math.max(
+      latest,
+      parseTimestampMs(state.metadata[key]?.receivedAt)
+    ), 0);
+  }
+
+  function formatFreshnessTime(timestampMs) {
+    return new Intl.DateTimeFormat(dashboardCfg.locale || 'de-CH', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date(timestampMs));
+  }
+
+  function updatePowerFreshness() {
+    const card = $('overview')?.querySelector('.overview-charging');
+    const status = $('power-updated');
+    if (!card || !status) return;
+
+    const charging = state.values['charging/is_charging'] === true ||
+      Number(state.values['charging/is_charging']) === 1;
+    const speed = Number(state.values['display/speed_kmh'] ?? state.values['display/speed']);
+    const moving = !charging && Number.isFinite(speed) && speed > 1;
+    const chargingTimestamp = latestTopicTimestamp(CHARGING_FRESHNESS_KEYS);
+    const powerTimestamp = latestTopicTimestamp(POWER_FRESHNESS_KEYS);
+    const receivedAt = moving
+      ? powerTimestamp
+      : charging
+        ? Math.max(chargingTimestamp, powerTimestamp)
+        : chargingTimestamp;
+
+    if (!receivedAt) {
+      card.classList.remove('is-data-stale');
+      status.hidden = true;
+      status.textContent = '';
+      return;
+    }
+
+    const stale = Date.now() - receivedAt > VEHICLE_ONLINE_MS;
+    card.classList.toggle('is-data-stale', stale);
+    status.hidden = !stale;
+    status.textContent = stale
+      ? `Nicht aktuell · letzter Messpunkt ${formatFreshnessTime(receivedAt)}`
+      : '';
+  }
+
   function updateDeviceInfo() {
     const mode = String(state.networkMode || '--').trim() || '--';
     const ip = String(state.deviceIp || '--').trim() || '--';
@@ -454,6 +510,7 @@
     setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
     updateVehicleStatus();
     updateSocFreshness();
+    updatePowerFreshness();
     if (state.values['location/latitude'] !== undefined && state.values['location/longitude'] !== undefined) {
       renderLocationStatus('mqtt');
     }
@@ -606,6 +663,7 @@
       meter.setAttribute('aria-valuenow', powerKw.toFixed(2));
       meter.querySelector('[data-power-meter-fill]')?.style.setProperty('--power-level', `${Math.min(100, powerKw / scaleMax * 100)}%`);
     });
+    updatePowerFreshness();
   }
   function renderChargingState() {
     const charging = state.values['charging/is_charging'] === true || Number(state.values['charging/is_charging']) === 1;
@@ -613,6 +671,7 @@
     const label = charging ? 'Lädt' : plugged ? 'Eingesteckt' : 'Nicht am Laden';
     setText('charging-main', label);
     setText('charging-card', label);
+    updatePowerFreshness();
   }
   function applyTopic(topic, payload, metadata = null) {
     const base = baseTopic() + '/';
@@ -670,6 +729,7 @@
     }
     if (OBD2_FRESHNESS_KEYS.includes(key)) updateObd2Freshness();
     if (key === 'display/soc') updateSocFreshness();
+    if (CHARGING_FRESHNESS_KEYS.includes(key) || POWER_FRESHNESS_KEYS.includes(key)) updatePowerFreshness();
 
     if (dataSourceCfg.type === 'legacy-mqtt') {
       window.MOTHistoryRecorder?.update(state.values, {
@@ -769,6 +829,12 @@ function resetDashboardForVehicle(vehicleId) {
   setText('mobile-power-flow', '--');
   setText('mobile-vehicle-power', '-- kW');
   $('overview')?.querySelector('.overview-charging')?.classList.remove('is-driving');
+  $('overview')?.querySelector('.overview-charging')?.classList.remove('is-data-stale');
+  const powerUpdated = $('power-updated');
+  if (powerUpdated) {
+    powerUpdated.hidden = true;
+    powerUpdated.textContent = '';
+  }
   setText('power', '-- kW');
   setText('voltage', '-- V');
   setText('charge-voltage', '-- V');
@@ -993,6 +1059,7 @@ function startDataProvider() {
         state.metadata = snapshot?.metadata || {};
         updateObd2Freshness();
         updateSocFreshness();
+        updatePowerFreshness();
         updateCoords('mqtt');
       },
       onError: error => console.error('MOT data provider error:', error)

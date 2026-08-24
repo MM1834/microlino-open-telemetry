@@ -101,6 +101,7 @@ async function render(hours=currentRangeHours){
       };
     })
     .sort((a,b)=>a.ts-b.ts);
+  updatePowerStatus(powerSource,resolutionSeconds);
   const powerSamples=closeInactiveGaps(
     powerSource,
     "power",
@@ -321,6 +322,24 @@ function updateSpeedStatus(samples,field,resolutionSeconds){
   const points=samples
     .filter(s=>s[field]!==null&&s[field]!==undefined&&Number.isFinite(Number(s[field])))
     .sort((a,b)=>a.ts-b.ts);
+  if(!points.length){
+    status.textContent="Nicht aktuell · noch kein Messpunkt";
+    status.classList.add("is-stale");
+    return;
+  }
+  const intervalMs=Math.max(60,Number(resolutionSeconds)||300)*1000;
+  const last=points[points.length-1];
+  const stale=Date.now()-last.ts>intervalMs*1.5;
+  const time=new Date(last.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  status.textContent=stale
+    ?`Nicht aktuell · letzter Messpunkt ${time} (Stillstand oder offline)`
+    :`Aktuell · letzter Messpunkt ${time}`;
+  status.classList.toggle("is-stale",stale);
+}
+
+function updatePowerStatus(points,resolutionSeconds){
+  const status=document.getElementById("power-history-status");
+  if(!status) return;
   if(!points.length){
     status.textContent="Nicht aktuell · noch kein Messpunkt";
     status.classList.add("is-stale");

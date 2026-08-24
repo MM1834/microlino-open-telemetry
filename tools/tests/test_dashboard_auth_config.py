@@ -130,6 +130,19 @@ class DashboardFreshnessTests(unittest.TestCase):
         self.assertIn("{ receivedAt: message.receivedAt }", provider)
         self.assertIn("Stand: ${relativeTime(receivedAt)} · ${stateLabel}", app)
 
+    def test_charging_and_power_card_marks_stale_topic_values(self) -> None:
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text()
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        css = (ROOT / "build/dashboard/current/css/dashboard.css").read_text()
+        self.assertIn('id="power-updated"', html)
+        self.assertIn("CHARGING_FRESHNESS_KEYS", app)
+        self.assertIn("POWER_FRESHNESS_KEYS", app)
+        self.assertIn("function updatePowerFreshness()", app)
+        self.assertIn("Date.now() - receivedAt > VEHICLE_ONLINE_MS", app)
+        self.assertIn("Nicht aktuell · letzter Messpunkt ${formatFreshnessTime(receivedAt)}", app)
+        self.assertIn("classList.toggle('is-data-stale', stale)", app)
+        self.assertIn(".overview-charging.is-data-stale", css)
+
 
 class DashboardOnboardingTests(unittest.TestCase):
     def test_empty_assignment_exposes_claim_form(self) -> None:
