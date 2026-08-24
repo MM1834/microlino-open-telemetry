@@ -22,6 +22,9 @@
 
 ## Completed predecessors
 
+- [NTF-002](NTF-002.md) completed the qualified charging-stop email path with
+  independent per-vehicle SOC target, durable 45+60-second validation and
+  physical `pioneer` acceptance on 2026-08-24; SMS remains deferred.
 - [CACHE-001](CACHE-001.md) delivered the optional bounded SOC/Speed offline
   cache, isolated and production Backfill paths, physical N16 power/replay
   acceptance and GPS-derived UTC cold-start proof on 2026-08-21.

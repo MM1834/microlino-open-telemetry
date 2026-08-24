@@ -5,6 +5,8 @@ from typing import Optional
 
 
 UNCHANGED_SOC_REFRESH_MS = 5 * 60 * 1000
+CHARGING_STOP_DELAY_MS = 60 * 1000
+CHARGING_START_QUALIFICATION_MS = 45 * 1000
 
 
 @dataclass(frozen=True)
@@ -12,6 +14,9 @@ class ChargingSessionState:
     session_id: Optional[str] = None
     plugged: bool = False
     charging_observed: bool = False
+    is_charging: Optional[bool] = None
+    charging_started_at: int = 0
+    stop_candidate_at: int = 0
     previous_soc: Optional[float] = None
     last_plugged_at: int = 0
     last_charging_at: int = 0
@@ -56,9 +61,29 @@ def apply_update(
     if topic_suffix == "charging/is_charging":
         if not isinstance(value, bool) or received_at <= state.last_charging_at:
             return state, None
+        candidate_at = state.stop_candidate_at
+        started_at = state.charging_started_at
+        if value:
+            candidate_at = 0
+            if state.is_charging is not True or started_at <= 0:
+                started_at = received_at
+        else:
+            if (
+                state.plugged
+                and state.charging_observed
+                and state.is_charging is True
+                and state.charging_started_at > 0
+                and received_at - state.charging_started_at
+                    >= CHARGING_START_QUALIFICATION_MS
+            ):
+                candidate_at = received_at
+            started_at = 0
         return replace(
             state,
             charging_observed=(state.charging_observed or (state.plugged and value)),
+            is_charging=value,
+            charging_started_at=started_at,
+            stop_candidate_at=candidate_at,
             last_charging_at=received_at,
         ), None
 
@@ -114,4 +139,25 @@ def crossed_threshold(
         session_id=before.session_id,
         previous_soc=before.previous_soc,
         current_soc=after.previous_soc,
+    )
+
+
+def charging_stop_due(
+    state: ChargingSessionState,
+    session_id: str,
+    candidate_at: int,
+    now_ms: int,
+    threshold: float,
+) -> bool:
+    """Return true only for the still-current persistent stop candidate."""
+    return (
+        bool(session_id)
+        and candidate_at > 0
+        and state.session_id == session_id
+        and state.stop_candidate_at == candidate_at
+        and state.plugged
+        and state.is_charging is False
+        and state.previous_soc is not None
+        and state.previous_soc < threshold
+        and now_ms >= candidate_at + CHARGING_STOP_DELAY_MS
     )

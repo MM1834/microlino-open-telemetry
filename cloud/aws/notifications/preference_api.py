@@ -56,6 +56,7 @@ def public(item):
             "enabled": False, "threshold": 80,
             "emailEnabled": False, "smsEnabled": False,
             "journeyEmailEnabled": False,
+            "chargingStopEmailEnabled": False, "chargingStopThreshold": 80,
             "emailConfirmed": False, "smsConfirmed": False,
             "readOnly": False,
         }
@@ -63,12 +64,15 @@ def public(item):
         key: item.get(key) for key in (
             "vehicleId", "enabled", "threshold", "emailEnabled", "smsEnabled",
             "journeyEmailEnabled", "email", "phoneE164", "emailConfirmed",
+            "chargingStopEmailEnabled", "chargingStopThreshold",
             "smsConfirmed", "updatedAt"
         )
     }
     result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
+    result["chargingStopEmailEnabled"] = item.get("chargingStopEmailEnabled") is True
     result["readOnly"] = False
     result["threshold"] = int(result.get("threshold") or 80)
+    result["chargingStopThreshold"] = int(result.get("chargingStopThreshold") or 80)
     result["updatedAt"] = int(result.get("updatedAt") or 0)
     return result
 
@@ -131,14 +135,19 @@ def handler(event, context):
         return response(200, public(reconcile_email_confirmation(key, item)))
     if method != "PUT":
         return response(405, {"error": "method_not_allowed"})
+    previous = preferences.get_item(Key=key, ConsistentRead=True).get("Item", {})
     try:
         body = json.loads(event.get("body") or "{}")
         threshold = int(body.get("threshold", 80))
+        charging_stop_threshold = int(body.get(
+            "chargingStopThreshold", previous.get("chargingStopThreshold", 80)
+        ))
     except (TypeError, ValueError, json.JSONDecodeError):
         return response(400, {"error": "invalid_request"})
     if threshold < 50 or threshold > 100:
         return response(400, {"error": "invalid_threshold"})
-    previous = preferences.get_item(Key=key, ConsistentRead=True).get("Item", {})
+    if charging_stop_threshold < 50 or charging_stop_threshold > 100:
+        return response(400, {"error": "invalid_charging_stop_threshold"})
     email = str(body.get("email", previous.get("email", ""))).strip().lower()
     phone = re.sub(
         r"[\s()-]", "",
@@ -149,6 +158,10 @@ def handler(event, context):
         "journeyEmailEnabled", previous.get("journeyEmailEnabled", False)
     ) is True
     journey_email_enabled = journey_email_requested and email_enabled
+    charging_stop_requested = body.get(
+        "chargingStopEmailEnabled", previous.get("chargingStopEmailEnabled", False)
+    ) is True
+    charging_stop_email_enabled = charging_stop_requested and email_enabled
     sms_enabled = body.get("smsEnabled") is True
     if email_enabled and not EMAIL.fullmatch(email):
         return response(400, {"error": "invalid_email"})
@@ -156,6 +169,8 @@ def handler(event, context):
         return response(400, {"error": "invalid_phone"})
     if "journeyEmailEnabled" in body and journey_email_requested and not email_enabled:
         return response(400, {"error": "journey_email_requires_email"})
+    if charging_stop_requested and not email_enabled:
+        return response(400, {"error": "charging_stop_email_requires_email"})
 
     item = {
         **key,
@@ -163,6 +178,8 @@ def handler(event, context):
         "threshold": threshold,
         "emailEnabled": email_enabled,
         "journeyEmailEnabled": journey_email_enabled,
+        "chargingStopEmailEnabled": charging_stop_email_enabled,
+        "chargingStopThreshold": charging_stop_threshold,
         "smsEnabled": sms_enabled,
         "email": email,
         "phoneE164": phone,

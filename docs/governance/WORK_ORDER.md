@@ -12,6 +12,31 @@
 
 ## High priority
 
+### Detect charging interruption and prepare controlled SMS
+
+**Completed work package:** [NTF-002 — Charging Interruption Notifications](../project/sprints/NTF-002.md)
+
+**Objective:** Detect a persistent transition from charging to still-plugged below
+the configured target, deliver one idempotent email after a durable 60-second
+validation and place any later SMS delivery behind explicit administrator approval
+and spend controls.
+
+**Current status:** The independent default-off Ladestopp checkbox and SOC target
+are repository-complete. The email backend is deployed with an encrypted durable
+60-second SQS validation, DLQ, falling-edge/cancellation state and idempotent
+per-user delivery. Live read-back confirms unchanged existing preferences plus the
+new default-off fields, and an invalid delayed probe produced zero deliveries.
+The static portal was uploaded and the controlled owner enabled a separate 100%
+Ladestopp target. A first brief startup-charge/stop sequence produced exactly one received
+email at 89% against a 100% target. That evidence triggered a deployed 45-second
+continuous-charging qualification and a hard one-delivery-per-user/vehicle/session
+idempotency boundary. The final controlled session charged for longer than 45
+seconds, stopped at 91% against the independent 100% target, remained plugged and
+produced exactly one stored event and one received email after the 60-second
+validation; the queue emptied and Lambda logs remained error-free. The email
+scope is closed. The AWS account remains unsubscribed from End User Messaging SMS
+in `eu-north-1`; SMS activation remains a separate work package.
+
 ### Combine binary charging History
 
 **Completed portal sprint:** [HIS-BIN-001 — Combined Binary Charging History](../project/sprints/HIS-BIN-001.md)

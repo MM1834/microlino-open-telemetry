@@ -4,6 +4,7 @@ from pathlib import Path
 
 TEMPLATE = (Path(__file__).resolve().parents[1] / "template.yaml").read_text()
 PREFERENCE_API = (Path(__file__).resolve().parents[1] / "preference_api.py").read_text()
+HANDLER = (Path(__file__).resolve().parents[1] / "handler.py").read_text()
 
 
 class TemplateContractTests(unittest.TestCase):
@@ -39,6 +40,28 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("JourneyFinalizerRule:", TEMPLATE)
         self.assertIn("ScheduleExpression: rate(5 minutes)", TEMPLATE)
         self.assertIn("dynamodb:GetItem, dynamodb:PutItem, dynamodb:Scan", TEMPLATE)
+
+    def test_charging_stop_uses_durable_delayed_queue(self):
+        self.assertIn("ChargingStopQueue:", TEMPLATE)
+        self.assertIn("ChargingStopDeadLetterQueue:", TEMPLATE)
+        self.assertIn("ChargingStopEventSource:", TEMPLATE)
+        self.assertIn("CHARGING_STOP_QUEUE_URL: !Ref ChargingStopQueue", TEMPLATE)
+        self.assertIn("sqs:SendMessage", TEMPLATE)
+
+    def test_charging_stop_preference_is_separate_and_defaults_off(self):
+        self.assertIn('"chargingStopEmailEnabled": False', PREFERENCE_API)
+        self.assertIn('"chargingStopThreshold": 80', PREFERENCE_API)
+        self.assertIn('"charging_stop_email_requires_email"', PREFERENCE_API)
+
+    def test_charging_stop_delivery_is_bounded_to_one_per_session(self):
+        state_source = (
+            Path(__file__).resolve().parents[1] / "notification_state.py"
+        ).read_text()
+        self.assertIn("CHARGING_START_QUALIFICATION_MS = 45 * 1000", state_source)
+        self.assertIn("f'{state.session_id}'", HANDLER)
+        self.assertNotIn(
+            "f'{state.session_id}|{state.stop_candidate_at}|{threshold}'", HANDLER
+        )
 
 
 if __name__ == "__main__":

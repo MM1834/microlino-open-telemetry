@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-20
+**Last reviewed:** 2026-08-24
 
 ## Purpose
 
@@ -484,6 +484,26 @@ SOC and email delivery. The hosted production portal successfully loaded the
 stored `pioneer` settings and persisted several changed SOC targets after its
 endpoint and exact CORS origin were corrected. The bounded email/portal pilot is
 complete; SMS remains deferred.
+
+NTF-002 extends that stack with a default-off charging-stop email and an
+independent per-user/per-vehicle stop SOC target. A fresh charging `true → false`
+edge while still plugged creates one durable 60-second SQS validation; restart,
+unplug, target attainment, stale state and duplicate session events suppress
+delivery. The reviewed additive Change Set reached `UPDATE_COMPLETE`, with an
+encrypted queue, DLQ and enabled Lambda mapping and no replacement of existing
+tables, topic, rules or APIs. Live Preference API read-back returned existing
+settings unchanged plus the new default-off fields; an invalid delayed probe
+correctly delivered nothing. After the portal upload and owner opt-in, a brief
+real startup charge/stop at 89% against a 100% target
+produced exactly one stored event and one received email. The resulting in-place
+hardening now requires 45 seconds of continuously cloud-observed charging before
+arming, resets on false and permits at most one Ladestopp delivery per user,
+vehicle and plugged session. A final controlled session charged for longer than
+45 seconds, stopped at 91% against the independent 100% target and remained
+plugged; exactly one delayed event and one received email followed after 60
+seconds, with an empty queue and no Lambda error. The NTF-002 email scope is
+complete. AWS SMS service access is still unavailable independently of the
+account's billable status and remains a separate deferred work package.
 
 Implemented in the repository under the consolidated `build/dashboard/current/`
 portal source tree:

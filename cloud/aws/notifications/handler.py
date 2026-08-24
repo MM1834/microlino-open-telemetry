@@ -12,7 +12,10 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
-from notification_state import ChargingSessionState, apply_update, crossed_threshold
+from notification_state import (
+    CHARGING_STOP_DELAY_MS, ChargingSessionState, apply_update,
+    charging_stop_due, crossed_threshold,
+)
 from journey_state import (
     STOP_DELAY_MS, JourneyState, apply_inactivity_timeout,
     apply_journey_update, clear_journey, summarize_journey,
@@ -24,8 +27,11 @@ preferences = dynamodb.Table(os.environ["PREFERENCE_TABLE_NAME"])
 sessions = dynamodb.Table(os.environ["SESSION_TABLE_NAME"])
 events = dynamodb.Table(os.environ["EVENT_TABLE_NAME"])
 sns = boto3.client("sns")
+sqs = boto3.client("sqs")
 email_topic_arn = os.environ["EMAIL_TOPIC_ARN"]
+charging_stop_queue_url = os.environ.get("CHARGING_STOP_QUEUE_URL", "")
 event_retention_days = min(31, max(1, int(os.environ.get("EVENT_RETENTION_DAYS", "31"))))
+CHARGING_STOP_DELAY_SECONDS = CHARGING_STOP_DELAY_MS // 1000
 
 CHARGING_SUFFIXES = {"charging/plugged", "charging/is_charging", "display/soc"}
 JOURNEY_SUFFIXES = {
@@ -54,6 +60,9 @@ def _state(item):
         session_id=item.get("sessionId"),
         plugged=bool(item.get("plugged", False)),
         charging_observed=bool(item.get("chargingObserved", False)),
+        is_charging=item.get("isCharging"),
+        charging_started_at=int(item.get("chargingStartedAt", 0)),
+        stop_candidate_at=int(item.get("stopCandidateAt", 0)),
         previous_soc=_number(item.get("previousSoc")),
         last_plugged_at=int(item.get("lastPluggedAt", 0)),
         last_charging_at=int(item.get("lastChargingAt", 0)),
@@ -67,6 +76,8 @@ def _item(vehicle_id, state, version, current=None):
         "vehicleId": vehicle_id, "version": version,
         "plugged": state.plugged,
         "chargingObserved": state.charging_observed,
+        "chargingStartedAt": state.charging_started_at,
+        "stopCandidateAt": state.stop_candidate_at,
         "lastPluggedAt": state.last_plugged_at,
         "lastChargingAt": state.last_charging_at,
         "lastSocAt": state.last_soc_at,
@@ -74,10 +85,13 @@ def _item(vehicle_id, state, version, current=None):
     })
     item.pop("sessionId", None)
     item.pop("previousSoc", None)
+    item.pop("isCharging", None)
     if state.session_id is not None:
         item["sessionId"] = state.session_id
     if state.previous_soc is not None:
         item["previousSoc"] = Decimal(str(state.previous_soc))
+    if state.is_charging is not None:
+        item["isCharging"] = state.is_charging
     return item
 
 
@@ -255,6 +269,116 @@ def dispatch(preference, identifier, vehicle_id, threshold, reached_soc):
     return deliveries
 
 
+def enqueue_charging_stop(vehicle_id, state):
+    if not charging_stop_queue_url or not state.session_id or not state.stop_candidate_at:
+        return False
+    sqs.send_message(
+        QueueUrl=charging_stop_queue_url,
+        DelaySeconds=CHARGING_STOP_DELAY_SECONDS,
+        MessageBody=json.dumps({
+            "vehicleId": vehicle_id,
+            "sessionId": state.session_id,
+            "candidateAt": state.stop_candidate_at,
+        }, separators=(",", ":")),
+    )
+    return True
+
+
+def charging_stop_event_id(preference, vehicle_id, state, threshold):
+    material = (
+        f'{preference["userSub"]}|{vehicle_id}|charging-stop|'
+        f'{state.session_id}'
+    ).encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
+
+
+def reserve_charging_stop_event(preference, vehicle_id, state, threshold, now_ms):
+    identifier = charging_stop_event_id(preference, vehicle_id, state, threshold)
+    now = int(time.time())
+    try:
+        events.put_item(
+            Item={
+                "eventId": identifier, "eventType": "CHARGING_STOP",
+                "userSub": preference["userSub"], "vehicleId": vehicle_id,
+                "sessionId": state.session_id,
+                "candidateAt": state.stop_candidate_at,
+                "threshold": Decimal(str(threshold)),
+                "stoppedSoc": Decimal(str(state.previous_soc)),
+                "receivedAt": now_ms, "createdAt": now * 1000,
+                "expiresAt": now + event_retention_days * 86400,
+                "status": "RESERVED",
+            },
+            ConditionExpression="attribute_not_exists(eventId)",
+        )
+        return identifier
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return None
+        raise
+
+
+def dispatch_charging_stop(preference, identifier, vehicle_id, state, threshold):
+    vehicle_name = str(preference.get("vehicleName") or vehicle_id)[:40]
+    text = (
+        f"MOT: Der Ladevorgang von {vehicle_name} ({vehicle_id}) ist bei "
+        f"{state.previous_soc:g}% SOC seit mindestens 60 Sekunden gestoppt "
+        f"(Ladestopp-Ziel {threshold:g}%). Das Fahrzeug ist weiterhin eingesteckt. "
+        "Dies kann auch ein manueller Stopp oder externes Lastmanagement sein. "
+        "Info, keine Ladesteuerung."
+    )
+    deliveries = []
+    if preference.get("emailEnabled"):
+        result = sns.publish(
+            TopicArn=email_topic_arn,
+            Subject=f"MOT - Ladestopp bei {state.previous_soc:g}% ({vehicle_id})"[:100],
+            Message=text,
+            MessageAttributes={
+                "recipientKey": {
+                    "DataType": "String",
+                    "StringValue": str(preference["recipientKey"]),
+                }
+            },
+        )
+        deliveries.append({"channel": "EMAIL", "messageId": result["MessageId"]})
+    events.update_item(
+        Key={"eventId": identifier},
+        UpdateExpression="SET #status=:status, deliveries=:deliveries",
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues={
+            ":status": "DISPATCHED" if deliveries else "NO_CONFIRMED_CHANNEL",
+            ":deliveries": deliveries,
+        },
+    )
+    return deliveries
+
+
+def validate_charging_stop(message, now_ms):
+    vehicle_id = str(message.get("vehicleId", ""))
+    session_id = str(message.get("sessionId", ""))
+    candidate_at = int(message.get("candidateAt", 0))
+    if not vehicle_id or not session_id or candidate_at <= 0:
+        return 0
+    item = sessions.get_item(
+        Key={"vehicleId": vehicle_id}, ConsistentRead=True
+    ).get("Item", {})
+    state = _state(item)
+    dispatched = 0
+    for preference in list_preferences(vehicle_id, "chargingStopEmailEnabled"):
+        threshold = float(preference.get("chargingStopThreshold", 80))
+        if not charging_stop_due(
+            state, session_id, candidate_at, now_ms, threshold
+        ):
+            continue
+        identifier = reserve_charging_stop_event(
+            preference, vehicle_id, state, threshold, now_ms
+        )
+        if identifier:
+            dispatched += len(dispatch_charging_stop(
+                preference, identifier, vehicle_id, state, threshold
+            ))
+    return dispatched
+
+
 def journey_event_id(user_sub, vehicle_id, journey_id):
     material = f"{user_sub}|{vehicle_id}|journey|{journey_id}".encode("utf-8")
     return hashlib.sha256(material).hexdigest()
@@ -393,6 +517,15 @@ def finalize_due_journeys(now_ms):
 
 
 def handler(event, context):
+    if event.get("Records") and all(
+        record.get("eventSource") == "aws:sqs" for record in event["Records"]
+    ):
+        dispatched = 0
+        for record in event["Records"]:
+            dispatched += validate_charging_stop(
+                json.loads(record.get("body") or "{}"), int(time.time() * 1000)
+            )
+        return {"accepted": True, "delayed": True, "deliveries": dispatched}
     if event.get("source") == "aws.events":
         return finalize_due_journeys(int(time.time() * 1000))
     topic = str(event.get("mqttTopic", ""))
@@ -408,6 +541,12 @@ def handler(event, context):
     dispatched = 0
     if suffix in CHARGING_SUFFIXES:
         before, after = update_session(vehicle_id, suffix, value, received_at)
+        if (
+            suffix == "charging/is_charging"
+            and value is False
+            and after.stop_candidate_at == received_at
+        ):
+            enqueue_charging_stop(vehicle_id, after)
     if suffix == "display/soc":
         for preference in list_preferences(vehicle_id):
             threshold = float(preference.get("threshold", 80))

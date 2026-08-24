@@ -275,6 +275,21 @@
     </label>
     <div id="notification-email-state" class="connection-detail"></div>
     <fieldset class="journey-notification-setting">
+      <legend>Ladestopp</legend>
+      <label class="settings-toggle">
+        <input id="notification-charging-stop-email-enabled" type="checkbox" aria-describedby="notification-charging-stop-state" />
+        <span>E-Mail, wenn das Laden nach mindestens 45 Sekunden Ladezeit vor dem Zielwert mindestens 60 Sekunden stoppt</span>
+      </label>
+      <label>
+        Ladestopp-Ziel-SOC
+        <div class="settings-input-suffix">
+          <input id="notification-charging-stop-threshold" type="number" min="50" max="100" step="1" value="80" required />
+          <span>%</span>
+        </div>
+      </label>
+      <small id="notification-charging-stop-state" class="connection-detail">Nur wenn das Fahrzeug weiterhin eingesteckt ist. Ein manueller Stopp oder Lastmanagement kann dieselbe Meldung auslösen.</small>
+    </fieldset>
+    <fieldset class="journey-notification-setting">
       <legend>Fahrtzusammenfassung</legend>
       <label class="settings-toggle">
         <input id="notification-journey-email-enabled" type="checkbox" aria-describedby="notification-journey-state" />
@@ -326,7 +341,7 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
-  <script src="js/app.js?v=20260821-history-resilience1"></script>
+  <script src="js/app.js?v=20260824-ntf2"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260821-history-resilience1"></script>

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Additive MOT NTF-001 charging and SOC notification pilot.
+Description: Additive MOT charging, journey and interruption notifications.
 
 Parameters:
   ProjectName: {Type: String, Default: mot}
@@ -80,6 +80,24 @@ Resources:
         - {Key: environment, Value: !Ref Environment}
         - {Key: component, Value: notifications}
 
+  ChargingStopDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-${Environment}-charging-stop-dlq"
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  ChargingStopQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-${Environment}-charging-stop"
+      MessageRetentionPeriod: 86400
+      VisibilityTimeout: 60
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ChargingStopDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
   NotificationRole:
     Type: AWS::IAM::Role
     Properties:
@@ -108,6 +126,9 @@ Resources:
               - Effect: Allow
                 Action: [sns:Publish]
                 Resource: [!Ref EmailTopic, "*"]
+              - Effect: Allow
+                Action: [sqs:SendMessage, sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes]
+                Resource: !GetAtt ChargingStopQueue.Arn
 
   NotificationFunction:
     Type: AWS::Lambda::Function
@@ -124,8 +145,17 @@ Resources:
           SESSION_TABLE_NAME: !Ref SessionTable
           EVENT_TABLE_NAME: !Ref EventTable
           EMAIL_TOPIC_ARN: !Ref EmailTopic
+          CHARGING_STOP_QUEUE_URL: !Ref ChargingStopQueue
           EVENT_RETENTION_DAYS: !Ref EventRetentionDays
       Code: .
+
+  ChargingStopEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt ChargingStopQueue.Arn
+      FunctionName: !Ref NotificationFunction
 
   NotificationLogGroup:
     Type: AWS::Logs::LogGroup
@@ -286,3 +316,4 @@ Outputs:
   EmailTopicArn: {Value: !Ref EmailTopic}
   EventTableName: {Value: !Ref EventTable}
   SessionTableName: {Value: !Ref SessionTable}
+  ChargingStopQueueUrl: {Value: !Ref ChargingStopQueue}

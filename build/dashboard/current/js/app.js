@@ -849,6 +849,8 @@ function renderNotificationPreferences(preferences = null, message = '') {
     $('notification-threshold').value = Number(preferences.threshold || 80);
     $('notification-email-enabled').checked = preferences.emailEnabled === true;
     $('notification-journey-email-enabled').checked = preferences.journeyEmailEnabled === true;
+    $('notification-charging-stop-email-enabled').checked = preferences.chargingStopEmailEnabled === true;
+    $('notification-charging-stop-threshold').value = Number(preferences.chargingStopThreshold || 80);
     $('notification-email').value = preferences.email || '';
     $('notification-email-state').textContent = preferences.emailConfirmed
       ? 'E-Mail-Adresse bestätigt'
@@ -860,7 +862,8 @@ function renderNotificationPreferences(preferences = null, message = '') {
   }
   const disabled = state.notificationBusy || state.notificationReadOnly;
   ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
-    'notification-journey-email-enabled', 'notification-email',
+    'notification-journey-email-enabled', 'notification-charging-stop-email-enabled',
+    'notification-charging-stop-threshold', 'notification-email',
     'notification-save'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
   $('notification-status').textContent = state.notificationReadOnly
     ? 'Demo-Zugang: Benachrichtigungen sind deaktiviert.'
@@ -903,6 +906,10 @@ async function saveNotificationPreferences(event) {
     renderNotificationPreferences(null, 'Für Fahrtzusammenfassungen zuerst den E-Mail-Kanal aktivieren.');
     return;
   }
+  if ($('notification-charging-stop-email-enabled').checked && !$('notification-email-enabled').checked) {
+    renderNotificationPreferences(null, 'Für Ladestopp-Meldungen zuerst den E-Mail-Kanal aktivieren.');
+    return;
+  }
   state.notificationBusy = true;
   renderNotificationPreferences(null, 'Wird gespeichert…');
   try {
@@ -911,6 +918,8 @@ async function saveNotificationPreferences(event) {
       threshold: Number($('notification-threshold').value),
       emailEnabled: $('notification-email-enabled').checked,
       journeyEmailEnabled: $('notification-journey-email-enabled').checked,
+      chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked,
+      chargingStopThreshold: Number($('notification-charging-stop-threshold').value),
       email: String($('notification-email').value || '').trim(),
       smsEnabled: false
     });

@@ -49,6 +49,14 @@ The bounded email/portal work was completed in
 [NTF-001](../project/sprints/NTF-001.md). Preserve the following later extensions
 outside that completed cloud pilot:
 
+- charging-stop-before-target detection and controlled SMS rollout are now active
+  in [NTF-002](../project/sprints/NTF-002.md);
+- observe whether the deployed 45-second continuous-charging qualification is
+  sufficient across vehicles and chargers. The first real startup oscillation
+  justified the gate; collect further traces before changing its duration;
+- retain a hard server-side rate boundary for any later SMS rollout. Ladestopp is
+  limited to one delivery per user, vehicle and plugged session; SMS additionally
+  needs spend limits and alarms before activation;
 - web push and application-native channels;
 - direct SMTP or another notification path for modules intentionally operated
   without AWS;

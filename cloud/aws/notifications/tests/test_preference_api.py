@@ -114,7 +114,10 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         module, _, _ = load_module()
         result = module.handler(event(), None)
         self.assertEqual(200, result["statusCode"])
-        self.assertFalse(json.loads(result["body"])["journeyEmailEnabled"])
+        body = json.loads(result["body"])
+        self.assertFalse(body["journeyEmailEnabled"])
+        self.assertFalse(body["chargingStopEmailEnabled"])
+        self.assertEqual(80, body["chargingStopThreshold"])
 
     def test_get_reconciles_confirmed_sns_subscription(self):
         previous = {
@@ -151,6 +154,30 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         }), None)
         self.assertEqual(400, result["statusCode"])
         self.assertEqual("journey_email_requires_email", json.loads(result["body"])["error"])
+
+    def test_charging_stop_email_requires_email_channel(self):
+        module, _, _ = load_module()
+        result = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "chargingStopEmailEnabled": True, "chargingStopThreshold": 75,
+        }), None)
+        self.assertEqual(400, result["statusCode"])
+        self.assertEqual(
+            "charging_stop_email_requires_email",
+            json.loads(result["body"])["error"],
+        )
+
+    def test_charging_stop_has_independent_threshold(self):
+        module, preference, _ = load_module()
+        result = module.handler(event("PUT", {
+            "enabled": True, "threshold": 90, "emailEnabled": True,
+            "chargingStopEmailEnabled": True, "chargingStopThreshold": 70,
+            "email": "driver@example.com",
+        }), None)
+        self.assertEqual(200, result["statusCode"])
+        self.assertEqual(90, preference.item["threshold"])
+        self.assertEqual(70, preference.item["chargingStopThreshold"])
+        self.assertTrue(preference.item["chargingStopEmailEnabled"])
 
     def test_opt_in_is_persisted_and_subscribes_new_email(self):
         module, preference, sns = load_module()
