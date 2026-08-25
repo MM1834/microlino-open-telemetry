@@ -28,3 +28,4 @@ uint32_t c6NetworkLastDisconnectAgeMs();
 bool c6NetworkLastDisconnectWasManagerInitiated();
 String c6NetworkApSsid();
 String c6NetworkApPassword();
+void c6NetworkEnsureOnboardingAp();

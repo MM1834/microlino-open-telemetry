@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-24
+**Last reviewed:** 2026-08-25
 
 ## Purpose
 
@@ -18,6 +18,16 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+ONB-UX-001 completed the guided C6 local-onboarding flow on 2026-08-25. The
+one-time credential transition now requires confirmation, the authenticated
+wizard owns WiFi, CAN, services and validation, and its progress survives required
+reboots. The protected local access point remains reachable until explicit
+completion; the final handoff reports the active profile, SSID and current IP
+without exposing a secret. Factory-first-run acceptance passed repeatedly on B025,
+and B021, B023 and B024 received the configuration-preserving firmware update.
+History, email and SMS remain optional administrator-enabled services pending the
+future onboarding admin tool.
 
 PWR-FRESH-001 completed a portal refinement for the adaptive charging/power
 overview card and net-power History. It uses authoritative per-topic `receivedAt`

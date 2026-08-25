@@ -8,9 +8,23 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-24
+**Last reviewed:** 2026-08-25
 
 ## High priority
+
+### Complete guided C6 local onboarding
+
+**Completed firmware sprint:** [ONB-UX-001 — Guided C6 Local Onboarding](../project/sprints/ONB-UX-001.md)
+
+**Objective:** Let a standard user complete protected local setup, connectivity,
+CAN selection, optional-service configuration and validation through one coherent
+flow that resumes safely after required reboots.
+
+**Current status:** Repository implementation and physical acceptance completed
+on 2026-08-25. B025 passed repeated factory-first-run walkthroughs; B021, B023 and
+B024 received configuration-preserving firmware updates. The onboarding guide and
+one-page handout reflect the accepted flow. Optional History, email and SMS
+activation stays in the future administrator-tool work package.
 
 ### Mark stale charging and power values
 

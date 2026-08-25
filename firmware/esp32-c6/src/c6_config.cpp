@@ -48,6 +48,11 @@ void c6ConfigLoad()
     c6Config.onboardingComplete = preferences.isKey("onboarded")
         ? preferences.getBool("onboarded", false)
         : validAdminPassword(c6Config.adminPassword);
+    c6Config.onboardingStep = preferences.getUChar(
+        "onboardStep", c6Config.onboardingComplete ? 7 : 1);
+    if (c6Config.onboardingStep < 1 || c6Config.onboardingStep > 7) {
+        c6Config.onboardingStep = c6Config.onboardingComplete ? 7 : 1;
+    }
     c6Config.otaEnabled = preferences.getBool("otaEn", false);
     c6Config.publishIntervalMs = preferences.getUInt("pubMs", 5000);
     if (c6Config.publishIntervalMs < 1000) c6Config.publishIntervalMs = 1000;
@@ -132,6 +137,7 @@ void c6ConfigSave()
     preferences.putString("abrpKey", c6Config.abrpApiKey);
     preferences.putString("abrpToken", c6Config.abrpUserToken);
     preferences.putBool("onboarded", c6Config.onboardingComplete);
+    preferences.putUChar("onboardStep", c6Config.onboardingStep);
     preferences.putBool("otaEn", c6Config.otaEnabled);
     preferences.putUInt("pubMs", c6Config.publishIntervalMs);
     preferences.end();
@@ -206,6 +212,7 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["gpsEnabled"] = c6Config.gpsEnabled;
     doc["offlineCacheEnabled"] = c6Config.offlineCacheEnabled;
     doc["onboardingComplete"] = c6Config.onboardingComplete;
+    doc["onboardingStep"] = c6Config.onboardingStep;
     if (includeSecrets) {
         doc["abrpApiKey"] = c6Config.abrpApiKey;
         doc["abrpUserToken"] = c6Config.abrpUserToken;
@@ -240,13 +247,15 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["abrpApiKey"].isNull()) candidate.abrpApiKey = doc["abrpApiKey"].as<String>();
     if (!doc["abrpUserToken"].isNull()) candidate.abrpUserToken = doc["abrpUserToken"].as<String>();
     if (!doc["onboardingComplete"].isNull()) candidate.onboardingComplete = doc["onboardingComplete"].as<bool>();
+    if (!doc["onboardingStep"].isNull()) candidate.onboardingStep = doc["onboardingStep"].as<uint8_t>();
     if (!doc["adminPassword"].isNull()) candidate.adminPassword = doc["adminPassword"].as<String>();
     candidate.wifiSsid.trim();
     candidate.wifi2Ssid.trim();
     if (candidate.wifiSsid.length() > 32 || candidate.wifiPassword.length() > 63 ||
         candidate.wifi2Ssid.length() > 32 || candidate.wifi2Password.length() > 63 ||
         candidate.abrpApiKey.length() > 192 || candidate.abrpUserToken.length() > 192 ||
-        candidate.publishIntervalMs < 1000 || candidate.publishIntervalMs > 3600000) {
+        candidate.publishIntervalMs < 1000 || candidate.publishIntervalMs > 3600000 ||
+        candidate.onboardingStep < 1 || candidate.onboardingStep > 7) {
         error = "invalid WiFi, ABRP credentials, or publish interval";
         return false;
     }

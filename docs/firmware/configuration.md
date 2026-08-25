@@ -56,8 +56,14 @@ connection state without printing key material.
 C6 ABRP is independently enabled at runtime and may operate alongside AWS IoT.
 The API key and user token are stored in NVS, accepted only through authenticated
 same-origin configuration routes and omitted from normal backup exports and
-diagnostics. The local onboarding wizard records only its completion state; it is
-not portal/account onboarding.
+diagnostics. The local onboarding wizard records only its progress and completion
+state; it is not portal/account onboarding.
+
+On C6 the wizard also stores its current step so required reboots resume the local
+setup journey. Its WiFi, CAN and service forms use the same persisted configuration
+model as the later administration page. The protected AP stays available until
+explicit wizard completion; afterward the normal station-stability and fallback
+rules apply. This local state remains separate from portal/account onboarding.
 
 Both C6 targets expose an authenticated `Offline History cache` option. It is
 off by default and records only SOC plus active one-minute Speed/terminal zero

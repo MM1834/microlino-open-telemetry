@@ -89,6 +89,78 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn("validAdminPassword(c6Config.adminPassword)", CONFIG)
         self.assertIn("c6Config.onboardingComplete", WEB)
 
+    def test_c6_wizard_progress_is_persisted_and_resumed(self) -> None:
+        config_h = (C6 / "c6_config.h").read_text(encoding="utf-8")
+        self.assertIn("uint8_t onboardingStep = 1", config_h)
+        self.assertIn('preferences.getUChar(\n        "onboardStep"', CONFIG)
+        self.assertIn('preferences.putUChar("onboardStep"', CONFIG)
+        self.assertIn("c6Config.onboardingStep = 4", WEB)
+        self.assertIn("c6Config.onboardingStep = 5", WEB)
+        self.assertIn("c6Config.onboardingStep = 6", WEB)
+        self.assertIn('server.on("/api/onboarding/step", HTTP_POST', WEB)
+
+    def test_first_setup_transitions_once_to_admin_and_wizard(self) -> None:
+        setup = WEB.split("void setupPage()", 1)[1].split("String channelJson", 1)[0]
+        self.assertIn("one-time <b>setup</b> login will no longer work", setup)
+        self.assertIn("sign in as <b>admin</b>", setup)
+        self.assertNotIn("name='ssid'", setup)
+        self.assertIn("Initial setup is already complete", setup)
+        self.assertIn("name='adminPasswordConfirm'", setup)
+        self.assertIn('server.arg("adminPassword") != server.arg("adminPasswordConfirm")', setup)
+        self.assertLess(
+            setup.index('server.arg("adminPassword") != server.arg("adminPasswordConfirm")'),
+            setup.index('c6ConfigSetAdminPassword(server.arg("adminPassword"))'),
+        )
+        self.assertIn("The device was not changed", setup)
+        self.assertIn("physical USB console recovery", setup)
+        self.assertIn("using the new password", setup)
+        self.assertIn("with the same new password", setup)
+
+    def test_wizard_embeds_configuration_and_dynamic_handoff(self) -> None:
+        self.assertIn('action=\'/wizard/connectivity\'', WEB)
+        self.assertIn('action=\'/wizard/vehicle\'', WEB)
+        self.assertIn('action=\'/wizard/services\'', WEB)
+        self.assertIn("c6NetworkProfileName()", WEB)
+        self.assertIn("c6NetworkIp()", WEB)
+        self.assertIn("c6NetworkApSsid()", WEB)
+        self.assertIn("http://192.168.4.1", WEB)
+        self.assertNotIn("c6Config.wifiPassword +", WEB)
+        self.assertNotIn("c6Config.wifi2Password +", WEB)
+
+    def test_settings_steps_have_one_unambiguous_continue_action(self) -> None:
+        self.assertIn("const bool settingsStep", WEB)
+        self.assertIn("step == onboardingStepNumber(OnboardingStep::Connectivity)", WEB)
+        self.assertIn("step == onboardingStepNumber(OnboardingStep::Vehicle)", WEB)
+        self.assertIn("step == onboardingStepNumber(OnboardingStep::Services)", WEB)
+        self.assertIn("Save WiFi &amp; continue", WEB)
+        self.assertIn("Save CAN &amp; continue", WEB)
+        self.assertNotIn("Save, reboot &amp; continue", WEB)
+
+    def test_unchanged_can_wizard_settings_continue_without_reboot(self) -> None:
+        handler = WEB.split("void wizardVehicleSave()", 1)[1].split("void wizardServicesSave()", 1)[0]
+        self.assertIn("const bool profilesChanged", handler)
+        self.assertIn("if (!profilesChanged)", handler)
+        self.assertLess(handler.index("if (!profilesChanged)"), handler.index("scheduleReboot();"))
+        self.assertIn('server.sendHeader("Location", "/wizard")', handler)
+        self.assertIn("restarts only if a CAN profile was changed", WEB)
+
+    def test_wizard_explains_connectivity_services_validation_and_ip_handoff(self) -> None:
+        self.assertIn("Use a 2.4 GHz WiFi network", WEB)
+        self.assertIn("Maximize Compatibility", WEB)
+        self.assertLess(WEB.index("<h3>History cache</h3>"), WEB.index("<h3>ABRP (optional)</h3>"))
+        self.assertIn("<hr><h3>ABRP (optional)</h3>", WEB)
+        self.assertIn("Device and telemetry validation", WEB)
+        self.assertIn("Start validation", WEB)
+        self.assertIn("router may assign a different IP later", WEB)
+        self.assertIn("also shown in the MOT Portal", WEB)
+
+    def test_blank_littlefs_is_formatted_but_corruption_is_fail_closed(self) -> None:
+        self.assertIn("littleFsPartitionIsErased", AWS_CLIENT)
+        self.assertIn("esp_partition_read", AWS_CLIENT)
+        self.assertIn("buffer[i] != 0xff", AWS_CLIENT)
+        self.assertIn("return LittleFS.begin(true)", AWS_CLIENT)
+        self.assertIn("return LittleFS.begin(false)", AWS_CLIENT)
+
     def test_unprovisioned_aws_runtime_is_fail_open_for_local_services(self) -> None:
         setup = AWS.split("void c6AwsSetup()", 1)[1].split("void c6AwsLoop()", 1)[0]
         self.assertIn("if (!motLoadAwsCredentials(credentials))", setup)

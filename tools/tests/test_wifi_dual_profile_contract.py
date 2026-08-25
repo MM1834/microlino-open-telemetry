@@ -66,6 +66,12 @@ class WifiDualProfileContractTests(unittest.TestCase):
         self.assertIn("scheduleRetry", NETWORK)
         self.assertIn("startFallbackAp();", NETWORK)
 
+    def test_fallback_ap_remains_during_incomplete_onboarding(self) -> None:
+        self.assertIn("if (!c6Config.onboardingComplete) startFallbackAp();", NETWORK)
+        self.assertIn("apActive && c6Config.onboardingComplete", NETWORK)
+        self.assertIn("c6NetworkEnsureOnboardingAp", NETWORK)
+        self.assertIn("c6NetworkEnsureOnboardingAp();", WEB)
+
     def test_web_and_serial_surfaces_cover_both_profiles_without_secret_echo(self) -> None:
         self.assertIn("Preferred home WiFi", WEB)
         self.assertIn("Second / mobile hotspot", WEB)

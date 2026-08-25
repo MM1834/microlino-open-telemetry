@@ -197,6 +197,7 @@ void c6NetworkSetup()
         startFallbackAp();
         return;
     }
+    if (!c6Config.onboardingComplete) startFallbackAp();
     tryPreferred();
 }
 
@@ -236,7 +237,7 @@ void c6NetworkLoop()
                 }
             }
         }
-        if (apActive && now - connectedSinceMs >= STABLE_INTERVAL_MS) stopFallbackAp();
+        if (apActive && c6Config.onboardingComplete && now - connectedSinceMs >= STABLE_INTERVAL_MS) stopFallbackAp();
         pollHomeScan(now);
         return;
     }
@@ -262,6 +263,11 @@ void c6NetworkLoop()
     }
 
     if (static_cast<int32_t>(now - nextRetryMs) >= 0) tryPreferred();
+}
+
+void c6NetworkEnsureOnboardingAp()
+{
+    if (!c6Config.onboardingComplete) startFallbackAp();
 }
 
 bool c6NetworkOnline() { return stationOnline(); }

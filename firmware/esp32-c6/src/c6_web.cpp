@@ -95,36 +95,42 @@ void scheduleReboot(uint32_t delayMs = 2000) { rebootPending = true; rebootAtMs 
 
 void setupPage()
 {
+    if (c6ConfigAdminConfigured()) {
+        if (!requireAdmin()) return;
+        server.sendHeader("Location", "/"); server.send(303);
+        return;
+    }
     if (!requireSetupAccess()) return;
     String out = header("MOT C6 Setup");
-    out += "<h1>Secure local setup</h1><p class='muted'>The setup access and fallback AP are protected by the device setup password printed on the serial console.</p>";
-    out += "<form method='POST' action='/setup'><div class='card'><h2>Preferred home WiFi</h2><label>SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'>";
-    out += "<label>Password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'>";
-    out += "<h2>Second / mobile hotspot</h2><label>SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'>";
-    out += "<label>Password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'>";
-    out += "<label>New local admin password (12–63 characters)</label><input type='password' name='adminPassword' minlength='12' maxlength='63' required>";
+    out += "<h1>Secure local setup</h1><p class='muted'>The setup access and WLAN/WiFi Access Point are protected by the device setup password from the inventory sheet.</p>";
+    out += "<form method='POST' action='/setup'><div class='card'><h2>Create local administration access</h2>";
+    out += "<label>New local admin / device hotspot password (12–63 characters)</label><input type='password' name='adminPassword' minlength='12' maxlength='63' autocomplete='new-password' required>";
+    out += "<label>Repeat local admin / device hotspot password</label><input type='password' name='adminPasswordConfirm' minlength='12' maxlength='63' autocomplete='new-password' required>";
+    out += "<p>After saving, this password protects both the <b>admin</b> login and the <b>MOT-xxxx</b> device hotspot. The one-time <b>setup</b> login will no longer work. If the password is lost, it can only be replaced through the physical USB console recovery.</p>";
     out += "<button>Secure device &amp; reboot</button></div></form></body></html>";
     server.send(200, "text/html", out);
 }
 
 void setupSave()
 {
+    if (c6ConfigAdminConfigured()) {
+        if (!requireAdmin()) return;
+        server.send(409, "text/plain", "Initial setup is already complete; use Configuration");
+        return;
+    }
     if (!requireSetupAccess() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    if (server.arg("adminPassword") != server.arg("adminPasswordConfirm")) {
+        server.send(400, "text/html", header("Passwords do not match") + "<h1>Passwords do not match</h1><p>The device was not changed. Go back and enter the same password twice.</p><p><a href='/setup'>Return to setup</a></p></body></html>");
+        return;
+    }
     if (!c6ConfigSetAdminPassword(server.arg("adminPassword"))) {
         server.send(400, "text/plain", "Admin password must be 12-63 printable ASCII characters"); return;
     }
-    String ssid = server.arg("ssid"); ssid.trim();
-    String ssid2 = server.arg("ssid2"); ssid2.trim();
-    if (ssid.length() > 32 || ssid2.length() > 32 || server.arg("wifiPassword").length() > 63 || server.arg("wifi2Password").length() > 63) { server.send(400, "text/plain", "Invalid WiFi configuration"); return; }
-    c6Config.wifiSsid = ssid;
-    if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
-    if (ssid.isEmpty()) c6Config.wifiPassword = "";
-    c6Config.wifi2Ssid = ssid2;
-    if (!server.arg("wifi2Password").isEmpty()) c6Config.wifi2Password = server.arg("wifi2Password");
-    if (ssid2.isEmpty()) c6Config.wifi2Password = "";
+    c6Config.onboardingComplete = false;
+    c6Config.onboardingStep = 1;
     c6Config.otaEnabled = true;
     c6ConfigSave();
-    server.send(200, "text/html", header("Setup saved") + "<h1>Setup saved</h1><p>Rebooting with protected local administration.</p></body></html>");
+    server.send(200, "text/html", header("Setup saved") + "<h1>Setup saved</h1><p>Rebooting. Reconnect to <b>" + htmlEscape(c6NetworkApSsid()) + "</b> using the new password, open <b>http://192.168.4.1</b>, and sign in as <b>admin</b> with the same new password. The onboarding wizard will continue automatically.</p></body></html>");
     scheduleReboot();
 }
 
@@ -241,7 +247,43 @@ void factoryReset()
 
 uint8_t requestedWizardStep()
 {
-    return onboardingClampStep(server.hasArg("step") ? server.arg("step").toInt() : 1);
+    return onboardingClampStep(server.hasArg("step")
+        ? server.arg("step").toInt()
+        : c6Config.onboardingStep);
+}
+
+String c6WizardNavigation(uint8_t step)
+{
+    String out = "<form method='POST' action='/api/onboarding/step'><p>";
+    if (step > 1) out += "<button name='step' value='" + String(step - 1) + "'>Back</button> ";
+    const bool settingsStep = step == onboardingStepNumber(OnboardingStep::Connectivity) ||
+                              step == onboardingStepNumber(OnboardingStep::Vehicle) ||
+                              step == onboardingStepNumber(OnboardingStep::Services);
+    if (step < onboardingStepCount() && !settingsStep) {
+        out += "<button name='step' value='" + String(step + 1) + "'>Next</button>";
+    }
+    out += "</p></form>";
+    return out;
+}
+
+String c6WizardAccessNotice()
+{
+    String out = "<div class='card'><h2>Access after setup</h2>";
+    if (c6NetworkOnline()) {
+        const String profile = c6NetworkProfileName();
+        const String activeSsid = profile == "home" ? c6Config.wifiSsid :
+                                  profile == "mobile" ? c6Config.wifi2Ssid : String();
+        out += "<p>Current WLAN: <b>" + htmlEscape(activeSsid) + "</b> (" +
+               htmlEscape(profile == "home" ? "Home" : "Mobile/WiFi2") +
+               ")<br>IP: <b>" + htmlEscape(c6NetworkIp()) + "</b></p>";
+        out += "<p>After completing onboarding, local access normally uses this WLAN and IP address. The router may assign a different IP later. After the adapter is successfully linked, its current IP is also shown in the MOT Portal.</p>";
+    } else {
+        out += "<p>No Home or Mobile/WiFi2 connection is currently active.</p>";
+    }
+    out += "<p>If neither configured WLAN is reachable, the protected hotspot <b>" +
+           htmlEscape(c6NetworkApSsid()) + "</b> becomes available. Connect to it, open "
+           "<b>http://192.168.4.1</b>, and sign in as <b>admin</b>.</p></div>";
+    return out;
 }
 
 void wizardPage()
@@ -259,24 +301,86 @@ void wizardPage()
             if (c6GpsDetected() || !c6Config.gpsEnabled) out += "<form method='POST' action='/api/gps/toggle'><label><input type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><button>Save &amp; reboot</button></form>";
             break;
         case OnboardingStep::Connectivity:
-            out += "<h2>Connectivity</h2><p>Configure preferred Home WiFi and the optional second/mobile hotspot.</p><p>Current state: <b>" + htmlEscape(c6NetworkStateName()) + "</b> via " + htmlEscape(c6NetworkProfileName()) + "</p><p><a href='/config'><button type='button'>Open configuration</button></a></p>";
+            out += "<h2>Connectivity</h2><p>During onboarding the protected hotspot <b>" + htmlEscape(c6NetworkApSsid()) + "</b> remains active at <b>http://192.168.4.1</b>. After completion it normally becomes inactive while Home or Mobile/WiFi2 is connected and returns when neither network is reachable.</p>";
+            out += "<p class='muted'>Use a 2.4 GHz WiFi network. For an iPhone Personal Hotspot, enable <b>Maximize Compatibility</b> so the hotspot offers a compatible 2.4 GHz connection.</p>";
+            out += "<p>Current state: <b>" + htmlEscape(c6NetworkStateName()) + "</b> via " + htmlEscape(c6NetworkProfileName()) + "</p>";
+            out += "<form method='POST' action='/wizard/connectivity'><label>Home WiFi SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Home WiFi password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'><label>Mobile/WiFi2 SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'><label>Mobile/WiFi2 password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'><button>Save WiFi &amp; continue</button><p class='muted'>The device restarts automatically to apply network changes. Reconnect as admin; the wizard then continues at the next step.</p></form>";
             break;
         case OnboardingStep::Vehicle:
-            out += "<h2>Vehicle and CAN</h2><p>CAN1: " + htmlEscape(decoderProfileName(c6Config.can1Profile)) + "<br>CAN2: " + htmlEscape(decoderProfileName(c6Config.can2Profile)) + "</p><p><a href='/config'><button type='button'>Edit decoder assignment</button></a></p>";
+            out += "<h2>Vehicle and CAN</h2><form method='POST' action='/wizard/vehicle'><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><select name='can2'>" + profileOptions(c6Config.can2Profile) + "</select><button>Save CAN &amp; continue</button><p class='muted'>The device restarts only if a CAN profile was changed. With unchanged settings, the wizard continues immediately.</p></form>";
             break;
         case OnboardingStep::Services:
-            out += "<h2>Telemetry services</h2><p>AWS: " + htmlEscape(c6AwsStatus()) + "</p><p>ABRP: " + String(c6AbrpConfigured() ? "enabled and configured" : (c6Config.abrpEnabled ? "enabled but credentials missing" : "disabled")) + "</p><p><a href='/config'><button type='button'>Configure services</button></a></p>";
+            out += "<h2>Telemetry services</h2><p>AWS: " + htmlEscape(c6AwsStatus()) + "</p><form method='POST' action='/wizard/services'><h3>History cache</h3><label><input style='width:auto' type='checkbox' name='offlineCacheEnabled'" + String(c6Config.offlineCacheEnabled ? " checked" : "") + "> Enable offline History cache</label><p class='muted'>Temporarily stores supported telemetry while the Internet connection is unavailable and forwards it after reconnection.</p><hr><h3>ABRP (optional)</h3><p class='muted'>A Better Routeplanner integration is optional and not required for MOT Portal telemetry.</p><label><input style='width:auto' type='checkbox' name='abrpEnabled'" + String(c6Config.abrpEnabled ? " checked" : "") + "> Enable ABRP</label><label>ABRP API key</label><input type='password' name='abrpApiKey' maxlength='192' placeholder='Leave blank to keep current'><label>ABRP user token</label><input type='password' name='abrpUserToken' maxlength='192' placeholder='Leave blank to keep current'><button>Save &amp; continue</button></form>";
             break;
         case OnboardingStep::Validation:
-            out += "<h2>Validation</h2><button onclick='validateDevice()'>Run validation</button><pre id='validation'>Not checked yet.</pre><script>async function validateDevice(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('validation').textContent=JSON.stringify(d,null,2)}</script>";
+            out += "<h2>Device and telemetry validation</h2><p>Start the validation to review device identity, network connection, CAN channels, optional GPS, AWS telemetry and runtime health before completing onboarding.</p><p class='muted'>Some telemetry checks can remain inactive until the adapter is connected to the vehicle or AWS credentials have been provisioned.</p><button onclick='validateDevice()'>Start validation</button><pre id='validation'>Validation has not been started.</pre><script>async function validateDevice(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('validation').textContent=JSON.stringify(d,null,2)}</script>";
             break;
         case OnboardingStep::Finish:
-            out += "<h2>Finish</h2><p>Completing onboarding disables automatic wizard launch. All settings remain editable.</p><form method='POST' action='/api/onboarding/complete'><button>Complete onboarding</button></form>";
+            out += "<h2>Finish</h2><p>Completing onboarding disables automatic wizard launch. All settings remain editable.</p>" + c6WizardAccessNotice() + "<form method='POST' action='/api/onboarding/complete'><button>Complete onboarding</button></form>";
             break;
     }
-    out += onboardingNavigation(step);
+    out += c6WizardNavigation(step);
     out += "<hr><form method='POST' action='/api/onboarding/restart'><button>Restart wizard</button></form></div><p><a href='/status'>Skip to status</a></p></body></html>";
     server.send(200, "text/html", out);
+}
+
+void onboardingStep()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6Config.onboardingStep = onboardingClampStep(server.arg("step").toInt());
+    c6ConfigSave();
+    server.sendHeader("Location", "/wizard"); server.send(303);
+}
+
+void wizardConnectivitySave()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    String ssid = server.arg("ssid"); ssid.trim();
+    String ssid2 = server.arg("ssid2"); ssid2.trim();
+    if (ssid.length() > 32 || ssid2.length() > 32 || server.arg("wifiPassword").length() > 63 || server.arg("wifi2Password").length() > 63) { server.send(400, "text/plain", "Invalid WiFi configuration"); return; }
+    c6Config.wifiSsid = ssid;
+    if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
+    if (ssid.isEmpty()) c6Config.wifiPassword = "";
+    c6Config.wifi2Ssid = ssid2;
+    if (!server.arg("wifi2Password").isEmpty()) c6Config.wifi2Password = server.arg("wifi2Password");
+    if (ssid2.isEmpty()) c6Config.wifi2Password = "";
+    c6Config.onboardingStep = 4;
+    c6ConfigSave();
+    server.send(200, "text/html", header("WiFi saved") + "<h1>WiFi saved</h1><p>Rebooting. The protected <b>" + htmlEscape(c6NetworkApSsid()) + "</b> hotspot remains available during onboarding. Reconnect at <b>http://192.168.4.1</b> and sign in as <b>admin</b>; the wizard will continue automatically.</p></body></html>");
+    scheduleReboot();
+}
+
+void wizardVehicleSave()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    const DecoderProfile can1 = decoderProfileNormalize(server.arg("can1").toInt());
+    const DecoderProfile can2 = decoderProfileNormalize(server.arg("can2").toInt(), DECODER_PROFILE_DISABLED);
+    const bool profilesChanged = can1 != c6Config.can1Profile || can2 != c6Config.can2Profile;
+    c6Config.can1Profile = can1;
+    c6Config.can2Profile = can2;
+    c6Config.onboardingStep = 5;
+    c6ConfigSave();
+    if (!profilesChanged) {
+        server.sendHeader("Location", "/wizard"); server.send(303);
+        return;
+    }
+    server.send(200, "text/html", header("CAN saved") + "<h1>CAN settings saved</h1><p>Rebooting. Reconnect as <b>admin</b>; onboarding will continue automatically.</p></body></html>");
+    scheduleReboot();
+}
+
+void wizardServicesSave()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    String abrpKey = c6Config.abrpApiKey;
+    String abrpToken = c6Config.abrpUserToken;
+    if (!server.arg("abrpApiKey").isEmpty()) abrpKey = server.arg("abrpApiKey");
+    if (!server.arg("abrpUserToken").isEmpty()) abrpToken = server.arg("abrpUserToken");
+    if (!c6ConfigSetAbrpCredentials(abrpKey, abrpToken)) { server.send(400, "text/plain", "Invalid ABRP credentials"); return; }
+    c6Config.abrpEnabled = server.hasArg("abrpEnabled");
+    c6ConfigSetOfflineCacheEnabled(server.hasArg("offlineCacheEnabled"));
+    c6Config.onboardingStep = 6;
+    c6ConfigSave();
+    server.sendHeader("Location", "/wizard"); server.send(303);
 }
 
 void onboardingStatus()
@@ -290,6 +394,7 @@ void onboardingComplete()
 {
     if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
     c6Config.onboardingComplete = true;
+    c6Config.onboardingStep = onboardingStepCount();
     c6ConfigSave();
     server.sendHeader("Location", "/status"); server.send(303);
 }
@@ -308,8 +413,10 @@ void onboardingRestart()
 {
     if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
     c6Config.onboardingComplete = false;
+    c6Config.onboardingStep = 1;
     c6ConfigSave();
-    server.sendHeader("Location", "/wizard?step=1"); server.send(303);
+    c6NetworkEnsureOnboardingAp();
+    server.sendHeader("Location", "/wizard"); server.send(303);
 }
 
 void abrpTest()
@@ -329,7 +436,11 @@ void c6WebSetup()
     server.on("/status", HTTP_GET, statusPage);
     server.on("/api/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", diagnosticsJson()); });
     server.on("/wizard", HTTP_GET, wizardPage);
+    server.on("/wizard/connectivity", HTTP_POST, wizardConnectivitySave);
+    server.on("/wizard/vehicle", HTTP_POST, wizardVehicleSave);
+    server.on("/wizard/services", HTTP_POST, wizardServicesSave);
     server.on("/api/onboarding", HTTP_GET, onboardingStatus);
+    server.on("/api/onboarding/step", HTTP_POST, onboardingStep);
     server.on("/api/onboarding/complete", HTTP_POST, onboardingComplete);
     server.on("/api/onboarding/restart", HTTP_POST, onboardingRestart);
     server.on("/api/gps/toggle", HTTP_POST, gpsToggle);

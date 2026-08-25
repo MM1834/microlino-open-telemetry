@@ -4,7 +4,7 @@
 >
 > **Zielgruppe:** Administrator, Geräte-Provisionierer, Support und eingeladene Benutzer
 >
-> **Letzte Prüfung:** 2026-08-08
+> **Letzte Prüfung:** 2026-08-25
 
 ## Zweck und Geltungsbereich
 
@@ -27,9 +27,9 @@ Sicherheitsgrenzen.
 | Physischer Adapter | `deviceId` | Geräteinventar |
 | Cloud-Gerät | IoT Thing und individuelles Zertifikat | AWS IoT |
 
-Diese Schlüssel dürfen nicht gegeneinander ausgetauscht werden. Insbesondere ist
-die E-Mail-Adresse kein Berechtigungsschlüssel, und ein Thing-Name ist keine
-Fahrzeugzuweisung.
+Diese Schlüssel dürfen nicht gegeneinander ausgetauscht werden. Insbesondere sind
+E-Mail-Adresse und Mobilnummer Benachrichtigungsziele, aber keine
+Berechtigungsschlüssel; ein Thing-Name ist keine Fahrzeugzuweisung.
 
 ## Voraussetzungen
 
@@ -37,6 +37,7 @@ Vor Beginn müssen folgende Punkte feststehen:
 
 - freigegebener Auftrag oder Beta-Vorgang mit nicht personenbezogener Referenz;
 - E-Mail-Adresse des einzuladenden Benutzers über einen geschützten Kanal;
+- optional: Mobilnummer im internationalen Format für SMS-Benachrichtigungen;
 - eindeutige, kleingeschriebene `vehicleId` aus Buchstaben, Ziffern und Bindestrichen;
 - eindeutige Gerätekennzeichnung und aus dem Gerät ausgelesene `deviceId`;
 - Hardwaretyp, CAN-Transceiver, Kabelbaum, GPS-Variante und Firmwareziel;
@@ -51,16 +52,19 @@ nie in Git, Tickets, Screenshots, E-Mails oder ungeschützte Support-Chats.
 
 ## Ablaufübersicht
 
-1. Fahrzeug- und Adapteridentitäten festlegen.
-2. Adapter hardwareseitig prüfen.
-3. Individuelle AWS-IoT-Identität erstellen und installieren.
-4. Firmware und lokale Administration konfigurieren.
-5. Telemetrie der vorgesehenen `vehicleId` nachweisen.
-6. Benutzer in Cognito einladen.
+1. **MOT Portal Account beantragen und aktivieren (falls noch nicht vorhanden).**
+   Die Einladung und Aktivierung können bereits vor der Gerätebereitstellung
+   erfolgen.
+2. Fahrzeug- und Adapteridentitäten festlegen.
+3. Adapter hardwareseitig prüfen.
+4. Individuelle AWS-IoT-Identität erstellen und installieren.
+5. Firmware und lokale Administration konfigurieren.
+6. Telemetrie der vorgesehenen `vehicleId` nachweisen.
 7. Einmaligen Fahrzeug-Claim ausstellen und geschützt übergeben.
 8. Benutzer schließt Anmeldung und Claim im Portal ab.
-9. Administrator prüft Identität, Berechtigung, Telemetrie und Isolation.
-10. Übergabe dokumentieren und Geheimnisse wieder entfernen.
+9. Optional Benachrichtigungskanäle registrieren und pro Fahrzeug aktivieren.
+10. Administrator prüft Identität, Berechtigung, Telemetrie und Isolation.
+11. Übergabe dokumentieren und Geheimnisse wieder entfernen.
 
 ## Validierter Referenzablauf vom 2026-08-08
 
@@ -152,21 +156,56 @@ prüfen.
 
 1. Das für Board und AWS-Pfad freigegebene Firmware-Artefakt flashen.
 2. Gemeldete Version, Boardtyp und `deviceId` mit dem Inventar vergleichen.
-3. Beim kontrollierten ersten Setup ein eindeutiges lokales
-   Administratorpasswort mit 12 bis 63 Zeichen setzen.
-4. Home-WLAN und, beim C6-Pfad falls vorgesehen, das zweite mobile
+3. Beim ersten Auftreten die Abkürzung **AP** einmal als **WLAN/WiFi Access Point**
+   ausschreiben und den lokalen Einstieg konkret erklären:
+   - Vom Laptop, Smartphone oder Tablet mit dem WLAN `MOT-xxxx` verbinden;
+     das Passwort steht auf dem geschützten Inventarblatt.
+   - Im Browser [http://192.168.4.1](http://192.168.4.1) öffnen.
+   - Mit Benutzername `setup` und demselben Passwort vom Inventarblatt anmelden.
+4. Beim kontrollierten ersten Setup ein eindeutiges lokales
+   Administratorpasswort mit 12 bis 63 Zeichen setzen und zur Vermeidung eines
+   Tippfehlers ein zweites Mal identisch eingeben. Es schützt danach sowohl den
+   lokalen Benutzer `admin` als auch den Geräte-Hotspot `MOT-xxxx`.
+   Nach dem Speichern gilt der initiale Benutzer `setup` nicht mehr. Für alle
+   folgenden Anmeldungen wird Benutzer `admin` mit dem soeben gesetzten lokalen
+   Administratorpasswort verwendet. Bei Verlust kann es nur über den physischen
+   USB-Konsolenbefehl `admin recover` ersetzt werden.
+5. Home-WLAN und, beim C6-Pfad falls vorgesehen, das zweite mobile
    Hotspot-Profil konfigurieren.
-5. Provisionierte `vehicleId`, Gerätename und CAN-Profil kontrollieren; eine
+6. Provisionierte `vehicleId`, Gerätename und CAN-Profil kontrollieren; eine
    bestehende `vehicleId` nicht eigenmächtig ändern.
-6. AWS IoT aktivieren. Legacy MQTT und ABRP bleiben deaktiviert, sofern der
+7. AWS IoT aktivieren. Legacy MQTT und ABRP bleiben deaktiviert, sofern der
    konkrete Vorgang sie nicht ausdrücklich vorsieht.
-7. Lokale OTA-Funktion nach der Provisionierung deaktiviert lassen.
-8. Konfiguration sichern. Das Backup geschützt behandeln, auch wenn aktuelle
+8. Lokale OTA-Funktion nach der Provisionierung deaktiviert lassen.
+9. Konfiguration sichern. Das Backup geschützt behandeln, auch wenn aktuelle
    C6-Backups geheimnisbereinigte Felder verwenden.
 
 Das lokale Administratorpasswort wird nur über den genehmigten Secret-/Supportkanal
 übergeben. Es gehört nicht auf das Geräteetikett oder in die allgemeine
 Übergabedokumentation.
+
+Die aktuelle C6-Firmware führt nach dem einmaligen Sicherheits-Setup automatisch
+durch den lokalen Wizard. WLAN, CAN und Dienste werden direkt in dessen Schritten
+bearbeitet. Der zuletzt erreichte Schritt bleibt über erforderliche Neustarts
+erhalten. Während der Wizard noch nicht abgeschlossen ist, bleibt der geschützte
+Hotspot `MOT-xxxx` auch bei erfolgreicher Verbindung mit Home oder Mobile/WiFi2
+unter `http://192.168.4.1` erreichbar.
+
+Der WLAN-Schritt erklärt diesen temporären Hotspot. Bei bestehender Verbindung
+zeigt die Abschlussseite das tatsächlich aktive Profil (Home oder Mobile/WiFi2),
+dessen WLAN-Namen und die aktuelle lokale IP-Adresse an. Nach dem expliziten
+Abschluss erfolgt der Zugriff normalerweise über dieses WLAN; der zusätzliche AP
+wird nach stabiler Verbindung beendet. Wenn weder Home noch Mobile/WiFi2
+erreichbar ist, wird der geschützte Hotspot wieder aktiv und die lokale
+Konfiguration ist über `MOT-xxxx` und `http://192.168.4.1` mit Benutzer `admin`
+erreichbar. WLAN- oder Administratorpasswörter werden auf diesen Seiten nicht
+angezeigt. Eine physische Erstanwendungsprüfung dieser neuen Führung steht noch
+aus.
+
+Im CAN-Schritt wird nur dann neu gestartet, wenn sich mindestens eines der beiden
+Decoderprofile tatsächlich geändert hat. Werden die angezeigten Profile
+unverändert bestätigt, speichert das Gerät lediglich den Wizard-Fortschritt und
+wechselt unmittelbar zum nächsten Schritt.
 
 ## 5. Adapter und Fahrzeug technisch validieren
 
@@ -193,6 +232,13 @@ als `vehicle_not_provisionable` ab.
 Die aktuelle Beta ist einladungsbasiert. Vor der Einladung prüft der Administrator
 den Ziel-Stack, User Pool und die E-Mail-Adresse. Der Benutzer wird über Cognito
 eingeladen; der Administrator vergibt und kennt kein Benutzerpasswort.
+
+Die Einladung ist nicht von einem bereits provisionierten oder online erreichbaren
+Adapter abhängig und darf deshalb am Anfang des Onboardings oder parallel zur
+Gerätevorbereitung erfolgen. Claim, History-Freigabe sowie E-Mail- und SMS-
+Aktivierung folgen erst, sobald ihre jeweiligen technischen Voraussetzungen
+erfüllt sind. Ein bestätigtes Konto ohne Fahrzeugberechtigung ist dabei ein
+zulässiger Zwischenzustand.
 
 Für einen neuen Benutzer ohne direkte Fahrzeugzuweisung wird das Konto über den
 genehmigten Cognito-Administratorweg angelegt und die Cognito-Einladung ausgelöst.
@@ -244,7 +290,77 @@ unterschieden. Der Benutzer versucht nicht wiederholt weiter, sondern kontaktier
 den Support. Der Administrator prüft den Zustand und stellt nur nach geklärtem
 Inventar- und Eigentumsstatus einen neuen Claim aus.
 
-## 9. Abschlussprüfung durch Administrator und Benutzer
+## 9. Optional: Benachrichtigungen registrieren und einstellen
+
+Dieser Schritt ist optional und darf die Anmeldung, Fahrzeugzuweisung oder
+Adapterinbetriebnahme nicht blockieren. Er kann während des gemeinsamen
+Onboardings oder später durch den Benutzer abgeschlossen werden.
+
+Die gewünschten optionalen Dienste werden mit dem MOT-Administrator abgestimmt:
+
+- **History:** wird für die Fahrzeugidentität administrativ freigegeben;
+- **E-Mail-Benachrichtigungen:** werden pro Fahrzeug vom Benutzer aktiviert; eine
+  technische Bestätigung der Zieladresse beziehungsweise Subscription muss
+  abgeschlossen sein und der Administrator prüft den wirksamen Zustand;
+- **SMS:** die Nummer wird durch den Benutzer bestätigt, im Pilot zusätzlich
+  administrativ freigegeben und danach pro Fahrzeug vom Benutzer aktiviert.
+
+Diese Freigaben können nach dem eigentlichen Onboarding erfolgen. Ein aktives
+Portal-Konto und eine erfolgreiche Fahrzeugverknüpfung hängen nicht von ihnen ab.
+
+### E-Mail
+
+1. Im Dashboard das gewünschte Fahrzeug auswählen und die
+   Benachrichtigungseinstellungen öffnen.
+2. Den E-Mail-Kanal für dieses Fahrzeug aktivieren und **Speichern** wählen.
+3. Falls eine Bestätigungsnachricht des Versanddienstes eintrifft, den darin
+   enthaltenen Link öffnen. Erst danach können Benachrichtigungen zugestellt
+   werden.
+
+### SMS im kontrollierten Pilotbetrieb
+
+1. Mobilnummer im internationalen Format mit `+41` oder `+49` eingeben.
+2. **Bestätigungscode senden** wählen, den per SMS erhaltenen Code eingeben und
+   bestätigen.
+3. Der Administrator gibt im aktuellen Pilotverfahren die bestätigte Nummer für
+   die vorgesehene Nutzung frei. Diese Abhängigkeit ist eine befristete
+   Schutzmassnahme des Piloten und nicht das Zielbild des definitiven Onboardings.
+4. Nach angezeigter Bestätigung und administrativer Freigabe SMS für das
+   ausgewählte Fahrzeug aktivieren und **Speichern** wählen.
+5. Die Seite neu laden und kontrollieren, dass die Einstellung weiterhin aktiv
+   ist.
+
+Eine Mobilnummer darf für mehrere Fahrzeuge oder auch für mehrere Benutzer
+verwendet werden. Im Pilot werden Verifikation und Freigabe für die jeweilige
+Benutzer-/Nummern-Zuordnung geführt; die Aktivierung wird separat pro Fahrzeug
+gespeichert. Das Ändern einer Mobilnummer überträgt keine Fahrzeugrechte.
+
+SMS und E-Mail melden das Erreichen der SOC-Limite sowie einen qualifizierten
+Ladestopp. Pro durchgehend eingesteckter Ladesession wird höchstens ein Ladestopp
+erkannt; erst Aus- und erneutes Einstecken beginnt eine neue Session. Die
+Fahrtzusammenfassung wird nur per E-Mail und nicht per SMS versendet. Alle
+Benachrichtigungen sind informativ und ersetzen keine Fahrzeuganzeige.
+
+## Zielbild für das definitive Onboarding
+
+Die fachliche Berechtigung zur Nutzung eines Benachrichtigungskanals wird künftig
+von der Registrierung einer konkreten E-Mail-Adresse oder Mobilnummer getrennt:
+
+- Fahrzeugzugriff bleibt ausschliesslich an Cognito-`sub` und Fahrzeugzuweisung
+  gebunden.
+- Ein Administrator erteilt bei Bedarf eine kanalbezogene Berechtigung, aber
+  erfasst oder genehmigt nicht routinemässig jede Zieladresse.
+- Der Benutzer registriert, verifiziert, ändert und entfernt seine eigenen
+  Benachrichtigungsziele selbst.
+- Die Aktivierung bleibt eine bewusste Einstellung pro Fahrzeug; dieselbe
+  verifizierte Nummer kann für mehrere berechtigte Zuordnungen verwendet werden.
+- Missbrauchsschutz, Länder-/Absenderfreigabe, Ausgabenlimit, Alarme und Audit
+  bleiben zentrale Betriebs- und Sicherheitskontrollen.
+
+Bis dieses Modell implementiert und validiert ist, gilt die oben beschriebene
+nummernspezifische Admin-Freigabe für den Pilotbetrieb.
+
+## 10. Abschlussprüfung durch Administrator und Benutzer
 
 Nach erfolgreichem Claim wird der Vorgang erst geschlossen, wenn alle Punkte
 bestätigt sind:
@@ -261,6 +377,12 @@ bestätigt sind:
 - Claim steht auf `CONSUMED` und kann nicht wiederverwendet werden;
 - privacy-sichere Auditereignisse für Ausstellung und Verbrauch sind vorhanden;
 - Abmeldung entfernt die authentifizierte Fahrzeugansicht;
+- falls E-Mail gewünscht: Kanal ist bestätigt, pro Fahrzeug gespeichert und mit
+  einer erwarteten Benachrichtigung geprüft;
+- falls SMS gewünscht: Nummer ist verifiziert und administrativ freigegeben, die
+  Aktivierung ist pro Fahrzeug gespeichert und eine Testzustellung wurde geprüft;
+- falls Benachrichtigungen übersprungen wurden: dies ist als optionale, später
+  nachholbare Entscheidung dokumentiert und blockiert den Abschluss nicht;
 - Übergabedatum, Git-Revision, Firmware-Artefakt, Stack, Region und Prüfergebnis
   sind ohne Geheimnisse dokumentiert.
 

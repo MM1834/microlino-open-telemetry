@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <WiFi.h>
+#include <esp_partition.h>
 #include <esp_system.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/x509_crt.h>
@@ -59,13 +60,40 @@ static bool readRequiredFile(
     return true;
 }
 
+static bool littleFsPartitionIsErased() {
+    const esp_partition_t* partition = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA,
+        ESP_PARTITION_SUBTYPE_DATA_SPIFFS,
+        nullptr);
+    if (partition == nullptr) return false;
+
+    uint8_t buffer[256];
+    const size_t inspectionBytes = min(static_cast<size_t>(partition->size), static_cast<size_t>(8192));
+    for (size_t offset = 0; offset < inspectionBytes; offset += sizeof(buffer)) {
+        const size_t length = min(sizeof(buffer), inspectionBytes - offset);
+        if (esp_partition_read(partition, offset, buffer, length) != ESP_OK) return false;
+        for (size_t i = 0; i < length; ++i) {
+            if (buffer[i] != 0xff) return false;
+        }
+    }
+    return true;
+}
+
+static bool mountLittleFsSafely() {
+    if (littleFsPartitionIsErased()) {
+        Serial.println("LittleFS: blank partition after factory erase; formatting once");
+        return LittleFS.begin(true);
+    }
+    return LittleFS.begin(false);
+}
+
 bool motLoadAwsCredentials(
     MotAwsCredentials& credentials,
     const char* basePath
 ) {
     credentials = MotAwsCredentials();
 
-    if (!LittleFS.begin(false)) {
+    if (!mountLittleFsSafely()) {
         credentials.message = "LittleFS mount failed";
         return false;
     }

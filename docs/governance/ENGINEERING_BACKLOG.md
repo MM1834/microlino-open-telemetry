@@ -95,6 +95,69 @@ handoff checklist for local AP setup, administrator password, WiFi, CAN1 profile
 first AWS publication, account invitation, claim consumption, History enablement
 and notification opt-in.
 
+The handoff must spell out **AP** once as **WLAN/WiFi Access Point** and give the
+non-technical local connection sequence explicitly: connect a laptop, smartphone
+or tablet to `MOT-xxxx` using the protected inventory password, open
+`http://192.168.4.1`, then authenticate as `setup` with that password. Account
+invitation may run before or in parallel with device preparation; the workflow
+must present an account without a vehicle as a valid intermediate state.
+
+### Unified local setup and first-run wizard
+
+**Completed (2026-08-25):** Implemented for both C6 targets and accepted through
+repeated factory-first-run testing on B025 plus configuration-preserving firmware
+updates on B021, B023 and B024. The reproducible onboarding guide and one-page
+pilot handout describe the resulting workflow. See
+[ONB-UX-001](../project/sprints/ONB-UX-001.md).
+
+Harden the C6 local first-run journey around one coherent WebUI shell. Today the
+one-time `setup` page establishes the `admin` credential, while the wizard links
+to a separate full configuration form. Saving WiFi there reboots the device; a
+successful station connection then stops the fallback AP and removes the known
+`192.168.4.1` route before the user has completed the wizard. Reconnecting later
+also changes the required username from `setup` to `admin` without enough
+in-product guidance. The implementation works technically but is not suitable as
+a standard-user handoff.
+
+Required behavior:
+
+- keep `setup` as a one-time credential transition and explain before reboot that
+  all subsequent authentication uses `admin` plus the newly chosen password;
+- render first-run steps and later configuration from the same settings sections
+  and save handlers, rather than sending the user into a disconnected initial
+  configuration screen;
+- automatically launch the wizard only while onboarding is incomplete, persist
+  the last completed step across every required reboot and resume there;
+- keep the WPA2-protected AP and `192.168.4.1` available while onboarding remains
+  incomplete, even when Home or Mobile WiFi connects; stop that extra AP after
+  explicit completion under the normal bounded stability rule;
+- explain on the WiFi step that the protected `MOT-xxxx` hotspot remains active
+  during onboarding, normally becomes inactive after completion when Home or
+  Mobile/WiFi2 is connected, and automatically returns when neither configured
+  station network is reachable;
+- after every network-changing save, show what will reboot, which credential to
+  use, and all available reconnection routes without displaying a secret;
+- show a dynamic handoff notice on the final wizard page. When the station is
+  connected, identify the active profile as Home or Mobile/WiFi2, display its
+  escaped SSID and current local IP address, and state that future access normally
+  uses that network. Never render a configured-but-inactive SSID as the current
+  connection and never display either WiFi password;
+- on that same page, explain the fallback: if neither Home nor Mobile/WiFi2 is
+  available, the protected `MOT-xxxx` hotspot becomes active and local
+  configuration is reachable again at `http://192.168.4.1` using the `admin`
+  credential;
+- after completion, route `/` to normal status/configuration and offer an
+  explicit, authenticated **Run setup wizard again** support action without
+  reverting the local administrator credential.
+
+Acceptance must cover first Home WiFi, first Mobile/WiFi2 profile, an unavailable
+configured network, station success during onboarding, reboot/resume at every
+network-changing step, explicit completion and a later configuration change. It
+must confirm that the temporary AP extension ends after completion and does not
+weaken the existing authentication or same-origin mutation checks. UI acceptance
+must additionally verify correct active-profile/SSID/IP display, the offline
+fallback wording and suppression of all stored network secrets.
+
 Add a user-editable portal display name or alias for each authorized vehicle.
 Changing it must not alter `vehicleId`, Thing name, device identity, certificate
 scope or authorization records. Until this exists, keep the readable name in the
@@ -144,6 +207,15 @@ Required capability slices:
 - produce privacy-safe audit evidence and an exportable support summary without
   email addresses, tokens, claim proofs, private keys, WiFi secrets or telemetry
   values.
+
+The definitive workflow must remove routine user–MOT ping-pong: after the
+administrator has prepared inventory and policy approvals, the tool guides the
+user through account confirmation, local device setup, claim consumption and
+optional notification verification without requiring a separate administrator
+message between ordinary steps. It must track prerequisites independently so
+account activation can precede device onboarding and History, email or SMS can
+be enabled later without restarting the process. Only exceptional, security-
+relevant or failed states are handed to an administrator.
 
 The tool must plan read-only by default, require an explicit apply step for every
 mutation, use conditional writes, remain idempotent across retries and expose

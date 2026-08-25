@@ -125,5 +125,14 @@ without an onboarding key migrate as completed and therefore do not unexpectedly
 enter the wizard after OTA. The wizard configures only the local adapter; portal
 accounts, vehicle ownership and certificate assignment remain external admin work.
 
+First setup now performs only the one-time transition from the device-specific
+`setup` credential to the user-selected `admin` credential. WiFi, CAN and optional
+services are edited inside the wizard, whose current step persists across reboots.
+Until explicit completion, the protected `MOT-*` AP remains active at
+`192.168.4.1` alongside a successful station connection. The final page shows the
+active Home or Mobile/WiFi2 SSID and current station IP when connected, plus the
+fallback-AP route without rendering stored passwords. After completion, a stable
+station connection stops the AP; loss of both configured networks restores it.
+
 For the 4 MB XIAO, run `python3 tools/check_c6_flash_gate.py` after building
 `xiao-esp32c6`. The maintained gate is 85% of one OTA application slot.

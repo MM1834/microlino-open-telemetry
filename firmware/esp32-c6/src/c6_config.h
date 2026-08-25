@@ -17,6 +17,7 @@ struct C6Configuration {
     String abrpApiKey;
     String abrpUserToken;
     bool onboardingComplete = false;
+    uint8_t onboardingStep = 1;
     bool otaEnabled = false;
     uint32_t publishIntervalMs = 5000;
 };

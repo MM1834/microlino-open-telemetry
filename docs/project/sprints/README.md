@@ -22,6 +22,9 @@
 
 ## Completed predecessors
 
+- [ONB-UX-001](ONB-UX-001.md) completed the guided C6 local onboarding flow,
+  physical factory-first-run acceptance and configuration-preserving rollout to
+  B021, B023 and B024 on 2026-08-25.
 - [PWR-FRESH-001](PWR-FRESH-001.md) marks stale charging/power overview values
   and net-power History measurements without hiding retained data; hosted desktop
   and smartphone acceptance passed on 2026-08-24.
