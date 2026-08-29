@@ -689,7 +689,7 @@
     switch (key) {
       case 'display/soc': setSoc(val); break;
       case 'display/speed_kmh': case 'display/speed': setText('speed-main', fmtNum(val,0)); setText('speed-card', fmtNum(val,0)); updateBmsPowerFlow(); break;
-      case 'display/odometer_km': case 'display/odo': setText('odo-main', `${fmtNum(val,1)} km`); break;
+      case 'display/odometer_km': case 'display/odo': setText('odo-main', `${fmtNum(val,0)} km`); break;
       case 'display/estimated_range_km': case 'display/range': state.values.range = val; renderRangeForecast(); break;
       case 'charging/is_charging': renderChargingState(); updateBmsPowerFlow(); break;
       case 'charging/plugged': renderChargingState(); break;
