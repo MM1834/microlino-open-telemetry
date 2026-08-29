@@ -332,3 +332,10 @@
   #charging .mini-grid>div:last-child{grid-column:1/-1}
   .cell-meta>span{display:flex;flex-direction:column;gap:3px}
 }
+
+/* Blend the photographic vehicle teaser into the dashboard card. */
+.hero-image-wrap{background:rgba(5,16,29,.72)}
+.hero-image-wrap img{
+  -webkit-mask-image:radial-gradient(ellipse 94% 92% at center,#000 68%,rgba(0,0,0,.82) 82%,transparent 100%);
+  mask-image:radial-gradient(ellipse 94% 92% at center,#000 68%,rgba(0,0,0,.82) 82%,transparent 100%);
+}
