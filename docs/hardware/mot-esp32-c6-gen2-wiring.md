@@ -4,7 +4,7 @@
 > Serienfreigabe oder fahrzeugseitige Zulassung
 >
 > **Zielhardware:** nanoESP32-C6-N16 mit zwei 3,3-V-CAN-Transceivern und
-> optionalem ATGM336H-5N-GPS
+> optionalem DA37+DA10-GNSS-Modul
 
 Diese Anleitung ist so ausgelegt, dass ein Pilot den Adapter auch ohne Betreuung
 vor Ort aufbauen und elektrisch vorprüfen kann. Sie setzt sicheres Löten,
@@ -26,7 +26,7 @@ voraus. Bei Unsicherheit den Adapter nicht mit dem Fahrzeug verbinden.
 |---:|---|---|
 | 1 | nanoESP32-C6-N16 | 16 MB Flash, USB-C |
 | 2 | CAN-Transceivermodul | 3,3 V, z. B. SN65HVD230; 120 Ω entfernbar/abschaltbar |
-| 1 | GPS/GNSS-Modul, optional | ATGM336H-5N, 3,3 V, UART 9600 Baud, Antenne |
+| 1 | GPS/GNSS-Modul, optional | Bevorzugt DA37+DA10, 3,3 V, UART/NMEA 9600 Baud, separate Antenne |
 | 3 | Keramikkondensator | 100 nF, mindestens 10 V |
 | 1 | Stützkondensator CAN | 10 µF, mindestens 6,3 V |
 | 1 | Stützkondensator GPS | 47 µF, mindestens 6,3 V |
@@ -67,6 +67,30 @@ verwenden. Übliche 5-V-TJA1050-/MCP2551-Breakouts sind kein direkter Ersatz.
 Die Standardkonfiguration ist CAN1 = Standard-CAN V1 Pioneer und CAN2 =
 Display-CAN. Die Firmware kann grundsätzlich jeden registrierten Decoder einem
 der beiden Controller zuweisen.
+
+DA37+DA10 ist das bevorzugte C6-Pilot-GPS. Die getrennte Antenne kann außerhalb
+des Gehäuses mit geeigneter Himmelsicht platziert werden, während Empfänger und
+Backup-Batterie geschützt im Gehäuse bleiben. PPS wird von MOT nicht benötigt.
+
+### GNSS-Antenne ausrichten
+
+Keramische GNSS-Patchantennen sind gerichtet. Im normalen Fahrzeugeinbau liegt
+die Antennenfläche parallel zum Horizont. Die freie Patch-/Keramikfläche zeigt
+nach oben zum Himmel; die Grundflächen-, PCB-, Kabel- oder vorgesehene
+Klebeseite zeigt nach unten zum Befestigungspunkt. Eine graue Klebefläche auf der
+Unterseite ist daher kein Hinweis, dass diese Fläche zum Himmel zeigen soll,
+sondern üblicherweise gerade zur Montage auf Kunststoff oder einer geeigneten
+Grundfläche vorgesehen.
+
+Nicht allein nach Farbe oder einem nachträglich aufgebrachten Klebepad montieren:
+Bei jeder neuen Antennencharge Herstellerzeichnung und Aufbau prüfen. Ist die
+aktive Seite nicht eindeutig identifizierbar, vor dem Verkleben im Freien beide
+Orientierungen unter gleichen Bedingungen vergleichen und Zeit bis zum Fix,
+Satellitenzahl und Empfangsqualität protokollieren. Die endgültige Pilotmontage
+muss die Patchfläche frei von Metall, Leiterplatten, Akkus und Kabelbündeln zum
+Himmel orientieren. Dünner, nicht metallisierter Kunststoff oberhalb der Antenne
+ist zulässig; Aluminium, metallisierte Folien und leitfähige Beschichtungen sind
+zu vermeiden.
 
 ## CAN-Abschluss – vor dem Einbau zwingend prüfen
 
@@ -137,8 +161,9 @@ Alle Prüfungen zunächst ohne Verbindung zu CAN1, CAN2 oder Fahrzeug-12-V:
 6. Zuerst GND und genau einen CAN-Bus verbinden. Fahrzeug/Bus aktivieren und in
    der lokalen MOT-Diagnose den Empfang kontrollieren. Danach ausschalten und
    erst den zweiten Bus ergänzen.
-7. GPS im Freien testen. `detected` bestätigt nur die UART-Erkennung; gültige
-   Koordinaten setzen einen Satelliten-Fix voraus.
+7. GPS-Antenne mit freier Patchfläche zum Himmel ausrichten und im Freien testen.
+   `detected` bestätigt nur die UART-Erkennung; gültige Koordinaten setzen einen
+   Satelliten-Fix voraus. Zeit bis zum ersten Fix und Satellitenzahl dokumentieren.
 8. Erst nach bestandenem USB-Test die optionale 12-V→5-V-Versorgung separat am
    `5V`-Eingang testen. Vor erneutem Anschluss von USB muss der externe 5-V-Pfad
    getrennt sein.

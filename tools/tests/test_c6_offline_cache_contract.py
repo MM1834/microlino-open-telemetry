@@ -60,6 +60,7 @@ class C6OfflineCacheContractTests(unittest.TestCase):
         self.assertIn("c6OfflineCacheStatusJson()", WEB)
         self.assertIn('normalized == "cache enable"', MAIN)
         self.assertIn('normalized == "cache purge"', MAIN)
+        self.assertIn('\\"cloudPaused\\"', CACHE)
 
     def test_test_cloud_root_cannot_match_operational_rule(self):
         self.assertIn("Default: mot-test", TEMPLATE)

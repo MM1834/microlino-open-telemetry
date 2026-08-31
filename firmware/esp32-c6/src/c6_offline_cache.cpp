@@ -386,6 +386,7 @@ String c6OfflineCacheStatusJson()
     const uint64_t oldestAgeSeconds = state.oldestSampleMs && nowMs >= state.oldestSampleMs
         ? (nowMs - state.oldestSampleMs) / 1000ULL : 0;
     String out = "{\"enabled\":" + String(c6Config.offlineCacheEnabled ? "true" : "false");
+    out += ",\"cloudPaused\":" + String(!c6Config.motCloudEnabled ? "true" : "false");
     out += ",\"mounted\":" + String(state.mounted ? "true" : "false");
     out += ",\"maxBytes\":" + String(static_cast<unsigned long>(MOT_OFFLINE_CACHE_MAX_BYTES));
     out += ",\"usedBytes\":" + String(static_cast<unsigned long>(state.recordCount * sizeof(CacheRecord)));

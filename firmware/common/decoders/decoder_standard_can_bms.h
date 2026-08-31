@@ -45,6 +45,7 @@ inline void decode18d(const uint8_t *data, const DecoderRules &rules)
     if (voltagePlausible) {
         telemetry.bms.packStatusValid = true;
         telemetry.bms.packVoltageMv = voltageMv;
+        telemetry.bms.standardSocValid = true;
         telemetry.bms.socPercent = data[7];
         telemetry.bms.packStatusLastUpdateMs = millis();
     } else {

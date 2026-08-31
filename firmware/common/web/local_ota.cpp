@@ -2,11 +2,14 @@
 
 #include <Update.h>
 #include "local_web_security.h"
+#include "ota_image_guard.h"
 
 namespace {
 WebServer *web = nullptr;
 const LocalOtaOptions *settings = nullptr;
 bool uploadAllowed = false;
+bool updateStarted = false;
+String validationError;
 bool rebootPending = false;
 uint32_t rebootAtMs = 0;
 
@@ -42,28 +45,53 @@ void upload()
     HTTPUpload &item = web->upload();
     if (item.status == UPLOAD_FILE_START) {
         uploadAllowed = authorize() && LocalWebSecurity::requireSameOrigin(*web);
-        if (uploadAllowed && !Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
+        updateStarted = false;
+        validationError = "";
     } else if (item.status == UPLOAD_FILE_WRITE && uploadAllowed) {
+        if (!updateStarted) {
+            const OtaImageGuardResult result = otaValidateImageHeader(item.buf, item.currentSize);
+            if (!result.accepted) {
+                validationError = result.reason;
+                uploadAllowed = false;
+                Serial.println("OTA rejected: " + validationError);
+                return;
+            }
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                validationError = "OTA partition could not be opened";
+                Update.printError(Serial);
+                uploadAllowed = false;
+                return;
+            }
+            updateStarted = true;
+        }
         if (Update.write(item.buf, item.currentSize) != item.currentSize) Update.printError(Serial);
     } else if (item.status == UPLOAD_FILE_END && uploadAllowed) {
-        if (!Update.end(true)) Update.printError(Serial);
+        if (!updateStarted || !Update.end(true)) Update.printError(Serial);
     } else if (item.status == UPLOAD_FILE_ABORTED) {
-        Update.abort();
+        if (updateStarted) Update.abort();
         uploadAllowed = false;
+        updateStarted = false;
     }
 }
 
 void finished()
 {
+    if (!validationError.isEmpty()) {
+        web->send(400, "text/html", header("OTA rejected") + "<h1 class='bad'>OTA rejected</h1><p>" + validationError + ".</p><p>The running firmware was not changed.</p><p><a href='/update'>Try again</a></p></body></html>");
+        validationError = "";
+        return;
+    }
     if (!uploadAllowed) { web->send(401, "text/plain", "OTA not authorized"); return; }
     if (Update.hasError()) {
         web->send(500, "text/html", header("OTA failed") + "<h1 class='bad'>OTA failed</h1><p>The running firmware remains active. Check that the binary matches this board and try again.</p><p><a href='/update'>Try again</a></p></body></html>");
         uploadAllowed = false;
+        updateStarted = false;
         return;
     }
     web->send(200, "text/html", header("OTA complete") + "<h1 class='ok'>OTA complete</h1><p>Verified image written. Rebooting shortly.</p></body></html>");
     rebootPending = true;
     rebootAtMs = millis() + 2500;
+    updateStarted = false;
 }
 }
 

@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/history-soc-speed.css">
   <link rel="stylesheet" href="css/location-map.css">
   <link rel="stylesheet" href="css/location-map-cleanup.css">
+  <script src="js/i18n.js?v=20260827-i18n1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -85,6 +86,14 @@
           <select id="vehicle-selector" class="vehicle-selector"></select>
         </label>
         <div class="top-spacer"></div>
+        <label class="language-selector" for="dashboard-language">
+          <span>Sprache</span>
+          <select id="dashboard-language" aria-label="Sprache">
+            <option value="de">Deutsch</option>
+            <option value="en">Englisch</option>
+            <option value="fr">Französisch</option>
+          </select>
+        </label>
         <div id="auth-controls" class="auth-controls" hidden>
           <span id="auth-status" class="auth-status" aria-live="polite">Nicht angemeldet</span>
           <label id="auth-remember-wrap" class="auth-remember"><input id="auth-remember" type="checkbox" /><span>Angemeldet bleiben</span></label>
@@ -250,12 +259,30 @@
 <section class="card settings-card" id="settings" hidden>
   <div class="card-header">
     <div>
-      <h2>Benachrichtigungen</h2>
+      <h2>Einstellungen</h2>
       <span class="muted">Persönlich · fahrzeugbezogen</span>
     </div>
     <strong id="notification-vehicle">--</strong>
   </div>
   <form id="notification-form" class="notification-form">
+    <fieldset class="journey-notification-setting range-setting">
+      <legend>Reichweite</legend>
+      <label>
+        Reichweite bei 100 % SOC
+        <div class="settings-input-suffix">
+          <input id="range-km-at-100" type="number" min="20" max="500" step="1" value="140" required />
+          <span>km</span>
+        </div>
+      </label>
+      <label>
+        Gewünschte SOC-Reserve
+        <div class="settings-input-suffix">
+          <input id="range-reserve-soc" type="number" min="0" max="50" step="1" value="0" required />
+          <span>%</span>
+        </div>
+      </label>
+      <small class="connection-detail">Die angezeigte Reichweite endet bei dieser Reserve. Beispiel: 15 % zeigt die noch fahrbare Strecke bis 15 % SOC.</small>
+    </fieldset>
     <label class="settings-toggle">
       <input id="notification-enabled" type="checkbox" />
       <span>Ladeziel-Benachrichtigung aktivieren</span>
@@ -289,7 +316,7 @@
           <span>%</span>
         </div>
       </label>
-      <small id="notification-charging-stop-state" class="connection-detail">Nur wenn das Fahrzeug weiterhin eingesteckt ist. Ein manueller Stopp oder Lastmanagement kann dieselbe Meldung auslösen.</small>
+      <small id="notification-charging-stop-state" class="connection-detail">Nur wenn das Fahrzeug weiterhin eingesteckt ist. Ein manueller Stopp, Lastmanagement oder Solar-Nulleinspeisung kann dieselbe Meldung auslösen. Pro durchgehend eingesteckter Ladesession wird höchstens eine Ladestopp-Meldung versendet; erst Ausstecken und erneutes Einstecken startet eine neue Session.</small>
     </fieldset>
     <fieldset class="journey-notification-setting">
       <legend>Fahrtzusammenfassung</legend>
@@ -299,10 +326,31 @@
       </label>
       <small id="notification-journey-state" class="connection-detail">Aktiv für geeignete Fahrten · Energiequelle wird in der E-Mail ausgewiesen.</small>
     </fieldset>
-    <label class="settings-toggle disabled-setting" title="Für den AWS-Free-Plan zurückgestellt">
-      <input id="notification-sms-enabled" type="checkbox" disabled />
-      <span>SMS senden – derzeit nicht verfügbar</span>
-    </label>
+    <fieldset class="journey-notification-setting">
+      <legend>SMS (Schweiz / Deutschland)</legend>
+      <label>
+        Mobilnummer im Format +41… oder +49…
+        <input id="notification-sms-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+41791234567" />
+      </label>
+      <div class="settings-actions">
+        <button id="notification-sms-request" class="auth-button secondary" type="button">Bestätigungscode senden</button>
+      </div>
+      <div id="notification-sms-confirmation-fields" class="sms-confirmation-fields" hidden>
+        <label>
+          Bestätigungscode
+          <input id="notification-sms-code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4,10}" />
+        </label>
+        <div class="settings-actions">
+          <button id="notification-sms-confirm" class="auth-button secondary" type="button">Code bestätigen</button>
+        </div>
+      </div>
+      <small id="notification-sms-state" class="connection-detail">Mobilnummer noch nicht bestätigt.</small>
+      <label class="settings-toggle">
+        <input id="notification-sms-enabled" type="checkbox" disabled />
+        <span>SMS-Kanal für dieses Fahrzeug aktivieren</span>
+      </label>
+      <small class="connection-detail">Die Nummer kann für mehrere Fahrzeuge verwendet werden. Die administrative Freigabe erfolgt für jede Benutzer–Fahrzeug-Zuordnung separat.</small>
+    </fieldset>
     <p id="notification-email-confirmation-help" class="muted settings-note"><strong>Bestätigung erforderlich:</strong> Nach dem Speichern sendet <em>AWS Notifications</em> eine technische Bestätigungsmail. Öffnen Sie diese und wählen Sie <em>Confirm subscription</em>. Die AWS-Mail erwähnt MOT möglicherweise nicht; prüfen Sie deshalb auch den Spam-Ordner. Ohne Bestätigung bleiben E-Mail-Benachrichtigungen inaktiv.</p>
     <p class="muted settings-note">Die Meldung ist rein informativ und steuert den Ladevorgang nicht.</p>
     <div class="settings-actions">
@@ -342,7 +390,7 @@
   <script src="js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260807-ntf1"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260824-ops1"></script>
   <script src="js/app.js?v=20260830-odometer1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>

@@ -162,7 +162,7 @@ bool MotAwsIotClient::begin(const MotAwsCredentials& credentials) {
     secureClient_.setPrivateKey(credentials.privateKey.c_str());
     // A weak but still associated WiFi link must not stall the firmware's
     // cooperative network/CAN/GPS loop for tens of seconds.
-    secureClient_.setHandshakeTimeout(5);
+    secureClient_.setHandshakeTimeout(7);
     secureClient_.setTimeout(5000);
     return configure(credentials, secureClient_);
 }
@@ -269,6 +269,8 @@ bool MotAwsIotClient::connect() {
                                     ? MAX_RECONNECT_INTERVAL_MS
                                     : reconnectDelayMs_ * 2);
         status_.reconnectDelayMs = reconnectDelayMs_;
+        status_.tlsErrorCode = tlsErrorCode;
+        status_.tlsError = tlsError[0] ? tlsError : "none";
         status_.message =
             "AWS IoT connect failed rc=" + String(mqtt_.state());
         Serial.println(status_.message);
@@ -283,6 +285,8 @@ bool MotAwsIotClient::connect() {
     status_.consecutiveConnectFailures = 0;
     reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
     status_.reconnectDelayMs = reconnectDelayMs_;
+    status_.tlsErrorCode = 0;
+    status_.tlsError = "";
     status_.message = "AWS IoT connected";
     Serial.printf(
         "AWS IoT: connected freeHeap=%u will=%s\n",

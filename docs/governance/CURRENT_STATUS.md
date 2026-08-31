@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-25
+**Last reviewed:** 2026-08-27
 
 ## Purpose
 
@@ -19,6 +19,19 @@ revision.
 
 ## Current product direction
 
+I18N-001 has a repository-complete portal localization slice. German remains the
+project language and the dashboard default/fallback; a persisted selector adds
+English and French without changing the English-only local firmware wizard.
+Static labels, runtime state, accessibility labels, dates and History charts use
+the selected locale. Desktop and smartphone browser acceptance passed in all
+three languages. The German one-page pilot handout remains authoritative and the
+same generator now produces reviewed English and French PDFs. Hosted portal
+upload and native-speaker review of the French wording remain open.
+The public landing page now mirrors the three-language choice and links to a
+dedicated `/onboarding/` page with prominent user-to-adapter and user-to-Portal
+paths plus high-contrast active states. Repository desktop and 390 px layout checks pass; hosted
+upload and maintainer acceptance remain pending.
+
 ONB-UX-001 completed the guided C6 local-onboarding flow on 2026-08-25. The
 one-time credential transition now requires confirmation, the authenticated
 wizard owns WiFi, CAN, services and validation, and its progress survives required
@@ -28,16 +41,119 @@ without exposing a secret. Factory-first-run acceptance passed repeatedly on B02
 and B021, B023 and B024 received the configuration-preserving firmware update.
 History, email and SMS remain optional administrator-enabled services pending the
 future onboarding admin tool.
+Pilot feedback is incorporated in the repository: displayed local HTTP addresses
+are clickable, wizard actions provide immediate progress feedback, the GPS option
+is compact, and CAN2 is presented as fixed Microlino Display CAN while retaining
+the extensible decoder-profile model. Physical acceptance remains pending.
 
-PWR-FRESH-001 completed a portal refinement for the adaptive charging/power
-overview card and net-power History. It uses authoritative per-topic `receivedAt`
-metadata and the existing 120-second freshness boundary. Depending on the visible
-mode it evaluates charging/plugged state, vehicle/pack power or both; stale
-contents are dimmed and annotated with the local time of the last measurement
-while the retained value remains visible. Net-power History applies the same
-wording to its last real sample before gap-closing zeroes. The full 185
+The unified C6 firmware now keeps every provisioned adapter AWS ready while
+allowing the user to disable MOT Cloud independently in the authenticated local
+wizard or configuration page. Existing devices default to enabled, disabling
+retains certificates and vehicle assignment, and ABRP can operate as the only
+active Internet telemetry service over WiFi. The offline History cache pauses
+without deleting queued records while MOT Cloud is disabled. Both canonical C6
+builds, the 85% XIAO gate and 199 repository tests pass. ABRP credentials require
+a separate confirmed deletion that also disables ABRP; blank secret fields retain
+their stored values. Physical mode-switch and credential-lifecycle acceptance
+remain open.
+
+The first productive Pioneer mode-switch exercise found two local-wizard defects:
+an unchanged WiFi form still forced a misleading reboot/AP handoff, and enabling
+MOT Cloud inside an already running wizard did not reboot to initialize the AWS
+client. Both paths are corrected: unchanged WiFi continues immediately, while a
+MOT Cloud state change reboots and resumes at validation. AWS status now retains
+the last TLS error code and detail after a bounded connect failure. Repository
+tests and both C6 builds pass. The observed Pioneer `rc=-2` failure ended at the
+former five-second TLS-handshake boundary despite adequate Home WiFi; the bound
+is minimally raised to seven seconds while the five-second socket timeout and
+retry policy remain unchanged. Productive runtime confirmation of the new
+seven-second bound remains open.
+The maintainer subsequently repeated MOT Cloud disable/enable on Pioneer over the
+configured Home WiFi: reconnection was initially delayed, then recovered without
+intervention and AWS telemetry resumed; ABRP continued to behave as expected.
+
+RNG-SET-001 has a repository-complete additive implementation for personal range
+settings. The authenticated per-user/per-vehicle preference record now supports
+a 20–500 km full-range basis and 0–50% SOC reserve, defaulting compatibly to
+140 km and 0%. Both fixed and confidence-blended personal forecasts use the
+configured values. The fields are grouped discreetly in the current settings
+card. The isolated Preference Lambda update is deployed and healthy; the
+maintainer uploaded the dashboard and confirmed that both values persist and
+affect the displayed range. Cross-vehicle validation remains open. A dedicated
+settings page with a return button is the documented follow-up layout slice.
+
+PWR-FRESH-001 completed a portal refinement for the
+adaptive charging/power overview card and net-power History. It uses authoritative per-topic
+`receivedAt` metadata and the existing 120-second freshness boundary. Depending
+on the visible mode it evaluates charging/plugged state, vehicle/pack power or
+both; stale contents are dimmed and annotated with the local time of the last
+measurement while the retained value remains visible. Net-power History applies
+the same wording to its last real sample before gap-closing zeroes. The full 185
 portal/tool tests and JavaScript syntax validation pass. Hosted desktop and
 smartphone acceptance passed on 2026-08-24; the sprint is closed.
+
+OPS-001 is active after a live capacity incident on 2026-08-24. The regional
+Lambda concurrent-execution quota was effectively only 10 and remained saturated
+at 10/10 from 20:03 through 20:09 CEST, producing 385–620 throttles per minute.
+State ingest and notification processing were the main consumers; transient
+Vehicle and Notification API 5xx responses caused the portal to present intact
+History and confirmed destinations as unavailable. DynamoDB showed no throttling.
+The repository portal now retries only transient authenticated reads and loads
+preferences and SMS status independently. Live read-back on 2026-08-25 reports
+the regional quota restored to 1,000. Request
+`f264d9016cab4178b782ed315413fa8b1DzGq1fA` opened support case
+`178759663200182`; no 1,001 dependency remains. Two account-level alarms are
+live on the confirmed operations topic; their `OK` actions are removed and the
+concurrency warning is aligned to 800. A minimal, no-replacement Change Set has
+also deployed an exact AWS IoT `WHERE` filter so irrelevant telemetry no longer
+invokes the Notification Lambda. Stack and effective SQL read-back pass; full
+post-filter capacity observation and hosted portal acceptance remain open.
+
+SMS-001.C is deployed with an auditable administrator approval store and
+exact-principal operator role. The SMS-001.E backend is also deployed through two
+reviewed, replacement-free Change Sets: authenticated users can register and
+verify a Swiss mobile destination for a selected vehicle, while activation
+remains locked to a separate exact administrator approval. A shared number is
+verified once by fingerprint but retains independent approval and opt-in for
+every user–vehicle association. JWT and direct unauthenticated probes fail. The
+hosted portal has completed the
+first Swiss verification-code flow after narrowing the required implicit send
+permission to the exact `MOT/CH` sender. AWS reports the destination `VERIFIED`,
+and the controlled Pioneer association now has a 30-day version-1 administrator
+approval plus atomic audit event. SMS-001.D is deployed and active for only SOC
+target and qualified charging-stop events; journey summaries remain email-only.
+The dispatcher revalidates every approval, verified destination, CH format,
+single-part body, fixed `MOT/CH` sender, live USD 10 spend limit, `OK` alarm,
+idempotency and destination/day rate boundary. The legacy SNS wildcard was
+removed and Pioneer opt-in is restored.
+The first live cost reconciliation reached USD 0.61488 and correctly put the
+initial USD 0.60 alarm into `ALARM`; email remained independent. AWS subsequently
+approved production access and a maximum monthly text quota of USD 50 in
+`eu-north-1`. On 2026-08-29 the project applied its lower USD 10 provider
+override, aligned the fail-closed Lambda expectation to USD 10 and raised the
+CloudWatch warning to USD 6. All three controls read back consistently, the alarm
+is `OK` with no recovery action, and current measured spend is USD 0.92232.
+Support case `178763910400803` and quota request
+`c52b7741a4e942cb89dc4e65a33e793afkks4KMb` are fulfilled.
+The `xruser`/`xrpioneer2` pilot association is independently ready: active
+vehicle access, confirmed and enabled Swiss destination, matching unexpired
+administrator approval and verified destination all pass. A reviewed
+CloudFormation update added its second exact destination authorization to the
+Notification role without a wildcard. The new privacy-safe dispatcher-gate
+preflight reports `ready=true`; no SMS was emitted and measured spend remained
+USD 0.61488.
+The first post-activation Ladestopp produced its email but the SMS provider call
+failed after all application gates. A direct identical call was accepted and the
+maintainer confirmed handset receipt at 13:23, isolating missing Lambda IAM for
+the exact verified destination and configuration set. Those two exact resources
+are now deployed alongside the fixed sender; no wildcard was added. Transport
+and handset delivery pass, while a new idempotency-distinct charging session is
+still required for full end-to-end Lambda acceptance.
+The following SOC-target crossing at 97% passed end to end with stored email and
+SMS `SENT` evidence and maintainer receipt of both. A later charging stop produced
+no second event because it remained in the already-consumed plugged session,
+confirming one-stop-per-plug-session idempotency. Charging-stop SMS acceptance
+therefore needs one fresh unplug/replug session.
 
 SES-001 has a deployed and DKIM-verified MOT domain identity for Cognito
 invitation, verification and recovery mail. A direct message from
@@ -68,14 +184,14 @@ issuance and normal beta accounts remain unchanged; the hosted portal hides
 **Fahrzeug hinzufügen** for demo identities.
 
 CACHE-001 closed on 2026-08-21 after delivering an optional, default-off
-SOC/Speed store-and-forward pilot. Its minimal `mot-test` AWS lane is deployed
+SOC/Speed store-and-forward pilot. Its minimal `mot-test` AWS lane was deployed
 and passed synthetic original-
 timestamp and duplicate-replay checks without writing operational State. The
 shared C6 journal/replay implementation, authenticated control, 155 repository
 tests and both canonical builds pass; XIAO remains a build-only compatibility
-target. Physical testing has started on the dedicated no-GPS B025
-nanoESP32-C6-N16, not the productive adapter. Its separate certificate is
-installed and its 256 KiB cache is enabled. Physical SOC, Speed, hard-power and
+target. Physical testing completed on the dedicated no-GPS B025
+nanoESP32-C6-N16 rather than the productive adapter. Its 256 KiB cache supported
+physical SOC, Speed, hard-power and
 in-flight-ACK-loss recovery all pass. Cost Explorer reported USD 0 for IoT,
 Lambda, DynamoDB and CloudWatch during the intensive test period; a conservative
 24-byte-record/16-KiB-physical-write bound supports decades of N16 flash life at
@@ -84,8 +200,8 @@ two fully offline driving hours per day.
 The first B025 hotspot acceptance also closed a least-privilege test-policy gap:
 AWS IoT requires `iot:RetainPublish` separately from `iot:Publish` for the
 firmware's retained Last Will and Birth metadata. The isolated policy now allows
-it only on the permitted status, system and live telemetry test paths. The device certificate fingerprint
-matches AWS, and B025 remains connected after publishing all Birth fields.
+it only on the permitted status, system and live telemetry test paths. The device
+certificate fingerprint matched AWS and B025 published all Birth fields.
 
 The first physical CACHE-001 SOC outage/reconnect path now passes on B025. During
 an iPhone hotspot loss, both CAN controllers continued with zero errors and three
@@ -121,13 +237,13 @@ ninth record separately. Final cache state is empty with `duplicates=8` and no
 drop, corruption or rejection. The stack is `UPDATE_COMPLETE` and the fault
 injection switch is restored to `true`.
 
-The production History-backfill backend is now deployed additively and enabled
-only for B025's `cache-b025-n16-01` vehicle identity. The reviewed Change Sets
+The production History-backfill backend was deployed additively first for B025's
+`cache-b025-n16-01` vehicle identity. The reviewed Change Sets
 contained no replacements. The general live ingest explicitly rejects both the
 Backfill request and ACK suffix before State or WebSocket work; a direct AWS test
 created zero State rows. A marked two-record production smoke batch stored SOC
 and Speed in History, the stack is `UPDATE_COMPLETE`, and no error was observed.
-B025 now uses its separate production Thing `mot-esp32c6-4085d9` and exact
+B025 used its separate production Thing `mot-esp32c6-4085d9` and exact
 `cache-b025-n16-01` namespace. Firmware/LittleFS upload, hotspot recovery, 11
 Birth fields and the first real production replay pass. During a mobile outage
 both CAN buses continued without errors; one real SOC 87 sample was acknowledged
@@ -167,10 +283,26 @@ cloud-ready for optional Backfill. A reviewed no-replacement Change Set added
 only the exact Backfill-ACK Subscribe/Receive path in that vehicle namespace.
 The stack is `UPDATE_COMPLETE`; the device-side cache remains default-off and no
 test row was inserted into Gino's History.
-B025 is also assigned to the confirmed `news@muehlberg.ch` portal account through
-an `ACTIVE/OWNER` UserVehicleAccess record after an empty conflict check. The
-current module, Thing and vehicle namespace were reused unchanged; the portal can
-therefore display its live State and the retained real SOC replay immediately.
+B021 `MOT-EC18DB`/`ml-pilot-021` is likewise cloud-enabled for operational
+History and optional offline Backfill as of 2026-08-28. The reviewed Change Set
+`enable-ml-pilot-021-history-20260828` modified only the two Lambda environment
+allowlists and their derived IoT rules without replacement; the stack returned to
+`UPDATE_COMPLETE`. IoT policy version 2 adds only Subscribe/Receive on the exact
+`mot/ml-pilot-021/history/backfill/ack/v1` path. Both Lambdas are active with
+successful updates. The adapter-side cache remains a separate, default-off local
+setting and must be enabled in the authenticated device wizard before any offline
+samples are collected.
+B025 was assigned to the confirmed `news@muehlberg.ch` portal account through an
+`ACTIVE/OWNER` UserVehicleAccess record after an empty conflict check.
+
+On 2026-08-26 B025 was fully retired from AWS at the maintainer's request. A
+no-replacement Change Set removed it from productive History and Backfill
+allowlists. Its 28 State rows, 177 History rows, account association and
+Notification session were deleted, followed by its productive Thing, policy and
+certificate. The dedicated `mot-cachetest` stack and separate external test
+certificate were also deleted. Negative read-backs show no remaining B025 Thing,
+certificate, data partition, account association or active stack; historical
+validation evidence remains documentation only.
 
 The existing productive Pioneer N16 `MOT-80A2DA` is now the second controlled
 CACHE-001 rollout. Its partition table matched the target byte-for-byte, allowing
@@ -227,6 +359,24 @@ the existing 30-day Cognito refresh-token lifetime. Only refresh state is retain
 persistently; the default remains browser-session-only, logout clears both storage
 classes, and hosted desktop and smartphone acceptance passed.
 
+OTA-HW-001 is complete. REV13 reads
+the existing Espressif image header and compares chip family and declared flash
+size with the running adapter before `Update.begin()`. This distinguishes the
+supported N16/XIAO pair without a new package format. N16 adds only 16 bytes RAM
+and 1,288 bytes flash; both C6 builds, LilyGO AWS and WROOM base pass, and XIAO
+remains below its gate at 83.50%. WROOM AWS currently exceeds its constrained
+slot by 3,344 bytes and is not releaseable. Physical rejection of a deliberately
+wrong image on N16 subsequently passed as described below.
+
+The first physical REV12 matching-image upload rejected safely without writing,
+but revealed that the C6 compile target resolved to the unknown chip sentinel
+65535 because the macro spelling was wrong. REV13 corrects it to
+`CONFIG_IDF_TARGET_ESP32C6`; a physical matching- and wrong-image retest is
+now complete. The matching N16 image installed normally. The XIAO C6 image was
+rejected for its declared 4 MB versus the adapter's 16 MB, and the LilyGO ESP32
+image was rejected for chip ID 0 versus ESP32-C6 ID 13. Both failures occurred
+before writing and left the running firmware unchanged.
+
 NTF-FIX-001 completed on 2026-08-20. It corrects the stale portal email
 confirmation flag by reconciling authenticated preference reads with the
 authoritative SNS subscription state. The controlled `xrpioneer2` record changed
@@ -240,9 +390,13 @@ estimate from existing power telemetry, idempotent email delivery and automatic
 priority for a future firmware counter. Its reviewed additive Change Set reached
 `UPDATE_COMPLETE`; the operational portal text is hosted and the first physical
 journey emails were received with plausible telemetry-estimate values.
-Firmware-counter work is
-still gated on measured flash, RAM and runtime-heap impact for the priority
-nanoESP32-C6-N16 target; XIAO 4 MB fit is optional and non-blocking.
+REV11 now contains the N16-only RAM journey-energy counter. It publishes stable
+drawn/regenerated Wh checkpoints every 60 seconds and at stop boundaries; the
+backend derives net energy and retains the telemetry-estimate fallback for
+missing, inconsistent or stale checkpoints. The final N16 build uses 58,600
+bytes RAM and 1,377,732 bytes application flash. XIAO keeps the counter disabled,
+builds successfully and passes the 85% OTA-slot gate at 83.40%. Physical runtime
+heap and road comparison remain open before wider rollout.
 
 The first JNY-001 road observation identified and corrected a post-stop charging
 edge: plugging in during the stability window no longer invalidates the completed
@@ -264,6 +418,14 @@ The in-place 2026-08-17 deployment passed its 33 local notification tests and AW
 runtime checks. Basic end-to-end journey email delivery is physically validated;
 the hard charge-boundary variant still needs a repeat observation. Multi-journey
 energy calibration, firmware-counter comparison and cost evidence remain open.
+
+A 2026-08-26 road observation exposed one false Standard-CAN charge boundary
+during continuous driving at up to 83.5 km/h; direct telemetry proved that it was
+not a connectivity gap or replay. The Notification Lambda now applies a deployed
+two-minute recent-movement guard unless speed zero was observed. Firmware with a
+configured Standard-CAN V1/V2 input suppresses both Display-CAN charging frames
+`0x603`/`0x604`, making Standard-CAN the exclusive plug/charge source. N16 and
+XIAO builds pass; REV8 installation and road-repeat evidence remain open.
 
 JNY-001 also has a deployed 30-minute inactivity fallback for journeys whose
 terminal speed or charging signal cannot reach AWS because coverage disappears.
@@ -505,6 +667,31 @@ stored `pioneer` settings and persisted several changed SOC targets after its
 endpoint and exact CORS origin were corrected. The bounded email/portal pilot is
 complete; SMS remains deferred.
 
+SMS-001 started on 2026-08-24 with an analysis and cost gate. The account upgrade
+subsequently activated End User Messaging SMS in the `eu-north-1` sandbox with an
+enforced/max USD 1 text-message limit. A deletion-protected account-default
+Protect configuration blocks every AWS-reported SMS country except CH and is
+associated with the fixed `mot-dev-sms` configuration set. AWS provisioned the
+deletion-protected transactional `MOT`/CH sender at zero monthly lease cost but
+reports it as unregistered. A USD 0.60 spend alarm and dedicated operations topic
+exist with independently confirmed maintainer and MOT support subscriptions. A
+controlled alarm-state test reached `ALARM` and returned to `OK` without any SMS
+send or SMS spend; the maintainer confirmed receipt at both alarm destinations.
+No SMS destination, admin approval, application enablement or delivery is claimed.
+The dormant legacy SNS phone-publish branch remains unacceptable
+without the remaining gates. The current AWS list price is USD 0.05124 per Swiss
+message part and the initial implementation estimate remains 6.5–12 engineering
+days.
+
+SMS-001.C is deployed as a separate administrator boundary. The encrypted
+pay-per-request approval table uses `vehicleId + userSub` and stores only a SHA-256
+destination fingerprint; its separate audit table retains bounded records for 90
+days. A dedicated role trusted only by the declared maintainer has exact item-level
+actions on the required tables and is not exposed to either notification Lambda.
+The reviewed minimal Change Set added only the two tables and role, with no
+modification, replacement or deletion. Both tables are active, TTL-enabled and
+empty. Role assumption passed and an unauthorized CLI probe created no record.
+
 NTF-002 extends that stack with a default-off charging-stop email and an
 independent per-user/per-vehicle stop SOC target. A fresh charging `true → false`
 edge while still plugged creates one durable 60-second SQS validation; restart,
@@ -522,8 +709,10 @@ vehicle and plugged session. A final controlled session charged for longer than
 45 seconds, stopped at 91% against the independent 100% target and remained
 plugged; exactly one delayed event and one received email followed after 60
 seconds, with an empty queue and no Lambda error. The NTF-002 email scope is
-complete. AWS SMS service access is still unavailable independently of the
-account's billable status and remains a separate deferred work package.
+complete. AWS SMS service access is still unavailable. An authenticated
+2026-08-24 console check showed that the account remains on the AWS Free account
+plan; the earlier billable-status assumption was incorrect. SMS activation
+remains a separate work package.
 
 Implemented in the repository under the consolidated `build/dashboard/current/`
 portal source tree:

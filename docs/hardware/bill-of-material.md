@@ -10,6 +10,14 @@
 | USB cable | Yes | Flashing, logs and bench power |
 | Enclosure | Recommended | Required for end-user-ready installation |
 
+## ESP32-C6-specific components
+
+| Component | Required | Notes |
+|---|---:|---|
+| DA37+DA10 GNSS module | GPS only | Preferred C6 pilot receiver; 3.3 V UART/NMEA at 9600 baud |
+| Separate GNSS antenna | GPS only | Can be positioned independently while the receiver remains inside the enclosure |
+| GPS support capacitors | Recommended | Fit the capacitors specified by the C6 Gen.2 assembly guide for final pilot hardware |
+
 ## LilyGO-specific components
 
 | Component | Required | Notes |

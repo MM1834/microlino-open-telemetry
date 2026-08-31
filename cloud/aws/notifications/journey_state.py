@@ -11,6 +11,7 @@ MIN_POWER_SAMPLE_MS = 30 * 1000
 MAX_POWER_GAP_MS = 90 * 1000
 MIN_ODOMETER_SAMPLE_MS = 30 * 1000
 MIN_MOVING_SAMPLE_MS = 60 * 1000
+CHARGING_MOVEMENT_GUARD_MS = 2 * 60 * 1000
 UNCHANGED_SOC_REFRESH_MS = 5 * 60 * 1000
 MIN_DISTANCE_KM = 3.0
 MIN_SOC_USED = 1.0
@@ -42,8 +43,11 @@ class JourneyState:
     firmware_counter_id: Optional[str] = None
     firmware_counter_invalid: bool = False
     firmware_drawn_wh: Optional[float] = None
+    firmware_drawn_at: int = 0
     firmware_regen_wh: Optional[float] = None
+    firmware_regen_at: int = 0
     firmware_net_wh: Optional[float] = None
+    firmware_net_at: int = 0
     latest_soc: Optional[float] = None
     latest_soc_at: int = 0
     latest_odometer: Optional[float] = None
@@ -108,8 +112,11 @@ def _start(state, received_at):
         firmware_counter_id=None,
         firmware_counter_invalid=False,
         firmware_drawn_wh=None,
+        firmware_drawn_at=0,
         firmware_regen_wh=None,
+        firmware_regen_at=0,
         firmware_net_wh=None,
+        firmware_net_at=0,
     )
 
 
@@ -222,6 +229,16 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
         )
     if suffix in {"charging/plugged", "charging/is_charging"}:
         if isinstance(value, bool) and value and state.active_id:
+            # A vehicle cannot physically begin charging while it is moving.
+            # Ignore isolated plug/charge assertions until either speed zero was
+            # observed or movement has been absent for a bounded interval. A
+            # real charge continues publishing and is then accepted.
+            if (
+                not state.stopped_at and state.last_moving_at
+                and 0 <= received_at - state.last_moving_at
+                < CHARGING_MOVEMENT_GUARD_MS
+            ):
+                return state
             # Standard-CAN charging is a hard boundary, not activity inside a
             # drive. Preserve an earlier zero-speed stop when present; otherwise
             # seal at the charge observation using the last moving endpoints.
@@ -257,7 +274,7 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
         previous = getattr(state, field)
         if previous is not None and float(value) < previous:
             return replace(state, firmware_counter_invalid=True)
-        return replace(state, **{field: float(value)})
+        return replace(state, **{field: float(value), field.replace("_wh", "_at"): received_at})
     return state
 
 
@@ -287,9 +304,16 @@ def summarize_journey(state: JourneyState, now_ms: int):
         return None, "soc_drop_too_small"
 
     firmware_net = state.firmware_net_wh
+    firmware_counter_fresh = state.firmware_net_at >= state.last_moving_at
     if firmware_net is None and state.firmware_drawn_wh is not None and state.firmware_regen_wh is not None:
         firmware_net = state.firmware_drawn_wh - state.firmware_regen_wh
-    if state.firmware_counter_id and not state.firmware_counter_invalid and firmware_net is not None:
+        firmware_counter_fresh = min(
+            state.firmware_drawn_at, state.firmware_regen_at,
+        ) >= state.last_moving_at
+    if (
+        state.firmware_counter_id and not state.firmware_counter_invalid
+        and firmware_net is not None and firmware_counter_fresh
+    ):
         drawn = (state.firmware_drawn_wh or max(firmware_net, 0.0)) / 1000.0
         regen = (state.firmware_regen_wh or max(-firmware_net, 0.0)) / 1000.0
         net = firmware_net / 1000.0

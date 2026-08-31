@@ -63,7 +63,7 @@ flowchart TB
 |---|---|---:|---|
 | Display CAN | `display-can` | Yes | Decodes standard 11-bit frames `0x602`, `0x603`, `0x604` |
 | Standard-CAN V1 - Pioneer | `standard-can-v1-pioneer` | Yes | Verified Pioneer `0x18D` BMS signals and provisional `0x4AD` cell pair |
-| Standard-CAN V2 | `standard-can-v2` | Pilot | Independent provisional `0x18D`/`0x4AD` decoder pending V2 vehicle verification |
+| Standard-CAN V2 | `standard-can-v2` | Pilot | Independent large-battery `0x1B0`/`0x1B1`/`0x2BA` decoder; plug/charge and current sign still need controlled validation |
 | Disabled | `disabled` | Yes | Receives but does not decode frames |
 
 The Display-CAN decoder derives SOC, speed, odometer, estimated range, charging

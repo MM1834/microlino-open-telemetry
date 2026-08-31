@@ -28,8 +28,10 @@ The LTE implementation must be non-blocking enough that it does not degrade the 
 
 ## C6 AWS coexistence and recovery
 
-On the unified C6 image, AWS IoT is the primary TLS transport. ABRP queues a
-request only while WiFi has a valid station address and AWS MQTT is connected.
+On the unified C6 image, ABRP can operate alongside MOT Cloud or in ABRP-only
+mode. With MOT Cloud enabled and provisioned, ABRP queues a request only while
+WiFi has a valid station address and AWS MQTT is connected. With MOT Cloud
+disabled, or without provisioned AWS credentials, ABRP requires only valid WiFi.
 Before creating a second TLS session it checks total free heap and the largest
 free allocation block; a low-memory request is deferred rather than risking AWS,
 WebUI or CAN/GPS service.

@@ -11,6 +11,7 @@ struct C6Configuration {
     String wifi2Password;
     String adminPassword;
     String setupPassword;
+    bool motCloudEnabled = true;
     bool abrpEnabled = false;
     bool gpsEnabled = true;
     bool offlineCacheEnabled = false;
@@ -34,6 +35,8 @@ void c6ConfigClearWifi2();
 bool c6ConfigAdminConfigured();
 bool c6ConfigSetAdminPassword(const String &password);
 bool c6ConfigSetAbrpCredentials(const String &apiKey, const String &userToken);
+void c6ConfigClearAbrpCredentials();
+void c6ConfigSetMotCloudEnabled(bool enabled);
 void c6ConfigSetAbrpEnabled(bool enabled);
 void c6ConfigSetOfflineCacheEnabled(bool enabled);
 String c6ConfigRecoverAdminPassword();

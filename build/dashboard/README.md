@@ -10,3 +10,10 @@ The repository dashboard material is consolidated here.
 
 The hosted path remains `/dashboard/`; this repository layout does not change the
 public URL.
+
+## Languages
+
+German is the project language and the maintained dashboard default/fallback.
+`current/js/i18n.js` adds the persisted English and French portal variants. New
+user-visible strings must be added to both translation catalogs and covered by
+`tools/tests/test_dashboard_i18n_contract.py`.

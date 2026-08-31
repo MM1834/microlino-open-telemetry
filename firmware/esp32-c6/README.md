@@ -14,6 +14,7 @@ Current implemented slice:
 - shared optional-GPS detection and NMEA fix-state handling;
 - bounded in-memory drive capture with on-demand summaries for known CAN IDs;
 - WiFi station configuration and optional runtime per-device AWS IoT publication;
+- N16-only RAM journey-energy accumulator with 60-second and stop checkpoints;
 - protected device-specific setup/fallback AP and non-blocking reconnect;
 - authenticated local WebUI, backup/restore, factory reset and local OTA;
 - authenticated seven-step local device onboarding wizard;
@@ -34,10 +35,11 @@ pio run -e nanoesp32c6-n16
 pio run -e xiao-esp32c6
 ```
 
-Both canonical environments always include AWS IoT and LittleFS. Without a valid
-credential set under `/aws`, AWS remains disabled at runtime while local WebUI,
-CAN, GPS, OTA and ABRP continue normally. There are no separate C6 non-AWS or
-`-aws` firmware generations.
+Both canonical environments always include AWS IoT and LittleFS. MOT Cloud is
+enabled by default but can be disabled independently in the authenticated local
+UI without deleting the valid credential set under `/aws`. Without credentials,
+or with MOT Cloud disabled, local WebUI, CAN, GPS, OTA and ABRP continue normally.
+There are no separate C6 non-AWS or `-aws` firmware generations.
 
 GPS reception is physically validated separately on both boards. The N16 also
 passed simultaneous dual-CAN reception and a normal-road WiFi/AWS IoT run with a
@@ -55,8 +57,9 @@ safe defaults for the intended dual-CAN adapter, not decoder-engine restrictions
 
 The capture starts automatically from an empty state at every boot and records a
 bounded summary in RAM without transmitting on either CAN bus. It tracks the
-known Standard-CAN charge/current/voltage candidates and Display-CAN SOC, speed,
-power-display and plug candidates. Use the serial console at 115200 baud:
+known Pioneer and large-battery Standard-CAN candidates (`0x18D`, `0x1B0`,
+`0x1B1`, `0x2BA`, `0x37F`, `0x4AD`) and Display-CAN SOC, speed, power-display and
+plug candidates. Use the serial console at 115200 baud:
 
 ```text
 drive reset
@@ -100,6 +103,8 @@ wifi set MyHomeSSID|MyPassword
 wifi2 set MyMobileHotspot|MyPassword
 wifi status
 aws status
+aws enable
+aws disable
 ```
 
 `wifi clear` and `wifi2 clear` remove each profile independently. Restart after
@@ -108,9 +113,29 @@ credential files from LittleFS `/aws`; credentials are not linked into the
 application image. The shared upload helper accepts `esp32-c6` and defaults to
 `nanoesp32c6-n16`, with `xiao-esp32c6` selectable explicitly.
 
+`aws disable` stops MOT Cloud while retaining the adapter's X.509 credentials and
+vehicle assignment; `aws enable` restores the saved service state after restart.
+The same switch is available in `/wizard` and `/config`. ABRP remains independently
+selectable and can be the only enabled Internet telemetry service.
+
+Blank ABRP credential fields intentionally keep the current secret values. Use
+the separately confirmed `Delete ABRP credentials` button, or `abrp clear` on the
+physical USB console, to disable ABRP and remove both values from NVS.
+
 The C6 publisher sends Display-CAN, confirmed Pioneer pack voltage/current/power,
 plug/charge state, provisional cell extrema and valid GPS coordinates using the
 same topic contract as the established devices.
+
+On `nanoesp32c6-n16`, REV11 additionally integrates fresh Standard-CAN vehicle
+power while moving and publishes non-decreasing drawn/regenerated Wh counters.
+The counter performs no flash writes and is intentionally disabled on XIAO.
+`energy status` prints its current RAM state over the USB serial console. Missing
+or incomplete firmware evidence remains compatible with the backend telemetry
+estimate.
+
+AWS status includes the MQTT result, bounded connect duration and the most recent
+TLS error code/detail. This distinguishes missing credentials from DNS/TCP/TLS
+failure without exposing certificate or key material.
 
 ## ABRP and local onboarding
 

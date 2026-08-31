@@ -7,6 +7,15 @@ TEMPLATE = (ROOT / "cloud/aws/foundation/template.yaml").read_text()
 
 
 class CognitoSesEmailContractTests(unittest.TestCase):
+    def test_admin_invitation_contains_portal_route_and_required_placeholders(self):
+        self.assertIn('EmailSubject: "MOT Portal – Ihr Zugang"', TEMPLATE)
+        self.assertIn(
+            "Anmeldung: https://www.microlino-open-telemetry.ch/dashboard/",
+            TEMPLATE,
+        )
+        self.assertIn("Benutzername: {username}", TEMPLATE)
+        self.assertIn("Temporäres Passwort: {####}", TEMPLATE)
+
     def test_ses_switch_defaults_fail_safe(self):
         self.assertIn("CognitoEmailSendingAccount:", TEMPLATE)
         self.assertIn("Default: COGNITO_DEFAULT", TEMPLATE)

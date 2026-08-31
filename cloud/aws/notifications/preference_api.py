@@ -21,7 +21,7 @@ read_only_vehicle_ids = {
 }
 
 EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PHONE = re.compile(r"^\+[1-9][0-9]{7,14}$")
+PHONE = re.compile(r"^\+(41|49)[1-9][0-9]{7,11}$")
 
 
 def response(status, body):
@@ -54,6 +54,7 @@ def public(item):
     if not item:
         return {
             "enabled": False, "threshold": 80,
+            "rangeKmAt100": 140, "rangeReserveSoc": 0,
             "emailEnabled": False, "smsEnabled": False,
             "journeyEmailEnabled": False,
             "chargingStopEmailEnabled": False, "chargingStopThreshold": 80,
@@ -65,7 +66,7 @@ def public(item):
             "vehicleId", "enabled", "threshold", "emailEnabled", "smsEnabled",
             "journeyEmailEnabled", "email", "phoneE164", "emailConfirmed",
             "chargingStopEmailEnabled", "chargingStopThreshold",
-            "smsConfirmed", "updatedAt"
+            "smsConfirmed", "rangeKmAt100", "rangeReserveSoc", "updatedAt"
         )
     }
     result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
@@ -73,6 +74,8 @@ def public(item):
     result["readOnly"] = False
     result["threshold"] = int(result.get("threshold") or 80)
     result["chargingStopThreshold"] = int(result.get("chargingStopThreshold") or 80)
+    result["rangeKmAt100"] = int(result.get("rangeKmAt100") or 140)
+    result["rangeReserveSoc"] = int(result.get("rangeReserveSoc") or 0)
     result["updatedAt"] = int(result.get("updatedAt") or 0)
     return result
 
@@ -142,12 +145,22 @@ def handler(event, context):
         charging_stop_threshold = int(body.get(
             "chargingStopThreshold", previous.get("chargingStopThreshold", 80)
         ))
+        range_km_at_100 = int(body.get(
+            "rangeKmAt100", previous.get("rangeKmAt100", 140)
+        ))
+        range_reserve_soc = int(body.get(
+            "rangeReserveSoc", previous.get("rangeReserveSoc", 0)
+        ))
     except (TypeError, ValueError, json.JSONDecodeError):
         return response(400, {"error": "invalid_request"})
     if threshold < 50 or threshold > 100:
         return response(400, {"error": "invalid_threshold"})
     if charging_stop_threshold < 50 or charging_stop_threshold > 100:
         return response(400, {"error": "invalid_charging_stop_threshold"})
+    if range_km_at_100 < 20 or range_km_at_100 > 500:
+        return response(400, {"error": "invalid_range_km_at_100"})
+    if range_reserve_soc < 0 or range_reserve_soc > 50:
+        return response(400, {"error": "invalid_range_reserve_soc"})
     email = str(body.get("email", previous.get("email", ""))).strip().lower()
     phone = re.sub(
         r"[\s()-]", "",
@@ -167,6 +180,10 @@ def handler(event, context):
         return response(400, {"error": "invalid_email"})
     if sms_enabled and not PHONE.fullmatch(phone):
         return response(400, {"error": "invalid_phone"})
+    if sms_enabled and previous.get("phoneE164") != phone:
+        return response(409, {"error": "sms_verification_required"})
+    if sms_enabled and previous.get("smsConfirmed") is not True:
+        return response(409, {"error": "sms_verification_required"})
     if "journeyEmailEnabled" in body and journey_email_requested and not email_enabled:
         return response(400, {"error": "journey_email_requires_email"})
     if charging_stop_requested and not email_enabled:
@@ -180,6 +197,8 @@ def handler(event, context):
         "journeyEmailEnabled": journey_email_enabled,
         "chargingStopEmailEnabled": charging_stop_email_enabled,
         "chargingStopThreshold": charging_stop_threshold,
+        "rangeKmAt100": range_km_at_100,
+        "rangeReserveSoc": range_reserve_soc,
         "smsEnabled": sms_enabled,
         "email": email,
         "phoneE164": phone,

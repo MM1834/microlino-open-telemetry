@@ -184,6 +184,19 @@ Resources:
           - CognitoSelfRegistrationIsEnabled
           - false
           - true
+        InviteMessageTemplate:
+          EmailSubject: "MOT Portal – Ihr Zugang"
+          EmailMessage: |-
+            Willkommen beim Microlino Open Telemetry (MOT) Portal.
+
+            Anmeldung: https://www.microlino-open-telemetry.ch/dashboard/
+
+            Benutzername: {username}
+            Temporäres Passwort: {####}
+
+            Melden Sie sich mit diesen Angaben an und setzen Sie beim ersten Login Ihr persönliches Passwort.
+
+            Falls Sie diesen Zugang nicht erwartet haben, ignorieren Sie diese Nachricht.
       EmailConfiguration: !If
         - CognitoUsesSes
         - EmailSendingAccount: DEVELOPER

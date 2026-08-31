@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import time
 from dataclasses import asdict, fields
 from decimal import Decimal
@@ -26,12 +27,24 @@ dynamodb = boto3.resource("dynamodb")
 preferences = dynamodb.Table(os.environ["PREFERENCE_TABLE_NAME"])
 sessions = dynamodb.Table(os.environ["SESSION_TABLE_NAME"])
 events = dynamodb.Table(os.environ["EVENT_TABLE_NAME"])
+sms_approvals = dynamodb.Table(os.environ.get("SMS_APPROVAL_TABLE_NAME", "disabled"))
+sms_destinations = dynamodb.Table(os.environ.get("SMS_DESTINATION_TABLE_NAME", "disabled"))
+sms_rate = dynamodb.Table(os.environ.get("SMS_RATE_TABLE_NAME", "disabled"))
 sns = boto3.client("sns")
 sqs = boto3.client("sqs")
+sms_voice = boto3.client("pinpoint-sms-voice-v2")
+cloudwatch = boto3.client("cloudwatch")
 email_topic_arn = os.environ["EMAIL_TOPIC_ARN"]
 charging_stop_queue_url = os.environ.get("CHARGING_STOP_QUEUE_URL", "")
 event_retention_days = min(31, max(1, int(os.environ.get("EVENT_RETENTION_DAYS", "31"))))
 CHARGING_STOP_DELAY_SECONDS = CHARGING_STOP_DELAY_MS // 1000
+SMS_PHONE = re.compile(r"^\+(41|49)[1-9][0-9]{7,11}$")
+sms_delivery_enabled = os.environ.get("SMS_DELIVERY_ENABLED", "false") == "true"
+sms_sender_arn = os.environ.get("SMS_SENDER_ARN", "")
+sms_sender_arn_de = os.environ.get("SMS_SENDER_ARN_DE", "")
+sms_configuration_set = os.environ.get("SMS_CONFIGURATION_SET", "")
+sms_spend_alarm_name = os.environ.get("SMS_SPEND_ALARM_NAME", "")
+sms_expected_spend_limit = Decimal(os.environ.get("SMS_EXPECTED_SPEND_LIMIT_USD", "1"))
 
 CHARGING_SUFFIXES = {"charging/plugged", "charging/is_charging", "display/soc"}
 JOURNEY_SUFFIXES = {
@@ -134,8 +147,78 @@ def list_preferences(vehicle_id, preference_field="enabled"):
     )
     return [
         item for item in result.get("Items", [])
-        if item.get(preference_field) is True
+        if preference_field is None or item.get(preference_field) is True
     ]
+
+
+def sms_delivery(preference, vehicle_id, text):
+    """Return privacy-safe SMS delivery evidence; every missing gate rejects."""
+    if not (preference.get("smsEnabled") is True and preference.get("smsConfirmed") is True):
+        return None
+    try:
+        if not sms_delivery_enabled:
+            return {"channel": "SMS", "status": "REJECTED", "reason": "KILL_SWITCH"}
+        phone = str(preference.get("phoneE164", ""))
+        if not SMS_PHONE.fullmatch(phone):
+            return {"channel": "SMS", "status": "REJECTED", "reason": "DESTINATION"}
+        if len(text) > 160 or any(ord(character) > 127 for character in text):
+            return {"channel": "SMS", "status": "REJECTED", "reason": "MESSAGE_FORMAT"}
+        now = int(time.time())
+        destination_fingerprint = hashlib.sha256(phone.encode()).hexdigest()
+        key = {"vehicleId": vehicle_id, "userSub": preference["userSub"]}
+        approval = sms_approvals.get_item(Key=key, ConsistentRead=True).get("Item", {})
+        if not (
+            approval.get("status") == "ACTIVE"
+            and approval.get("destinationFingerprint") == destination_fingerprint
+            and approval.get("isoCountryCode") == ("CH" if phone.startswith("+41") else "DE")
+            and approval.get("originator") == "MOT"
+            and int(approval.get("expiresAt", 0)) > now
+        ):
+            return {"channel": "SMS", "status": "REJECTED", "reason": "APPROVAL"}
+        destination = sms_destinations.get_item(
+            Key={"destinationFingerprint": destination_fingerprint}, ConsistentRead=True
+        ).get("Item", {})
+        if destination.get("status") != "VERIFIED":
+            return {"channel": "SMS", "status": "REJECTED", "reason": "VERIFICATION"}
+        alarms = cloudwatch.describe_alarms(AlarmNames=[sms_spend_alarm_name]).get("MetricAlarms", [])
+        if len(alarms) != 1 or alarms[0].get("StateValue") != "OK":
+            return {"channel": "SMS", "status": "REJECTED", "reason": "SPEND_ALARM"}
+        limits = sms_voice.describe_spend_limits().get("SpendLimits", [])
+        text_limits = [item for item in limits if item.get("Name") == "TEXT_MESSAGE_MONTHLY_SPEND_LIMIT"]
+        if len(text_limits) != 1 or Decimal(str(text_limits[0].get("EnforcedLimit", "-1"))) != sms_expected_spend_limit:
+            return {"channel": "SMS", "status": "REJECTED", "reason": "SPEND_LIMIT"}
+        day = time.strftime("%Y%m%d", time.gmtime(now))
+        sms_rate.update_item(
+            Key={"rateKey": f"{destination_fingerprint}|{day}"},
+            UpdateExpression="SET expiresAt=:expiry ADD #count :one",
+            ConditionExpression="attribute_not_exists(#count) OR #count < :maximum",
+            ExpressionAttributeNames={"#count": "count"},
+            ExpressionAttributeValues={":expiry": now + 172800, ":one": 1, ":maximum": 10},
+        )
+        result = sms_voice.send_text_message(
+            DestinationPhoneNumber=phone,
+            OriginationIdentity=sms_sender_arn if phone.startswith("+41") else sms_sender_arn_de,
+            MessageBody=text, MessageType="TRANSACTIONAL",
+            ConfigurationSetName=sms_configuration_set,
+        )
+        return {"channel": "SMS", "status": "SENT", "messageId": result["MessageId"]}
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "PROVIDER")
+        reason = "RATE_LIMIT" if code == "ConditionalCheckFailedException" else "PROVIDER"
+        return {"channel": "SMS", "status": "REJECTED", "reason": reason}
+
+
+def record_deliveries(identifier, deliveries):
+    sent = any(item.get("status", "SENT") == "SENT" for item in deliveries)
+    events.update_item(
+        Key={"eventId": identifier},
+        UpdateExpression="SET #status=:status, deliveries=:deliveries",
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues={
+            ":status": "DISPATCHED" if sent else "NO_DELIVERY",
+            ":deliveries": deliveries,
+        },
+    )
 
 
 def _journey_state(item):
@@ -246,26 +329,10 @@ def dispatch(preference, identifier, vehicle_id, threshold, reached_soc):
             },
         )
         deliveries.append({"channel": "EMAIL", "messageId": result["MessageId"]})
-    if preference.get("smsEnabled") and preference.get("smsConfirmed"):
-        result = sns.publish(
-            PhoneNumber=preference["phoneE164"],
-            Message=text,
-            MessageAttributes={
-                "AWS.SNS.SMS.SMSType": {
-                    "DataType": "String", "StringValue": "Transactional"
-                }
-            },
-        )
-        deliveries.append({"channel": "SMS", "messageId": result["MessageId"]})
-    events.update_item(
-        Key={"eventId": identifier},
-        UpdateExpression="SET #status=:status, deliveries=:deliveries",
-        ExpressionAttributeNames={"#status": "status"},
-        ExpressionAttributeValues={
-            ":status": "DISPATCHED" if deliveries else "NO_CONFIRMED_CHANNEL",
-            ":deliveries": deliveries,
-        },
-    )
+    sms_result = sms_delivery(preference, vehicle_id, text)
+    if sms_result:
+        deliveries.append(sms_result)
+    record_deliveries(identifier, deliveries)
     return deliveries
 
 
@@ -340,15 +407,15 @@ def dispatch_charging_stop(preference, identifier, vehicle_id, state, threshold)
             },
         )
         deliveries.append({"channel": "EMAIL", "messageId": result["MessageId"]})
-    events.update_item(
-        Key={"eventId": identifier},
-        UpdateExpression="SET #status=:status, deliveries=:deliveries",
-        ExpressionAttributeNames={"#status": "status"},
-        ExpressionAttributeValues={
-            ":status": "DISPATCHED" if deliveries else "NO_CONFIRMED_CHANNEL",
-            ":deliveries": deliveries,
-        },
+    sms_text = (
+        f"MOT: {vehicle_id} Ladestopp bei {state.previous_soc:g}% "
+        f"(Ziel {threshold:g}%). Seit 60s nicht am Laden, weiterhin eingesteckt. "
+        "Info, keine Ladesteuerung."
     )
+    sms_result = sms_delivery(preference, vehicle_id, sms_text)
+    if sms_result:
+        deliveries.append(sms_result)
+    record_deliveries(identifier, deliveries)
     return deliveries
 
 
@@ -363,7 +430,9 @@ def validate_charging_stop(message, now_ms):
     ).get("Item", {})
     state = _state(item)
     dispatched = 0
-    for preference in list_preferences(vehicle_id, "chargingStopEmailEnabled"):
+    for preference in list_preferences(vehicle_id, None):
+        if not (preference.get("chargingStopEmailEnabled") is True or preference.get("smsEnabled") is True):
+            continue
         threshold = float(preference.get("chargingStopThreshold", 80))
         if not charging_stop_due(
             state, session_id, candidate_at, now_ms, threshold

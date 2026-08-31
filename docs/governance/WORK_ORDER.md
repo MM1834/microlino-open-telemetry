@@ -8,9 +8,45 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-25
+**Last reviewed:** 2026-08-27
 
 ## High priority
+
+### Reject OTA images built for incompatible adapter hardware
+
+**Completed firmware sprint:** [OTA-HW-001 — Hardware-aware local OTA guard](../project/sprints/OTA-HW-001.md)
+
+**Objective:** Validate the standard Espressif application-image chip ID and
+declared flash size before the first OTA flash write, primarily preventing N16
+and XIAO images from being interchanged.
+
+**Current status:** Complete. REV13 implements the corrected guard before
+`Update.begin()` in the shared C6/WROOM OTA path and LilyGO's local route. A
+matching N16 image installed successfully; the XIAO image was rejected for 4 MB
+versus 16 MB and the LilyGO image for ESP32 versus ESP32-C6, both before writing.
+N16, XIAO, LilyGO AWS and WROOM base builds pass; XIAO remains below its gate at
+83.50%. The current WROOM AWS aggregate exceeds its already constrained slot by
+3,344 bytes and remains a separate release blocker. Boards with identical chip
+and flash geometry remain outside this guard and would need a future signed MOT
+manifest.
+
+### Localize the pilot portal and user handout
+
+**Active portal work package:** I18N-001
+
+**Objective:** Keep German as the project language and dashboard default while
+making the pilot-facing portal and one-page handout available in English and
+French. The local firmware wizard remains English-only.
+
+**Current status:** Repository implementation and visual desktop/smartphone
+acceptance are complete. The portal persists a `de`/`en`/`fr` selection, updates
+locale-sensitive dates and History charts, and retains German as fallback. The
+reproducible one-page generator produces German, English and French A4 PDFs.
+Hosted upload and native-speaker review of French wording remain open.
+The public root landing page now also carries the persisted three-language
+selector and links to the dedicated interactive `/onboarding/` page. Static contracts,
+JavaScript checks and local desktop/390 px browser acceptance pass; hosted upload
+and maintainer acceptance remain open.
 
 ### Complete guided C6 local onboarding
 
@@ -25,6 +61,23 @@ on 2026-08-25. B025 passed repeated factory-first-run walkthroughs; B021, B023 a
 B024 received configuration-preserving firmware updates. The onboarding guide and
 one-page handout reflect the accepted flow. Optional History, email and SMS
 activation stays in the future administrator-tool work package.
+The repository also contains the first pilot-feedback refinement: clickable local
+URLs, visible action progress, a compact GPS control and fixed Display-CAN
+presentation for the hard-wired CAN2 input. Physical acceptance remains pending.
+
+### Make range basis and SOC reserve configurable
+
+**Active portal sprint:** [RNG-SET-001 — Personal Range Settings](../project/sprints/RNG-SET-001.md)
+
+**Objective:** Use explicit per-user/per-vehicle full-range and reserve settings
+for both fixed and learned range forecasts while retaining 140 km / 0% defaults.
+
+**Current status:** Repository API, persistence, calculation and compact settings
+fields are implemented. The isolated Preference Lambda update is deployed and
+healthy; the matching dashboard is hosted and the maintainer confirmed that both
+values persist and affect the displayed result. Cross-vehicle validation remains
+open. A dedicated settings page with an explicit return-to-dashboard button is a
+documented follow-up.
 
 ### Mark stale charging and power values
 
@@ -34,10 +87,98 @@ activation stays in the future administrator-tool work package.
 immediately clear in the overview and net-power History when their source topics
 have stopped updating.
 
-**Current status:** Mode-specific timestamps dim stale contents after the existing
-120-second boundary and show `Nicht aktuell · letzter Messpunkt hh:mm`. All 185
-portal/tool tests pass and hosted desktop and smartphone acceptance completed on
-2026-08-24. The sprint is closed.
+**Current status:** The repository implementation uses mode-specific topic
+timestamps, dims stale contents after the existing 120-second boundary and shows
+`Nicht aktuell · letzter Messpunkt hh:mm`. All 185 portal/tool tests pass and
+hosted desktop and smartphone acceptance of overview and net-power History
+completed on 2026-08-24. The sprint is closed.
+
+### Restore Lambda capacity and isolate interactive APIs
+
+**Active work package:** [OPS-001 — Lambda Capacity and Portal Resilience](../project/sprints/OPS-001.md)
+
+**Objective:** Remove the exceptional regional ten-concurrency bottleneck, keep
+interactive Vehicle/History/Notification APIs responsive during telemetry bursts
+and make the portal retain independently successful data when one read fails.
+
+**Current status:** A live incident on 2026-08-24 reached the full 10/10 regional
+Lambda concurrency pool for at least seven consecutive minutes and produced
+385–620 throttles per minute. State ingest and notification processing were the
+principal consumers; DynamoDB was not throttled. The repository portal now
+retries only transient GET failures and uses independent preference/SMS results,
+so one failed read is no longer presented as several empty or unconfirmed
+settings. AWS initially rejected a request for 100 because the Service Quotas
+workflow compared the effective value 10 with a nominal default of 1,000. Live
+read-back on 2026-08-25 now reports the effective regional quota restored to
+1,000; the queue/isolation design and hosted acceptance remain open. Two
+account-level CloudWatch alarms use the confirmed operations topic, notify only
+on `ALARM`, and the concurrency warning is aligned to 800. The repository
+Notification Rule now filters irrelevant topics before
+Lambda invocation. Its first packaged Change Set was deliberately not executed
+and removed because packaging drift also proposed unrelated Lambda, integration
+and journey-finalizer modifications.
+After explicit approval, AWS accepted the 1,001-concurrency request and opened
+support case `178759663200182`; the restored effective value of 1,000 closes the
+capacity gate. A second Change Set derived from the live template modified only the
+Notification IoT Rule. Its first SQL form rolled back safely on an AWS IoT syntax
+error; the corrected array-literal form then reached `UPDATE_COMPLETE` with no
+replacement. Live SQL read-back passes. The first full post-filter minute reduced
+notification invocations from 187–206 to 4, notification throttles from 115–139
+to 5 and account throttles from 225–265 to 18. State-ingest isolation and hosted
+portal acceptance remain open.
+
+### Activate controlled SMS notifications
+
+**Active work package:** [SMS-001 — Controlled SMS Notification Pilot](../project/sprints/SMS-001.md)
+
+**Objective:** Deliver the existing SOC-target and qualified charging-stop events
+through a bounded SMS pilot only after AWS service activation, administrator
+approval, Swiss destination and sender allowlisting, an enforced spend limit and
+an operational alarm are deployed as one fail-closed package.
+
+**Current status:** Analysis is complete and AWS has approved End User Messaging
+SMS production access in `eu-north-1` with a maximum monthly text quota of USD
+50. The project deliberately enforces a lower USD 10 monthly override and a USD
+6 CloudWatch warning. A deletion-protected account-default Protect configuration
+blocks 244 countries and allows only CH; it is also associated with the fixed
+`mot-dev-sms` configuration set. The deletion-protected transactional `MOT`/CH
+sender has zero monthly lease cost but is reported by AWS as unregistered. Alarm
+subscriptions for `info@muehlberg.ch` and
+`support@microlino-open-telemetry.ch` are independently confirmed. A controlled
+CloudWatch test exercised the operations topic, reached `ALARM` and returned to
+`OK` without sending an SMS or incurring SMS spend; the maintainer confirmed
+receipt at both destinations. SMS-001.C is now deployed additively: encrypted
+approval and 90-day audit tables plus an exact-principal, table-only admin role.
+The non-echoing plan/apply CLI stores only the destination fingerprint and writes
+approval plus audit atomically with optimistic version checks. The reviewed
+Change Set added exactly those three resources without modification, replacement
+or deletion; an unauthorized probe failed before write.
+Current AWS list price remains USD 0.05124 per Swiss message part;
+estimated total implementation and acceptance effort remains 6.5–12 engineering
+days. SMS-001.E backend deployment is complete: the portal source can
+self-register and verify a Swiss number through a least-privilege API, reuse its
+fingerprint across users or vehicles and expose activation only for the exact
+approved association. Both reviewed, replacement-free Change Sets reached
+`UPDATE_COMPLETE`; unauthenticated probes fail. The hosted portal subsequently
+delivered and accepted the first
+verification code after two least-privilege corrections: unnecessary creation
+tags were removed and the implicit send permission was restricted to the exact
+`MOT/CH` sender. AWS now reports the controlled destination `VERIFIED`, and its
+exact Pioneer association has a 30-day version-1 administrator approval with an
+atomic audit record. SMS-001.D is now deployed and activated after a disabled
+staging pass: it gates SOC-target and qualified charging-stop SMS on exact
+approval, verification, fixed `MOT/CH` sender, USD 10 live limit, `OK` spend alarm,
+single-part format, idempotency and ten-per-destination/day rate state. Journey
+summaries remain email-only. The old SNS wildcard permission was removed, the
+Pioneer opt-in is restored and the new rate table is empty. Physical delivery and
+cost reconciliation remain pending.
+
+The first live reconciliation measured USD 0.61488 and correctly tripped the
+initial USD 0.60 alarm while email delivery continued. AWS later approved
+production access with a USD 50 maximum. On 2026-08-29 provider override and
+Lambda expectation were aligned to USD 10 before the alarm was raised to USD 6.
+All three controls now pass live read-back, the alarm is `OK`, recovery emails
+remain disabled and current measured spend is USD 0.92232.
 
 ### Detect charging interruption and prepare controlled SMS
 
@@ -157,12 +298,20 @@ a backward-compatible telemetry estimate, stable delayed journey completion,
 idempotent email delivery and an additive firmware-counter priority path. The
 backend and matching portal wording are deployed, and physical journey emails
 with plausible telemetry-estimate values were received. The new hard
-Standard-CAN charge boundary needs a repeat road observation. An independent
+Standard-CAN charge boundary exposed one false split during continuous movement.
+The deployed backend now rejects plug/charge assertions while movement is newer
+than two minutes unless speed zero was observed. The matching REV8 firmware makes
+Standard-CAN V1/V2 exclusively authoritative by suppressing Display-CAN `0x603`
+and `0x604`; N16 and XIAO builds pass, while OTA installation and a repeat road
+observation remain open. An independent
 30-minute inactivity fallback for a missing terminal signal is also deployed;
 its physical no-coverage garage observation remains open. Multi-journey energy
-calibration and cost evidence remain open. Before firmware counters are
-implemented, exact flash/RAM/heap impact must
-still be measured on nanoESP32-C6-N16; XIAO fit remains non-blocking.
+calibration and cost evidence remain open. REV11 now implements the RAM-only
+drawn/regenerated Wh counter for nanoESP32-C6-N16 with 60-second and journey-end
+checkpoints. The final N16 build uses 58,600 bytes RAM and 1,377,732 bytes flash;
+XIAO keeps the counter disabled and passes its 85% OTA-slot gate at 83.40%.
+Backend freshness fallback, physical runtime-heap observation and a controlled
+road comparison remain the rollout gates.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 

@@ -43,6 +43,8 @@ struct MotAwsStatus {
     uint32_t totalConnectFailures = 0;
     uint32_t lastConnectDurationMs = 0;
     uint32_t reconnectDelayMs = 0;
+    int tlsErrorCode = 0;
+    String tlsError;
     String message;
 };
 

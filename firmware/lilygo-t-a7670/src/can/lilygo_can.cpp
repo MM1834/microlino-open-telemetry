@@ -21,7 +21,7 @@ struct ChannelStatus {
     uint32_t framesStd = 0;
     uint32_t framesErr = 0;
     uint32_t framesRtr = 0;
-    uint32_t suppressedDisplayPlugged = 0;
+    uint32_t suppressedDisplayCharging = 0;
     uint32_t lastFrameMs = 0;
     String lastError;
 };
@@ -95,10 +95,11 @@ void accountFrame(ChannelStatus& status, uint8_t channel, MotCanFrame& frame, bo
     else ++status.framesStd;
     if (rtr) ++status.framesRtr;
 
-    const bool suppressDisplayPlugged = standardCanConfigured() &&
-        profile == DECODER_PROFILE_DISPLAY_CAN && frame.id == 0x604;
-    if (suppressDisplayPlugged) {
-        ++status.suppressedDisplayPlugged;
+    const bool displayChargingFrame = frame.id == 0x603 || frame.id == 0x604;
+    const bool suppressDisplayCharging = standardCanConfigured() &&
+        profile == DECODER_PROFILE_DISPLAY_CAN && displayChargingFrame;
+    if (suppressDisplayCharging) {
+        ++status.suppressedDisplayCharging;
     } else if (!rtr) {
         decoderEngineHandleFrame(frame, profile);
     }
@@ -170,7 +171,7 @@ String channelJson(uint8_t channel, const ChannelStatus& status, DecoderProfile 
     json += "\"framesStd\":" + String(status.framesStd) + ",";
     json += "\"framesExt\":" + String(status.framesExt) + ",";
     json += "\"framesRtr\":" + String(status.framesRtr) + ",";
-    json += "\"suppressedDisplayPlugged\":" + String(status.suppressedDisplayPlugged) + ",";
+    json += "\"suppressedDisplayCharging\":" + String(status.suppressedDisplayCharging) + ",";
     json += "\"busErrors\":" + String(status.framesErr) + ",";
     json += "\"lastFrameMs\":" + String(status.lastFrameMs) + ",";
     json += "\"ageMs\":" + String(status.lastFrameMs ? millis() - status.lastFrameMs : 0) + ",";

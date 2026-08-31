@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
   <title id="title">MOT ESP32-C6 Gen.2 Verdrahtungsplan</title>
-  <desc id="desc">Verdrahtung eines nanoESP32-C6-N16 mit zwei 3,3-Volt-CAN-Transceivern, optionalem ATGM336H-5N-GPS, Stützkondensatoren und einer alternativ nutzbaren geschützten 12-Volt-auf-5-Volt-Versorgung über den internen 3,3-Volt-Regler.</desc>
+  <desc id="desc">Verdrahtung eines nanoESP32-C6-N16 mit zwei physisch sendegesperrten 3,3-Volt-CAN-Transceivern, optionalem DA37+DA10-GNSS, Stützkondensatoren und einer alternativ nutzbaren geschützten 12-Volt-auf-5-Volt-Versorgung über den internen 3,3-Volt-Regler.</desc>
   <defs>
     <style>
       .bg{fill:#f5f7fb}.panel{fill:#fff;stroke:#25324a;stroke-width:3}.soft{fill:#eef3fa;stroke:#6d7b94;stroke-width:2}
@@ -17,7 +17,7 @@
   <rect class="bg" width="1600" height="1120"/>
   <text class="t h1" x="55" y="58">MOT ESP32-C6 Gen.2 — Verdrahtungsplan</text>
   <text class="t body muted" x="55" y="90">nanoESP32-C6-N16 · Dual-CAN · optionales GPS · alternative 12-V-Fahrzeugversorgung</text>
-  <text class="t small muted" x="1390" y="58">Rev. 0.1 · 2026-08-14</text>
+  <text class="t small muted" x="1390" y="58">Rev. 0.2 · 2026-08-25</text>
 
   <!-- central board -->
   <rect class="board" x="570" y="210" width="460" height="585" rx="24"/>
@@ -54,7 +54,10 @@
   <text class="t pin" x="82" y="525">CAN-H</text>
   <text class="t pin" x="300" y="525">CAN-L</text>
   <text class="t small muted" x="250" y="560" text-anchor="middle">CAN1 default: Standard-CAN V1 Pioneer</text>
-  <path class="wire signal" d="M445 433 H590" marker-end="url(#arrow-purple)"/>
+  <path class="wire signal" d="M590 455 H525"/>
+  <path class="wire signal" d="M495 433 H445" marker-end="url(#arrow-purple)"/>
+  <text class="t small red" x="510" y="416" text-anchor="middle">JP1 offen</text>
+  <path class="wire pwr thin" d="M465 433 V405"/><text class="t small red" x="455" y="400" text-anchor="end">10 kΩ an 3V3</text>
   <path class="wire signal" d="M590 500 H445" marker-end="url(#arrow-purple)"/>
 
   <!-- CAN2 -->
@@ -68,7 +71,10 @@
   <text class="t pin" x="82" y="825">CAN-H</text>
   <text class="t pin" x="300" y="825">CAN-L</text>
   <text class="t small muted" x="250" y="860" text-anchor="middle">CAN2 default: Display-CAN</text>
-  <path class="wire signal" d="M445 733 H520 V600 H590" marker-end="url(#arrow-purple)"/>
+  <path class="wire signal" d="M590 600 H525 V733 H505"/>
+  <path class="wire signal" d="M475 733 H445" marker-end="url(#arrow-purple)"/>
+  <text class="t small red" x="490" y="716" text-anchor="middle">JP2 offen</text>
+  <path class="wire pwr thin" d="M465 733 V705"/><text class="t small red" x="455" y="700" text-anchor="end">10 kΩ an 3V3</text>
   <path class="wire signal" d="M590 645 H500 V778 H445" marker-end="url(#arrow-purple)"/>
 
   <!-- bus outputs -->
@@ -80,7 +86,7 @@
   <!-- GPS -->
   <rect class="gps" x="1145" y="315" width="400" height="320" rx="18"/>
   <text class="t h2" x="1345" y="353" text-anchor="middle">Optionales GPS / GNSS</text>
-  <text class="t body" x="1345" y="380" text-anchor="middle">ATGM336H-5N · UART 9600</text>
+  <text class="t body" x="1345" y="380" text-anchor="middle">DA37+DA10 · UART/NMEA 9600</text>
   <text class="t pin" x="1175" y="448">RX</text><text class="t pin" x="1175" y="493">TX</text>
   <text class="t pin red" x="1175" y="543">VCC 3V3</text><text class="t pin" x="1175" y="580">GND</text>
   <text class="t pin muted" x="1438" y="448">PPS · NC</text>
@@ -89,7 +95,7 @@
   <text class="t body" x="1393" y="578" text-anchor="middle">100 nF ∥ 47 µF</text>
   <path class="wire signal" d="M1010 465 H1175" marker-end="url(#arrow-purple)"/>
   <path class="wire signal" d="M1175 493 H1010" marker-end="url(#arrow-purple)"/>
-  <path class="wire signal thin dash" d="M1505 418 H1540"/><text class="t small muted" x="1525" y="405" text-anchor="middle">IPEX-Patchantenne</text>
+  <path class="wire signal thin dash" d="M1505 418 H1540"/><text class="t small muted" x="1525" y="405" text-anchor="middle">separate GNSS-Antenne</text>
 
   <!-- rail and decoupling -->
   <path class="wire pwr" d="M760 760 V810 H535 V980 H1450"/>

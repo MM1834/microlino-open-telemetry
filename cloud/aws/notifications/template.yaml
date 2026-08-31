@@ -13,11 +13,40 @@ Parameters:
   AccessTableArn: {Type: String}
   EventRetentionDays: {Type: Number, Default: 31, MinValue: 1, MaxValue: 31}
   LogRetentionDays: {Type: Number, Default: 7, AllowedValues: [1, 3, 5, 7, 14, 30]}
+  SmsApprovalAuditRetentionDays:
+    Type: Number
+    Default: 90
+    MinValue: 30
+    MaxValue: 365
+  SmsAdminPrincipalArn:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^arn:[a-z0-9-]+:iam::[0-9]{12}:(user|role)/[A-Za-z0-9+=,.@_/-]+$'
+    Description: Exact IAM principal allowed to assume the SMS approval administrator role.
+  SmsDeliveryEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Fail-closed deployment kill switch for notification SMS delivery.
+  SmsVerifiedDestinationNumberArn:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^arn:[a-z0-9-]+:sms-voice:[a-z0-9-]+:[0-9]{12}:verified-destination-number/vdn-[a-f0-9]+$'
+    Description: Exact verified sandbox destination authorized for the controlled pilot.
+  SmsAdditionalVerifiedDestinationNumberArn:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^arn:[a-z0-9-]+:sms-voice:[a-z0-9-]+:[0-9]{12}:verified-destination-number/vdn-[a-f0-9]+$'
+    Description: Optional second exact verified sandbox destination for the controlled pilot.
   ReadOnlyVehicleIds:
     Type: String
     Default: ""
     AllowedPattern: '^$|^[a-z0-9][a-z0-9-]{0,63}(,[a-z0-9][a-z0-9-]{0,63})*$'
     Description: Comma-separated vehicles whose notification preferences are read-only.
+
+Conditions:
+  HasSmsAdminPrincipal: !Not [!Equals [!Ref SmsAdminPrincipalArn, ""]]
+  HasSmsAdditionalVerifiedDestination: !Not [!Equals [!Ref SmsAdditionalVerifiedDestinationNumberArn, ""]]
 
 Resources:
   PreferenceTable:
@@ -38,6 +67,109 @@ Resources:
         - {Key: project, Value: !Ref ProjectName}
         - {Key: environment, Value: !Ref Environment}
         - {Key: component, Value: notifications}
+
+  SmsApprovalTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-sms-approvals"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: vehicleId, AttributeType: S}
+        - {AttributeName: userSub, AttributeType: S}
+      KeySchema:
+        - {AttributeName: vehicleId, KeyType: HASH}
+        - {AttributeName: userSub, KeyType: RANGE}
+      TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: sms-approvals}
+
+  SmsApprovalAuditTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-sms-approval-audit"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: eventId, AttributeType: S}
+      KeySchema:
+        - {AttributeName: eventId, KeyType: HASH}
+      TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: sms-approval-audit}
+
+  SmsDestinationTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-sms-destinations"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: destinationFingerprint, AttributeType: S}
+      KeySchema:
+        - {AttributeName: destinationFingerprint, KeyType: HASH}
+      TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: sms-destinations}
+
+  SmsRateTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-sms-rate"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: rateKey, AttributeType: S}
+      KeySchema:
+        - {AttributeName: rateKey, KeyType: HASH}
+      TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: sms-rate}
+
+  SmsApprovalAdminRole:
+    Type: AWS::IAM::Role
+    Condition: HasSmsAdminPrincipal
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-sms-approval-admin"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: !Ref SmsAdminPrincipalArn}
+            Action: [sts:AssumeRole]
+      Policies:
+        - PolicyName: sms-approval-admin
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource:
+                  - !Ref AccessTableArn
+                  - !GetAtt PreferenceTable.Arn
+                  - !GetAtt SmsApprovalTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:UpdateItem]
+                Resource:
+                  - !GetAtt SmsApprovalTable.Arn
+                  - !GetAtt SmsApprovalAuditTable.Arn
 
   SessionTable:
     Type: AWS::DynamoDB::Table
@@ -121,14 +253,36 @@ Resources:
                 Action: [dynamodb:Query]
                 Resource: !GetAtt PreferenceTable.Arn
               - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource:
+                  - !GetAtt SmsApprovalTable.Arn
+                  - !GetAtt SmsDestinationTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:UpdateItem]
+                Resource: !GetAtt SmsRateTable.Arn
+              - Effect: Allow
                 Action: [dynamodb:PutItem, dynamodb:UpdateItem]
                 Resource: !GetAtt EventTable.Arn
               - Effect: Allow
                 Action: [sns:Publish]
-                Resource: [!Ref EmailTopic, "*"]
+                Resource: !Ref EmailTopic
               - Effect: Allow
                 Action: [sqs:SendMessage, sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes]
                 Resource: !GetAtt ChargingStopQueue.Arn
+              - Effect: Allow
+                Action: [sms-voice:SendTextMessage]
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/CH"
+                  - !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/DE"
+                  - !Ref SmsVerifiedDestinationNumberArn
+                  - !If [HasSmsAdditionalVerifiedDestination, !Ref SmsAdditionalVerifiedDestinationNumberArn, !Ref AWS::NoValue]
+                  - !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:configuration-set/mot-dev-sms"
+              - Effect: Allow
+                Action: [sms-voice:DescribeSpendLimits]
+                Resource: "*"
+              - Effect: Allow
+                Action: [cloudwatch:DescribeAlarms]
+                Resource: "*"
 
   NotificationFunction:
     Type: AWS::Lambda::Function
@@ -147,6 +301,15 @@ Resources:
           EMAIL_TOPIC_ARN: !Ref EmailTopic
           CHARGING_STOP_QUEUE_URL: !Ref ChargingStopQueue
           EVENT_RETENTION_DAYS: !Ref EventRetentionDays
+          SMS_DELIVERY_ENABLED: !Ref SmsDeliveryEnabled
+          SMS_APPROVAL_TABLE_NAME: !Ref SmsApprovalTable
+          SMS_DESTINATION_TABLE_NAME: !Ref SmsDestinationTable
+          SMS_RATE_TABLE_NAME: !Ref SmsRateTable
+          SMS_SENDER_ARN: !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/CH"
+          SMS_SENDER_ARN_DE: !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/DE"
+          SMS_CONFIGURATION_SET: mot-dev-sms
+          SMS_SPEND_ALARM_NAME: mot-dev-sms-monthly-spend-warning
+          SMS_EXPECTED_SPEND_LIMIT_USD: "10"
       Code: .
 
   ChargingStopEventSource:
@@ -180,7 +343,16 @@ Resources:
       TopicRulePayload:
         AwsIotSqlVersion: "2016-03-23"
         RuleDisabled: false
-        Sql: SELECT topic() AS mqttTopic, timestamp() AS receivedAt, encode(*, 'base64') AS payloadBase64 FROM 'mot/+/+/+'
+        Sql: >-
+          SELECT topic() AS mqttTopic, timestamp() AS receivedAt,
+          encode(*, 'base64') AS payloadBase64 FROM 'mot/+/+/+'
+          WHERE
+          (topic(3) = 'charging' AND topic(4) IN ['plugged', 'is_charging', 'power_signed'])
+          OR (topic(3) = 'display' AND topic(4) IN ['soc', 'odometer_km', 'speed_kmh'])
+          OR (topic(3) = 'bms' AND topic(4) = 'vehicle_power_w')
+          OR (topic(3) = 'status' AND topic(4) = 'online')
+          OR (topic(3) = 'journey' AND topic(4) IN
+          ['energy_counter_id', 'energy_drawn_wh', 'energy_regen_wh', 'energy_net_wh'])
         Actions:
           - Lambda: {FunctionArn: !GetAtt NotificationFunction.Arn}
 
@@ -245,6 +417,65 @@ Resources:
           READ_ONLY_VEHICLE_IDS: !Ref ReadOnlyVehicleIds
       Code: .
 
+  SmsVerificationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [lambda.amazonaws.com]}
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: sms-destination-verification
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource:
+                  - !Ref AccessTableArn
+                  - !GetAtt SmsApprovalTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem]
+                Resource:
+                  - !GetAtt PreferenceTable.Arn
+                  - !GetAtt SmsDestinationTable.Arn
+              - Effect: Allow
+                Action:
+                  - sms-voice:CreateVerifiedDestinationNumber
+                  - sms-voice:SendDestinationNumberVerificationCode
+                  - sms-voice:VerifyDestinationNumber
+                Resource: "*"
+              - Effect: Allow
+                Action: [sms-voice:SendTextMessage]
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/CH"
+                  - !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/DE"
+
+  SmsVerificationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-sms-verification"
+      Runtime: python3.12
+      Handler: sms_verification_api.handler
+      Timeout: 15
+      MemorySize: 128
+      Role: !GetAtt SmsVerificationRole.Arn
+      Environment:
+        Variables:
+          PREFERENCE_TABLE_NAME: !Ref PreferenceTable
+          ACCESS_TABLE_NAME: !Ref AccessTableName
+          SMS_APPROVAL_TABLE_NAME: !Ref SmsApprovalTable
+          SMS_DESTINATION_TABLE_NAME: !Ref SmsDestinationTable
+          SMS_SENDER_ARN_CH: !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/CH"
+          SMS_SENDER_ARN_DE: !Sub "arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:sender-id/MOT/DE"
+          SMS_CONFIGURATION_SET: mot-dev-sms
+          READ_ONLY_VEHICLE_IDS: !Ref ReadOnlyVehicleIds
+      Code: .
+
   PreferenceApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
@@ -252,7 +483,7 @@ Resources:
       ProtocolType: HTTP
       CorsConfiguration:
         AllowOrigins: [!Ref ApiAllowedOrigin]
-        AllowMethods: [GET, PUT, OPTIONS]
+        AllowMethods: [GET, POST, PUT, OPTIONS]
         AllowHeaders: [content-type, authorization]
         MaxAge: 300
 
@@ -293,6 +524,41 @@ Resources:
       AuthorizerId: !Ref PreferenceAuthorizer
       Target: !Sub "integrations/${PreferenceIntegration}"
 
+  SmsVerificationIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref PreferenceApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt SmsVerificationFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  SmsVerificationGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref PreferenceApi
+      RouteKey: "GET /api/vehicles/{vehicleId}/notifications/sms"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref PreferenceAuthorizer
+      Target: !Sub "integrations/${SmsVerificationIntegration}"
+
+  SmsVerificationRequestRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref PreferenceApi
+      RouteKey: "POST /api/vehicles/{vehicleId}/notifications/sms/request"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref PreferenceAuthorizer
+      Target: !Sub "integrations/${SmsVerificationIntegration}"
+
+  SmsVerificationConfirmRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref PreferenceApi
+      RouteKey: "POST /api/vehicles/{vehicleId}/notifications/sms/confirm"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref PreferenceAuthorizer
+      Target: !Sub "integrations/${SmsVerificationIntegration}"
+
   PreferenceStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -309,6 +575,14 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${PreferenceApi}/*/*"
 
+  SmsVerificationInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SmsVerificationFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${PreferenceApi}/*/*"
+
 Outputs:
   PreferenceApiBaseUrl:
     Value: !Sub "https://${PreferenceApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
@@ -317,3 +591,11 @@ Outputs:
   EventTableName: {Value: !Ref EventTable}
   SessionTableName: {Value: !Ref SessionTable}
   ChargingStopQueueUrl: {Value: !Ref ChargingStopQueue}
+  SmsApprovalTableName: {Value: !Ref SmsApprovalTable}
+  SmsApprovalAuditTableName: {Value: !Ref SmsApprovalAuditTable}
+  SmsDestinationTableName: {Value: !Ref SmsDestinationTable}
+  SmsRateTableName: {Value: !Ref SmsRateTable}
+  SmsApprovalAuditRetentionDays: {Value: !Ref SmsApprovalAuditRetentionDays}
+  SmsApprovalAdminRoleArn:
+    Condition: HasSmsAdminPrincipal
+    Value: !GetAtt SmsApprovalAdminRole.Arn

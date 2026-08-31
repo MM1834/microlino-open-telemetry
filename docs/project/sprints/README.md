@@ -10,6 +10,9 @@
 
 ## Active implementation work
 
+- [RNG-SET-001 — personal range settings](RNG-SET-001.md)
+- [OPS-001 — Lambda capacity and portal resilience](OPS-001.md)
+- [SMS-001 — controlled SMS notification pilot](SMS-001.md)
 - [SES-001 — Cognito domain email delivery](SES-001.md)
 - [C6-ENV-001 — unified C6 build environments](C6-ENV-001.md)
 - [HIS-001 — bounded telemetry history pilot](HIS-001.md)
@@ -22,6 +25,8 @@
 
 ## Completed predecessors
 
+- [OTA-HW-001](OTA-HW-001.md) added the REV13 pre-write chip/flash OTA guard;
+  matching N16 OTA and deliberate XIAO/LilyGO rejection passed physically.
 - [ONB-UX-001](ONB-UX-001.md) completed the guided C6 local onboarding flow,
   physical factory-first-run acceptance and configuration-preserving rollout to
   B021, B023 and B024 on 2026-08-25.
@@ -33,7 +38,8 @@
   physical `pioneer` acceptance on 2026-08-24; SMS remains deferred.
 - [CACHE-001](CACHE-001.md) delivered the optional bounded SOC/Speed offline
   cache, isolated and production Backfill paths, physical N16 power/replay
-  acceptance and GPS-derived UTC cold-start proof on 2026-08-21.
+  acceptance and GPS-derived UTC cold-start proof on 2026-08-21; the dedicated
+  B025 AWS test resources were retired on 2026-08-26 after evidence capture.
 - [DEMO-001](DEMO-001.md) deployed the isolated frozen demo dataset, enforced
   server-side read-only notification and onboarding boundaries, and passed hosted
   acceptance on 2026-08-20.

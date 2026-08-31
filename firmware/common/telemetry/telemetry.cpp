@@ -17,7 +17,8 @@ bool telemetryIsCharging()
     const uint32_t nowMs = millis();
     const bool freshBmsCurrent = telemetry.bms.packCurrentValid &&
         nowMs - telemetry.bms.packCurrentLastUpdateMs <= 10000;
-    const bool freshBmsStatus = telemetry.bms.packStatusValid &&
+    const bool freshBmsStatus = telemetry.bms.statusLastUpdateMs != 0 &&
+        telemetry.bms.packStatusValid &&
         nowMs - telemetry.bms.statusLastUpdateMs <= 10000;
     return freshBmsCurrent && freshBmsStatus
         ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f

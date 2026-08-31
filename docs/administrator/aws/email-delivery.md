@@ -59,6 +59,9 @@ email configuration. The operational values are:
 - `CognitoEmailSendingAccount=DEVELOPER`;
 - sender `MOT Portal <support@microlino-open-telemetry.ch>`;
 - reply-to `support@microlino-open-telemetry.ch`;
+- administrator invitations name the MOT Portal, link directly to
+  `https://www.microlino-open-telemetry.ch/dashboard/` and include Cognito's
+  `{username}` and temporary-password placeholders;
 - SES Easy DKIM, RSA 2048;
 - shared SES sending, without dedicated IP addresses.
 

@@ -1,6 +1,6 @@
 # CACHE-001 — Optional Offline SOC/Speed Cache
 
-> **Status:** Closed — isolated and production N16 acceptance passed
+> **Status:** Closed — acceptance passed; dedicated B025 AWS resources retired
 >
 > **Date:** 2026-08-20
 
@@ -335,3 +335,35 @@ Backfill allowlist `cache-b025-n16-01,pioneer,ginopioneer`. Thing
 2 adds only Subscribe/Receive on
 `mot/ginopioneer/history/backfill/ack/v1`. The local recovery policy copy matches
 AWS. No synthetic row was written to Gino's History during this preparation.
+
+## B025 retirement
+
+On 2026-08-26 the maintainer explicitly retired the dedicated B025 test adapter
+from AWS after CACHE-001 evidence was complete. The productive certificate was
+first detached and made inactive. A reviewed no-replacement Change Set removed
+`cache-b025-n16-01` from the operational History and Backfill allowlists. AWS then
+deleted 28 State rows, 177 History rows, its `ACTIVE/OWNER` account association
+and Notification session; no Preference, Journey event, SMS, Claim, Ownership or
+live-connection rows existed.
+
+The productive Thing `mot-esp32c6-4085d9`, its policy and certificate were
+deleted. The dedicated `mot-cachetest` stack was deleted with its Test Thing,
+policy, Lambda, IoT rule, alarm, log group and empty TTL table; its externally
+provided test certificate was subsequently deactivated and deleted. Negative
+read-backs found no remaining B025 Thing, certificate, data partition, account
+association or active stack. Historical sprint evidence and documentation are
+retained as audit material, not active adapter resources.
+
+## B021 operational enablement
+
+On 2026-08-28 the maintainer explicitly enabled B021
+`MOT-EC18DB`/`ml-pilot-021` for cloud History and optional offline Backfill. The
+reviewed Change Set `enable-ml-pilot-021-history-20260828` added only that vehicle
+to both operational allowlists; all four derived Lambda/IoT-rule modifications
+were in place with `Replacement=False`, and the stack returned to
+`UPDATE_COMPLETE`. IoT policy version 2 grants Subscribe/Receive only on
+`mot/ml-pilot-021/history/backfill/ack/v1`; the existing vehicle-scoped Publish
+permission already covers its Backfill upload. Final read-back confirmed both
+Lambdas active with successful updates and effective allowlists containing
+`ml-pilot-021`. The physical adapter cache remains default-off until explicitly
+enabled in the authenticated local wizard.

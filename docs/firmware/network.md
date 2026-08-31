@@ -37,7 +37,8 @@ fallback AP stops after any station connection remains stable for ten seconds.
 weak-RSSI flag. This preserves local administration and Internet transports on a
 weak but working Home link and prevents Home–Mobile–AP oscillation when Mobile is
 unavailable.
-AWS TLS/socket waits are bounded to five seconds and failed connects use
+AWS TLS handshakes are bounded to seven seconds and socket waits to five seconds;
+failed connects use
 exponential backoff from 10 seconds up to five minutes. ABRP retains its separate
 task and now also rejects the stale `WL_CONNECTED`/zero-IP condition.
 

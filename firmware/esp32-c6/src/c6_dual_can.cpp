@@ -88,9 +88,10 @@ void receiveChannel(size_t index)
     }
     c6CanScanObserve(index, frame);
     c6DriveCaptureObserve(index, frame);
+    const bool displayChargingFrame = frame.id == 0x603 || frame.id == 0x604;
     if (!(standardCanConfigured() &&
           channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&
-          frame.id == 0x604)) {
+          displayChargingFrame)) {
         decoderEngineHandleFrame(frame, channel.status.profile);
     }
 }

@@ -27,8 +27,11 @@ String telemetryToJson(const MotTelemetry &state)
     doc["bms"]["cell_voltages_valid"] = state.bms.cellVoltagesValid;
     if (state.bms.packStatusValid) {
         doc["bms"]["pack_voltage_v"] = serialized(String(state.bms.packVoltageMv / 1000.0f, 3));
-        doc["bms"]["standard_soc"] = state.bms.socPercent;
     }
+    if (state.bms.standardSocValid)
+        doc["bms"]["standard_soc"] = serialized(String(state.bms.socPercent, 2));
+    if (state.bms.sohValid)
+        doc["bms"]["soh_percent"] = serialized(String(state.bms.sohPercent, 2));
     if (state.bms.packCurrentValid) {
         doc["bms"]["pack_current_a"] = serialized(String(state.bms.packCurrentA, 1));
         doc["bms"]["pack_power_w"] = serialized(String(state.bms.packPowerW, 0));

@@ -8,6 +8,7 @@
 #include "c6_config.h"
 #include "c6_dual_can.h"
 #include "c6_gps.h"
+#include "c6_journey_energy.h"
 #include "c6_network.h"
 #include "c6_offline_cache.h"
 #include "c6_web.h"
@@ -116,6 +117,12 @@ void handleSerialCommand(String command)
         Serial.println("AWS IoT: " + c6AwsStatus());
         return;
     }
+    if (normalized == "aws enable" || normalized == "aws disable") {
+        const bool enabled = normalized == "aws enable";
+        c6ConfigSetMotCloudEnabled(enabled);
+        Serial.printf("MOT Cloud: %s (saved; credentials unchanged; restart required to enable)\n", enabled ? "enabled" : "disabled");
+        return;
+    }
     if (normalized == "cache status") {
         Serial.println("Offline cache: " + c6OfflineCacheStatusJson());
         return;
@@ -131,8 +138,17 @@ void handleSerialCommand(String command)
         Serial.println("Offline cache: queued samples purged");
         return;
     }
+    if (normalized == "energy status") {
+        Serial.println("Journey energy: " + c6JourneyEnergyStatusJson());
+        return;
+    }
     if (normalized == "abrp status") {
         Serial.println("ABRP: " + c6AbrpStatusJson());
+        return;
+    }
+    if (normalized == "abrp clear") {
+        c6ConfigClearAbrpCredentials();
+        Serial.println("ABRP: disabled; API key and user token deleted");
         return;
     }
     if (normalized == "abrp send") {
@@ -164,7 +180,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable");
+        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
         return;
     }
 
@@ -212,6 +228,7 @@ void setup()
     telemetryInit();
     c6ConfigLoad();
     c6OfflineCacheSetup();
+    c6JourneyEnergySetup();
 
     if (!c6DualCanSetup()) {
         Serial.println("Dual-CAN startup incomplete");
@@ -222,12 +239,13 @@ void setup()
     c6AwsSetup();
     c6AbrpSetup();
     c6DriveCaptureReset();
-    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable");
+    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
 }
 
 void loop()
 {
     c6DualCanLoop();
+    c6JourneyEnergyLoop();
     c6GpsLoop();
     c6NetworkLoop();
     c6WebLoop();
@@ -256,9 +274,9 @@ void loop()
         const uint32_t packAgeMs = millis() - telemetry.bms.packStatusLastUpdateMs;
         const uint32_t cellsAgeMs = millis() - telemetry.bms.cellVoltagesLastUpdateMs;
         if (telemetry.bms.packStatusValid && packAgeMs <= 10000) {
-            Serial.printf("Standard-CAN BMS: pack=%.3f V SOC-field=%u status=0x%02X plugged=%s age=%lu ms\n",
+            Serial.printf("Standard-CAN BMS: pack=%.3f V SOC-field=%.2f status=0x%02X plugged=%s age=%lu ms\n",
                           telemetry.bms.packVoltageMv / 1000.0,
-                          static_cast<unsigned>(telemetry.bms.socPercent),
+                          telemetry.bms.socPercent,
                           static_cast<unsigned>(telemetry.bms.statusByte),
                           telemetry.bms.plugged ? "yes" : "no",
                           static_cast<unsigned long>(packAgeMs));

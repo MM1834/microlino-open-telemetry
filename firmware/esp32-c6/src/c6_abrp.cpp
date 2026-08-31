@@ -30,13 +30,14 @@ bool location(AbrpLocation &value)
 void c6AbrpSetup() { setupAbrp(settings()); }
 void c6AbrpLoop()
 {
-    // AWS is the primary telemetry transport. Do not start a second TLS
-    // session while MQTT is reconnecting or recovering memory.
-    if (c6NetworkTransportReady() && c6AwsConnected()) abrpLoop(settings(), location);
+    // When MOT Cloud is enabled and provisioned, do not start a second TLS
+    // session while AWS MQTT is reconnecting or recovering memory. ABRP remains
+    // independent when MOT Cloud is disabled or AWS is not provisioned.
+    if (c6NetworkTransportReady() && c6AwsAllowsAbrp()) abrpLoop(settings(), location);
 }
 bool c6AbrpQueueTelemetry()
 {
-    return c6NetworkTransportReady() && c6AwsConnected() && queueAbrpTelemetry(settings(), location);
+    return c6NetworkTransportReady() && c6AwsAllowsAbrp() && queueAbrpTelemetry(settings(), location);
 }
 String c6AbrpStatusJson() { return abrpStatusJson(settings()); }
 bool c6AbrpConfigured() { return abrpEnabled(settings()); }

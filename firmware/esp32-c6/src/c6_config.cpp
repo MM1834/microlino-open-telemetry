@@ -40,6 +40,7 @@ void c6ConfigLoad()
     c6Config.wifi2Password = preferences.getString("pass2", "");
     c6Config.adminPassword = preferences.getString("otaPass", "");
     c6Config.setupPassword = preferences.getString("setupPass", "");
+    c6Config.motCloudEnabled = preferences.getBool("cloudEn", true);
     c6Config.abrpEnabled = preferences.getBool("abrpEn", false);
     c6Config.gpsEnabled = preferences.getBool("gpsEn", true);
     c6Config.offlineCacheEnabled = preferences.getBool("cacheEn", false);
@@ -131,6 +132,7 @@ void c6ConfigSave()
     preferences.putString("pass2", c6Config.wifi2Password);
     preferences.putString("otaPass", c6Config.adminPassword);
     preferences.putString("setupPass", c6Config.setupPassword);
+    preferences.putBool("cloudEn", c6Config.motCloudEnabled);
     preferences.putBool("abrpEn", c6Config.abrpEnabled);
     preferences.putBool("gpsEn", c6Config.gpsEnabled);
     preferences.putBool("cacheEn", c6Config.offlineCacheEnabled);
@@ -168,11 +170,31 @@ bool c6ConfigSetAbrpCredentials(const String &apiKeyValue, const String &userTok
     return true;
 }
 
+void c6ConfigClearAbrpCredentials()
+{
+    c6Config.abrpEnabled = false;
+    c6Config.abrpApiKey = "";
+    c6Config.abrpUserToken = "";
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("abrpEn", false);
+    preferences.remove("abrpKey");
+    preferences.remove("abrpToken");
+    preferences.end();
+}
+
 void c6ConfigSetAbrpEnabled(bool enabled)
 {
     c6Config.abrpEnabled = enabled;
     preferences.begin(PREFERENCES_NAMESPACE, false);
     preferences.putBool("abrpEn", enabled);
+    preferences.end();
+}
+
+void c6ConfigSetMotCloudEnabled(bool enabled)
+{
+    c6Config.motCloudEnabled = enabled;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("cloudEn", enabled);
     preferences.end();
 }
 
@@ -208,6 +230,7 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["can2Profile"] = static_cast<int>(c6Config.can2Profile);
     doc["publishIntervalMs"] = c6Config.publishIntervalMs;
     doc["otaEnabled"] = c6Config.otaEnabled;
+    doc["motCloudEnabled"] = c6Config.motCloudEnabled;
     doc["abrpEnabled"] = c6Config.abrpEnabled;
     doc["gpsEnabled"] = c6Config.gpsEnabled;
     doc["offlineCacheEnabled"] = c6Config.offlineCacheEnabled;
@@ -241,6 +264,7 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["can2Profile"].isNull()) candidate.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
     if (!doc["publishIntervalMs"].isNull()) candidate.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
+    if (!doc["motCloudEnabled"].isNull()) candidate.motCloudEnabled = doc["motCloudEnabled"].as<bool>();
     if (!doc["abrpEnabled"].isNull()) candidate.abrpEnabled = doc["abrpEnabled"].as<bool>();
     if (!doc["gpsEnabled"].isNull()) candidate.gpsEnabled = doc["gpsEnabled"].as<bool>();
     if (!doc["offlineCacheEnabled"].isNull()) candidate.offlineCacheEnabled = doc["offlineCacheEnabled"].as<bool>();

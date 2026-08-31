@@ -13,6 +13,12 @@ OTA off until a provisioner explicitly enables it again.
 3. Keep USB recovery access available.
 4. Build the intended board environment.
 5. Enable local OTA deliberately in Config.
+
+REV13 validates the standard Espressif image header before opening the OTA
+partition. A different ESP chip family or declared physical flash size is
+rejected with HTTP 400, leaving the running firmware unchanged. This prevents
+the 16 MB N16 and 4 MB XIAO C6 images from being interchanged. Boards with the
+same chip family and flash geometry are not uniquely identified by this guard.
 6. Upload the firmware binary through the authenticated WebUI.
 7. Allow the device to reboot.
 8. Verify firmware version, network, MQTT/AWS, CAN and GPS.

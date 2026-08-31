@@ -2,6 +2,7 @@
 
 #include "c6_config.h"
 #include "c6_gps.h"
+#include "c6_journey_energy.h"
 #include "c6_network.h"
 #include "c6_offline_cache.h"
 #include "system/device_id.h"
@@ -37,7 +38,8 @@ bool publishTelemetry()
     bool published = false;
     const bool freshBmsCurrent = telemetry.bms.packCurrentValid &&
         millis() - telemetry.bms.packCurrentLastUpdateMs <= 10000;
-    const bool freshBmsStatus = telemetry.bms.packStatusValid &&
+    const bool freshBmsStatus = telemetry.bms.statusLastUpdateMs != 0 &&
+        telemetry.bms.packStatusValid &&
         millis() - telemetry.bms.statusLastUpdateMs <= 10000;
     if (telemetry.display.valid) {
         published |= client.publishFloat("display/soc", telemetry.display.soc, 1);
@@ -45,6 +47,7 @@ bool publishTelemetry()
         published |= client.publishFloat("display/odometer_km", telemetry.display.odometerKm, 1);
         published |= client.publishInt("display/estimated_range_km", telemetry.display.estimatedRangeKm);
     }
+    published |= c6JourneyEnergyPublish(client);
     if (freshBmsCurrent && freshBmsStatus) {
         published |= client.publishBool("charging/is_charging", telemetryIsCharging());
         published |= client.publishBool("charging/plugged", telemetry.bms.plugged);
@@ -83,6 +86,10 @@ bool publishTelemetry()
 
 void c6AwsSetup()
 {
+    if (!c6Config.motCloudEnabled) {
+        Serial.println("AWS IoT: MOT Cloud disabled; credentials retained");
+        return;
+    }
     if (!motLoadAwsCredentials(credentials)) {
         Serial.println("AWS IoT: " + credentials.message);
         return;
@@ -95,6 +102,10 @@ void c6AwsSetup()
 
 void c6AwsLoop()
 {
+    if (!c6Config.motCloudEnabled) {
+        if (client.connected()) client.disconnect();
+        return;
+    }
     client.loop(runtime(), c6NetworkTransportReady());
     if (!client.connected()) freshLivePublished = false;
     if (client.connected() && millis() - lastPublishMs >= c6Config.publishIntervalMs) {
@@ -106,6 +117,7 @@ void c6AwsLoop()
 
 String c6AwsStatus()
 {
+    if (!c6Config.motCloudEnabled) return "disabled; credentials retained";
     const MotAwsStatus &status = client.status();
     return String(status.connected ? "connected" : "disconnected") +
            " credentials=" + (status.credentialsLoaded ? "yes" : "no") +
@@ -115,13 +127,20 @@ String c6AwsStatus()
            " totalFailures=" + String(status.totalConnectFailures) +
            " lastConnectMs=" + String(status.lastConnectDurationMs) +
            " retryMs=" + String(status.reconnectDelayMs) +
+           " tlsCode=" + String(status.tlsErrorCode) +
+           " tls=" + (status.tlsError.isEmpty() ? "none" : status.tlsError) +
            " message=" + status.message;
 }
 bool c6AwsConnected() { return client.connected(); }
+bool c6AwsAllowsAbrp()
+{
+    return !c6Config.motCloudEnabled || !client.enabled() || client.connected();
+}
 
 #else
 void c6AwsSetup() { Serial.println("AWS IoT: not included in this build"); }
 void c6AwsLoop() {}
 String c6AwsStatus() { return "not included in this build"; }
 bool c6AwsConnected() { return true; }
+bool c6AwsAllowsAbrp() { return true; }
 #endif

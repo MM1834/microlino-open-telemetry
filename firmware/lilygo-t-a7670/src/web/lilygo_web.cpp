@@ -16,6 +16,7 @@
 #include "modem/lilygo_modem.h"
 #include "mqtt/lilygo_mqtt.h"
 #include "network/lilygo_network.h"
+#include "web/ota_image_guard.h"
 #include "telemetry/telemetry.h"
 #include "config/configuration_readiness.h"
 #include "lte/lilygo_lte_client.h"
@@ -25,6 +26,8 @@ static WebServer server(80);
 static bool rebootPending = false;
 static unsigned long rebootAtMs = 0;
 static bool otaUploadAllowed = false;
+static bool otaUpdateStarted = false;
+static String otaValidationError;
 
 static bool requireAdmin()
 {
@@ -491,6 +494,11 @@ static void handleOtaPage()
 
 static void handleOtaDone()
 {
+    if (!otaValidationError.isEmpty()) {
+        server.send(400, "text/plain", "OTA rejected: " + otaValidationError + ". Running firmware unchanged.");
+        otaValidationError = "";
+        return;
+    }
     if (!otaUploadAllowed) {
         server.send(401, "text/plain", "OTA not authorized");
         return;
@@ -498,6 +506,7 @@ static void handleOtaDone()
 
     bool ok = !Update.hasError();
     otaUploadAllowed = false;
+    otaUpdateStarted = false;
 
     server.send(ok ? 200 : 500, "text/plain", ok ? "OTA OK. Rebooting." : "OTA failed.");
 
@@ -513,17 +522,35 @@ static void handleOtaUpload()
 
     if (upload.status == UPLOAD_FILE_START) {
         otaUploadAllowed = config.otaEnabled && requireAdmin() && requireSameOrigin();
+        otaUpdateStarted = false;
+        otaValidationError = "";
         if (!otaUploadAllowed) return;
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_WRITE) {
         if (!otaUploadAllowed) return;
+        if (!otaUpdateStarted) {
+            const OtaImageGuardResult result = otaValidateImageHeader(upload.buf, upload.currentSize);
+            if (!result.accepted) {
+                otaValidationError = result.reason;
+                otaUploadAllowed = false;
+                Serial.println("OTA rejected: " + otaValidationError);
+                return;
+            }
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                otaValidationError = "OTA partition could not be opened";
+                Update.printError(Serial);
+                otaUploadAllowed = false;
+                return;
+            }
+            otaUpdateStarted = true;
+        }
         if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_END) {
         if (!otaUploadAllowed) return;
-        if (!Update.end(true)) Update.printError(Serial);
+        if (!otaUpdateStarted || !Update.end(true)) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_ABORTED) {
-        Update.abort();
+        if (otaUpdateStarted) Update.abort();
         otaUploadAllowed = false;
+        otaUpdateStarted = false;
     }
 }
 

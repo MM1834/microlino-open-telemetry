@@ -23,16 +23,36 @@ class BmsTelemetryContractTests(unittest.TestCase):
         self.assertIn("telemetry.bms.isRegenerating", source)
         self.assertIn("telemetry.bms.isDischarging", source)
 
-    def test_v2_decoder_is_independent_and_explicitly_provisional(self) -> None:
+    def test_v2_decoder_uses_large_battery_big_endian_layout(self) -> None:
         source = (ROOT / "firmware/common/decoders/decoder_standard_can_v2.cpp").read_text()
-        mechanism = (ROOT / "firmware/common/decoders/decoder_standard_can_bms.h").read_text()
-
-        self.assertIn("V2_PROVISIONAL_RULES", source)
-        self.assertIn("MotStandardCanBms::handleFrame(frame, V2_PROVISIONAL_RULES)", source)
+        self.assertIn("readBe16", source)
+        self.assertIn("frame.id == 0x1B0", source)
+        self.assertIn("frame.id == 0x1B1", source)
+        self.assertIn("frame.id == 0x2BA", source)
+        self.assertIn("socHundredths / 100.0f", source)
+        self.assertIn("sohHundredths / 100.0f", source)
+        self.assertIn("currentRaw / 10.0f", source)
+        self.assertIn("telemetry.bms.vehiclePowerW = -powerW", source)
+        self.assertNotIn("frame.id == 0x18D", source)
+        self.assertNotIn("frame.id == 0x4AD", source)
         self.assertNotIn("PIONEER_RULES", source)
-        self.assertNotIn("V2_PROVISIONAL_RULES", mechanism)
 
-    def test_standard_can_prevents_display_plugged_override(self) -> None:
+        frame_1b0 = bytes.fromhex("00 00 B8 D9 0E 34 0E 3A")
+        self.assertEqual(47321, int.from_bytes(frame_1b0[2:4], "big"))
+        self.assertEqual(3636, int.from_bytes(frame_1b0[4:6], "big"))
+        self.assertEqual(3642, int.from_bytes(frame_1b0[6:8], "big"))
+        frame_1b1 = bytes.fromhex("0C 8F 25 E5 00 00 0B AE")
+        self.assertEqual(32.15, int.from_bytes(frame_1b1[0:2], "big") / 100)
+        self.assertEqual(97.01, int.from_bytes(frame_1b1[2:4], "big") / 100)
+        self.assertEqual(-2.0, int.from_bytes(bytes.fromhex("FF EC"), "big", signed=True) / 10)
+
+    def test_aws_soc_remains_display_can_soc(self) -> None:
+        source = (ROOT / "firmware/esp32-c6/src/c6_aws.cpp").read_text()
+        self.assertIn('publishFloat("display/soc", telemetry.display.soc, 1)', source)
+        self.assertNotIn('publishFloat("display/soc", telemetry.bms.socPercent', source)
+        self.assertIn("telemetry.bms.statusLastUpdateMs != 0", source)
+
+    def test_standard_can_prevents_all_display_charging_overrides(self) -> None:
         configurations = (
             ROOT / "firmware/lilygo-t-a7670/src/can/lilygo_can.cpp",
             ROOT / "firmware/esp32-c6/src/c6_dual_can.cpp",
@@ -42,9 +62,9 @@ class BmsTelemetryContractTests(unittest.TestCase):
                 source = path.read_text()
                 self.assertIn("standardCanConfigured", source)
                 self.assertIn("DECODER_PROFILE_DISPLAY_CAN", source)
-                self.assertIn("frame.id == 0x604", source)
+                self.assertIn("frame.id == 0x603 || frame.id == 0x604", source)
         lilygo = configurations[0].read_text()
-        self.assertIn("suppressedDisplayPlugged", lilygo)
+        self.assertIn("suppressedDisplayCharging", lilygo)
 
     def test_all_device_publishers_use_the_same_bms_topics(self) -> None:
         publishers = (

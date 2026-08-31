@@ -67,7 +67,8 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260807-ntf1", source)
+        self.assertIn("aws-backend-provider.js?v=20260824-ops1", source)
+        self.assertIn("app.js?v=20260830-odometer1", source)
 
 
 class DashboardNotificationSettingsTests(unittest.TestCase):
@@ -79,6 +80,8 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn('id="notification-journey-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-threshold"', html)
+        self.assertIn('id="range-km-at-100"', html)
+        self.assertIn('id="range-reserve-soc"', html)
         self.assertIn("nach mindestens 45 Sekunden Ladezeit", html)
         self.assertIn("mindestens 60 Sekunden stoppt", html)
         self.assertIn("Zusammenfassung geeigneter Fahrten per E-Mail", html)
@@ -100,6 +103,22 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         for config in (CONFIG_EXAMPLE, BETA_CONFIG_EXAMPLE, PRODUCTION_CONFIG_EXAMPLE):
             self.assertIn("notificationApiBaseUrl:", config.read_text(encoding="utf-8"))
 
+    def test_read_requests_retry_transient_capacity_failures(self) -> None:
+        provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("const RETRYABLE_HTTP_STATUS = new Set([429, 500, 502, 503, 504])", provider)
+        self.assertIn("async function fetchWithRetry", provider)
+        self.assertIn("250 * (2 ** attempt)", provider)
+        self.assertIn("method === 'GET'", provider)
+
+    def test_email_and_sms_status_load_independently(self) -> None:
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
+        self.assertIn("await Promise.allSettled", app)
+        self.assertIn("SMS-Status vorübergehend nicht verfügbar.", app)
+        self.assertIn("Ein Teil der Einstellungen ist vorübergehend nicht verfügbar.", app)
+        self.assertNotIn("const [preferences, smsStatus] = await Promise.all([", app)
+
     def test_app_loads_and_saves_for_selected_vehicle(self) -> None:
         app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
         self.assertIn("async function loadNotificationPreferences", app)
@@ -110,11 +129,29 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn("journeyEmailEnabled: $('notification-journey-email-enabled').checked", app)
         self.assertIn("chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked", app)
         self.assertIn("chargingStopThreshold: Number($('notification-charging-stop-threshold').value)", app)
+        self.assertIn("rangeKmAt100: Number($('range-km-at-100').value)", app)
+        self.assertIn("rangeReserveSoc: Number($('range-reserve-soc').value)", app)
+        self.assertIn("responsePreferences?.rangeReserveSoc ?? requestedPreferences.rangeReserveSoc", app)
         self.assertIn("Für Ladestopp-Meldungen zuerst den E-Mail-Kanal aktivieren.", app)
         self.assertIn("Für Fahrtzusammenfassungen zuerst den E-Mail-Kanal aktivieren.", app)
+        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        self.assertIn("Pro durchgehend eingesteckter Ladesession", html)
+        self.assertIn("Ausstecken und erneutes Einstecken", html)
+        self.assertIn("Solar-Nulleinspeisung", html)
         self.assertIn("email.dataset.confirmedEmail", app)
         self.assertIn("help.hidden = stillConfirmed", app)
         self.assertIn("addEventListener('input', updateEmailConfirmationHelp)", app)
+
+    def test_sms_save_captures_opt_in_before_busy_render_and_hides_code(self) -> None:
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
+        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        capture = app.index("const requestedPreferences = {")
+        busy = app.index("state.notificationBusy = true;", capture)
+        self.assertLess(capture, busy)
+        self.assertIn("saveNotificationPreferences(requestedPreferences)", app)
+        self.assertIn("state.smsNotificationStatus.smsEnabled = preferences.smsEnabled === true", app)
+        self.assertIn("notification-sms-confirmation-fields", html)
+        self.assertIn("status?.verificationStatus !== 'PENDING'", app)
 
 
 class DashboardFreshnessTests(unittest.TestCase):

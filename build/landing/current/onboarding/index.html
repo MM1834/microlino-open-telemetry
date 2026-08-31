@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Der MOT Onboarding- und Zugriffsprozess in drei Phasen.">
+  <title>MOT Onboarding</title>
+  <link rel="stylesheet" href="../css/site.css?v=20260829-4">
+</head>
+<body data-page="onboarding">
+  <a class="skip-link" href="#main" data-i18n="skip">Zum Inhalt springen</a>
+  <header class="site-header">
+    <a class="brand" href="../" aria-label="Microlino Open Telemetry home"><img src="../img/mot-logo.svg" alt="Microlino Open Telemetry"></a>
+    <nav aria-label="Hauptnavigation" data-i18n-aria-label="navLabel"><a href="../" data-i18n="backHome">Zur Startseite</a></nav>
+    <label class="language-picker"><span class="sr-only" data-i18n="language">Sprache</span><select id="language-select" aria-label="Sprache"><option value="de">DE</option><option value="en">EN</option><option value="fr">FR</option></select></label>
+    <a class="button button-small" href="/dashboard/" data-i18n="openDashboard">Dashboard öffnen</a>
+  </header>
+  <main id="main">
+    <section class="section onboarding-page" id="access-flow">
+      <div class="section-heading">
+        <p class="eyebrow" data-i18n="flowEyebrow">Onboarding und Zugriff</p>
+        <h1 class="page-title" data-i18n="flowTitle">Wer verbindet sich wann womit?</h1>
+        <p data-i18n="flowLead">Der Adapter verbindet Fahrzeug, lokale Einrichtung und MOT Cloud. Der Benutzer verwendet je nach Phase einen anderen Zugriffsweg.</p>
+      </div>
+      <div class="system-flow" aria-label="Geräte- und Netzwerkfluss" data-i18n-aria-label="systemFlowLabel">
+        <article class="flow-node" data-flow-part="vehicle"><span class="flow-icon">◉</span><strong>Microlino</strong><small data-i18n="flowVehicle">Fahrzeugdaten über OBD-II/CAN und optional Strom über USB-C</small></article>
+        <div class="strong-arrow"><span data-i18n="obdUsb">OBD-II / CAN<br>USB-C Strom</span></div>
+        <article class="flow-node flow-device" data-flow-part="adapter"><span class="flow-icon">▦</span><strong data-i18n="motDevice">MOT Adapter</strong><small data-i18n="flowAdapter">Lokale Konfiguration, CAN-Dekodierung und Telemetrie</small><div class="port-row"><span>OBD-II</span><span>USB-C</span><span>WiFi</span></div></article>
+        <div class="network-stack"><article data-flow-part="ap"><strong data-i18n="localAp">Lokaler Access Point</strong><small>MOT-xxxx · 192.168.4.1</small></article><article data-flow-part="home"><strong data-i18n="homeWifi">Home-WLAN</strong><small data-i18n="internet24">2.4 GHz · Internet</small></article><article data-flow-part="mobile"><strong data-i18n="mobileWifi">Mobile-WLAN / Hotspot</strong><small data-i18n="internet24">2.4 GHz · Internet</small></article></div>
+        <div class="strong-arrow cloud-arrow"><span data-i18n="internetAws">Internet / AWS</span></div>
+        <article class="flow-node flow-portal" data-flow-part="portal"><span class="flow-icon">☁</span><strong>MOT Portal</strong><small data-i18n="flowPortal">Account, Claim, Live-Daten, History und Einstellungen</small></article>
+      </div>
+      <div class="phase-explorer">
+        <div class="phase-intro">
+          <div><p class="eyebrow" data-i18n="phaseExplorerEyebrow">Interaktive Phasenansicht</p><h2 data-i18n="phaseExplorerTitle">Zugriffsweg nach Phase anzeigen</h2></div>
+          <p class="phase-hint" data-i18n="phaseExplorerHint">Eine Phase anklicken – die zugehörigen Verbindungen und Ziele werden hervorgehoben.</p>
+        </div>
+        <div class="phase-controls" aria-label="Onboarding-Phase" data-i18n-aria-label="phaseLabel"><button type="button" data-phase="1" aria-pressed="true"><span data-i18n="phase1">Phase 1 · Account</span><span class="button-cue" aria-hidden="true">›</span></button><button type="button" data-phase="2" aria-pressed="false"><span data-i18n="phase2">Phase 2 · Adapter lokal</span><span class="button-cue" aria-hidden="true">›</span></button><button type="button" data-phase="3" aria-pressed="false"><span data-i18n="phase3">Phase 3 · Portal und Betrieb</span><span class="button-cue" aria-hidden="true">›</span></button></div>
+      <div class="user-access" aria-label="Zugriffswege des Benutzers" data-i18n-aria-label="userAccessLabel">
+        <article class="access-target access-ap" data-access-target="ap"><strong data-i18n="adapterLocal">MOT Adapter lokal</strong><small data-i18n="viaAp">über AP: MOT-xxxx · 192.168.4.1</small></article><div class="access-arrow arrow-left access-ap-route" data-access="ap"><span data-i18n="routeAp">Phase 2 · Ersteinrichtung</span></div>
+        <article class="user-node"><span>●</span><strong data-i18n="user">Benutzer</strong><small data-i18n="userDevices">Smartphone · Tablet · Laptop</small></article>
+        <article class="access-target access-ip" data-access-target="local-ip"><strong data-i18n="adapterLocal">MOT Adapter lokal</strong><small data-i18n="viaIp">über Home-/Mobile-WLAN-IP</small></article><div class="access-arrow arrow-left access-ip-route" data-access="local-ip"><span data-i18n="routeIp">Phase 2 und später · Einstellungen</span></div><div class="access-arrow arrow-right access-portal-route" data-access="portal"><span data-i18n="routePortal">Phase 1 und 3 · Account, Claim, Betrieb</span></div><article class="access-target access-portal" data-access-target="portal"><strong>MOT Portal</strong><small data-i18n="viaPortal">über Internet · Dashboard</small></article>
+      </div>
+        <p class="phase-detail" id="phase-detail" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+  <footer><img src="../img/mot-logo.svg" alt="Microlino Open Telemetry"><p data-i18n="footerTagline">Open Source · Local-first · Datenschutzbewusst</p><div><a href="mailto:support@microlino-open-telemetry.ch" data-i18n="contact">Kontakt</a><a href="../" data-i18n="backHome">Zur Startseite</a></div></footer>
+  <script src="../js/i18n.js?v=20260829-2"></script>
+  <script src="../js/onboarding-flow.js?v=20260829-2"></script>
+</body>
+</html>

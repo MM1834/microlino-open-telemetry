@@ -3,6 +3,12 @@
 ![Desktop Home](../assets/images/dashboard/desktop-home.png)
 
 The dashboard provides current and live telemetry through the configured provider.
+German remains the project language and the portal's default and fallback. A
+persisted dashboard selector additionally supports English and French. It applies
+to static content, runtime status and error messages, accessibility labels,
+locale-sensitive dates and History chart annotations. The local firmware wizard
+is a separate surface and remains English-only.
+
 The adaptive charging/power overview card evaluates the authoritative timestamp
 of the topics used by its current mode. After the existing 120-second freshness
 boundary, the retained charging or power presentation is dimmed and annotated
@@ -30,8 +36,12 @@ The backend derives the forecast from at most the ten newest valid journeys in
 the last 30 days and stops adding older journeys after about 150 km. Charging,
 odometer resets, implausible efficiency and very small segments are excluded.
 Up to 100 km and 20 consumed SOC percentage points, the historical kilometres per
-SOC point are progressively blended with the configured 140 km baseline; beyond
-both evidence thresholds the personal value is used without baseline weighting.
+SOC point are progressively blended with the user's configured full-range basis;
+beyond both evidence thresholds the personal value is used without baseline
+weighting. The authenticated per-user/per-vehicle settings default to 140 km at
+100% SOC and 0% reserve. A non-zero reserve is subtracted from current SOC for
+both the fixed comparison and personal forecast, so the displayed usable range
+reaches zero at the chosen reserve and is labelled `bis N%`.
 
 The repository portal also renders the Standard-CAN BMS topics
 `bms/pack_voltage`, `bms/pack_current`, `bms/pack_power_w` and the provisional
@@ -117,3 +127,38 @@ the backend finalizes the journey after 30 minutes without relevant telemetry.
 It uses the last received signal as the endpoint and labels the email as a
 telemetry timeout, so unobserved distance inside a garage is not presented as
 measured journey data.
+
+## SMS destination preference
+
+The repository portal supports a controlled Swiss and German SMS destination lifecycle. A
+user enters a `+41` or `+49` mobile number for the selected vehicle, requests and confirms
+the AWS verification code, and can enable SMS only after a separate administrator
+approval matches that user, vehicle and number. The same verified number may be
+associated with several vehicles or users; verification is shared by number,
+while approval and opt-in remain separate for every user–vehicle association.
+The portal never lists the other associations.
+
+Changing the number disables SMS until the new exact destination is verified and
+approved. Portal state is not a delivery authorization: the backend dispatcher
+must still enforce every SMS-001 spend, alarm, sender, country, rate and kill
+switch at send time. The portal implementation is not yet evidence of hosted or
+handset acceptance.
+
+The verification-code input is shown only after the user requests a code and
+while that verification remains pending. A confirmed number therefore presents
+only its verification/approval state and vehicle-specific SMS opt-in. The save
+path captures the opt-in before switching the form into its busy presentation so
+that stale status cannot clear the selected checkbox.
+
+## Charging-stop session boundary
+
+Charging-stop notification is intentionally limited to one event per continuous
+plugged session. Unplugging and plugging in again starts a new session. Merely
+resuming charging while the vehicle remains connected does not reset the
+idempotency boundary.
+
+This avoids repeated warnings when a Microlino remains connected for hours or
+days and intermittently tops up. The same rule covers external control such as
+solar zero-export operation, load management or a manual pause: the first
+qualified stop may notify, while later stop/resume cycles in the same plugged
+session remain suppressed. SOC-target notification remains an independent event.

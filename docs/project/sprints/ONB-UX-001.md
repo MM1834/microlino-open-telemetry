@@ -26,6 +26,14 @@ configuration access.
   non-empty storage fail-closed;
 - updated the operator onboarding guide and reproducible one-page pilot handout.
 
+## Pilot feedback refinement
+
+Post-acceptance pilot feedback made displayed local HTTP addresses clickable,
+added immediate visual progress feedback to wizard actions, reduced and indented
+the optional GPS control, and presents CAN2 as the fixed Microlino Display-CAN
+wiring in the wizard. The decoder-profile model remains extensible for a later
+explicit display variant such as a verified miles decoder.
+
 ## Acceptance evidence
 
 - the rebuilt flow was exercised repeatedly on factory-erased demo unit B025;

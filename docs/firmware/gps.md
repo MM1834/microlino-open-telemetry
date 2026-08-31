@@ -15,6 +15,10 @@ are published only with a valid location fix.
 | nanoESP32-C6-N16 | 20 | 21 | 9600 | Same optional receiver and detection states as WROOM |
 | Seeed XIAO ESP32-C6 | 17 | 16 | 9600 | Candidate compact-board wiring |
 
+DA37+DA10 is the preferred optional receiver for new C6 pilot assemblies. It uses
+the existing 3.3 V, 9600-baud NMEA UART contract and requires no firmware variant.
+Its separate antenna improves enclosure placement; PPS remains unconnected.
+
 The nanoESP32-C6-N16 UART wiring was physically checked on 2026-08-06: receiver
 TX to GPIO20 and receiver RX to GPIO21 produced continuously increasing UART-byte
 counts and checksum-valid NMEA sentences. The indoor test confirmed module
@@ -48,6 +52,12 @@ successfully disabled and re-enabled GPS. While disabled, Runtime Diagnostics
 reported `GPS_DISABLED`, zero received characters and no fix. The exported
 configuration included `gpsEnabled`; the common import path restores the same
 persisted setting.
+
+Demo adapter B025 physically validated DA37+DA10 on 2026-08-25 without additional
+firmware changes or added support capacitors. UART input produced continuous valid
+NMEA, GNSS time set the system clock and the receiver progressed from
+`GPS_DETECTED` to a stable `GPS_FIX` outdoors after an approximately two-minute
+cold start. Support capacitors remain part of the recommended final assembly.
 
 Location MQTT topics are emitted only while the current fix is valid. Retained AWS
 coordinates may remain as last-known values when a fix disappears; consumers use

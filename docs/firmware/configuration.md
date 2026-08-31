@@ -19,6 +19,7 @@ targets retain Display-CAN as the default for their available input.
 | `mqttHost` / `mqttPort` | MQTT broker endpoint |
 | `mqttUser` / `mqttPass` | MQTT credentials |
 | `otaEnabled` / `otaPassword` | OTA configuration |
+| `motCloudEnabled` | C6-only runtime switch for provisioned MOT Cloud / AWS IoT |
 | `abrpEnabled` | Enables optional ABRP integration |
 | `offlineCacheEnabled` | C6-only, default-off SOC/active-Speed outage cache |
 | ABRP API key/token | ABRP credentials |
@@ -50,10 +51,20 @@ reports selection state without secret echo. A restart applies configuration
 changes made through the console.
 
 The canonical C6 builds load the same four per-device credential files from
-`/aws` in LittleFS as WROOM and LilyGO. `aws status` reports credential and
-connection state without printing key material.
+`/aws` in LittleFS as WROOM and LilyGO. Every distributed adapter may therefore
+remain AWS ready while `motCloudEnabled` independently controls whether it opens
+an AWS IoT connection. The setting defaults to enabled for backward compatibility.
+Disabling it does not delete certificates, keys or vehicle assignment. `aws
+status` reports disabled, credential and connection state without printing key
+material; `aws enable` and `aws disable` provide physical-console recovery.
 
-C6 ABRP is independently enabled at runtime and may operate alongside AWS IoT.
+C6 ABRP is independently enabled at runtime and may operate alongside AWS IoT or
+as the only active Internet telemetry service. When MOT Cloud is enabled and
+provisioned, ABRP waits while AWS reconnects to avoid competing TLS allocations;
+when MOT Cloud is disabled or unprovisioned, ABRP requires only working WiFi.
+Blank credential fields retain the stored API key and user token. The separately
+confirmed `Delete ABRP credentials` action disables ABRP and removes both values
+from NVS atomically; the physical-console equivalent is `abrp clear`.
 The API key and user token are stored in NVS, accepted only through authenticated
 same-origin configuration routes and omitted from normal backup exports and
 diagnostics. The local onboarding wizard records only its progress and completion
@@ -64,6 +75,9 @@ setup journey. Its WiFi, CAN and service forms use the same persisted configurat
 model as the later administration page. The protected AP stays available until
 explicit wizard completion; afterward the normal station-stability and fallback
 rules apply. This local state remains separate from portal/account onboarding.
+Unchanged WiFi and CAN forms continue without a needless reboot. Changing MOT
+Cloud state reboots before validation so credentials are loaded or the active AWS
+client is stopped consistently; the final completion itself applies immediately.
 
 Both C6 targets expose an authenticated `Offline History cache` option. It is
 off by default and records only SOC plus active one-minute Speed/terminal zero
@@ -72,6 +86,10 @@ It never stores GPS/location. XIAO is capped at 128 KiB and N16 at 256 KiB;
 reaching the cap stops new writes instead of rotating flash. Disabling the option
 or factory reset purges queued records. Configuration export includes only the
 boolean setting, never cached telemetry.
+
+When MOT Cloud is disabled, cache sampling and replay pause. Existing queued
+records are retained for a later re-enable; only explicitly disabling the cache,
+purging it or factory-resetting the adapter deletes them.
 
 GPS hardware is recommended, but not required, for cache deployments. The C6 GPS
 service already validates GNSS date/time and sets the shared system UTC clock;

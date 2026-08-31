@@ -118,6 +118,39 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         self.assertFalse(body["journeyEmailEnabled"])
         self.assertFalse(body["chargingStopEmailEnabled"])
         self.assertEqual(80, body["chargingStopThreshold"])
+        self.assertEqual(140, body["rangeKmAt100"])
+        self.assertEqual(0, body["rangeReserveSoc"])
+
+    def test_range_settings_are_persisted(self):
+        module, preference, _ = load_module()
+        result = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "rangeKmAt100": 220, "rangeReserveSoc": 15,
+        }), None)
+        self.assertEqual(200, result["statusCode"])
+        self.assertEqual(220, preference.item["rangeKmAt100"])
+        self.assertEqual(15, preference.item["rangeReserveSoc"])
+
+    def test_old_client_preserves_range_settings(self):
+        module, preference, _ = load_module({
+            "vehicleId": "pioneer", "userSub": "user-a",
+            "rangeKmAt100": 180, "rangeReserveSoc": 12,
+        })
+        result = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+        }), None)
+        self.assertEqual(200, result["statusCode"])
+        self.assertEqual(180, preference.item["rangeKmAt100"])
+        self.assertEqual(12, preference.item["rangeReserveSoc"])
+
+    def test_range_settings_are_bounded(self):
+        module, _, _ = load_module()
+        result = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "rangeKmAt100": 140, "rangeReserveSoc": 51,
+        }), None)
+        self.assertEqual(400, result["statusCode"])
+        self.assertEqual("invalid_range_reserve_soc", json.loads(result["body"])["error"])
 
     def test_get_reconciles_confirmed_sns_subscription(self):
         previous = {

@@ -24,6 +24,8 @@ struct MotBmsTelemetry {
     bool packStatusValid = false;
     bool packCurrentValid = false;
     bool cellVoltagesValid = false;
+    bool standardSocValid = false;
+    bool sohValid = false;
     uint32_t packVoltageMv = 0;
     int16_t packCurrentRaw = 0;
     float packCurrentA = NAN;
@@ -31,7 +33,8 @@ struct MotBmsTelemetry {
     float vehiclePowerW = NAN;
     bool isRegenerating = false;
     bool isDischarging = false;
-    uint8_t socPercent = 0;
+    float socPercent = NAN;
+    float sohPercent = NAN;
     uint8_t statusByte = 0;
     bool plugged = false;
     uint16_t cellVoltageAMv = 0;

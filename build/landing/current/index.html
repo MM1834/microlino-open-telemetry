@@ -1,48 +1,49 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#07111f">
   <meta name="description" content="Microlino Open Telemetry is an open-source, local-first telemetry platform for Microlino vehicles.">
   <title>Microlino Open Telemetry</title>
-  <link rel="stylesheet" href="css/site.css">
+  <link rel="stylesheet" href="css/site.css?v=20260829-4">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main" data-i18n="skip">Zum Inhalt springen</a>
   <header class="site-header">
     <a class="brand" href="#top" aria-label="Microlino Open Telemetry home">
       <img src="img/mot-logo.svg" alt="Microlino Open Telemetry">
     </a>
-    <nav aria-label="Primary navigation">
-      <a href="#architecture">Architecture</a>
-      <a href="#experience">Portal</a>
-      <a href="#onboarding">Quick start</a>
-      <a href="#status">Status</a>
+    <nav aria-label="Hauptnavigation" data-i18n-aria-label="navLabel">
+      <a href="#architecture" data-i18n="navArchitecture">Architektur</a>
+      <a href="onboarding/" data-i18n="navOnboarding">Onboarding</a>
+      <a href="#experience" data-i18n="navPortal">Portal</a>
+      <a href="#status" data-i18n="navStatus">Status</a>
     </nav>
-    <a class="button button-small" href="/dashboard/">Open dashboard</a>
+    <label class="language-picker"><span class="sr-only" data-i18n="language">Sprache</span><select id="language-select" aria-label="Sprache"><option value="de">DE</option><option value="en">EN</option><option value="fr">FR</option></select></label>
+    <a class="button button-small" href="/dashboard/" data-i18n="openDashboard">Dashboard öffnen</a>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <p class="eyebrow">The MOT experience</p>
-        <h1>Your Microlino. Always in view.</h1>
-        <p class="lead">Live vehicle data, secure access and bounded history in a responsive portal designed for desktop and mobile.</p>
+        <p class="eyebrow" data-i18n="heroEyebrow">Das MOT Erlebnis</p>
+        <h1 data-i18n="heroTitle">Dein Microlino. Immer im Blick.</h1>
+        <p class="lead" data-i18n="heroLead">Live-Fahrzeugdaten, sicherer Zugriff und begrenzte History in einem Portal für Desktop und Mobilgeräte.</p>
         <div class="actions">
-          <a class="button" href="/dashboard/">Open dashboard</a>
-          <a class="text-link" href="#architecture">Explore the architecture <span aria-hidden="true">↓</span></a>
+          <a class="button" href="/dashboard/" data-i18n="openDashboard">Dashboard öffnen</a>
+          <a class="text-link" href="#architecture"><span data-i18n="exploreArchitecture">Architektur entdecken</span> <span aria-hidden="true">↓</span></a>
         </div>
-        <ul class="hero-points" aria-label="Core principles">
-          <li>No vehicle control</li>
-          <li>Local operation remains available</li>
-          <li>Unique device identity</li>
+        <ul class="hero-points" aria-label="Grundprinzipien" data-i18n-aria-label="principlesLabel">
+          <li data-i18n="principlePassive">Keine Fahrzeugsteuerung</li>
+          <li data-i18n="principleLocal">Lokaler Betrieb bleibt verfügbar</li>
+          <li data-i18n="principleIdentity">Eindeutige Geräteidentität</li>
         </ul>
       </div>
-      <div class="hero-visual" aria-label="Stylized Microlino connected to telemetry signals">
+      <div class="hero-visual" aria-label="Stilisierter Microlino mit Telemetriesignalen" data-i18n-aria-label="heroVisualLabel">
         <div class="signal signal-one"></div>
         <div class="signal signal-two"></div>
-        <img src="img/microlino-outline.svg" alt="Microlino outline">
+        <img src="img/microlino-outline.svg" alt="Microlino-Silhouette" data-i18n-alt="microlinoAlt">
         <span class="telemetry-chip chip-can">2 × CAN</span>
         <span class="telemetry-chip chip-live">LIVE</span>
         <span class="telemetry-chip chip-soc">SOC 100%</span>
@@ -51,100 +52,109 @@
 
     <section class="section" id="architecture">
       <div class="section-heading">
-        <p class="eyebrow">One telemetry core · multiple services</p>
-        <h2>Built around clear trust boundaries.</h2>
-        <p>Vehicle data is decoded once at the edge. Local tools, the MOT cloud and ABRP remain separate service paths.</p>
+        <p class="eyebrow" data-i18n="architectureEyebrow">Ein Telemetrie-Kern · mehrere Dienste</p>
+        <h2 data-i18n="architectureTitle">Klare technische Vertrauensgrenzen.</h2>
+        <p data-i18n="architectureLead">Fahrzeugdaten werden einmal im Adapter dekodiert. Lokale Werkzeuge, MOT Cloud und ABRP bleiben getrennte Dienstpfade.</p>
       </div>
-      <div class="architecture" aria-label="Telemetry architecture">
+      <div class="architecture" aria-label="Telemetriearchitektur" data-i18n-aria-label="architectureLabel">
         <article class="architecture-card">
-          <span class="card-label">Vehicle</span>
+          <span class="card-label" data-i18n="vehicle">Fahrzeug</span>
           <img src="img/microlino-outline.svg" alt="">
-          <h3>Two passive CAN buses</h3>
-          <p>Display CAN and Standard CAN are read independently without controlling vehicle behaviour.</p>
+          <h3 data-i18n="vehicleTitle">Zwei passive CAN-Busse</h3>
+          <p data-i18n="vehicleText">Display CAN und Standard CAN werden unabhängig gelesen, ohne das Fahrzeug zu steuern.</p>
         </article>
         <span class="flow-arrow" aria-hidden="true">→</span>
         <article class="architecture-card card-highlight">
-          <span class="card-label">Edge device</span>
+          <span class="card-label" data-i18n="edgeDevice">Edge-Gerät</span>
           <span class="architecture-icon">▦</span>
-          <h3>MOT device</h3>
-          <p>ESP32-C6 dual-CAN pilot, ESP32-WROOM or LilyGO. Shared decoders, telemetry model and optional GPS.</p>
+          <h3 data-i18n="motDevice">MOT Adapter</h3>
+          <p data-i18n="deviceText">ESP32-C6 Dual-CAN, ESP32-WROOM oder LilyGO. Gemeinsame Decoder, Telemetriemodell und optionales GPS.</p>
         </article>
         <span class="flow-arrow" aria-hidden="true">→</span>
         <article class="architecture-card">
-          <span class="card-label">Secure cloud</span>
+          <span class="card-label" data-i18n="secureCloud">Sichere Cloud</span>
           <span class="architecture-icon">☁</span>
           <h3>AWS IoT</h3>
-          <p>MQTT/TLS with unique X.509 identity, live state, bounded history and APIs.</p>
+          <p data-i18n="cloudText">MQTT/TLS mit eindeutiger X.509-Identität, Live-Status, begrenzter History und APIs.</p>
         </article>
         <span class="flow-arrow" aria-hidden="true">→</span>
         <article class="architecture-card">
-          <span class="card-label">User service</span>
+          <span class="card-label" data-i18n="userService">Benutzerdienst</span>
           <span class="architecture-icon">▣</span>
-          <h3>Web portal</h3>
-          <p>Cognito sign-in, authorized vehicles and authenticated live telemetry.</p>
+          <h3 data-i18n="webPortal">Webportal</h3>
+          <p data-i18n="portalText">Cognito-Anmeldung, autorisierte Fahrzeuge und authentifizierte Live-Telemetrie.</p>
         </article>
       </div>
       <div class="direct-services">
         <article>
           <span class="service-dot local"></span>
-          <div><h3>Local WebUI</h3><p>Setup, diagnostics, recovery and local OTA — available without the cloud.</p></div>
+          <div><h3 data-i18n="localWebui">Lokale WebUI</h3><p data-i18n="localWebuiText">Einrichtung, Diagnose, Recovery und lokales OTA – ohne Cloud verfügbar.</p></div>
         </article>
         <article>
           <span class="service-dot abrp"></span>
-          <div><h3>Direct ABRP path</h3><p>Optional firmware-to-ABRP telemetry API over WiFi. The MOT portal is not in this path.</p></div>
+          <div><h3 data-i18n="abrpPath">Direkter ABRP-Pfad</h3><p data-i18n="abrpText">Optionale Telemetrie direkt vom Adapter zu ABRP über WLAN. Das MOT Portal liegt nicht in diesem Pfad.</p></div>
         </article>
       </div>
     </section>
 
+    <section class="section onboarding-teaser" id="access-flow">
+      <div class="section-heading">
+        <p class="eyebrow" data-i18n="flowEyebrow">Onboarding und Zugriff</p>
+        <h2 data-i18n="flowTitle">Wer verbindet sich wann womit?</h2>
+        <p data-i18n="flowLead">Der Adapter verbindet Fahrzeug, lokale Einrichtung und MOT Cloud. Der Benutzer verwendet je nach Phase einen anderen Zugriffsweg.</p>
+      </div>
+      <a class="button" href="onboarding/" data-i18n="openOnboarding">Onboarding-Grafik öffnen</a>
+    </section>
+
     <section class="section experience" id="experience">
       <div class="section-heading narrow">
-        <p class="eyebrow">Open-source vehicle telemetry</p>
-        <h2>From CAN bus to trusted insight.</h2>
-        <p>A modular, passive telemetry platform for Microlino — local-first, privacy-aware and securely cloud-connected.</p>
+        <p class="eyebrow" data-i18n="experienceEyebrow">Open-Source-Fahrzeugtelemetrie</p>
+        <h2 data-i18n="experienceTitle">Vom CAN-Bus zur vertrauenswürdigen Übersicht.</h2>
+        <p data-i18n="experienceLead">Eine modulare, passive Telemetrieplattform für Microlino – local-first, datenschutzbewusst und sicher mit der Cloud verbunden.</p>
       </div>
       <figure class="screenshot-frame">
-        <img src="img/dashboard-home.png" alt="MOT dashboard showing a Microlino and live telemetry values">
-        <figcaption>Portal layout shown with telemetry captured from the project Microlino Pioneer.</figcaption>
+        <img src="img/dashboard-home.png" alt="MOT Dashboard mit Microlino und Live-Telemetrie" data-i18n-alt="dashboardAlt">
+        <figcaption data-i18n="screenshotCaption">Portalansicht mit Telemetrie des Projektfahrzeugs Microlino Pioneer.</figcaption>
       </figure>
       <div class="feature-grid">
-        <article><strong>Live telemetry</strong><span>Two CAN buses, battery voltage/current/power, charging, speed and optional GPS</span></article>
-        <article><strong>Authorized access</strong><span>Server-side user-to-vehicle isolation</span></article>
-        <article><strong>Bounded history</strong><span>SOC, charging, plugged, speed and net power for 24 h, 7 d and 30 d</span></article>
+        <article><strong data-i18n="liveTelemetry">Live-Telemetrie</strong><span data-i18n="liveTelemetryText">Zwei CAN-Busse, Batteriespannung, Strom, Leistung, Laden, Geschwindigkeit und optionales GPS</span></article>
+        <article><strong data-i18n="authorizedAccess">Autorisierter Zugriff</strong><span data-i18n="authorizedAccessText">Serverseitige Trennung von Benutzern und Fahrzeugen</span></article>
+        <article><strong data-i18n="boundedHistory">Begrenzte History</strong><span data-i18n="boundedHistoryText">SOC, Laden, Steckerstatus, Geschwindigkeit und Nettoleistung für 24 h, 7 d und 30 d</span></article>
       </div>
-      <div class="field-evidence" aria-label="Validated Pioneer field data">
-        <article><span>Traction observed</span><strong>20.9 kW</strong><small>normal-road peak accepted by the decoder</small></article>
-        <article><span>Regeneration observed</span><strong>7.8 kW</strong><small>light braking on a controlled flat-road run</small></article>
-        <article><span>Charging observed</span><strong>1.8–3.2 kW</strong><small>multiple EVSE settings and charge taper</small></article>
-        <article><span>Dual-CAN reception</span><strong>0 errors</strong><small>simultaneous Pioneer Standard and Display CAN capture</small></article>
+      <div class="field-evidence" aria-label="Validierte Pioneer-Felddaten" data-i18n-aria-label="fieldEvidenceLabel">
+        <article><span data-i18n="tractionObserved">Traktion beobachtet</span><strong>20.9 kW</strong><small data-i18n="tractionText">Spitze im normalen Strassenbetrieb vom Decoder akzeptiert</small></article>
+        <article><span data-i18n="regenObserved">Rekuperation beobachtet</span><strong>7.8 kW</strong><small data-i18n="regenText">Leichtes Bremsen bei einer kontrollierten Fahrt</small></article>
+        <article><span data-i18n="chargingObserved">Laden beobachtet</span><strong>1.8–3.2 kW</strong><small data-i18n="chargingText">Mehrere EVSE-Einstellungen und Lade-Taper</small></article>
+        <article><span data-i18n="dualCanObserved">Dual-CAN-Empfang</span><strong data-i18n="zeroErrors">0 Fehler</strong><small data-i18n="dualCanText">Pioneer Standard CAN und Display CAN gleichzeitig erfasst</small></article>
       </div>
     </section>
 
     <section class="section" id="onboarding">
       <div class="section-heading">
-        <p class="eyebrow">Quick start · controlled beta</p>
-        <h2>Connect. Claim. Drive.</h2>
-        <p>A single-use claim binds a provisioned vehicle to an authenticated user. Device certificates remain on the device.</p>
+        <p class="eyebrow" data-i18n="quickEyebrow">Schnellstart · kontrollierte Beta</p>
+        <h2 data-i18n="quickTitle">Verbinden. Claim. Fahren.</h2>
+        <p data-i18n="quickLead">Ein einmaliger Claim verbindet ein vorbereitetes Fahrzeug mit einem authentifizierten Benutzer. Gerätezertifikate bleiben auf dem Adapter.</p>
       </div>
       <ol class="steps">
-        <li><span>1</span><h3>Receive</h3><p>Get the prepared device, beta account and expiring claim code.</p></li>
-        <li><span>2</span><h3>Sign in</h3><p>Open the dashboard and authenticate through Cognito with PKCE.</p></li>
-        <li><span>3</span><h3>Claim</h3><p>Enter the single-use proof. No device private key enters the browser.</p></li>
-        <li><span>4</span><h3>Authorize</h3><p>The backend atomically binds the vehicle to the signed-in user.</p></li>
-        <li><span>5</span><h3>Drive</h3><p>The portal shows only authorized live and historical telemetry.</p></li>
+        <li><span>1</span><h3 data-i18n="receive">Erhalten</h3><p data-i18n="receiveText">Vorbereiteten Adapter, Beta-Konto und zeitlich begrenzten Claim-Code erhalten.</p></li>
+        <li><span>2</span><h3 data-i18n="signIn">Anmelden</h3><p data-i18n="signInText">Dashboard öffnen und sicher über Cognito anmelden.</p></li>
+        <li><span>3</span><h3>Claim</h3><p data-i18n="claimText">Einmaligen Claim eingeben. Kein privater Geräteschlüssel gelangt in den Browser.</p></li>
+        <li><span>4</span><h3 data-i18n="authorize">Autorisieren</h3><p data-i18n="authorizeText">Das Backend verbindet das Fahrzeug atomar mit dem angemeldeten Benutzer.</p></li>
+        <li><span>5</span><h3 data-i18n="drive">Fahren</h3><p data-i18n="driveText">Das Portal zeigt nur autorisierte Live- und History-Daten.</p></li>
       </ol>
     </section>
 
     <section class="section" id="status">
       <div class="status-panel">
         <div>
-          <p class="eyebrow">Project status · 06 August 2026</p>
-          <h2>Dual-CAN pilot validated.</h2>
-          <p>The ESP32-C6 N16 received both Pioneer CAN buses, decoded battery energy flow and published live telemetry through WiFi and AWS IoT. ESP32-WROOM and LilyGO remain supported alternatives.</p>
+          <p class="eyebrow" data-i18n="statusEyebrow">Projektstatus · 29. August 2026</p>
+          <h2 data-i18n="statusTitle">RC.1-Pilot ist produktiv.</h2>
+          <p data-i18n="statusText">ESP32-C6-Adapter, sichere AWS-IoT-Telemetrie, autorisierte Portalzugriffe, Live-Daten und begrenzte History sind im kontrollierten Pilotbetrieb.</p>
         </div>
         <div class="status-list">
-          <p><span class="status-dot ready"></span><strong>Validated:</strong> two passive CAN inputs, Pioneer battery power, WiFi/AWS telemetry and portal history</p>
-          <p><span class="status-dot active"></span><strong>Pilot boundary:</strong> C6 N16 qualified; XIAO and long-duration operation remain limited</p>
-          <p><span class="status-dot next"></span><strong>Next:</strong> production wiring, enclosure, OTA parity and wider lifecycle gates</p>
+          <p><span class="status-dot ready"></span><span data-i18n="statusReady"><strong>Validiert:</strong> zwei passive CAN-Eingänge, Fahrzeugleistung, WLAN/AWS-Telemetrie und Portal-History</span></p>
+          <p><span class="status-dot active"></span><span data-i18n="statusBoundary"><strong>Pilotgrenze:</strong> kontrolliertes Benutzer- und Geräte-Onboarding mit administrativen Freigaben</span></p>
+          <p><span class="status-dot next"></span><span data-i18n="statusNext"><strong>Als Nächstes:</strong> Onboarding härten, Admin-Werkzeuge ergänzen und den Pilotbetrieb ausweiten</span></p>
         </div>
       </div>
     </section>
@@ -152,8 +162,9 @@
 
   <footer>
     <img src="img/mot-logo.svg" alt="Microlino Open Telemetry">
-    <p>Open source · Local-first · Privacy-aware</p>
-    <div><a href="mailto:support@microlino-open-telemetry.ch">Contact</a><a href="/dashboard/">Dashboard</a></div>
+    <p data-i18n="footerTagline">Open Source · Local-first · Datenschutzbewusst</p>
+    <div><a href="mailto:support@microlino-open-telemetry.ch" data-i18n="contact">Kontakt</a><a href="/dashboard/">Dashboard</a></div>
   </footer>
+  <script src="js/i18n.js?v=20260829-2"></script>
 </body>
 </html>

@@ -79,27 +79,36 @@ value, not by itself proof of active charging. The current threshold-derived
 behaviour and must be replaced or confirmed using controlled traces and an
 independent plugged/charging signal.
 
-Display-CAN `0x604` may provide `charging.plugged` only on a display-only
-installation. If either configured input uses Standard-CAN V1 Pioneer or V2, the
-dual-CAN input layer suppresses `0x604` for this field. Standard-CAN `bms.plugged` is
-then authoritative and supplies the canonical `charging.plugged` value; CAN input
-processing order cannot overwrite it with Display-CAN state.
+Display-CAN `0x603`/`0x604` may provide compatibility charging power/state and
+`charging.plugged` only on a display-only installation. If either configured
+input uses Standard-CAN V1 Pioneer or V2, the dual-CAN input layer suppresses
+both frames for charging telemetry. Standard-CAN then exclusively supplies the
+canonical plug, charge and compatibility-power values; CAN input processing
+order and stale Display-CAN fallback cannot overwrite them.
 
 ## Standard-CAN profiles
 
-`standard-can-v1-pioneer` now decodes the physically confirmed `0x18D` pack
-voltage, current scale, derived power and plug/charge states. It also exposes the
-observed but still provisional `0x4AD` cell pair. `standard-can-v2` has an
-independent decoder implementation. Its initial `0x18D`/`0x4AD` rules preserve
-the same evidence-backed pilot layout, but its constants and handlers are
-separate so V2 validation can change them without affecting Pioneer vehicles.
-The 0.3 A current scale, power sign and plug/charge interpretation remain
-provisional on V2 until independently measured on that vehicle generation.
+`standard-can-v1-pioneer` decodes the physically confirmed `0x18D` pack voltage,
+current scale, derived power and plug/charge states. It also exposes the observed
+but still provisional `0x4AD` cell pair. `standard-can-v2` is now an independent
+large-battery decoder based on the recovered source workbook and a 16,675-frame
+capture from that vehicle generation. It does not reuse the Pioneer `0x18D` or
+`0x4AD` layout.
 
-| CAN ID | Provisional Standard-CAN V2 values | Evidence status |
+| CAN ID | Standard-CAN V2 large-battery values | Evidence status |
 |---:|---|---|
-| `0x18D` | bytes 3–4 little-endian pack voltage in mV; byte 7 SOC in % | Observed on Pioneer; independent reference still pending |
-| `0x4AD` | bytes 0–1 and 2–3 little-endian cell voltages in mV; derived min/max/delta | Observed on Pioneer; independent reference still pending |
+| `0x1B0` | bytes 2–3 pack mV, 4–5 minimum cell mV, 6–7 maximum cell mV; all big-endian | Source workbook plus plausible 47.317–47.326 V and 3,635–3,643 mV live values |
+| `0x1B1` | bytes 0–1 SOC ×100 and 2–3 SOH ×100; big-endian | Source workbook plus stable 32.15% SOC and 97.01% SOH sample |
+| `0x2BA` | bytes 0–1 signed big-endian battery current ×10 | Flespi source explicitly uses signed 16-bit big-endian; stationary sample -1.9 to -2.1 A supports `/10` |
+| `0x18D` | retained as raw discovery data only | Large-battery payload is incompatible with Pioneer scaling |
+| `0x4AD` | not decoded | Absent from both available large-battery captures |
+
+Pack power is derived from `0x2BA` current and fresh `0x1B0` voltage. Negative
+current in the stationary capture is consistent with pack discharge, so vehicle
+power retains the MOT convention `vehiclePower = -packPower`. The current sign
+still requires a controlled traction/regeneration/charging comparison. No V2
+plugged or active-charging state is inferred yet. Display-CAN `0x602` remains the
+AWS `display/soc` source; the separately decoded BMS SOC never overwrites it.
 
 The full measurement table, plausibility boundary and AWS topic contract are in
 [Pioneer Standard-CAN decoder](pioneer-standard-can.md).

@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-20
+**Last reviewed:** 2026-08-29
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
@@ -79,6 +79,25 @@ Later user settings may include account presentation preferences, time zone,
 privacy/retention choices and other per-vehicle services. Define one versioned API
 and storage model rather than adding unrelated settings to Cognito attributes or
 static portal configuration.
+
+RNG-SET-001 adds the first non-notification preferences to the existing compact
+settings card: full-range basis and desired SOC reserve. As a follow-up, move the
+growing settings surface to a dedicated authenticated page with preserved vehicle
+selection and an explicit button back to the standard dashboard page. Keep the
+same versioned per-user/per-vehicle storage contract during that layout change.
+
+Before changing the personal range-learning formula, collect comparable field
+evidence from several pilot vehicles with different battery capacities and usage
+profiles. Record configured full-range basis and SOC reserve, distance and SOC
+consumption per accepted segment, learned and fixed-SOC forecasts, temperature
+and relevant heating/air-conditioning use. The first `xrpioneer2` review produced
+151.2 km over 93 consumed SOC points and therefore a fully learned 162.6 km
+100%-equivalent despite its configured 120 km basis; one short 8 km / 3 SOC-point
+segment was noisy but did not explain the overall result. Keep the deployed
+formula unchanged while gathering evidence. After the cross-vehicle review,
+decide explicitly whether small segments need stronger weighting limits, whether
+confidence should increase more slowly, or whether the learned value needs a
+vehicle/battery-specific bound relative to the configured basis.
 
 Administrator functions must remain a separate least-privilege surface. A future
 admin UI may expose inventory, invitation/claim state, roles, delivery health and
@@ -293,6 +312,14 @@ Extend OBD/CAN decoding to additional vehicle models after obtaining verified
 traces and choosing the required hardware interface. Preserve passive monitoring
 and record signal confidence.
 
+For every supported model and battery variant, validate SOC, traction,
+regeneration, charging power and range scaling against controlled vehicle
+observations. For the Standard-CAN V2 decoder, treat `charging/plugged` and
+`charging/is_charging` from Standard CAN as an explicit release gate: capture
+unplugged, plugged-idle, active-charging and charge-stop transitions before those
+signals are considered verified or used as authoritative notification and journey
+boundaries.
+
 Hardware options previously requiring evaluation:
 
 - rewire pins 1 and 9 of the current module to standard CAN;
@@ -376,6 +403,17 @@ along interference sources. Record the selected cable length and adapter positio
 as part of pilot-installation evidence rather than assuming one position suits
 all vehicles.
 
+For the small-series enclosure, define a keyed GNSS-antenna pocket or bracket
+that makes reverse installation difficult: the free ceramic patch face must be
+parallel to the horizon and face the windscreen/sky, while the documented
+ground-plane/PCB/cable or adhesive face points into the enclosure. Do not encode
+orientation as a colour rule because supplier batches and adhesive pads can
+change. Incoming inspection must identify the antenna part/revision; first-article
+validation must compare time to first fix, satellite count and reception quality
+in the intended enclosure and vehicle location. Mark the enclosure drawing with
+`GNSS SKY SIDE` and keep metal, metallized coatings, batteries, PCBs and cable
+bundles outside the required clearance volume.
+
 ## Vehicle adapter power supply
 
 Turn the existing pilot wiring guidance into a qualified unattended power-input
@@ -417,6 +455,23 @@ the same option.
 Create a versioned vehicle-profile model with traceable signal evidence, firmware
 compatibility and safe fallback behaviour for unknown models.
 
+### Display unit setting and canonical distance units
+
+Determine whether selecting miles in the Microlino instrument display changes
+only the visible cluster presentation or also changes the raw Display-CAN `0x602`
+speed and odometer values. The current decoder unconditionally interprets byte 1
+as `km/h × 2` and the odometer field as `km × 1024`; the Standard-CAN profiles do
+not currently provide an independent speed or odometer signal.
+
+Record matched passive traces with the vehicle set once to kilometres and once to
+miles, including stationary odometer samples and a GPS-referenced drive. Compare
+the complete `0x602` payload and scan Standard-CAN for a stable kilometre-based
+speed/odometer source if the display bus changes units. Keep the canonical MOT
+contract in `km/h` and `km`: any unit-dependent source must be detected and
+normalized before telemetry, History, range learning or ABRP consumption. Do not
+infer the unit from the numeric magnitude alone. Preserve the raw-frame evidence,
+vehicle/display setting and firmware revision with the acceptance record.
+
 ## Beta support tooling
 
 Evaluate privacy-conscious support bundles, device health summaries and audit-safe
@@ -447,6 +502,54 @@ Reassess Device Shadows, ABRP over the shared LilyGO LTE/TLS transport and other
 external services only after the beta identity, authorization and connectivity
 foundations are reliable. SOC notification processing is tracked separately above
 because it is a plausible bounded pilot feature.
+
+### Secure local MQTT and Smart-Home integration
+
+Restore an optional local MQTT output in the shared C6 firmware so a user can
+consume vehicle telemetry on a broker in the home network without depending on
+MOT Cloud. The older configurable legacy-MQTT path is implementation evidence,
+not an acceptable security baseline: the new path must be disabled by default and
+must not offer plaintext MQTT.
+
+Required security and lifecycle behavior:
+
+- require TLS with broker-hostname verification and a user-supplied trust anchor;
+  do not provide an `insecure` certificate-bypass mode;
+- authenticate every device with either a dedicated broker username/password or
+  a dedicated client certificate and private key. TLS server validation is
+  mandatory in both cases, and anonymous access is prohibited;
+- keep local-broker credentials separate from AWS IoT credentials, redact them
+  from status, logs and configuration exports, preserve stored secrets when an
+  authenticated form is submitted blank, and provide an explicit confirmed
+  delete/replace operation;
+- use a unique client ID and least-privilege broker ACL restricted to the selected
+  `mot/<vehicleId>/#` publish namespace. Local MQTT is telemetry output only and
+  must not create a generic command/control subscription;
+- allow MOT Cloud, local MQTT and ABRP to be enabled independently. Failure or
+  backoff of one service must not block CAN processing or the other services;
+- define bounded reconnect behavior, retained-state, Birth/Last-Will, freshness
+  metadata and payload types from the canonical MQTT topic contract, including a
+  versioned migration path where legacy and AWS boolean encodings differ;
+- document certificate upload, CA/server-certificate rotation and recovery from
+  expiry or broker replacement without requiring a firmware rebuild.
+
+The first consumer acceptance path should use the Home Assistant MQTT integration
+with a local Mosquitto broker and explicit entity mapping for SOC, range, charging,
+plugged, speed, power, odometer and online/freshness state. Prefer MQTT Discovery
+only after its stable unique IDs, device grouping, units, device/state classes,
+availability topic and retained discovery lifecycle have contract tests; manual
+configuration is the safer initial pilot. Verify the same broker contract with an
+ioBroker MQTT client/adapter. Neither integration may require AWS device
+certificates or expose the device-local HTTP API to another network.
+
+Separately evaluate a cloud-side Smart-Home adapter for users who cannot reach the
+vehicle's LAN broker. It should consume the authenticated Vehicle REST API for
+snapshot/history and the authorized WebSocket API for live updates through a
+documented OAuth/Cognito flow; copying a portal access token into long-lived
+configuration is not an acceptable product interface. Decide whether to publish
+an official Home Assistant integration, a small user-operated bridge, or a
+versioned external API only after token refresh, revocation, rate limits, data
+minimization and support ownership are defined.
 
 ## LilyGO cellular-path replacement
 

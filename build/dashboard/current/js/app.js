@@ -8,6 +8,7 @@
     ? window.MOTAuth.create({ config: cfg.auth || {} })
     : null;
   const $ = (id) => document.getElementById(id);
+  const activeLocale = () => window.MOT_I18N?.locale || dashboardCfg.locale || 'de-CH';
   const state = {
     lastMessage: 0,
     values: {},
@@ -27,7 +28,10 @@
     notificationBusy: false,
     notificationVehicleId: null,
     notificationReadOnly: false,
-    rangeForecast: null
+    smsNotificationStatus: null,
+    rangeForecast: null,
+    rangeKmAt100: Number(vehicleCfg.defaultRangeKmAt100 || 140),
+    rangeReserveSoc: 0
   };
 
 
@@ -137,7 +141,7 @@
     try {
       const result = await state.dataProvider.issueClaim(vehicleId);
       if (output) { output.textContent = result.claim || ''; output.hidden = false; }
-      renderOnboardingAdmin(`Claim für ${result.vehicleId} erstellt; gültig bis ${new Date(result.expiresAt * 1000).toLocaleString()}.`);
+      renderOnboardingAdmin(`Claim für ${result.vehicleId} erstellt; gültig bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())}.`);
     } catch (error) {
       renderOnboardingAdmin(error?.message || 'Claim-Ausgabe fehlgeschlagen');
     } finally {
@@ -368,7 +372,7 @@
   }
 
   function formatFreshnessTime(timestampMs) {
-    return new Intl.DateTimeFormat(dashboardCfg.locale || 'de-CH', {
+    return new Intl.DateTimeFormat(activeLocale(), {
       hour: '2-digit',
       minute: '2-digit'
     }).format(new Date(timestampMs));
@@ -506,8 +510,8 @@
   }
   function updateClock() {
     const d = new Date();
-    setText('date-now', d.toLocaleDateString(cfg.dashboard?.locale || 'de-CH'));
-    setText('time-now', d.toLocaleTimeString(cfg.dashboard?.locale || 'de-CH'));
+    setText('date-now', d.toLocaleDateString(activeLocale()));
+    setText('time-now', d.toLocaleTimeString(activeLocale()));
     updateVehicleStatus();
     updateSocFreshness();
     updatePowerFreshness();
@@ -526,17 +530,24 @@
   }
   function renderRangeForecast() {
     const soc = Number(state.values['display/soc']);
-    const maxRange = Number(vehicleCfg.defaultRangeKmAt100 || 140);
+    const maxRange = Number(state.rangeKmAt100 || vehicleCfg.defaultRangeKmAt100 || 140);
+    const reserveSoc = Math.max(0, Math.min(50, Number(state.rangeReserveSoc || 0)));
     if (!Number.isFinite(soc)) return;
-    const standardRange = Math.round(maxRange * soc / 100);
+    const usableSoc = Math.max(0, soc - reserveSoc);
+    const standardRange = Math.round(maxRange * usableSoc / 100);
     const forecast = state.rangeForecast;
-    const learned = Number(forecast?.effectiveKmPerSoc);
+    const historical = Number(forecast?.historicalKmPerSoc);
+    const confidence = Math.max(0, Math.min(1, Number(forecast?.confidence)));
+    const learned = Number.isFinite(historical) && Number.isFinite(confidence)
+      ? confidence * historical + (1 - confidence) * maxRange / 100
+      : Number(forecast?.effectiveKmPerSoc);
     const hasForecast = Number.isFinite(learned) && Number(forecast?.tripCount) > 0;
-    const displayedRange = hasForecast ? Math.round(soc * learned) : standardRange;
+    const displayedRange = hasForecast ? Math.round(usableSoc * learned) : standardRange;
+    const reserveLabel = reserveSoc > 0 ? ` · bis ${reserveSoc}%` : '';
     setText('range-main', `${displayedRange} km`);
     setText('range-forecast-main', `${displayedRange} km`);
-    setText('range-method', hasForecast ? 'Persönliche Prognose' : `Nach SoC · Basis ${maxRange} km`);
-    setText('range-soc-comparison', `Nach SoC: ${standardRange} km`);
+    setText('range-method', hasForecast ? `Persönliche Prognose${reserveLabel}` : `Nach SoC · Basis ${maxRange} km${reserveLabel}`);
+    setText('range-soc-comparison', `Nach SoC: ${standardRange} km · Basis ${maxRange} km${reserveLabel}`);
     setText('range-forecast-basis', hasForecast
       ? `Basierend auf ${fmtNum(forecast.distanceKm, 0)} km · ${forecast.tripCount} ${Number(forecast.tripCount) === 1 ? 'Fahrt' : 'Fahrten'}`
       : 'Noch keine ausreichende Fahrhistorie');
@@ -544,6 +555,12 @@
   window.addEventListener('mot-range-forecast', event => {
     state.rangeForecast = event.detail || null;
     renderRangeForecast();
+  });
+  window.addEventListener('mot-language-change', () => {
+    updateClock();
+    renderRangeForecast();
+    updateDeviceInfo();
+    window.MOTHistoryChart?.render?.();
   });
   function locationReceivedAtMs() {
     const latMeta =
@@ -566,7 +583,7 @@
     const date = new Date(timestampMs);
     if (Number.isNaN(date.getTime())) return 'Zeitpunkt nicht verfügbar';
 
-    return new Intl.DateTimeFormat(dashboardCfg.locale || 'de-CH', {
+    return new Intl.DateTimeFormat(activeLocale(), {
       dateStyle: 'short',
       timeStyle: 'medium'
     }).format(date);
@@ -807,6 +824,8 @@ function resetDashboardForVehicle(vehicleId) {
   state.vehicleLastSeenMs = 0;
   state.vehicleLastSeenSource = '';
   state.rangeForecast = null;
+  state.rangeKmAt100 = Number(vehicleCfg.defaultRangeKmAt100 || 140);
+  state.rangeReserveSoc = 0;
 
   setText('side-vehicle', vehicleId || '--');
   setText('side-topic', vehicleId ? `${baseTopic(vehicleId)}/#` : '--');
@@ -917,6 +936,11 @@ function renderNotificationPreferences(preferences = null, message = '') {
     $('notification-journey-email-enabled').checked = preferences.journeyEmailEnabled === true;
     $('notification-charging-stop-email-enabled').checked = preferences.chargingStopEmailEnabled === true;
     $('notification-charging-stop-threshold').value = Number(preferences.chargingStopThreshold || 80);
+    state.rangeKmAt100 = Number(preferences.rangeKmAt100 || vehicleCfg.defaultRangeKmAt100 || 140);
+    state.rangeReserveSoc = Number(preferences.rangeReserveSoc || 0);
+    $('range-km-at-100').value = state.rangeKmAt100;
+    $('range-reserve-soc').value = state.rangeReserveSoc;
+    renderRangeForecast();
     $('notification-email').value = preferences.email || '';
     $('notification-email-state').textContent = preferences.emailConfirmed
       ? 'E-Mail-Adresse bestätigt'
@@ -924,16 +948,52 @@ function renderNotificationPreferences(preferences = null, message = '') {
     $('notification-email').dataset.confirmedEmail = preferences.emailConfirmed === true
       ? String(preferences.email || '').trim().toLowerCase()
       : '';
+    $('notification-sms-enabled').checked = preferences.smsEnabled === true;
     updateEmailConfirmationHelp();
   }
   const disabled = state.notificationBusy || state.notificationReadOnly;
   ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
     'notification-journey-email-enabled', 'notification-charging-stop-email-enabled',
-    'notification-charging-stop-threshold', 'notification-email',
-    'notification-save'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
+    'notification-charging-stop-threshold', 'notification-email', 'notification-sms-phone',
+    'range-km-at-100', 'range-reserve-soc', 'notification-save'
+  ].forEach(id => { if ($(id)) $(id).disabled = disabled; });
+  renderSmsNotificationStatus();
   $('notification-status').textContent = state.notificationReadOnly
     ? 'Demo-Zugang: Benachrichtigungen sind deaktiviert.'
     : message;
+}
+
+function renderSmsNotificationStatus() {
+  const status = state.smsNotificationStatus;
+  const readOnly = state.notificationReadOnly;
+  const busy = state.notificationBusy;
+  if (!status) {
+    $('notification-sms-state').textContent = state.smsNotificationError
+      ? 'SMS-Status vorübergehend nicht verfügbar.'
+      : 'Mobilnummer noch nicht bestätigt.';
+  } else {
+    if (status.phoneE164 && !$('notification-sms-phone').value) {
+      $('notification-sms-phone').value = status.phoneE164;
+    }
+    const label = status.verificationStatus !== 'VERIFIED'
+      ? (status.verificationStatus === 'PENDING'
+        ? 'Bestätigungscode ausstehend.'
+        : 'Mobilnummer noch nicht bestätigt.')
+      : (status.smsApproved
+        ? 'Mobilnummer bestätigt und administrativ freigegeben.'
+        : 'Mobilnummer bestätigt; administrative Freigabe ausstehend.');
+    $('notification-sms-state').textContent = label;
+    $('notification-sms-enabled').checked = status.smsEnabled === true;
+  }
+  const verified = status?.verificationStatus === 'VERIFIED';
+  const phoneUnchanged = String($('notification-sms-phone').value || '').trim()
+    === String(status?.phoneE164 || '');
+  $('notification-sms-request').disabled = busy || readOnly;
+  $('notification-sms-confirm').disabled = busy || readOnly || status?.verificationStatus !== 'PENDING';
+  $('notification-sms-code').disabled = busy || readOnly || status?.verificationStatus !== 'PENDING';
+  $('notification-sms-confirmation-fields').hidden = status?.verificationStatus !== 'PENDING';
+  $('notification-sms-enabled').disabled = busy || readOnly || status?.smsReady !== true || !phoneUnchanged;
+  if (!verified || !phoneUnchanged) $('notification-sms-enabled').checked = false;
 }
 
 function updateEmailConfirmationHelp() {
@@ -953,16 +1013,26 @@ async function loadNotificationPreferences(force = false) {
   if (!state.dataProvider?.getNotificationPreferences || !state.selectedVehicleId) return;
   if (!force && state.notificationVehicleId === state.selectedVehicleId) return;
   state.notificationBusy = true;
+  state.smsNotificationStatus = null;
+  state.smsNotificationError = '';
   renderNotificationPreferences(null, 'Einstellungen werden geladen…');
-  try {
-    const preferences = await state.dataProvider.getNotificationPreferences();
-    state.notificationVehicleId = state.selectedVehicleId;
-    state.notificationBusy = false;
-    renderNotificationPreferences(preferences, '');
-  } catch (error) {
-    state.notificationBusy = false;
-    renderNotificationPreferences(null, error?.message || 'Einstellungen konnten nicht geladen werden');
+  const [preferencesResult, smsResult] = await Promise.allSettled([
+    state.dataProvider.getNotificationPreferences(),
+    state.dataProvider.getSmsNotificationStatus?.() || Promise.resolve(null)
+  ]);
+  const preferences = preferencesResult.status === 'fulfilled' ? preferencesResult.value : null;
+  if (smsResult.status === 'fulfilled') {
+    state.smsNotificationStatus = smsResult.value;
+  } else {
+    state.smsNotificationError = smsResult.reason?.message || 'SMS-Status nicht verfügbar';
   }
+  if (preferences || state.smsNotificationStatus) state.notificationVehicleId = state.selectedVehicleId;
+  state.notificationBusy = false;
+  const partialFailure = preferencesResult.status === 'rejected' || smsResult.status === 'rejected';
+  renderNotificationPreferences(
+    preferences,
+    partialFailure ? 'Ein Teil der Einstellungen ist vorübergehend nicht verfügbar.' : ''
+  );
 }
 
 async function saveNotificationPreferences(event) {
@@ -976,24 +1046,74 @@ async function saveNotificationPreferences(event) {
     renderNotificationPreferences(null, 'Für Ladestopp-Meldungen zuerst den E-Mail-Kanal aktivieren.');
     return;
   }
+  const requestedPreferences = {
+    enabled: $('notification-enabled').checked,
+    threshold: Number($('notification-threshold').value),
+    emailEnabled: $('notification-email-enabled').checked,
+    journeyEmailEnabled: $('notification-journey-email-enabled').checked,
+    chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked,
+    chargingStopThreshold: Number($('notification-charging-stop-threshold').value),
+    rangeKmAt100: Number($('range-km-at-100').value),
+    rangeReserveSoc: Number($('range-reserve-soc').value),
+    email: String($('notification-email').value || '').trim(),
+    phoneE164: String($('notification-sms-phone').value || '').trim(),
+    smsEnabled: $('notification-sms-enabled').checked
+  };
   state.notificationBusy = true;
   renderNotificationPreferences(null, 'Wird gespeichert…');
   try {
-    const preferences = await state.dataProvider.saveNotificationPreferences({
-      enabled: $('notification-enabled').checked,
-      threshold: Number($('notification-threshold').value),
-      emailEnabled: $('notification-email-enabled').checked,
-      journeyEmailEnabled: $('notification-journey-email-enabled').checked,
-      chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked,
-      chargingStopThreshold: Number($('notification-charging-stop-threshold').value),
-      email: String($('notification-email').value || '').trim(),
-      smsEnabled: false
-    });
+    const responsePreferences = await state.dataProvider.saveNotificationPreferences(requestedPreferences);
+    const preferences = {
+      ...requestedPreferences,
+      ...responsePreferences,
+      rangeKmAt100: responsePreferences?.rangeKmAt100 ?? requestedPreferences.rangeKmAt100,
+      rangeReserveSoc: responsePreferences?.rangeReserveSoc ?? requestedPreferences.rangeReserveSoc
+    };
+    if (state.smsNotificationStatus) {
+      state.smsNotificationStatus.smsEnabled = preferences.smsEnabled === true;
+    }
     state.notificationBusy = false;
     renderNotificationPreferences(preferences, 'Gespeichert');
   } catch (error) {
     state.notificationBusy = false;
     renderNotificationPreferences(null, error?.message || 'Speichern fehlgeschlagen');
+  }
+}
+
+async function requestSmsVerification() {
+  if (state.notificationBusy || state.notificationReadOnly || !state.dataProvider?.requestSmsVerification) return;
+  state.notificationBusy = true;
+  renderNotificationPreferences(null, 'Bestätigungscode wird angefordert…');
+  try {
+    state.smsNotificationStatus = await state.dataProvider.requestSmsVerification(
+      String($('notification-sms-phone').value || '').trim()
+    );
+    state.notificationBusy = false;
+    renderNotificationPreferences(null, state.smsNotificationStatus.verificationStatus === 'VERIFIED'
+      ? 'Bereits bestätigte Mobilnummer übernommen.'
+      : 'Bestätigungscode gesendet.');
+  } catch (error) {
+    state.notificationBusy = false;
+    renderNotificationPreferences(null, error?.status === 429
+      ? 'Bitte mindestens 60 Sekunden bis zum nächsten Code warten.'
+      : (error?.message || 'Bestätigungscode konnte nicht gesendet werden.'));
+  }
+}
+
+async function confirmSmsVerification() {
+  if (state.notificationBusy || state.notificationReadOnly || !state.dataProvider?.confirmSmsVerification) return;
+  state.notificationBusy = true;
+  renderNotificationPreferences(null, 'Code wird geprüft…');
+  try {
+    state.smsNotificationStatus = await state.dataProvider.confirmSmsVerification(
+      String($('notification-sms-code').value || '').trim()
+    );
+    $('notification-sms-code').value = '';
+    state.notificationBusy = false;
+    renderNotificationPreferences(null, 'Mobilnummer bestätigt.');
+  } catch (error) {
+    state.notificationBusy = false;
+    renderNotificationPreferences(null, error?.message || 'Code konnte nicht bestätigt werden.');
   }
 }
 
@@ -1085,6 +1205,14 @@ function startDataProvider() {
   $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
   $('notification-form')?.addEventListener('submit', saveNotificationPreferences);
   $('notification-email')?.addEventListener('input', updateEmailConfirmationHelp);
+  $('notification-sms-request')?.addEventListener('click', requestSmsVerification);
+  $('notification-sms-confirm')?.addEventListener('click', confirmSmsVerification);
+  $('notification-sms-phone')?.addEventListener('input', () => {
+    const changed = String($('notification-sms-phone').value || '').trim()
+      !== String(state.smsNotificationStatus?.phoneE164 || '');
+    if (changed) $('notification-sms-enabled').checked = false;
+    renderSmsNotificationStatus();
+  });
   async function bootstrap() {
     initStatic();
     resetDashboardForVehicle(state.selectedVehicleId);

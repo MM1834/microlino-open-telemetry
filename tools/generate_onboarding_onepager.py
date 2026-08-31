@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the German MOT pilot onboarding one-pager."""
+"""Generate the authoritative German and translated MOT pilot one-pagers."""
 
 from pathlib import Path
 
@@ -176,3 +176,5 @@ def generate() -> None:
 
 if __name__ == "__main__":
     generate()
+    from generate_onboarding_onepager_translations import generate_translations
+    generate_translations()

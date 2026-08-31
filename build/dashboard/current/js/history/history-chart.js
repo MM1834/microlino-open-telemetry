@@ -16,6 +16,7 @@ async function init(){
   await render(currentRangeHours);
   window.addEventListener("mot-history-sample",()=>render(currentRangeHours));
   window.addEventListener("mot-history-cleared",()=>render(currentRangeHours));
+  window.addEventListener("mot-language-change",()=>render(currentRangeHours));
 }
 
 async function render(hours=currentRangeHours){
@@ -330,7 +331,7 @@ function updateSpeedStatus(samples,field,resolutionSeconds){
   const intervalMs=Math.max(60,Number(resolutionSeconds)||300)*1000;
   const last=points[points.length-1];
   const stale=Date.now()-last.ts>intervalMs*1.5;
-  const time=new Date(last.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  const time=new Date(last.ts).toLocaleTimeString(activeLocale(),{hour:"2-digit",minute:"2-digit"});
   status.textContent=stale
     ?`Nicht aktuell · letzter Messpunkt ${time} (Stillstand oder offline)`
     :`Aktuell · letzter Messpunkt ${time}`;
@@ -348,7 +349,7 @@ function updatePowerStatus(points,resolutionSeconds){
   const intervalMs=Math.max(60,Number(resolutionSeconds)||300)*1000;
   const last=points[points.length-1];
   const stale=Date.now()-last.ts>intervalMs*1.5;
-  const time=new Date(last.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  const time=new Date(last.ts).toLocaleTimeString(activeLocale(),{hour:"2-digit",minute:"2-digit"});
   status.textContent=stale
     ?`Nicht aktuell · letzter Messpunkt ${time} (Stillstand oder offline)`
     :`Aktuell · letzter Messpunkt ${time}`;
@@ -480,7 +481,7 @@ function draw(canvas,points,o){
 
 function formatAxisTime(timestamp,rangeHours=24){
   const date=new Date(timestamp);
-  const locale=window.MOT_CONFIG?.dashboard?.locale||"de-CH";
+  const locale=activeLocale();
   if(rangeHours<=24){
     return date.toLocaleTimeString(locale,{hour:"2-digit",minute:"2-digit"});
   }
@@ -541,6 +542,10 @@ function getVehicleId(){
 
 function formatResolution(seconds){
   return seconds<3600?`${Math.round(seconds/60)} min`:`${Math.round(seconds/3600)} h`;
+}
+
+function activeLocale(){
+  return window.MOT_I18N?.locale||window.MOT_CONFIG?.dashboard?.locale||"de-CH";
 }
 
 window.MOTHistoryChart={init,render,closeInactiveGaps,binaryStepPath,historyDisplayPower,formatSignedPower};

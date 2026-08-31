@@ -58,6 +58,7 @@ flowchart LR
 | nanoESP32-C6-N16 + two CAN transceivers | Qualified pilot candidate | Simultaneous Pioneer dual-CAN, WiFi/AWS and portal path validated; production wiring/soak/WebUI/OTA open |
 | Seeed XIAO ESP32-C6 | Compatibility candidate | 4 MB flash and GPS validated; vehicle dual-CAN/AWS run not completed |
 | L76K GPS | Verified | Valid GPS fix and location telemetry |
+| DA37+DA10 GNSS | Preferred C6 pilot module | B025 validated NMEA, GNSS time and stable outdoor fix; separate antenna supports enclosed receiver placement |
 | Microlino Pioneer | Verified | Project vehicle for field tests |
 
 ## ESP32-C6 pilot result

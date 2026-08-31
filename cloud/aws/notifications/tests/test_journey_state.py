@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from journey_state import (  # noqa: E402
-    INACTIVITY_TIMEOUT_MS, JourneyState, STOP_DELAY_MS,
+    CHARGING_MOVEMENT_GUARD_MS, INACTIVITY_TIMEOUT_MS, JourneyState, STOP_DELAY_MS,
     apply_inactivity_timeout, apply_journey_update, clear_journey,
     summarize_journey,
 )
@@ -105,6 +105,30 @@ class JourneyStateTests(unittest.TestCase):
         self.assertEqual("Firmware-Zähler", summary.source_flag)
         self.assertAlmostEqual(0.6, summary.energy_net_kwh)
 
+    def test_drawn_and_regen_counters_derive_net_without_net_topic(self):
+        state = self.eligible_estimate()
+        state = self.update(state, "journey/energy_counter_id", "boot-8-trip-2", 33_100)
+        state = self.update(state, "journey/energy_drawn_wh", 750, 33_110)
+        state = self.update(state, "journey/energy_regen_wh", 150, 33_120)
+        summary, reason = summarize_journey(state, state.stopped_at + STOP_DELAY_MS)
+        self.assertEqual("eligible", reason)
+        self.assertEqual("firmware_counter", summary.energy_source)
+        self.assertAlmostEqual(0.75, summary.energy_drawn_kwh)
+        self.assertAlmostEqual(0.15, summary.energy_regen_kwh)
+        self.assertAlmostEqual(0.6, summary.energy_net_kwh)
+
+    def test_stale_firmware_checkpoint_falls_back_to_estimate(self):
+        state = self.eligible_estimate()
+        state = self.update(state, "journey/energy_counter_id", "boot-8-trip-3", 32_000)
+        state = self.update(state, "journey/energy_drawn_wh", 750, 32_010)
+        state = self.update(state, "journey/energy_regen_wh", 150, 32_020)
+        state = self.update(state, "display/speed_kmh", 20, 34_000)
+        state = self.update(state, "display/speed_kmh", 0, 34_020)
+        summary, reason = summarize_journey(state, state.stopped_at + STOP_DELAY_MS)
+        self.assertEqual("eligible", reason)
+        self.assertEqual("telemetry_estimate", summary.energy_source)
+        self.assertEqual("Telemetrie-Schätzung", summary.source_flag)
+
     def test_counter_change_falls_back_to_estimate(self):
         state = self.eligible_estimate()
         state = self.update(state, "journey/energy_counter_id", "one", 33_100)
@@ -121,10 +145,28 @@ class JourneyStateTests(unittest.TestCase):
         state = self.update(state, "display/odometer_km", 104, 33_000)
         state = self.update(state, "display/soc", 77, 33_010)
         state = self.update(state, "charging/is_charging", True, 33_015)
-        summary, reason = summarize_journey(state, 33_015)
+        self.assertFalse(state.charging_after_stop)
+        accepted_at = state.last_moving_at + CHARGING_MOVEMENT_GUARD_MS
+        state = self.update(state, "charging/is_charging", True, accepted_at)
+        summary, reason = summarize_journey(state, accepted_at)
         self.assertIsNotNone(summary)
         self.assertEqual("eligible", reason)
         self.assertTrue(state.charging_after_stop)
+
+    def test_standard_can_charging_after_speed_zero_is_immediate(self):
+        state = self.eligible_estimate()
+        state = self.update(state, "charging/plugged", True, 34_000)
+        self.assertTrue(state.charging_after_stop)
+        self.assertEqual("speed_zero", state.stop_trigger)
+
+    def test_charging_glitch_during_recent_movement_does_not_split_journey(self):
+        state = self.started()
+        state = self.update(state, "display/speed_kmh", 60, 62_000)
+        unchanged = self.update(state, "charging/plugged", True, 62_500)
+        self.assertEqual(state, unchanged)
+        resumed = self.update(unchanged, "display/speed_kmh", 50, 122_000)
+        self.assertEqual(state.active_id, resumed.active_id)
+        self.assertFalse(resumed.charging_after_stop)
 
     def test_charging_after_stop_does_not_reject_completed_journey(self):
         state = self.eligible_estimate()

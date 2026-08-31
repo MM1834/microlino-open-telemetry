@@ -17,6 +17,14 @@ It is a static, dependency-free website intended for the root of
 `https://www.microlino-open-telemetry.ch/`. The authenticated portal remains a
 separate application at `/dashboard/`.
 
+The current repository revision adds a persisted German, English and French
+language selector and a dedicated interactive page at `/onboarding/`. The diagram
+distinguishes vehicle-to-adapter OBD-II/CAN and optional USB-C power, local AP
+access, direct access through the Home/Mobile-WiFi IP and normal user access to
+the MOT Portal. Phase controls expose the relevant path without moving this
+public explanation into the authenticated dashboard. The root page links to the
+onboarding page through its navigation and a concise call-to-action.
+
 ## Content boundary
 
 The landing page presents:
@@ -25,6 +33,7 @@ The landing page presents:
 - the distinct MOT cloud, local WebUI and direct ABRP service paths;
 - current portal capabilities;
 - the controlled beta onboarding journey;
+- the local and portal access paths across the three onboarding phases;
 - a dated project-status summary derived from governance.
 
 It does not contain Cognito configuration, API endpoints, credentials or runtime

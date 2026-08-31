@@ -25,8 +25,22 @@
       return result;
     }
 
+    const RETRYABLE_HTTP_STATUS = new Set([429, 500, 502, 503, 504]);
+
+    async function fetchWithRetry(url, options = {}, retries = 2) {
+      let response;
+      for (let attempt = 0; attempt <= retries; attempt += 1) {
+        response = await fetch(url, options);
+        if (response.ok || !RETRYABLE_HTTP_STATUS.has(response.status) || attempt === retries) {
+          return response;
+        }
+        await new Promise(resolve => window.setTimeout(resolve, 250 * (2 ** attempt)));
+      }
+      return response;
+    }
+
     async function get(path) {
-      const response = await fetch(`${baseUrl()}${path}`, {
+      const response = await fetchWithRetry(`${baseUrl()}${path}`, {
         headers: await headers(),
         cache: 'no-store'
       });
@@ -64,12 +78,15 @@
 
     async function notificationRequest(path, method = 'GET', body = null) {
       if (!notificationBaseUrl()) throw new Error('Notification API URL fehlt');
-      const response = await fetch(`${notificationBaseUrl()}${path}`, {
+      const options = {
         method,
         headers: { ...(await headers()), ...(body ? { 'content-type': 'application/json' } : {}) },
         cache: 'no-store',
         body: body ? JSON.stringify(body) : null
-      });
+      };
+      const response = method === 'GET'
+        ? await fetchWithRetry(`${notificationBaseUrl()}${path}`, options)
+        : await fetch(`${notificationBaseUrl()}${path}`, options);
       if (!response.ok) {
         const error = new Error(`Notification API HTTP ${response.status}`);
         error.status = response.status;
@@ -247,6 +264,29 @@
         return notificationRequest(
           `/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications`,
           'PUT', preferences
+        );
+      },
+
+      async getSmsNotificationStatus() {
+        if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
+        return notificationRequest(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications/sms`
+        );
+      },
+
+      async requestSmsVerification(phoneE164) {
+        if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
+        return notificationRequest(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications/sms/request`,
+          'POST', { phoneE164 }
+        );
+      },
+
+      async confirmSmsVerification(verificationCode) {
+        if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
+        return notificationRequest(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications/sms/confirm`,
+          'POST', { verificationCode }
         );
       },
 
