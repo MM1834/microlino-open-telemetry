@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260901-webflash1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260903-settings-page1" />
   <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
-  <link rel="stylesheet" href="css/location-map.css">
+  <link rel="stylesheet" href="css/location-map.css?v=20260903-mobile-interaction1">
   <link rel="stylesheet" href="css/location-map-cleanup.css">
-  <script src="js/i18n.js?v=20260827-i18n1"></script>
+  <script src="js/i18n.js?v=20260903-settings-page1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -29,7 +29,8 @@
         <a href="#temps">♨ Temperaturen</a>
         <a href="#cells">▦ Zellen</a>
         <a href="#history">↗ History</a>
-        <a href="#settings">⚙ Einstellungen</a>
+        <a href="settings/">⚙ Einstellungen</a>
+        <a href="administration/" data-admin-nav hidden>⌘ Administration</a>
       </nav>
       <div class="side-status card compact">
         <div class="status-line"><span id="side-dot" class="dot"></span><strong id="side-online">Offline</strong></div>
@@ -99,6 +100,8 @@
           <label id="auth-remember-wrap" class="auth-remember"><input id="auth-remember" type="checkbox" /><span>Angemeldet bleiben</span></label>
           <button id="auth-login" class="auth-button" type="button">Anmelden</button>
           <button id="vehicle-add" class="auth-button" type="button" hidden>Fahrzeug hinzufügen</button>
+          <a class="auth-button mobile-settings-link" href="settings/" data-settings-nav hidden>Einstellungen</a>
+          <a class="auth-button mobile-admin-link" href="administration/" data-admin-nav hidden>Administration</a>
           <button id="auth-logout" class="auth-button" type="button" hidden>Abmelden</button>
         </div>
         <span id="date-now" class="muted">--</span>
@@ -142,7 +145,10 @@
             <h2>⌖ Standort</h2>
             <a id="location-map-link" class="location-map-link" href="#" target="_blank" rel="noopener">OpenStreetMap öffnen</a>
           </div>
-          <iframe id="location-map-frame" class="location-map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div id="location-map-interaction" class="location-map-interaction">
+            <iframe id="location-map-frame" class="location-map-frame" title="OpenStreetMap Standortkarte" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <button id="location-map-activate" class="location-map-activate" type="button" aria-pressed="false">Karte bedienen</button>
+          </div>
           <div class="location-text"><strong id="location-title">Standort nicht verfügbar</strong><span id="location-coords">--</span><small id="location-updated">--</small></div>
         </article>
 
@@ -221,7 +227,7 @@
       <h3>SoC Verlauf</h3>
       <div class="history-chart-wrap">
         <div id="soc-history-empty" class="history-empty">Noch keine SOC-History vorhanden.</div>
-        <canvas id="soc-history-chart"></canvas>
+        <canvas id="soc-history-chart" aria-label="Display-SoC und optionaler interner Standard-CAN-SoC"></canvas>
       </div>
     </div>
 
@@ -255,118 +261,6 @@
     </div>
   </div>
   <div id="soc-history-meta" class="history-meta"></div>
-</section>
-
-<section class="card settings-card" id="settings" hidden>
-  <div class="card-header">
-    <div>
-      <h2>Einstellungen</h2>
-      <span class="muted">Persönlich · fahrzeugbezogen</span>
-    </div>
-    <strong id="notification-vehicle">--</strong>
-  </div>
-  <form id="notification-form" class="notification-form">
-    <fieldset class="journey-notification-setting range-setting">
-      <legend>Reichweite</legend>
-      <label>
-        Reichweite bei 100 % SOC
-        <div class="settings-input-suffix">
-          <input id="range-km-at-100" type="number" min="20" max="500" step="1" value="140" required />
-          <span>km</span>
-        </div>
-      </label>
-      <label>
-        Gewünschte SOC-Reserve
-        <div class="settings-input-suffix">
-          <input id="range-reserve-soc" type="number" min="0" max="50" step="1" value="0" required />
-          <span>%</span>
-        </div>
-      </label>
-      <small class="connection-detail">Die angezeigte Reichweite endet bei dieser Reserve. Beispiel: 15 % zeigt die noch fahrbare Strecke bis 15 % SOC.</small>
-    </fieldset>
-    <label class="settings-toggle">
-      <input id="notification-enabled" type="checkbox" />
-      <span>Ladeziel-Benachrichtigung aktivieren</span>
-    </label>
-    <label>
-      Ziel-SOC
-      <div class="settings-input-suffix">
-        <input id="notification-threshold" type="number" min="50" max="100" step="1" value="80" required />
-        <span>%</span>
-      </div>
-    </label>
-    <label class="settings-toggle">
-      <input id="notification-email-enabled" type="checkbox" />
-      <span>E-Mail-Kanal aktivieren</span>
-    </label>
-    <label>
-      E-Mail-Adresse
-      <input id="notification-email" type="email" autocomplete="email" />
-    </label>
-    <div id="notification-email-state" class="connection-detail"></div>
-    <fieldset class="journey-notification-setting">
-      <legend>Ladestopp</legend>
-      <label class="settings-toggle">
-        <input id="notification-charging-stop-email-enabled" type="checkbox" aria-describedby="notification-charging-stop-state" />
-        <span>E-Mail, wenn das Laden nach mindestens 45 Sekunden Ladezeit vor dem Zielwert mindestens 60 Sekunden stoppt</span>
-      </label>
-      <label>
-        Ladestopp-Ziel-SOC
-        <div class="settings-input-suffix">
-          <input id="notification-charging-stop-threshold" type="number" min="50" max="100" step="1" value="80" required />
-          <span>%</span>
-        </div>
-      </label>
-      <small id="notification-charging-stop-state" class="connection-detail">Nur wenn das Fahrzeug weiterhin eingesteckt ist. Ein manueller Stopp, Lastmanagement oder Solar-Nulleinspeisung kann dieselbe Meldung auslösen. Pro durchgehend eingesteckter Ladesession wird höchstens eine Ladestopp-Meldung versendet; erst Ausstecken und erneutes Einstecken startet eine neue Session.</small>
-    </fieldset>
-    <fieldset class="journey-notification-setting">
-      <legend>Ladezusammenfassung</legend>
-      <label class="settings-toggle">
-        <input id="notification-charging-summary-email-enabled" type="checkbox" aria-describedby="notification-charging-summary-state" />
-        <span>Zusammenfassung abgeschlossener Ladevorgänge per E-Mail</span>
-      </label>
-      <small id="notification-charging-summary-state" class="connection-detail">Versand beim Ausstecken oder nach 10 Minuten ohne Laden · ausschließlich Standard-Telemetrie.</small>
-    </fieldset>
-    <fieldset class="journey-notification-setting">
-      <legend>Fahrtzusammenfassung</legend>
-      <label class="settings-toggle">
-        <input id="notification-journey-email-enabled" type="checkbox" aria-describedby="notification-journey-state" />
-        <span>Zusammenfassung geeigneter Fahrten per E-Mail</span>
-      </label>
-      <small id="notification-journey-state" class="connection-detail">Aktiv für geeignete Fahrten · Energiequelle wird in der E-Mail ausgewiesen.</small>
-    </fieldset>
-    <fieldset class="journey-notification-setting">
-      <legend>SMS (Schweiz / Deutschland)</legend>
-      <label>
-        Mobilnummer im Format +41… oder +49…
-        <input id="notification-sms-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+41791234567" />
-      </label>
-      <div class="settings-actions">
-        <button id="notification-sms-request" class="auth-button secondary" type="button">Bestätigungscode senden</button>
-      </div>
-      <div id="notification-sms-confirmation-fields" class="sms-confirmation-fields" hidden>
-        <label>
-          Bestätigungscode
-          <input id="notification-sms-code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4,10}" />
-        </label>
-        <div class="settings-actions">
-          <button id="notification-sms-confirm" class="auth-button secondary" type="button">Code bestätigen</button>
-        </div>
-      </div>
-      <small id="notification-sms-state" class="connection-detail">Mobilnummer noch nicht bestätigt.</small>
-      <label class="settings-toggle">
-        <input id="notification-sms-enabled" type="checkbox" disabled />
-        <span>SMS-Kanal für dieses Fahrzeug aktivieren</span>
-      </label>
-      <small class="connection-detail">Die Nummer kann für mehrere Fahrzeuge verwendet werden. Die administrative Freigabe erfolgt für jede Benutzer–Fahrzeug-Zuordnung separat.</small>
-    </fieldset>
-    <p id="notification-email-confirmation-help" class="muted settings-note"><strong>Bestätigung erforderlich:</strong> Nach dem Speichern sendet <em>AWS Notifications</em> eine technische Bestätigungsmail. Öffnen Sie diese und wählen Sie <em>Confirm subscription</em>. Die AWS-Mail erwähnt MOT möglicherweise nicht; prüfen Sie deshalb auch den Spam-Ordner. Ohne Bestätigung bleiben E-Mail-Benachrichtigungen inaktiv.</p>
-    <p class="muted settings-note">Die Meldung ist rein informativ und steuert den Ladevorgang nicht.</p>
-    <div class="settings-actions">
-      <button id="notification-save" class="auth-button" type="submit">Speichern</button>
-      <span id="notification-status" class="connection-detail" aria-live="polite"></span>
-    </div>
-  </form>
 </section>
 
 <section id="firmware-flasher" class="card firmware-card" hidden>
@@ -408,46 +302,6 @@
   </details>
 </section>
 
-<section id="onboarding-admin" class="card onboarding-card" hidden>
-  <div>
-    <h1>Beta-Onboarding verwalten</h1>
-    <p>Erstellt einen einmaligen Claim für eine kontrollierte Fahrzeug-ID. Der Code wird nur hier angezeigt.</p>
-  </div>
-  <form id="admin-claim-form" class="onboarding-form" autocomplete="off">
-    <label for="admin-vehicle-id">Fahrzeug-ID</label>
-    <div class="onboarding-input-row">
-      <input id="admin-vehicle-id" name="vehicleId" required pattern="[a-z0-9][a-z0-9-]{0,63}" autocomplete="off" />
-      <button class="auth-button" type="submit">Claim erstellen</button>
-    </div>
-    <code id="admin-claim-output" class="claim-output" hidden></code>
-    <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
-    <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
-  </form>
-  <hr class="admin-divider" />
-  <div>
-    <h2>Web-Flasher freigeben</h2>
-    <p>Schaltet eine freigegebene Adapter-Firmware zeitlich begrenzt für einen Portal-Benutzer frei.</p>
-  </div>
-  <form id="admin-firmware-form" class="onboarding-form" autocomplete="off">
-    <label for="admin-firmware-user">Benutzer-E-Mail</label>
-    <div class="admin-firmware-row">
-      <input id="admin-firmware-user" name="username" type="email" required autocomplete="off" />
-      <label for="admin-firmware-target">Adaptertyp</label>
-      <select id="admin-firmware-target" name="target" required>
-        <option value="nanoesp32c6-n16">nanoESP32-C6 N16</option>
-        <option value="xiao-esp32c6">XIAO ESP32-C6</option>
-      </select>
-      <label for="admin-firmware-hours">Gültigkeit (Stunden)</label>
-      <input id="admin-firmware-hours" name="expiresInHours" type="number" min="1" max="168" value="48" required />
-    </div>
-    <div class="settings-actions">
-      <button id="admin-firmware-grant" class="auth-button" type="submit">Web-Flasher freigeben</button>
-      <button id="admin-firmware-revoke" class="auth-button secondary" type="button">Freigabe entziehen</button>
-      <span id="admin-firmware-status" class="connection-detail" aria-live="polite"></span>
-    </div>
-  </form>
-</section>
-
 </main>
   </div>
   <script src="config.js"></script>
@@ -456,11 +310,11 @@
   <script src="js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260901-webflash2"></script>
-  <script src="js/app.js?v=20260901-webflash10"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260903-settings-page1"></script>
+  <script src="js/app.js?v=20260903-settings-page1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260824-power-freshness1"></script>
+  <script src="js/history/history-chart.js?v=20260903-internal-soc1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>

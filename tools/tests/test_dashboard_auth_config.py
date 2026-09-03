@@ -67,17 +67,43 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260901-webflash2", source)
-        self.assertIn("app.js?v=20260901-webflash10", source)
+        self.assertIn("aws-backend-provider.js?v=20260903-settings-page1", source)
+        self.assertIn("app.js?v=20260903-settings-page1", source)
+
+
+class DashboardMobileMapInteractionTests(unittest.TestCase):
+    def test_mobile_map_requires_deliberate_activation(self) -> None:
+        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        css = (ROOT / "build/dashboard/current/css/location-map.css").read_text(encoding="utf-8")
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="location-map-interaction"', html)
+        self.assertIn('id="location-map-activate"', html)
+        self.assertIn('aria-pressed="false"', html)
+        self.assertIn("@media (max-width:900px)", css)
+        self.assertIn(".location-map-interaction:not(.is-interactive) .location-map-frame", css)
+        self.assertIn("pointer-events:none", css)
+        self.assertIn("function setLocationMapInteractive(active)", app)
+        self.assertIn("!interaction.contains(event.target)", app)
+        self.assertIn("mobileMapQuery.addEventListener('change', resetInteraction)", app)
+        self.assertIn("mobileMapQuery.addListener?.(resetInteraction)", app)
 
 
 class DashboardNotificationSettingsTests(unittest.TestCase):
     def test_portal_exposes_vehicle_scoped_email_settings(self) -> None:
-        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        dashboard = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        html = (ROOT / "build/dashboard/current/settings/index.html").read_text(encoding="utf-8")
+        self.assertIn('href="settings/"', dashboard)
+        self.assertIn('data-settings-nav hidden', dashboard)
+        self.assertNotIn('id="notification-form"', dashboard)
+        css = (ROOT / "build/dashboard/current/css/dashboard.css").read_text(encoding="utf-8")
+        self.assertIn(".settings-page .settings-topbar{position:static;order:0", css)
         self.assertIn('id="notification-form"', html)
+        self.assertIn('id="settings-vehicle"', html)
         self.assertIn('id="notification-threshold"', html)
         self.assertIn('id="notification-email"', html)
         self.assertIn('id="notification-journey-email-enabled"', html)
+        self.assertIn('id="notification-daily-summary-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-email-enabled"', html)
         self.assertIn('id="notification-charging-summary-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-threshold"', html)
@@ -114,29 +140,29 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn("method === 'GET'", provider)
 
     def test_email_and_sms_status_load_independently(self) -> None:
-        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
+        app = (ROOT / "build/dashboard/current/js/settings.js").read_text(encoding="utf-8")
         self.assertIn("await Promise.allSettled", app)
         self.assertIn("SMS-Status vorübergehend nicht verfügbar.", app)
         self.assertIn("Ein Teil der Einstellungen ist vorübergehend nicht verfügbar.", app)
         self.assertNotIn("const [preferences, smsStatus] = await Promise.all([", app)
 
     def test_app_loads_and_saves_for_selected_vehicle(self) -> None:
-        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
-        self.assertIn("async function loadNotificationPreferences", app)
-        self.assertIn("async function saveNotificationPreferences", app)
-        self.assertIn("state.selectedVehicleId", app)
+        app = (ROOT / "build/dashboard/current/js/settings.js").read_text(encoding="utf-8")
+        self.assertIn("async function loadPreferences", app)
+        self.assertIn("async function savePreferences", app)
+        self.assertIn("state.vehicleId", app)
         self.assertIn("getNotificationPreferences", app)
         self.assertIn("saveNotificationPreferences", app)
         self.assertIn("journeyEmailEnabled: $('notification-journey-email-enabled').checked", app)
+        self.assertIn("dailySummaryEmailEnabled: $('notification-daily-summary-email-enabled').checked", app)
         self.assertIn("chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked", app)
         self.assertIn("chargingSummaryEmailEnabled: $('notification-charging-summary-email-enabled').checked", app)
         self.assertIn("chargingStopThreshold: Number($('notification-charging-stop-threshold').value)", app)
         self.assertIn("rangeKmAt100: Number($('range-km-at-100').value)", app)
         self.assertIn("rangeReserveSoc: Number($('range-reserve-soc').value)", app)
-        self.assertIn("responsePreferences?.rangeReserveSoc ?? requestedPreferences.rangeReserveSoc", app)
         self.assertIn("Für Ladestopp-Meldungen zuerst den E-Mail-Kanal aktivieren.", app)
         self.assertIn("Für Fahrtzusammenfassungen zuerst den E-Mail-Kanal aktivieren.", app)
-        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
+        html = (ROOT / "build/dashboard/current/settings/index.html").read_text(encoding="utf-8")
         self.assertIn("Pro durchgehend eingesteckter Ladesession", html)
         self.assertIn("Ausstecken und erneutes Einstecken", html)
         self.assertIn("Solar-Nulleinspeisung", html)
@@ -145,18 +171,32 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn("addEventListener('input', updateEmailConfirmationHelp)", app)
 
     def test_sms_save_captures_opt_in_before_busy_render_and_hides_code(self) -> None:
-        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
-        html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        capture = app.index("const requestedPreferences = {")
-        busy = app.index("state.notificationBusy = true;", capture)
+        app = (ROOT / "build/dashboard/current/js/settings.js").read_text(encoding="utf-8")
+        html = (ROOT / "build/dashboard/current/settings/index.html").read_text(encoding="utf-8")
+        capture = app.index("const requested = {")
+        busy = app.index("setBusy(true);", capture)
         self.assertLess(capture, busy)
-        self.assertIn("saveNotificationPreferences(requestedPreferences)", app)
-        self.assertIn("state.smsNotificationStatus.smsEnabled = preferences.smsEnabled === true", app)
+        self.assertIn("saveNotificationPreferences(requested)", app)
+        self.assertIn("state.smsStatus.smsEnabled = result.smsEnabled === true", app)
         self.assertIn("notification-sms-confirmation-fields", html)
         self.assertIn("status?.verificationStatus !== 'PENDING'", app)
 
+    def test_dashboard_still_applies_range_preferences_without_settings_form(self) -> None:
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
+        self.assertIn("if (!$('settings'))", app)
+        self.assertIn("state.rangeKmAt100 = Number(preferences.rangeKmAt100", app)
+        self.assertIn("state.rangeReserveSoc = Number(preferences.rangeReserveSoc", app)
+
 
 class DashboardFreshnessTests(unittest.TestCase):
+    def test_soc_history_supports_optional_internal_soc(self) -> None:
+        history = (ROOT / "build/dashboard/current/js/history/history-chart.js").read_text()
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        self.assertIn('field:"socInternal"', history)
+        self.assertIn('label:"Interner SoC"', history)
+        self.assertIn("secondaryPoints", history)
+        self.assertIn("optionaler interner Standard-CAN-SoC", html)
+
     def test_live_channel_is_distinct_from_obd2_value_freshness(self) -> None:
         app = (ROOT / "build/dashboard/current/js/app.js").read_text()
         html = (ROOT / "build/dashboard/current/index.html").read_text()
@@ -212,23 +252,29 @@ class DashboardOnboardingTests(unittest.TestCase):
 
     def test_admin_claim_ui_requires_token_group_and_backend(self) -> None:
         auth = (ROOT / "build/dashboard/current/js/auth/auth-manager.js").read_text()
-        provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text()
         app = (ROOT / "build/dashboard/current/js/app.js").read_text()
         html = (ROOT / "build/dashboard/current/index.html").read_text()
+        admin_html = (ROOT / "build/dashboard/current/administration/index.html").read_text()
+        admin_js = (ROOT / "build/dashboard/current/js/administration.js").read_text()
         self.assertIn("hasGroup(groupName)", auth)
         self.assertIn("auth.hasGroup?.('mot-beta-admins')", app)
-        self.assertIn("async issueClaim(vehicleId)", provider)
-        self.assertIn("'/api/onboarding/claims'", provider)
-        self.assertIn('id="onboarding-admin"', html)
-        self.assertIn('id="admin-claim-output"', html)
+        self.assertIn("auth.hasGroup('mot-beta-admins')", admin_js)
+        self.assertIn("'/api/onboarding/claims'", admin_js)
+        self.assertIn('data-admin-nav hidden', html)
+        self.assertNotIn('id="onboarding-admin"', html)
+        self.assertIn('id="admin-content"', admin_html)
+        self.assertIn('id="admin-claim-output"', admin_html)
+        self.assertIn('id="admin-firmware-form"', admin_html)
+        self.assertIn('id="admin-denied"', admin_html)
 
-    def test_admin_claim_ui_follows_notifications_without_legacy_status_card(self) -> None:
+    def test_admin_functions_are_not_embedded_in_dashboard(self) -> None:
         html = (ROOT / "build/dashboard/current/index.html").read_text()
-        css = (ROOT / "build/dashboard/current/css/dashboard.css").read_text()
-        self.assertLess(html.index('id="settings"'), html.index('id="onboarding-admin"'))
-        self.assertIn('#onboarding-admin{order:75}', css)
+        app = (ROOT / "build/dashboard/current/js/app.js").read_text()
+        self.assertNotIn('Beta-Onboarding verwalten', html)
+        self.assertNotIn('Web-Flasher freigeben', html)
+        self.assertNotIn('grantFirmwareAccess', app)
+        self.assertNotIn('issueOnboardingClaim', app)
         self.assertNotIn('class="card panel status-panel"', html)
-        self.assertNotIn('.main>.status-panel{order:80;width:100%}', css)
 
 
 class DashboardRangeForecastTests(unittest.TestCase):

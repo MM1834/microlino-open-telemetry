@@ -10,6 +10,7 @@
 
 ## Active implementation work
 
+- [DAY-SUM-001 — daily journey and charging summary](DAY-SUM-001.md)
 - [CHG-SUM-001 — email-only charging summary](CHG-SUM-001.md)
 - [DBG-001 — bounded vehicle telemetry debug capture](DBG-001.md)
 - [WEBFLASH-001 — controlled portal Web Flasher](WEBFLASH-001.md)
@@ -29,6 +30,13 @@
 
 ## Completed predecessors
 
+- [SET-UX-001](SET-UX-001.md) moved all personal range and notification controls
+  to a dedicated authenticated, vehicle-specific page; hosted `motbeta`
+  desktop/smartphone acceptance and persistence passed on 2026-09-03.
+- [ADM-UX-001](ADM-UX-001.md) moved beta-onboarding and Web-Flasher grant
+  controls to a dedicated authorization-gated page; hosted desktop/smartphone,
+  three-language, administrator and standard-user acceptance passed on
+  2026-09-03.
 - [OTA-HW-001](OTA-HW-001.md) added the REV13 pre-write chip/flash OTA guard;
   matching N16 OTA and deliberate XIAO/LilyGO rejection passed physically.
 - [ONB-UX-001](ONB-UX-001.md) completed the guided C6 local onboarding flow,

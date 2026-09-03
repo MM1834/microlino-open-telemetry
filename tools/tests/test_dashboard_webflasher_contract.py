@@ -60,13 +60,26 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertIn("Number(release.flashSizeBytes) / (1024 * 1024)", app)
         self.assertIn("authorizeFirmwareDownload", app)
         self.assertIn("reportFirmwareResult", app)
-        self.assertIn('id="admin-firmware-target"', (DASHBOARD / "index.html").read_text(encoding="utf-8"))
+        admin_html = (DASHBOARD / "administration/index.html").read_text(encoding="utf-8")
+        admin_js = (DASHBOARD / "js/administration.js").read_text(encoding="utf-8")
+        self.assertIn('id="admin-firmware-target"', admin_html)
+        self.assertIn("auth.hasGroup('mot-beta-admins')", admin_js)
+        self.assertIn("'/api/firmware/grants'", admin_js)
+        self.assertIn("'/api/firmware/grants/revoke'", admin_js)
         self.assertIn("approvedRelease.target", (DASHBOARD / "js/firmware/web-flasher.js").read_text(encoding="utf-8"))
         for path in (
             "/api/firmware/access", "/api/firmware/download", "/api/firmware/result",
             "/api/firmware/grants", "/api/firmware/grants/revoke",
         ):
             self.assertIn(path, provider)
+
+    def test_mobile_flasher_remains_near_end_after_settings_move(self) -> None:
+        css = (DASHBOARD / "css/dashboard.css").read_text(encoding="utf-8")
+        html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="settings"', html)
+        self.assertIn('href="settings/"', html)
+        self.assertIn("#firmware-flasher{order:71;width:100%}", css)
+        self.assertIn("dashboard.css?v=20260903-settings-page1", html)
 
     def test_esptool_is_vendored_with_license(self) -> None:
         bundle = DASHBOARD / "vendor/esptool-js/bundle-0.6.0.js"

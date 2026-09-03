@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <title>MOT Einstellungen</title>
+  <link rel="stylesheet" href="../css/dashboard.css?v=20260903-settings-page1" />
+  <script src="../js/i18n.js?v=20260903-settings-page1"></script>
+</head>
+<body class="settings-page">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../img/microlino.jpeg" alt="Microlino" />
+        <div><strong>MICROLINO</strong><span>Telemetrie Dashboard</span></div>
+      </div>
+      <nav class="nav">
+        <a href="../">⌂ Übersicht</a>
+        <a class="active" href="./">⚙ Einstellungen</a>
+        <a href="../administration/" data-admin-nav hidden>⌘ Administration</a>
+      </nav>
+    </aside>
+
+    <main class="main settings-main">
+      <header class="topbar card compact settings-topbar">
+        <div>
+          <h1>Einstellungen</h1>
+          <span class="muted">Persönlich · fahrzeugbezogen</span>
+        </div>
+        <div class="top-spacer"></div>
+        <label class="language-selector" for="dashboard-language">
+          <span>Sprache</span>
+          <select id="dashboard-language" aria-label="Sprache">
+            <option value="de">Deutsch</option>
+            <option value="en">Englisch</option>
+            <option value="fr">Französisch</option>
+          </select>
+        </label>
+        <div class="auth-controls">
+          <span id="settings-auth-status" class="auth-status" aria-live="polite">Sitzung wird geprüft…</span>
+          <button id="settings-login" class="auth-button" type="button" hidden>Anmelden</button>
+          <a class="auth-button secondary" href="../">Zum Dashboard</a>
+          <button id="settings-logout" class="auth-button" type="button" hidden>Abmelden</button>
+        </div>
+      </header>
+
+      <section id="settings-denied" class="card admin-access-card" hidden>
+        <h2>Einstellungen nicht verfügbar</h2>
+        <p id="settings-denied-message">Bitte zuerst anmelden.</p>
+      </section>
+
+      <section id="settings" class="card settings-card" hidden>
+        <div class="card-header">
+          <div>
+            <h2>Fahrzeugeinstellungen</h2>
+            <span class="muted">Benachrichtigungen und Reichweitenberechnung</span>
+          </div>
+          <label class="settings-vehicle-selector" for="settings-vehicle">
+            <span>Fahrzeug</span>
+            <select id="settings-vehicle"></select>
+          </label>
+        </div>
+        <form id="notification-form" class="notification-form">
+          <fieldset class="journey-notification-setting range-setting">
+            <legend>Reichweite</legend>
+            <label>
+              Reichweite bei 100 % SOC
+              <div class="settings-input-suffix">
+                <input id="range-km-at-100" type="number" min="20" max="500" step="1" value="140" required />
+                <span>km</span>
+              </div>
+            </label>
+            <label>
+              Gewünschte SOC-Reserve
+              <div class="settings-input-suffix">
+                <input id="range-reserve-soc" type="number" min="0" max="50" step="1" value="0" required />
+                <span>%</span>
+              </div>
+            </label>
+            <small class="connection-detail">Die angezeigte Reichweite endet bei dieser Reserve. Beispiel: 15 % zeigt die noch fahrbare Strecke bis 15 % SOC.</small>
+          </fieldset>
+          <label class="settings-toggle">
+            <input id="notification-enabled" type="checkbox" />
+            <span>Ladeziel-Benachrichtigung aktivieren</span>
+          </label>
+          <label>
+            Ziel-SOC
+            <div class="settings-input-suffix">
+              <input id="notification-threshold" type="number" min="50" max="100" step="1" value="80" required />
+              <span>%</span>
+            </div>
+          </label>
+          <label class="settings-toggle">
+            <input id="notification-email-enabled" type="checkbox" />
+            <span>E-Mail-Kanal aktivieren</span>
+          </label>
+          <label>
+            E-Mail-Adresse
+            <input id="notification-email" type="email" autocomplete="email" />
+          </label>
+          <div id="notification-email-state" class="connection-detail"></div>
+          <fieldset class="journey-notification-setting">
+            <legend>Ladestopp</legend>
+            <label class="settings-toggle">
+              <input id="notification-charging-stop-email-enabled" type="checkbox" aria-describedby="notification-charging-stop-state" />
+              <span>E-Mail, wenn das Laden nach mindestens 45 Sekunden Ladezeit vor dem Zielwert mindestens 60 Sekunden stoppt</span>
+            </label>
+            <label>
+              Ladestopp-Ziel-SOC
+              <div class="settings-input-suffix">
+                <input id="notification-charging-stop-threshold" type="number" min="50" max="100" step="1" value="80" required />
+                <span>%</span>
+              </div>
+            </label>
+            <small id="notification-charging-stop-state" class="connection-detail">Nur wenn das Fahrzeug weiterhin eingesteckt ist. Ein manueller Stopp, Lastmanagement oder Solar-Nulleinspeisung kann dieselbe Meldung auslösen. Pro durchgehend eingesteckter Ladesession wird höchstens eine Ladestopp-Meldung versendet; erst Ausstecken und erneutes Einstecken startet eine neue Session.</small>
+          </fieldset>
+          <fieldset class="journey-notification-setting">
+            <legend>Ladezusammenfassung</legend>
+            <label class="settings-toggle">
+              <input id="notification-charging-summary-email-enabled" type="checkbox" aria-describedby="notification-charging-summary-state" />
+              <span>Zusammenfassung abgeschlossener Ladevorgänge per E-Mail</span>
+            </label>
+            <small id="notification-charging-summary-state" class="connection-detail">Versand beim Ausstecken oder nach 10 Minuten ohne Laden · ausschließlich Standard-Telemetrie.</small>
+          </fieldset>
+          <fieldset class="journey-notification-setting">
+            <legend>Fahrtzusammenfassung</legend>
+            <label class="settings-toggle">
+              <input id="notification-journey-email-enabled" type="checkbox" aria-describedby="notification-journey-state" />
+              <span>Zusammenfassung geeigneter Fahrten per E-Mail</span>
+            </label>
+            <small id="notification-journey-state" class="connection-detail">Aktiv für geeignete Fahrten · Energiequelle wird in der E-Mail ausgewiesen.</small>
+          </fieldset>
+          <fieldset class="journey-notification-setting">
+            <legend>Tagesübersicht</legend>
+            <label class="settings-toggle">
+              <input id="notification-daily-summary-email-enabled" type="checkbox" aria-describedby="notification-daily-summary-state" />
+              <span>Tägliche Zusammenfassung von Fahrten und Ladevorgängen per E-Mail</span>
+            </label>
+            <small id="notification-daily-summary-state" class="connection-detail">Europe/Zurich · Versand nach Mitternacht, bei laufenden Vorgängen spätestens um 08:05 Uhr · keine E-Mail ohne Aktivität.</small>
+          </fieldset>
+          <fieldset class="journey-notification-setting">
+            <legend>SMS (Schweiz / Deutschland)</legend>
+            <label>
+              Mobilnummer im Format +41… oder +49…
+              <input id="notification-sms-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+41791234567" />
+            </label>
+            <div class="settings-actions">
+              <button id="notification-sms-request" class="auth-button secondary" type="button">Bestätigungscode senden</button>
+            </div>
+            <div id="notification-sms-confirmation-fields" class="sms-confirmation-fields" hidden>
+              <label>
+                Bestätigungscode
+                <input id="notification-sms-code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4,10}" />
+              </label>
+              <div class="settings-actions">
+                <button id="notification-sms-confirm" class="auth-button secondary" type="button">Code bestätigen</button>
+              </div>
+            </div>
+            <small id="notification-sms-state" class="connection-detail">Mobilnummer noch nicht bestätigt.</small>
+            <label class="settings-toggle">
+              <input id="notification-sms-enabled" type="checkbox" disabled />
+              <span>SMS-Kanal für dieses Fahrzeug aktivieren</span>
+            </label>
+            <small class="connection-detail">Die Nummer kann für mehrere Fahrzeuge verwendet werden. Die administrative Freigabe erfolgt für jede Benutzer–Fahrzeug-Zuordnung separat.</small>
+          </fieldset>
+          <p id="notification-email-confirmation-help" class="muted settings-note"><strong>Bestätigung erforderlich:</strong> Nach dem Speichern sendet <em>AWS Notifications</em> eine technische Bestätigungsmail. Öffnen Sie diese und wählen Sie <em>Confirm subscription</em>. Die AWS-Mail erwähnt MOT möglicherweise nicht; prüfen Sie deshalb auch den Spam-Ordner. Ohne Bestätigung bleiben E-Mail-Benachrichtigungen inaktiv.</p>
+          <p class="muted settings-note">Die Meldung ist rein informativ und steuert den Ladevorgang nicht.</p>
+          <div class="settings-actions">
+            <button id="notification-save" class="auth-button" type="submit">Speichern</button>
+            <span id="notification-status" class="connection-detail" aria-live="polite"></span>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script src="../config.js"></script>
+  <script src="../js/auth/pkce.js"></script>
+  <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
+  <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
+  <script src="../js/providers/provider-registry.js"></script>
+  <script src="../js/providers/aws-backend-provider.js?v=20260903-settings-page1"></script>
+  <script src="../js/settings.js?v=20260903-settings-page1"></script>
+</body>
+</html>

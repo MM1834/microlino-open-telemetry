@@ -85,30 +85,40 @@ SHA-256 `9eeb9f20faf571ba65e03cec5c653b688ec0c35010990c484b6679d72cb95488`.
 Both reviewed Change Sets modified existing resources in place; the stack returned
 to `UPDATE_COMPLETE`. No user has yet received a firmware grant.
 
-The successor `C6-001-REV15-AWS` was uploaded and activated on 2026-09-03 through
-the reviewed replacement-free Change Set `webflash-rev15-20260903`. Its N16
-application is 1,438,992 bytes with SHA-256
-`ab033ed3aaa6b7fab67923915ac68e3aa6781bcd03c4dfabbae564d3f77ae528`;
-the XIAO application is 1,425,552 bytes with SHA-256
-`f7a7bf9846ce3bdc2f51c86b84b231482251314528356bd99e253f2060a859ba`.
+The successor `C6-001-REV15-AWS` was uploaded and activated on 2026-09-03. A
+release-integrity review then found that the first REV15 manifests had been
+derived from `MOT_REVISION=REV15` while the binaries still embedded the older
+`C6-001-REV14-AWS` display/runtime string. Those mislabeled objects are no longer
+active. The corrected N16 application is 1,438,992 bytes with SHA-256
+`19d43d83626bfeceeb203ffdd241d6c5fd10f2c16ba5e731faf14f02bdaaad86`;
+the corrected XIAO application is 1,425,552 bytes with SHA-256
+`4314da2f03266a0a8ab406ab73cfe53b78c67e5a7b364e510ba27b1015a214a1`.
 Both manifests retain the fixed `0x10000` application-only write and preserve
 NVS, OTA metadata, LittleFS and AWS credentials. S3 read-back confirms the exact
 sizes, AES256 encryption and versioned object IDs. The stack and Lambda
-configuration read back `C6-001-REV15-AWS` for both targets. Existing REV14 grant
-records remain intact but deliberately fail the exact version/SHA gate; a pilot
-must receive a newly audited REV15 grant through the administrator flow.
+configuration read back `C6-001-REV15-AWS` and the corrected hashes for both
+targets after replacement-free Change Sets
+`webflash-rev15-corrected-xiao-20260903` and
+`webflash-rev15-corrected-n16-20260903`. Existing grants bound to older hashes
+fail closed. The packaging tool now also requires the declared release string to
+occur in the application binary, preventing a recurrence. `xruser` received a
+new audited 48-hour XIAO grant for `xrpioneer2`; exact-principal access read-back
+returns only the corrected 4 MB XIAO artifact.
 
 ### C — Portal flasher
 
 - **Implemented in the repository 2026-09-01:** authenticated settings card in
   German, English and French, visible only after a successful backend access check;
-- administrator grant/revoke form inside the existing role-protected panel;
+- administrator grant/revoke form on the dedicated role-protected Administration
+  page delivered by ADM-UX-001;
 - vendored Apache-2.0 `esptool-js` 0.6.0 integration over Web Serial;
 - exact CH343 USB, ESP32-C6 and 16 MB flash preflight, followed by byte-length and
   SHA-256 verification before the first write;
 - fixed application-only write at `0x10000`, `eraseAll: false`, deterministic
   progress, result audit and unsupported-browser states;
 - local desktop and 390 px portal smoke tests pass without horizontal overflow.
+- smartphone layout assigns the authorized flasher an explicit order immediately
+  after personal settings; desktop document order is unchanged.
 
 ### D — Acceptance and rollout
 

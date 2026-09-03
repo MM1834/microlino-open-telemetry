@@ -19,6 +19,38 @@ revision.
 
 ## Current product direction
 
+ADM-UX-001 completed a dedicated portal administration page.
+`Beta-Onboarding verwalten` and Web-Flasher grant/revoke are no longer embedded
+in the dashboard. The desktop sidebar and compact smartphone header expose
+`Administration` only after an authenticated `mot-beta-admins` group check, and
+the destination page independently keeps its forms hidden until the same check
+passes. Existing backend authorization remains unchanged and authoritative.
+Hosted desktop and smartphone acceptance passed in German, English and French
+with both an administrator and a standard user; the latter saw no privileged
+navigation or forms.
+
+SET-UX-001 completed a dedicated personal settings page. Range
+basis, SOC reserve, email/SMS notification controls and daily, journey and
+charging summaries no longer occupy the live dashboard. The authenticated page
+lists only assigned vehicles and scopes every preference operation to the chosen
+vehicle without starting telemetry polling or a WebSocket. The dashboard retains
+only the preference read required for its range forecast. Existing backend data
+and authorization are unchanged. Hosted `motbeta` desktop/smartphone acceptance
+and a persistence check passed on 2026-09-03; the same content is approved for
+the normal `/dashboard/` release.
+
+DAY-SUM-001 has a deployed optional daily email summary backend. It aggregates
+per-user journey and charging completion events by their end date, uses
+`Europe/Zurich` calendar boundaries and retries hourly from 00:05 through 08:05
+while an activity is still running. At the deadline, completed activity is sent
+with an explicit exclusion note for an ongoing session; empty days remain silent.
+The preference defaults off and is independent from individual reports. Reviewed
+Change Set `day-sum-001-20260903` added the Zurich scheduler and updated the
+shared Lambdas in place without replacing any table or function; stack
+`mot-dev-notifications` reached `UPDATE_COMPLETE`, the schedule is enabled and
+the public API remains JWT-protected. Hosted portal upload and controlled live
+delivery/deferral acceptance remain open.
+
 The controlled 2026-09-03 Pioneer SOC run established `0x48D data[7]` as an
 exact Standard-CAN copy of the visible whole-percent SOC and `data[6]` as a
 separate internal SOC-like value that remained roughly 6–8 points lower. The V1
@@ -26,6 +58,16 @@ decoder now publishes these optional values as `bms/soc_display` and
 `bms/soc_internal` without replacing canonical Display-CAN `display/soc`. The
 portal renders them only when present. The large-battery capture contained no
 `0x48D`; its independent `0x1B1` SOC/SOH fields are also optional portal details.
+Normal History now preserves `bms/soc_internal` independently at the core
+five-minute cadence and overlays it as a labelled optional curve beside the
+canonical Display-CAN SOC. The bounded diagnostic path already captures this and
+all other numeric/boolean `bms/*` topics at their incoming cadence.
+The replacement-free 2026-09-03 Foundation update activated this path in
+production. Its first real Pioneer bucket stored `socInternal=90` at 11:45 CEST.
+Diagnostic capture now includes `pioneer` alongside `xrpioneer2`; a per-vehicle
+deadline stops Pioneer automatically on 2026-09-06 at 23:59:59 CEST while the
+existing global `xrpioneer2` deadline remains unchanged. Immediate read-back
+captured `display/soc=98`, `bms/soc_display=98` and `bms/soc_internal=90`.
 
 CHG-SUM-001 adds an optional email-only summary for qualified charging sessions.
 It deliberately uses only the normal notification telemetry stream and never
@@ -81,7 +123,13 @@ upload and physical XIAO acceptance remain open. The SOC-decoder successor
 The replacement-free Change Set `webflash-rev15-20260903` changed only the exact
 release parameters, Lambda environment and object-key-scoped IAM reads; the
 stack returned to `UPDATE_COMPLETE`. Existing REV14 grant records remain stored
-but require an explicitly audited REV15 regrant before use.
+but require an explicitly audited REV15 regrant before use. A subsequent
+integrity check caught that the initially packaged REV15 binaries still embedded
+the REV14 runtime string. Correctly rebuilt XIAO and N16 images now embed
+`C6-001-REV15-AWS`; two replacement-free correction Change Sets activated their
+new exact object keys and hashes. The packaging tool rejects binaries that do
+not contain the declared version. `xruser` has an audited 48-hour XIAO grant, and
+principal-specific read-back returns only the corrected 4 MB artifact.
 
 I18N-001 has a repository-complete portal localization slice. German remains the
 project language and the dashboard default/fallback; a persisted selector adds
@@ -351,6 +399,12 @@ cloud-ready for optional Backfill. A reviewed no-replacement Change Set added
 only the exact Backfill-ACK Subscribe/Receive path in that vehicle namespace.
 The stack is `UPDATE_COMPLETE`; the device-side cache remains default-off and no
 test row was inserted into Gino's History.
+`xrpioneer2` is now also accepted by the server-side offline History Backfill
+path. Replacement-free Change Set `cache-xrpioneer2-backfill-20260903` added only
+that vehicle to `OfflineHistoryBackfillVehicleAllowlist`; the Backfill Lambda and
+derived IoT rule updated in place, the stack returned to `UPDATE_COMPLETE`, and
+the effective Lambda allowlist read-back includes `xrpioneer2`. This does not by
+itself enable the adapter-side cache, which remains a separate local setting.
 B021 `MOT-EC18DB`/`ml-pilot-021` is likewise cloud-enabled for operational
 History and optional offline Backfill as of 2026-08-28. The reviewed Change Set
 `enable-ml-pilot-021-history-20260828` modified only the two Lambda environment

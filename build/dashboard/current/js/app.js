@@ -28,7 +28,6 @@
     firmwareAccess: null,
     firmwareFlasher: null,
     firmwareBusy: false,
-    firmwareAdminBusy: false,
     notificationBusy: false,
     notificationVehicleId: null,
     notificationReadOnly: false,
@@ -58,6 +57,12 @@
     if (message) status.textContent = message;
     else if (!auth.isConfigured()) status.textContent = 'Cognito nicht konfiguriert';
     else status.textContent = authenticated ? 'Angemeldet' : 'Nicht angemeldet';
+    document.querySelectorAll('[data-admin-nav]').forEach(link => {
+      link.hidden = !(authenticated && auth.hasGroup?.('mot-beta-admins'));
+    });
+    document.querySelectorAll('[data-settings-nav]').forEach(link => {
+      link.hidden = !authenticated;
+    });
     renderOnboarding(state.onboardingRequired, '');
   }
 
@@ -124,39 +129,6 @@
       const stillRequired = state.availableVehicles.length === 0;
       renderOnboarding(stillRequired, stillRequired ? $('onboarding-status')?.textContent || '' : '');
     }
-  }
-
-  function renderOnboardingAdmin(message = '') {
-    const panel = $('onboarding-admin');
-    if (!panel || !auth) return;
-    panel.hidden = !(auth.isAuthenticated() && auth.hasGroup?.('mot-beta-admins'));
-    const status = $('admin-claim-status');
-    if (status && message) status.textContent = message;
-  }
-
-  async function issueOnboardingClaim(event) {
-    event.preventDefault();
-    if (state.onboardingBusy || !state.dataProvider?.issueClaim) return;
-    const vehicleId = String($('admin-vehicle-id')?.value || '').trim();
-    const output = $('admin-claim-output');
-    state.onboardingBusy = true;
-    if (output) { output.hidden = true; output.textContent = ''; }
-    renderOnboardingAdmin('Claim wird erstellt…');
-    try {
-      const result = await state.dataProvider.issueClaim(vehicleId);
-      if (output) { output.textContent = result.claim || ''; output.hidden = false; }
-      renderOnboardingAdmin(`Claim für ${result.vehicleId} erstellt; gültig bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())}.`);
-    } catch (error) {
-      renderOnboardingAdmin(error?.message || 'Claim-Ausgabe fehlgeschlagen');
-    } finally {
-      state.onboardingBusy = false;
-    }
-  }
-
-  function clearIssuedClaim() {
-    const output = $('admin-claim-output');
-    if (output) { output.textContent = ''; output.hidden = true; }
-    renderOnboardingAdmin('Claim-Anzeige wurde geleert.');
   }
 
   function renderFirmwareAccess(message = '') {
@@ -259,44 +231,6 @@
 
   function updateFirmwareConfirmation() {
     renderFirmwareAccess();
-  }
-
-  async function grantFirmwareAccess(event) {
-    event.preventDefault();
-    if (state.firmwareAdminBusy || !state.dataProvider?.grantFirmware) return;
-    const username = String($('admin-firmware-user')?.value || '').trim();
-    const target = String($('admin-firmware-target')?.value || 'nanoesp32c6-n16');
-    const expiresInHours = Number($('admin-firmware-hours')?.value || 48);
-    state.firmwareAdminBusy = true;
-    $('admin-firmware-status').textContent = 'Freigabe wird erstellt…';
-    try {
-      const result = await state.dataProvider.grantFirmware(username, target, expiresInHours);
-      $('admin-firmware-status').textContent = `Web-Flasher ${target} für ${username} bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())} freigegeben.`;
-    } catch (error) {
-      $('admin-firmware-status').textContent = error?.message || 'Freigabe fehlgeschlagen.';
-    } finally {
-      state.firmwareAdminBusy = false;
-    }
-  }
-
-  async function revokeFirmwareAccess() {
-    if (state.firmwareAdminBusy || !state.dataProvider?.revokeFirmware) return;
-    const username = String($('admin-firmware-user')?.value || '').trim();
-    const target = String($('admin-firmware-target')?.value || 'nanoesp32c6-n16');
-    if (!username) {
-      $('admin-firmware-status').textContent = 'Bitte Benutzer-E-Mail eingeben.';
-      return;
-    }
-    state.firmwareAdminBusy = true;
-    $('admin-firmware-status').textContent = 'Freigabe wird entzogen…';
-    try {
-      await state.dataProvider.revokeFirmware(username, target);
-      $('admin-firmware-status').textContent = `Web-Flasher-Freigabe ${target} für ${username} entzogen.`;
-    } catch (error) {
-      $('admin-firmware-status').textContent = error?.message || 'Freigabe konnte nicht entzogen werden.';
-    } finally {
-      state.firmwareAdminBusy = false;
-    }
   }
 
   async function beginLogin() {
@@ -943,6 +877,43 @@
     if (link) link.href = href;
   }
 
+  const mobileMapQuery = window.matchMedia('(max-width: 900px)');
+
+  function setLocationMapInteractive(active) {
+    const interaction = $('location-map-interaction');
+    const button = $('location-map-activate');
+    if (!interaction || !button) return;
+
+    const enabled = Boolean(active && mobileMapQuery.matches);
+    interaction.classList.toggle('is-interactive', enabled);
+    button.setAttribute('aria-pressed', String(enabled));
+    button.textContent = enabled ? 'Seitenscrollen' : 'Karte bedienen';
+  }
+
+  function initLocationMapInteraction() {
+    const interaction = $('location-map-interaction');
+    const button = $('location-map-activate');
+    if (!interaction || !button) return;
+
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      setLocationMapInteractive(!interaction.classList.contains('is-interactive'));
+    });
+    document.addEventListener('pointerdown', event => {
+      if (interaction.classList.contains('is-interactive') && !interaction.contains(event.target)) {
+        setLocationMapInteractive(false);
+      }
+    });
+    const resetInteraction = () => setLocationMapInteractive(false);
+    if (typeof mobileMapQuery.addEventListener === 'function') {
+      mobileMapQuery.addEventListener('change', resetInteraction);
+    } else {
+      mobileMapQuery.addListener?.(resetInteraction);
+    }
+    setLocationMapInteractive(false);
+  }
+
   function updateCoords(source = 'mqtt') {
     const lat = state.values['location/latitude'] ?? state.values['location/lat'] ?? state.values['gps/latitude'] ?? state.values['gps/lat'];
     const lon = state.values['location/longitude'] ?? state.values['location/lon'] ?? state.values['gps/longitude'] ?? state.values['gps/lon'];
@@ -974,7 +945,7 @@
     const img = vehicleCfg.image || 'img/microlino.jpeg';
     $('hero-image')?.setAttribute('src', img); $('brand-image')?.setAttribute('src', img);
     setText('vehicle-name', vehicleCfg.name || 'Microlino Pioneer'); setText('side-vehicle', mqttCfg.vehicleId || 'pioneer'); setText('side-topic', `${baseTopic()}/#`);
-    initBars(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
+    initBars(); initLocationMapInteraction(); setSoc(NaN); applyDefaultLocation(); updateDeviceInfo(); updateVehicleStatus();
   }
 
 
@@ -1041,6 +1012,7 @@ function resetDashboardForVehicle(vehicleId) {
   if (mapFrame) mapFrame.removeAttribute('src');
   const mapLink = $('location-map-link');
   if (mapLink) mapLink.removeAttribute('href');
+  setLocationMapInteractive(false);
 
   updateDeviceInfo();
   updateVehicleStatus();
@@ -1092,6 +1064,11 @@ async function selectVehicle(vehicleId) {
 function renderNotificationPreferences(preferences = null, message = '') {
   const panel = $('settings');
   const supported = Boolean(state.dataProvider?.getNotificationPreferences && auth?.isAuthenticated());
+  if (preferences) {
+    state.rangeKmAt100 = Number(preferences.rangeKmAt100 || vehicleCfg.defaultRangeKmAt100 || 140);
+    state.rangeReserveSoc = Number(preferences.rangeReserveSoc || 0);
+    renderRangeForecast();
+  }
   if (!panel) return;
   panel.hidden = !supported || !state.selectedVehicleId;
   if (panel.hidden) return;
@@ -1103,13 +1080,11 @@ function renderNotificationPreferences(preferences = null, message = '') {
     $('notification-email-enabled').checked = preferences.emailEnabled === true;
     $('notification-journey-email-enabled').checked = preferences.journeyEmailEnabled === true;
     $('notification-charging-summary-email-enabled').checked = preferences.chargingSummaryEmailEnabled === true;
+    $('notification-daily-summary-email-enabled').checked = preferences.dailySummaryEmailEnabled === true;
     $('notification-charging-stop-email-enabled').checked = preferences.chargingStopEmailEnabled === true;
     $('notification-charging-stop-threshold').value = Number(preferences.chargingStopThreshold || 80);
-    state.rangeKmAt100 = Number(preferences.rangeKmAt100 || vehicleCfg.defaultRangeKmAt100 || 140);
-    state.rangeReserveSoc = Number(preferences.rangeReserveSoc || 0);
     $('range-km-at-100').value = state.rangeKmAt100;
     $('range-reserve-soc').value = state.rangeReserveSoc;
-    renderRangeForecast();
     $('notification-email').value = preferences.email || '';
     $('notification-email-state').textContent = preferences.emailConfirmed
       ? 'E-Mail-Adresse bestätigt'
@@ -1122,7 +1097,8 @@ function renderNotificationPreferences(preferences = null, message = '') {
   }
   const disabled = state.notificationBusy || state.notificationReadOnly;
   ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
-    'notification-journey-email-enabled', 'notification-charging-summary-email-enabled', 'notification-charging-stop-email-enabled',
+    'notification-journey-email-enabled', 'notification-charging-summary-email-enabled',
+    'notification-daily-summary-email-enabled', 'notification-charging-stop-email-enabled',
     'notification-charging-stop-threshold', 'notification-email', 'notification-sms-phone',
     'range-km-at-100', 'range-reserve-soc', 'notification-save'
   ].forEach(id => { if ($(id)) $(id).disabled = disabled; });
@@ -1181,6 +1157,16 @@ function updateEmailConfirmationHelp() {
 async function loadNotificationPreferences(force = false) {
   if (!state.dataProvider?.getNotificationPreferences || !state.selectedVehicleId) return;
   if (!force && state.notificationVehicleId === state.selectedVehicleId) return;
+  if (!$('settings')) {
+    try {
+      const preferences = await state.dataProvider.getNotificationPreferences();
+      state.notificationVehicleId = state.selectedVehicleId;
+      renderNotificationPreferences(preferences);
+    } catch (error) {
+      console.error('Range settings failed:', error);
+    }
+    return;
+  }
   state.notificationBusy = true;
   state.smsNotificationStatus = null;
   state.smsNotificationError = '';
@@ -1219,12 +1205,17 @@ async function saveNotificationPreferences(event) {
     renderNotificationPreferences(null, 'Für Ladezusammenfassungen zuerst den E-Mail-Kanal aktivieren.');
     return;
   }
+  if ($('notification-daily-summary-email-enabled').checked && !$('notification-email-enabled').checked) {
+    renderNotificationPreferences(null, 'Für Tagesübersichten zuerst den E-Mail-Kanal aktivieren.');
+    return;
+  }
   const requestedPreferences = {
     enabled: $('notification-enabled').checked,
     threshold: Number($('notification-threshold').value),
     emailEnabled: $('notification-email-enabled').checked,
     journeyEmailEnabled: $('notification-journey-email-enabled').checked,
     chargingSummaryEmailEnabled: $('notification-charging-summary-email-enabled').checked,
+    dailySummaryEmailEnabled: $('notification-daily-summary-email-enabled').checked,
     chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked,
     chargingStopThreshold: Number($('notification-charging-stop-threshold').value),
     rangeKmAt100: Number($('range-km-at-100').value),
@@ -1375,10 +1366,6 @@ function startDataProvider() {
   $('auth-logout')?.addEventListener('click', beginLogout);
   $('vehicle-add')?.addEventListener('click', toggleOnboarding);
   $('onboarding-form')?.addEventListener('submit', submitOnboarding);
-  $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
-  $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
-  $('admin-firmware-form')?.addEventListener('submit', grantFirmwareAccess);
-  $('admin-firmware-revoke')?.addEventListener('click', revokeFirmwareAccess);
   $('firmware-connect')?.addEventListener('click', connectFirmwareAdapter);
   $('firmware-confirm')?.addEventListener('change', updateFirmwareConfirmation);
   $('firmware-flash')?.addEventListener('click', flashFirmware);
@@ -1412,7 +1399,6 @@ function startDataProvider() {
         setOnline(false, 'Anmeldung erforderlich');
         return;
       }
-      renderOnboardingAdmin();
     }
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();

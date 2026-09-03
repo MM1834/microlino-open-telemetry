@@ -107,7 +107,39 @@ detail-card layout is unchanged by this desktop-only rule.
 - Cells
 - Location
 
+On smartphone-sized viewports, the embedded OpenStreetMap is non-interactive by
+default so vertical gestures continue scrolling the dashboard. The explicit
+`Karte bedienen` control enables map pan and zoom; the same control switches
+back to page scrolling, and touching outside the map also leaves interaction
+mode. Desktop map interaction remains immediate, while the external
+OpenStreetMap link is always available.
+
+## Administration
+
+Privileged beta-onboarding claim issuance and Web-Flasher grant/revoke controls
+live on the separate `/dashboard/administration/` page. The dashboard exposes its
+Administration navigation entry only when the restored Cognito access token
+contains `mot-beta-admins`; the destination keeps all forms hidden until it has
+independently checked the same claim. Signed-out and non-administrator users see
+no privileged controls. The onboarding and firmware APIs remain the authoritative
+server-side authorization boundary.
+
+## Settings
+
+Personal, vehicle-specific range and notification controls live on the dedicated
+authenticated `/dashboard/settings/` page. It lists only the signed-in user's
+assigned vehicles and scopes each preference read and write to the selected
+vehicle. The page does not start telemetry polling or a WebSocket connection.
+The main dashboard retains only a background preference read for full-range and
+SOC-reserve values because those two settings directly affect its range forecast.
+
 ## Journey email preference
+
+The optional daily summary is independent from individual journey and charging
+emails. It totals completed events for the preceding `Europe/Zurich` calendar day,
+waits hourly for an active session until 08:05 and sends no email on an empty day.
+Sessions ending after midnight belong to their completion day rather than being
+split at midnight.
 
 The notification settings include a separate, default-off opt-in for qualifying
 journey summaries. It reuses the configured email channel and cannot be enabled

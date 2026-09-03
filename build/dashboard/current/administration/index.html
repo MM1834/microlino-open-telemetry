@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <title>MOT Administration</title>
+  <link rel="stylesheet" href="../css/dashboard.css?v=20260903-settings-page1" />
+  <script src="../js/i18n.js?v=20260903-settings-page1"></script>
+</head>
+<body class="admin-page">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../img/microlino.jpeg" alt="Microlino" />
+        <div><strong>MICROLINO</strong><span>Telemetrie Dashboard</span></div>
+      </div>
+      <nav class="nav">
+        <a href="../">⌂ Übersicht</a>
+        <a href="../settings/">⚙ Einstellungen</a>
+        <a class="active" href="./">⌘ Administration</a>
+      </nav>
+    </aside>
+
+    <main class="main admin-main">
+      <header class="topbar card compact admin-topbar">
+        <div>
+          <h1>Administration</h1>
+          <span class="muted">Geschützter Bereich für berechtigte Administratoren</span>
+        </div>
+        <div class="top-spacer"></div>
+        <label class="language-selector" for="dashboard-language">
+          <span>Sprache</span>
+          <select id="dashboard-language" aria-label="Sprache">
+            <option value="de">Deutsch</option>
+            <option value="en">Englisch</option>
+            <option value="fr">Französisch</option>
+          </select>
+        </label>
+        <div class="auth-controls">
+          <span id="admin-auth-status" class="auth-status" aria-live="polite">Sitzung wird geprüft…</span>
+          <button id="admin-login" class="auth-button" type="button" hidden>Anmelden</button>
+          <a class="auth-button secondary" href="../">Zum Dashboard</a>
+          <button id="admin-logout" class="auth-button" type="button" hidden>Abmelden</button>
+        </div>
+      </header>
+
+      <section id="admin-denied" class="card admin-access-card" hidden>
+        <h2>Zugriff nicht möglich</h2>
+        <p id="admin-denied-message">Diese Seite ist nur für berechtigte Administratoren verfügbar.</p>
+      </section>
+
+      <div id="admin-content" class="admin-content" hidden>
+        <section class="card onboarding-card admin-function-card">
+          <div>
+            <h1>Beta-Onboarding verwalten</h1>
+            <p>Erstellt einen einmaligen Claim für eine kontrollierte Fahrzeug-ID. Der Code wird nur hier angezeigt.</p>
+          </div>
+          <form id="admin-claim-form" class="onboarding-form" autocomplete="off">
+            <label for="admin-vehicle-id">Fahrzeug-ID</label>
+            <div class="onboarding-input-row">
+              <input id="admin-vehicle-id" name="vehicleId" required pattern="[a-z0-9][a-z0-9-]{0,63}" autocomplete="off" />
+              <button class="auth-button" type="submit">Claim erstellen</button>
+            </div>
+            <code id="admin-claim-output" class="claim-output" hidden></code>
+            <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
+            <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
+          </form>
+        </section>
+
+        <section class="card onboarding-card admin-function-card">
+          <div>
+            <h1>Web-Flasher freigeben</h1>
+            <p>Schaltet eine freigegebene Adapter-Firmware zeitlich begrenzt für einen Portal-Benutzer frei.</p>
+          </div>
+          <form id="admin-firmware-form" class="onboarding-form" autocomplete="off">
+            <label for="admin-firmware-user">Benutzer-E-Mail</label>
+            <input id="admin-firmware-user" name="username" type="email" required autocomplete="off" />
+            <label for="admin-firmware-target">Adaptertyp</label>
+            <select id="admin-firmware-target" name="target" required>
+              <option value="nanoesp32c6-n16">nanoESP32-C6 N16</option>
+              <option value="xiao-esp32c6">XIAO ESP32-C6</option>
+            </select>
+            <label for="admin-firmware-hours">Gültigkeit (Stunden)</label>
+            <input id="admin-firmware-hours" name="expiresInHours" type="number" min="1" max="168" value="48" required />
+            <div class="settings-actions">
+              <button id="admin-firmware-grant" class="auth-button" type="submit">Web-Flasher freigeben</button>
+              <button id="admin-firmware-revoke" class="auth-button secondary" type="button">Freigabe entziehen</button>
+            </div>
+            <span id="admin-firmware-status" class="connection-detail" aria-live="polite"></span>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="../config.js"></script>
+  <script src="../js/auth/pkce.js"></script>
+  <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
+  <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
+  <script src="../js/administration.js?v=20260903-admin-page1"></script>
+</body>
+</html>

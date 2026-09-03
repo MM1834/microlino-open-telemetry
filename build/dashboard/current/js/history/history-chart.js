@@ -71,6 +71,12 @@ async function render(hours=currentRangeHours){
     min:0,
     max:100,
     color:"#38bdf8",
+    secondary:{
+      field:"socInternal",
+      label:"Interner SoC",
+      color:"#a78bfa",
+      dash:[7,5]
+    },
     rangeHours:hours
   });
 
@@ -386,7 +392,16 @@ function draw(canvas,points,o){
 
   const L=42,R=18,T=18,B=28;
   const PW=w-L-R,PH=h-T-B;
-  const vals=points.map(p=>Number(p[o.field]));
+  const secondaryPoints=o.secondary
+    ?o.samples.filter(p=>p[o.secondary.field]!==null&&p[o.secondary.field]!==undefined&&Number.isFinite(Number(p[o.secondary.field])))
+    :[];
+  const allPoints=[...points,...secondaryPoints].sort((a,b)=>a.ts-b.ts);
+  const vals=allPoints.flatMap(p=>{
+    const values=[];
+    if(Number.isFinite(Number(p[o.field]))) values.push(Number(p[o.field]));
+    if(o.secondary&&Number.isFinite(Number(p[o.secondary.field]))) values.push(Number(p[o.secondary.field]));
+    return values;
+  });
   const minY=o.min ?? Math.min(...vals);
   let chartMinY=o.includeZero?Math.min(minY,0):minY;
   let maxY=o.max ?? Math.max(...vals,1);
@@ -421,8 +436,8 @@ function draw(canvas,points,o){
     ctx.fillText((maxY-(i*(maxY-chartMinY)/4)).toFixed(0),6,y+4);
   }
 
-  const minTs=points[0].ts;
-  const maxTs=points[points.length-1].ts||minTs+1;
+  const minTs=allPoints[0].ts;
+  const maxTs=allPoints[allPoints.length-1].ts||minTs+1;
   const x=ts=>L+((ts-minTs)/Math.max(1,maxTs-minTs))*PW;
   const y=v=>T+(1-(v-chartMinY)/(maxY-chartMinY))*PH;
 
@@ -461,6 +476,19 @@ function draw(canvas,points,o){
   ctx.lineWidth=3;
   ctx.stroke();
 
+  if(secondaryPoints.length){
+    ctx.beginPath();
+    secondaryPoints.forEach((p,i)=>{
+      const px=x(p.ts),py=y(Number(p[o.secondary.field]));
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    });
+    ctx.strokeStyle=o.secondary.color;
+    ctx.lineWidth=2.5;
+    ctx.setLineDash(o.secondary.dash||[]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   const first=points[0], last=points[points.length-1];
   const latestPoint=o.latestPoint||last;
   ctx.fillStyle="rgba(226,232,240,.95)";
@@ -469,14 +497,18 @@ function draw(canvas,points,o){
   const latestValue=o.formatValue
     ?o.formatValue(latestPoint[o.field],latestPoint)
     :Number(latestPoint[o.field]).toFixed(o.decimals??0);
-  ctx.fillText(`${o.label}: ${latestValue}${o.unit?" "+o.unit:""}`,w-R,T+14);
+  const secondaryLatest=secondaryPoints[secondaryPoints.length-1];
+  const secondaryLabel=secondaryLatest
+    ?` · ${o.secondary.label}: ${Number(secondaryLatest[o.secondary.field]).toFixed(o.decimals??0)}${o.unit?" "+o.unit:""}`
+    :"";
+  ctx.fillText(`${o.label}: ${latestValue}${o.unit?" "+o.unit:""}${secondaryLabel}`,w-R,T+14);
 
   ctx.fillStyle="rgba(148,163,184,.9)";
   ctx.font="11px system-ui";
   ctx.textAlign="left";
-  ctx.fillText(formatAxisTime(first.ts,o.rangeHours),L,h-8);
+  ctx.fillText(formatAxisTime(minTs,o.rangeHours),L,h-8);
   ctx.textAlign="right";
-  ctx.fillText(formatAxisTime(last.ts,o.rangeHours),w-R,h-8);
+  ctx.fillText(formatAxisTime(maxTs,o.rangeHours),w-R,h-8);
 }
 
 function formatAxisTime(timestamp,rangeHours=24){

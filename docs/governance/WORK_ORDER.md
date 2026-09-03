@@ -12,6 +12,21 @@
 
 ## High priority
 
+### Add an optional daily journey and charging summary
+
+**Active work package:** [DAY-SUM-001 — Daily Journey and Charging Summary](../project/sprints/DAY-SUM-001.md)
+
+**Objective:** Send one optional email per user, vehicle and Zurich calendar day
+with totals from completed journey and charging events, while waiting for active
+sessions until a bounded 08:05 deadline.
+
+**Current status:** Backend deployment is complete. The additive default-off
+preference, event aggregation, `Europe/Zurich` Scheduler, retry/idempotency
+boundary and portal control are implemented. Reviewed Change Set
+`day-sum-001-20260903` reached `UPDATE_COMPLETE` without replacing a table or
+Lambda function; scheduler and JWT-protection read-backs pass. Hosted portal
+upload and controlled live email/deferral acceptance remain open.
+
 ### Validate the optional charging-summary email
 
 **Active backend/portal sprint:** [CHG-SUM-001 — Email Charging Summary](../project/sprints/CHG-SUM-001.md)
@@ -66,7 +81,11 @@ Portal integration is repository-
 complete: admin grant/revoke, authorization-gated German/English/French UI,
 vendored Web Serial flasher, exact hardware and SHA-256 preflight, fixed write
 range, progress and result audit. The physical B025 N16 update passed. Hosted
-portal upload and physical XIAO acceptance remain open.
+portal upload and physical XIAO acceptance remain open. The REV15 release-integrity
+follow-up corrected stale embedded REV14 version strings in both catalog targets,
+activated exact new object hashes without replacement and added a packaging gate
+against manifest/binary version mismatch. `xruser` now has a bounded audited
+grant for the corrected XIAO image associated with `xrpioneer2`.
 
 ### Reject OTA images built for incompatible adapter hardware
 

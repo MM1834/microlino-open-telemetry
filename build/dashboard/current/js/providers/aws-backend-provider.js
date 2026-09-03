@@ -258,6 +258,11 @@
         );
       },
 
+      async getVehicles() {
+        const result = await get('/api/vehicles');
+        return Array.isArray(result) ? result : (result.vehicles || []);
+      },
+
       getSelectedVehicleId() { return activeVehicleId; },
 
       async claimVehicle(claim) {
