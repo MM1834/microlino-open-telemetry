@@ -100,6 +100,11 @@ class FakeBoto3(types.ModuleType):
 
 
 def load_lambda(resource_name, tables, environment, management=None):
+    tables = dict(tables)
+    environment = dict(environment)
+    if resource_name == "StateIngestFunction":
+        tables.setdefault("__debug__", VehicleHistoryTable())
+        environment.setdefault("DEBUG_TABLE_NAME", "__debug__")
     boto3 = FakeBoto3(tables, management)
     old_modules = {
         name: sys.modules.get(name)
@@ -546,6 +551,56 @@ class IngestAuthorizationTests(unittest.TestCase):
             "alpha", "charging/plugged", True, "boolean", 1_700_000_301_000
         ))
 
+    def test_debug_capture_is_vehicle_scoped_expiring_and_non_location(self):
+        debug = VehicleHistoryTable()
+        module = load_lambda(
+            "StateIngestFunction",
+            {
+                "state": VehicleStateTable(), "connections": ConnectionTable(),
+                "access": AccessTable({}), "history": VehicleHistoryTable(),
+                "debug": debug,
+            },
+            {
+                "TABLE_NAME": "state", "CONNECTION_TABLE_NAME": "connections",
+                "ACCESS_TABLE_NAME": "access", "WEBSOCKET_API_ID": "api",
+                "WEBSOCKET_STAGE": "$default", "AWS_REGION": "eu-north-1",
+                "HISTORY_TABLE_NAME": "history", "HISTORY_ENABLED": "false",
+                "DEBUG_TABLE_NAME": "debug", "DEBUG_ENABLED": "true",
+                "DEBUG_VEHICLE_ALLOWLIST": "alpha",
+                "DEBUG_CAPTURE_UNTIL_EPOCH_SECONDS": "1700000100",
+                "DEBUG_RETENTION_DAYS": "7",
+            },
+        )
+        module.time = types.SimpleNamespace(time=lambda: 1_700_000_000)
+        received_at = 1_700_000_001_123
+        self.assertTrue(module.store_debug(
+            "alpha", "bms/pack_voltage", 52, "number", received_at
+        ))
+        self.assertTrue(module.store_debug(
+            "alpha", "bms/future_confirmed_pid", 123, "number", received_at + 1
+        ))
+        self.assertFalse(module.store_debug(
+            "beta", "bms/pack_current", -20, "number", received_at + 2
+        ))
+        self.assertFalse(module.store_debug(
+            "alpha", "location/latitude", 47, "number", received_at + 3
+        ))
+        self.assertFalse(module.store_debug(
+            "alpha", "bms/json", {"raw": 1}, "json_object", received_at + 4
+        ))
+        self.assertEqual(2, len(debug.items))
+        self.assertEqual(
+            f"{received_at:013d}#bms/pack_voltage", debug.items[0]["sampleKey"]
+        )
+        self.assertEqual(
+            7 * 86400,
+            debug.items[0]["expiresAt"] - debug.items[0]["receivedAt"] // 1000,
+        )
+        module.time = types.SimpleNamespace(time=lambda: 1_700_000_101)
+        self.assertFalse(module.store_debug(
+            "alpha", "bms/pack_voltage", 53, "number", received_at + 5
+        ))
+
     def test_speed_history_samples_driving_minutes_and_one_stop(self):
         history = VehicleHistoryTable()
         module = load_lambda(
@@ -704,6 +759,20 @@ class TemplateStructureTests(unittest.TestCase):
         self.assertIn("MaxValue: 31", template)
         self.assertIn("VehicleHistoryDailyWriteAlarm:", template)
         self.assertIn('RouteKey: "GET /api/vehicles/{vehicleId}/history"', template)
+
+    def test_debug_guardrails_are_fail_closed_and_separate(self):
+        template = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn("EnableTelemetryDebug:", template)
+        self.assertIn("TelemetryDebugVehicleAllowlist:", template)
+        self.assertIn("TelemetryDebugCaptureUntilEpochSeconds:", template)
+        self.assertIn("TelemetryDebugRetentionDays:", template)
+        self.assertIn("VehicleDebugHistoryTable:", template)
+        self.assertIn("VehicleDebugHistoryDailyWriteAlarm:", template)
+        self.assertIn('Default: "false"', template)
+        self.assertIn('Default: ""', template)
+        self.assertIn("Default: 0", template)
+        self.assertIn('not topic_suffix.startswith(("display/", "charging/", "bms/"))', template)
+        self.assertNotIn('topic_suffix.startswith(("location/"', template)
 
     def test_vehicle_api_has_capacity_for_thirty_day_history(self):
         template = TEMPLATE.read_text(encoding="utf-8")

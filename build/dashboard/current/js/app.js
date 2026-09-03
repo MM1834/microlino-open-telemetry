@@ -25,6 +25,10 @@
     onboardingBusy: false,
     onboardingRequired: false,
     onboardingExpanded: false,
+    firmwareAccess: null,
+    firmwareFlasher: null,
+    firmwareBusy: false,
+    firmwareAdminBusy: false,
     notificationBusy: false,
     notificationVehicleId: null,
     notificationReadOnly: false,
@@ -153,6 +157,146 @@
     const output = $('admin-claim-output');
     if (output) { output.textContent = ''; output.hidden = true; }
     renderOnboardingAdmin('Claim-Anzeige wurde geleert.');
+  }
+
+  function renderFirmwareAccess(message = '') {
+    const panel = $('firmware-flasher');
+    const access = state.firmwareAccess;
+    const authorized = access?.authorized === true && access.release;
+    if (!panel) return;
+    panel.hidden = !authorized;
+    if (!authorized) return;
+
+    const release = access.release;
+    $('firmware-release-version').textContent = release.version || '--';
+    const flashMb = Number(release.flashSizeBytes) / (1024 * 1024);
+    $('firmware-release-target').textContent = `${release.target} · ${release.chipFamily} · ${flashMb} MB`;
+    $('firmware-release-sha').textContent = release.sha256 || '--';
+    $('firmware-access-expiry').textContent = new Date(access.expiresAt * 1000).toLocaleString(activeLocale());
+    const supported = Boolean(state.firmwareFlasher?.supported());
+    $('firmware-browser-warning').hidden = supported;
+    $('firmware-connect').disabled = state.firmwareBusy || !supported;
+    $('firmware-confirm').disabled = state.firmwareBusy || !state.firmwareFlasher?.getDeviceInfo();
+    $('firmware-flash').disabled = state.firmwareBusy
+      || !$('firmware-confirm').checked || !state.firmwareFlasher?.getDeviceInfo();
+    if (message) $('firmware-status').textContent = message;
+  }
+
+  function setFirmwareStatus(message, level = 'info') {
+    const status = $('firmware-status');
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.level = level;
+  }
+
+  async function loadFirmwareAccess() {
+    if (!state.dataProvider?.getFirmwareAccess) return;
+    try {
+      state.firmwareAccess = await state.dataProvider.getFirmwareAccess();
+      if (!state.firmwareAccess?.authorized) {
+        renderFirmwareAccess();
+        return;
+      }
+      const module = await import('./firmware/web-flasher.js?v=20260901-webflash10');
+      state.firmwareFlasher = module.createWebFlasher({
+        onStatus: setFirmwareStatus,
+        onProgress: percent => {
+          const progress = $('firmware-progress');
+          progress.hidden = false;
+          progress.value = percent;
+        },
+        onLog: line => {
+          const output = $('firmware-log');
+          output.textContent += `${line}\n`;
+          output.scrollTop = output.scrollHeight;
+        }
+      });
+      renderFirmwareAccess();
+    } catch (error) {
+      console.error('Firmware access failed:', error);
+      state.firmwareAccess = null;
+      renderFirmwareAccess();
+    }
+  }
+
+  async function connectFirmwareAdapter() {
+    if (state.firmwareBusy || !state.firmwareFlasher) return;
+    state.firmwareBusy = true;
+    $('firmware-confirm').checked = false;
+    $('firmware-log').textContent = '';
+    $('firmware-progress').hidden = true;
+    renderFirmwareAccess();
+    try {
+      const device = await state.firmwareFlasher.connect(state.firmwareAccess.release);
+      $('firmware-device').textContent = `${device.chipName} · ${device.flashSize}`;
+    } catch (error) {
+      console.error('Firmware preflight failed:', error);
+      $('firmware-device').textContent = 'Prüfung fehlgeschlagen';
+    } finally {
+      state.firmwareBusy = false;
+      renderFirmwareAccess();
+    }
+  }
+
+  async function flashFirmware() {
+    if (state.firmwareBusy || !state.firmwareFlasher || !$('firmware-confirm').checked) return;
+    state.firmwareBusy = true;
+    renderFirmwareAccess();
+    try {
+      await state.firmwareFlasher.flash({
+        authorizeDownload: () => state.dataProvider.authorizeFirmwareDownload(),
+        reportResult: (operationId, result, target) => state.dataProvider.reportFirmwareResult(operationId, result, target)
+      });
+      $('firmware-device').textContent = 'Update abgeschlossen · Adapter neu gestartet';
+      $('firmware-confirm').checked = false;
+    } catch (error) {
+      console.error('Firmware update failed:', error);
+    } finally {
+      state.firmwareBusy = false;
+      renderFirmwareAccess();
+    }
+  }
+
+  function updateFirmwareConfirmation() {
+    renderFirmwareAccess();
+  }
+
+  async function grantFirmwareAccess(event) {
+    event.preventDefault();
+    if (state.firmwareAdminBusy || !state.dataProvider?.grantFirmware) return;
+    const username = String($('admin-firmware-user')?.value || '').trim();
+    const target = String($('admin-firmware-target')?.value || 'nanoesp32c6-n16');
+    const expiresInHours = Number($('admin-firmware-hours')?.value || 48);
+    state.firmwareAdminBusy = true;
+    $('admin-firmware-status').textContent = 'Freigabe wird erstellt…';
+    try {
+      const result = await state.dataProvider.grantFirmware(username, target, expiresInHours);
+      $('admin-firmware-status').textContent = `Web-Flasher ${target} für ${username} bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())} freigegeben.`;
+    } catch (error) {
+      $('admin-firmware-status').textContent = error?.message || 'Freigabe fehlgeschlagen.';
+    } finally {
+      state.firmwareAdminBusy = false;
+    }
+  }
+
+  async function revokeFirmwareAccess() {
+    if (state.firmwareAdminBusy || !state.dataProvider?.revokeFirmware) return;
+    const username = String($('admin-firmware-user')?.value || '').trim();
+    const target = String($('admin-firmware-target')?.value || 'nanoesp32c6-n16');
+    if (!username) {
+      $('admin-firmware-status').textContent = 'Bitte Benutzer-E-Mail eingeben.';
+      return;
+    }
+    state.firmwareAdminBusy = true;
+    $('admin-firmware-status').textContent = 'Freigabe wird entzogen…';
+    try {
+      await state.dataProvider.revokeFirmware(username, target);
+      $('admin-firmware-status').textContent = `Web-Flasher-Freigabe ${target} für ${username} entzogen.`;
+    } catch (error) {
+      $('admin-firmware-status').textContent = error?.message || 'Freigabe konnte nicht entzogen werden.';
+    } finally {
+      state.firmwareAdminBusy = false;
+    }
   }
 
   async function beginLogin() {
@@ -724,6 +868,26 @@
       case 'bms/cell_min_mv': setText('cell-min', `${fmtNum(Number(val)/1000,3)} V`); break;
       case 'bms/cell_max_mv': setText('cell-max', `${fmtNum(Number(val)/1000,3)} V`); break;
       case 'bms/cell_delta_mv': setText('cell-delta', `${fmtNum(val,0)} mV`); break;
+      case 'bms/soc_internal':
+        setText('bms-soc-internal', `${fmtNum(val,0)}%`);
+        $('bms-soc-internal-row')?.removeAttribute('hidden');
+        $('bms-soc-details')?.removeAttribute('hidden');
+        break;
+      case 'bms/soc_display':
+        setText('bms-soc-display', `${fmtNum(val,0)}%`);
+        $('bms-soc-display-row')?.removeAttribute('hidden');
+        $('bms-soc-details')?.removeAttribute('hidden');
+        break;
+      case 'bms/standard_soc':
+        setText('bms-standard-soc', `${fmtNum(val,2)}%`);
+        $('bms-standard-soc-row')?.removeAttribute('hidden');
+        $('bms-soc-details')?.removeAttribute('hidden');
+        break;
+      case 'bms/soh_percent':
+        setText('bms-soh', `${fmtNum(val,2)}%`);
+        $('bms-soh-row')?.removeAttribute('hidden');
+        $('bms-soc-details')?.removeAttribute('hidden');
+        break;
       case 'system/firmware': case 'system/version': case 'system/firmware_version': setText('fw-version', val); break;
       case 'system/device_id': setText('device-id', val); break;
       case 'system/rssi': case 'system/wifi_rssi': setText('rssi', `${fmtNum(val,0)} dBm`); break;
@@ -859,6 +1023,10 @@ function resetDashboardForVehicle(vehicleId) {
   setText('charge-voltage', '-- V');
   setText('current', '-- A');
   setText('charge-current', '-- A');
+  $('bms-soc-details')?.setAttribute('hidden', '');
+  for (const id of ['bms-soc-internal-row', 'bms-soc-display-row', 'bms-standard-soc-row', 'bms-soh-row']) {
+    $(id)?.setAttribute('hidden', '');
+  }
 
   setText('fw-version', '--');
   setText('device-id', '--');
@@ -934,6 +1102,7 @@ function renderNotificationPreferences(preferences = null, message = '') {
     $('notification-threshold').value = Number(preferences.threshold || 80);
     $('notification-email-enabled').checked = preferences.emailEnabled === true;
     $('notification-journey-email-enabled').checked = preferences.journeyEmailEnabled === true;
+    $('notification-charging-summary-email-enabled').checked = preferences.chargingSummaryEmailEnabled === true;
     $('notification-charging-stop-email-enabled').checked = preferences.chargingStopEmailEnabled === true;
     $('notification-charging-stop-threshold').value = Number(preferences.chargingStopThreshold || 80);
     state.rangeKmAt100 = Number(preferences.rangeKmAt100 || vehicleCfg.defaultRangeKmAt100 || 140);
@@ -953,7 +1122,7 @@ function renderNotificationPreferences(preferences = null, message = '') {
   }
   const disabled = state.notificationBusy || state.notificationReadOnly;
   ['notification-enabled', 'notification-threshold', 'notification-email-enabled',
-    'notification-journey-email-enabled', 'notification-charging-stop-email-enabled',
+    'notification-journey-email-enabled', 'notification-charging-summary-email-enabled', 'notification-charging-stop-email-enabled',
     'notification-charging-stop-threshold', 'notification-email', 'notification-sms-phone',
     'range-km-at-100', 'range-reserve-soc', 'notification-save'
   ].forEach(id => { if ($(id)) $(id).disabled = disabled; });
@@ -1046,11 +1215,16 @@ async function saveNotificationPreferences(event) {
     renderNotificationPreferences(null, 'Für Ladestopp-Meldungen zuerst den E-Mail-Kanal aktivieren.');
     return;
   }
+  if ($('notification-charging-summary-email-enabled').checked && !$('notification-email-enabled').checked) {
+    renderNotificationPreferences(null, 'Für Ladezusammenfassungen zuerst den E-Mail-Kanal aktivieren.');
+    return;
+  }
   const requestedPreferences = {
     enabled: $('notification-enabled').checked,
     threshold: Number($('notification-threshold').value),
     emailEnabled: $('notification-email-enabled').checked,
     journeyEmailEnabled: $('notification-journey-email-enabled').checked,
+    chargingSummaryEmailEnabled: $('notification-charging-summary-email-enabled').checked,
     chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked,
     chargingStopThreshold: Number($('notification-charging-stop-threshold').value),
     rangeKmAt100: Number($('range-km-at-100').value),
@@ -1203,6 +1377,11 @@ function startDataProvider() {
   $('onboarding-form')?.addEventListener('submit', submitOnboarding);
   $('admin-claim-form')?.addEventListener('submit', issueOnboardingClaim);
   $('admin-claim-clear')?.addEventListener('click', clearIssuedClaim);
+  $('admin-firmware-form')?.addEventListener('submit', grantFirmwareAccess);
+  $('admin-firmware-revoke')?.addEventListener('click', revokeFirmwareAccess);
+  $('firmware-connect')?.addEventListener('click', connectFirmwareAdapter);
+  $('firmware-confirm')?.addEventListener('change', updateFirmwareConfirmation);
+  $('firmware-flash')?.addEventListener('click', flashFirmware);
   $('notification-form')?.addEventListener('submit', saveNotificationPreferences);
   $('notification-email')?.addEventListener('input', updateEmailConfirmationHelp);
   $('notification-sms-request')?.addEventListener('click', requestSmsVerification);
@@ -1237,6 +1416,7 @@ function startDataProvider() {
     }
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();
+    await loadFirmwareAccess();
   }
 
   bootstrap().catch(error => {

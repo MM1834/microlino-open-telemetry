@@ -4,6 +4,7 @@
 #include <Client.h>
 
 void setupLilygoModem();
+bool lilygoConfigureIntegratedGpsNmea(bool enabled);
 
 bool lilygoGprsConnected();
 bool lilygoEnsureGprsConnected();

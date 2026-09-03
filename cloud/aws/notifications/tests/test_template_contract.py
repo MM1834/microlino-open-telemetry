@@ -59,6 +59,37 @@ class TemplateContractTests(unittest.TestCase):
         self.assertNotIn("sms_delivery", journey)
         self.assertNotIn("send_text_message", journey)
 
+    def test_charging_summary_is_email_only_and_uses_standard_state(self):
+        summary = HANDLER.split("def dispatch_charging_summary", 1)[1].split("def send_charging_summaries", 1)[0]
+        self.assertIn("sns.publish", summary)
+        self.assertNotIn("sms_delivery", summary)
+        self.assertNotIn("debug", summary.lower())
+        self.assertIn("chargingSummaryEmailEnabled", PREFERENCE_API)
+        self.assertIn("CHARGING_SUMMARY_DELAY_SECONDS", HANDLER)
+
+    def test_legacy_plain_counter_id_is_narrowly_accepted(self):
+        self.assertIn("allow_plain_counter_id", HANDLER)
+        self.assertIn('r"[A-Za-z0-9_-]{1,80}"', HANDLER)
+        self.assertIn(
+            'allow_plain_counter_id=(suffix == "journey/energy_counter_id")',
+            HANDLER,
+        )
+
+    def test_stable_stop_is_finalized_before_resumed_movement(self):
+        self.assertIn("resumed_after_stable_stop", HANDLER)
+        self.assertIn("finalize_stable_stop=True", HANDLER)
+        first = HANDLER.index("finalize_stable_stop=True")
+        second = HANDLER.index(
+            "update_journey(vehicle_id, suffix, value, received_at)", first
+        )
+        self.assertLess(first, second)
+
+    def test_journey_state_isolated_from_charging_session_contention(self):
+        self.assertIn('JOURNEY_SESSION_PREFIX = "journey#"', HANDLER)
+        self.assertIn("JOURNEY_UPDATE_ATTEMPTS = 12", HANDLER)
+        self.assertIn('"journeyVehicleId": vehicle_id', HANDLER)
+        self.assertIn("_journey_retry_delay(attempt)", HANDLER)
+
     def test_sms_admin_approval_is_separate_from_user_preference_api(self):
         self.assertIn("SmsApprovalTable:", TEMPLATE)
         self.assertIn("SmsApprovalAuditTable:", TEMPLATE)

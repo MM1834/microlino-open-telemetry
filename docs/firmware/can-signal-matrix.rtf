@@ -36,7 +36,7 @@ mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
 | Signal | Display CAN | Pioneer Standard CAN (V1 vehicle) | Externally supplied / newer large-battery vehicle | Current assessment |\
 |---|---|---|---|---|\
 | Display SOC | `0x602 data[0] / 2` | No equivalent confirmed | External source: `0x18D data[7]`; large-battery live frame: `0x05` with meaning unknown | Display CAN confirmed by existing decoder. The external V2 assignment cannot be generalized to the tested large-battery vehicle. |\
-| Standard/BMS SOC candidate | Not used | `0x18D data[7]` | External source: same byte; large-battery semantics unknown | Raw Pioneer field confirmed, semantics unresolved. Keep every source and vehicle generation separate. |\
+| Standard/BMS SOC candidate | Not used | `0x48D data[6]` internal candidate; `data[7]` display-correlated SOC | `0x1B1 data[0..1] / 100`, big-endian | Pioneer fields confirmed as separate whole-percent values; internal semantics remain provisional. Large-battery scan contains no `0x48D`. |\
 | Speed | `0x602 data[1] / 2` | Not found | No supplied mapping | Display-CAN decoder field. |\
 | Odometer | `0x602 data[4..7]` with current packed scaling | Not found | No supplied mapping | Display-CAN decoder field. |\
 | HV pack voltage | Not currently decoded | `0x18D data[3..4]`, unsigned little-endian mV | External source: same mapping; large-battery frame decodes to impossible 792 mV | Confirmed only on Pioneer. The supplied mapping is unusable on the tested large-battery vehicle. |\
@@ -46,7 +46,7 @@ mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
 | Active charging | Current `0x603` power-threshold inference is not reliable | Positive signed `0x18D data[1..2]`; idle offset about -3/-4 | Unknown on the large-battery vehicle | Confirmed only on Pioneer across start, stable charge, AC removal and natural completion. |\
 | Cell values A/B | Not decoded | `0x4AD data[0..1]` and `[2..3]`, unsigned little-endian mV | External source: same mapping; `0x4AD` absent on tested large-battery vehicle | Plausible on Pioneer. External vehicle assignment is unresolved and the mapping is unusable on the tested vehicle. |\
 | Cell min/max/delta | Not decoded | Derived from the two `0x4AD` values | External source: same derivation; unavailable without `0x4AD` on large-battery vehicle | Plausible only for the observed Pioneer payload. |\
-| SOH | Not decoded | Not found | `0x1B1 data[2..3] / 100` candidate | Externally indicated only. |\
+| SOH | Not decoded | Not found | `0x1B1 data[2..3] / 100` candidate | 83 identical large-battery frames decode to plausible 97.01%; external validation still pending. |\
 | Pedal/power request | `0x603 data[4]` is the dashboard power display | `0x37F data[2..3]` candidate | Same candidate | `0x37F` was present but constant in stationary Pioneer testing; driving evidence is required. |\
 \
 ## Pioneer Standard-CAN findings\
@@ -61,6 +61,13 @@ mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
 | `data[5]` | `uint8` | unknown | Stable `0x00` in recorded phases | Unknown |\
 | `data[6]` | `uint8` state | `0x10` unplugged; `0x20` plugged | Confirmed by repeated powered and AC-deenergized plug tests; transient `0x04` also occurred | V2 source calls it a charge/status byte |\
 | `data[7]` | `uint8` | Standard/BMS SOC candidate | Raw value confirmed; stayed 90 while Pioneer display showed 97\'96100% | Same byte was supplied as Display SOC; large-battery live value `0x05` remains uninterpreted |\
+\
+### CAN ID `0x48D` (Pioneer only)\
+\
+| Bytes | Decoding | MOT topic | Evidence |\
+|---|---|---|---|\
+| `data[6]` | whole percent | `bms/soc_internal` | Separate internal SOC-like value; followed charge/discharge but remained about 6-8 points below display SOC |\
+| `data[7]` | whole percent | `bms/soc_display` | Matched visible Pioneer SOC exactly through controlled driving, rest and charging |\
 \
 ### Charging evidence for `0x18D data[1..2]`\
 \

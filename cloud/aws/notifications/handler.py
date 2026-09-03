@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import random
 import re
 import time
 from dataclasses import asdict, fields
@@ -16,6 +17,10 @@ from botocore.exceptions import ClientError
 from notification_state import (
     CHARGING_STOP_DELAY_MS, ChargingSessionState, apply_update,
     charging_stop_due, crossed_threshold,
+)
+from charging_summary_state import (
+    SUMMARY_DELAY_MS, ChargingSummaryState, apply as apply_charging_summary,
+    delayed_due as charging_summary_due,
 )
 from journey_state import (
     STOP_DELAY_MS, JourneyState, apply_inactivity_timeout,
@@ -38,6 +43,7 @@ email_topic_arn = os.environ["EMAIL_TOPIC_ARN"]
 charging_stop_queue_url = os.environ.get("CHARGING_STOP_QUEUE_URL", "")
 event_retention_days = min(31, max(1, int(os.environ.get("EVENT_RETENTION_DAYS", "31"))))
 CHARGING_STOP_DELAY_SECONDS = CHARGING_STOP_DELAY_MS // 1000
+CHARGING_SUMMARY_DELAY_SECONDS = SUMMARY_DELAY_MS // 1000
 SMS_PHONE = re.compile(r"^\+(41|49)[1-9][0-9]{7,11}$")
 sms_delivery_enabled = os.environ.get("SMS_DELIVERY_ENABLED", "false") == "true"
 sms_sender_arn = os.environ.get("SMS_SENDER_ARN", "")
@@ -55,11 +61,19 @@ JOURNEY_SUFFIXES = {
     "journey/energy_net_wh",
 }
 RELEVANT_SUFFIXES = CHARGING_SUFFIXES | JOURNEY_SUFFIXES
+JOURNEY_SESSION_PREFIX = "journey#"
+JOURNEY_UPDATE_ATTEMPTS = 12
 
 
-def _decode(encoded):
+def _decode(encoded, allow_plain_counter_id=False):
     raw = base64.b64decode(encoded or "")
-    return json.loads(raw.decode("utf-8"), parse_float=Decimal)
+    text = raw.decode("utf-8")
+    try:
+        return json.loads(text, parse_float=Decimal)
+    except json.JSONDecodeError:
+        if allow_plain_counter_id and re.fullmatch(r"[A-Za-z0-9_-]{1,80}", text):
+            return text
+        raise
 
 
 def _number(value):
@@ -106,6 +120,39 @@ def _item(vehicle_id, state, version, current=None):
     if state.is_charging is not None:
         item["isCharging"] = state.is_charging
     return item
+
+
+def _summary_state(item):
+    stored = item.get("chargingSummary") or {}
+    names = {field.name for field in fields(ChargingSummaryState)}
+    return ChargingSummaryState(**{
+        key: _number(value) for key, value in stored.items() if key in names
+    })
+
+
+def update_charging_summary(vehicle_id, suffix, value, received_at):
+    for _ in range(4):
+        current = sessions.get_item(Key={"vehicleId": vehicle_id}, ConsistentRead=True).get("Item", {})
+        version = int(current.get("version", 0))
+        before = _summary_state(current)
+        after = apply_charging_summary(before, suffix, _number(value), received_at)
+        if after == before:
+            return before, after
+        item = dict(current)
+        item.update({"vehicleId": vehicle_id, "version": version + 1,
+                     "chargingSummary": _ddb(asdict(after)), "updatedAt": int(time.time() * 1000)})
+        kwargs = {"Item": item, "ConditionExpression": "attribute_not_exists(vehicleId)"}
+        if version:
+            kwargs.update({"ConditionExpression": "#version=:version",
+                           "ExpressionAttributeNames": {"#version": "version"},
+                           "ExpressionAttributeValues": {":version": version}})
+        try:
+            sessions.put_item(**kwargs)
+            return before, after
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise
+    raise RuntimeError("charging summary session contention")
 
 
 def update_session(vehicle_id, suffix, value, received_at):
@@ -237,13 +284,55 @@ def _ddb(value):
     return value
 
 
+def _journey_session_id(vehicle_id):
+    return f"{JOURNEY_SESSION_PREFIX}{vehicle_id}"
+
+
+def _journey_retry_delay(attempt):
+    time.sleep(min(0.1, 0.005 * (2 ** min(attempt, 4))) * (0.5 + random.random()))
+
+
+def _read_journey_session(vehicle_id):
+    """Read the isolated Journey item, seeding it once from the legacy item."""
+    session_id = _journey_session_id(vehicle_id)
+    current = sessions.get_item(
+        Key={"vehicleId": session_id}, ConsistentRead=True
+    ).get("Item", {})
+    if current:
+        return current
+
+    legacy = sessions.get_item(
+        Key={"vehicleId": vehicle_id}, ConsistentRead=True
+    ).get("Item", {})
+    seed = {
+        "vehicleId": session_id,
+        "journeyVehicleId": vehicle_id,
+        "version": 1,
+        "journey": _ddb(asdict(_journey_state(legacy))),
+        "updatedAt": int(time.time() * 1000),
+    }
+    try:
+        sessions.put_item(
+            Item=seed,
+            ConditionExpression="attribute_not_exists(vehicleId)",
+        )
+        return seed
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+            raise
+    return sessions.get_item(
+        Key={"vehicleId": session_id}, ConsistentRead=True
+    ).get("Item", {})
+
+
 def _put_journey(vehicle_id, current, state):
     version = int(current.get("version", 0))
-    item = dict(current)
-    item.update({
-        "vehicleId": vehicle_id, "version": version + 1,
+    item = {
+        "vehicleId": _journey_session_id(vehicle_id),
+        "journeyVehicleId": vehicle_id,
+        "version": version + 1,
         "journey": _ddb(asdict(state)), "updatedAt": int(time.time() * 1000),
-    })
+    }
     kwargs = {
         "Item": item, "ConditionExpression": "attribute_not_exists(vehicleId)"
     }
@@ -257,20 +346,31 @@ def _put_journey(vehicle_id, current, state):
 
 
 def update_journey(vehicle_id, suffix, value, received_at):
-    for _ in range(4):
-        current = sessions.get_item(
-            Key={"vehicleId": vehicle_id}, ConsistentRead=True
-        ).get("Item", {})
+    for attempt in range(JOURNEY_UPDATE_ATTEMPTS):
+        current = _read_journey_session(vehicle_id)
         before = _journey_state(current)
-        after = apply_journey_update(before, suffix, _number(value), received_at)
+        normalized = _number(value)
+        if (
+            suffix == "display/speed_kmh"
+            and not isinstance(normalized, bool)
+            and isinstance(normalized, (int, float))
+            and normalized > 1
+            and before.active_id
+            and before.stopped_at
+            and not before.charging_after_stop
+            and received_at - before.stopped_at >= STOP_DELAY_MS
+        ):
+            return before, True
+        after = apply_journey_update(before, suffix, normalized, received_at)
         if after == before:
-            return after
+            return after, False
         try:
             _put_journey(vehicle_id, current, after)
-            return after
+            return after, False
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
                 raise
+            _journey_retry_delay(attempt)
     raise RuntimeError("journey session contention")
 
 
@@ -349,6 +449,62 @@ def enqueue_charging_stop(vehicle_id, state):
         }, separators=(",", ":")),
     )
     return True
+
+
+def enqueue_charging_summary(vehicle_id, state):
+    if not charging_stop_queue_url or not state.session_id or not state.stop_candidate_at:
+        return False
+    sqs.send_message(QueueUrl=charging_stop_queue_url,
+        DelaySeconds=CHARGING_SUMMARY_DELAY_SECONDS,
+        MessageBody=json.dumps({"type": "charging_summary", "vehicleId": vehicle_id,
+            "sessionId": state.session_id, "candidateAt": state.stop_candidate_at}, separators=(",", ":")))
+    return True
+
+
+def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
+    material = f'{preference["userSub"]}|{vehicle_id}|charging-summary|{state.session_id}'.encode()
+    identifier = hashlib.sha256(material).hexdigest()
+    now = int(time.time())
+    try:
+        events.put_item(Item={"eventId": identifier, "eventType": "CHARGING_SUMMARY",
+            "userSub": preference["userSub"], "vehicleId": vehicle_id,
+            "sessionId": state.session_id, "receivedAt": ended_at, "createdAt": now * 1000,
+            "expiresAt": now + event_retention_days * 86400, "status": "RESERVED"},
+            ConditionExpression="attribute_not_exists(eventId)")
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return 0
+        raise
+    name = str(preference.get("vehicleName") or vehicle_id)[:40]
+    duration = max(1, round((ended_at - state.started_at) / 60000))
+    start_soc = "unbekannt" if state.start_soc is None else f"{state.start_soc:g}%"
+    end_soc = "unbekannt" if state.last_soc is None else f"{state.last_soc:g}%"
+    delta = "unbekannt" if state.start_soc is None or state.last_soc is None else f"{state.last_soc-state.start_soc:+g} Prozentpunkte"
+    text = (f"MOT Ladezusammenfassung für {name} ({vehicle_id})\n\n"
+            f"Start-SOC (Display-CAN): {start_soc}\nEnd-SOC (Display-CAN): {end_soc}\n"
+            f"SOC-Änderung: {delta}\nDauer: {duration} Minuten\n"
+            f"Geschätzte geladene Energie: {state.energy_kwh:.2f} kWh\n"
+            f"Abschluss: {'Fahrzeug ausgesteckt' if reason == 'unplugged' else '10 Minuten nicht mehr geladen'}\n\n"
+            "Passive Telemetrie; keine Ladesteuerung.")
+    result = sns.publish(TopicArn=email_topic_arn,
+        Subject=f"MOT - Ladezusammenfassung {end_soc} ({vehicle_id})"[:100], Message=text,
+        MessageAttributes={"recipientKey": {"DataType": "String", "StringValue": str(preference["recipientKey"])}})
+    record_deliveries(identifier, [{"channel": "EMAIL", "messageId": result["MessageId"]}])
+    return 1
+
+
+def send_charging_summaries(vehicle_id, state, ended_at, reason):
+    return sum(dispatch_charging_summary(pref, vehicle_id, state, ended_at, reason)
+               for pref in list_preferences(vehicle_id, None)
+               if pref.get("emailEnabled") is True and pref.get("chargingSummaryEmailEnabled") is True)
+
+
+def validate_charging_summary(message, now_ms):
+    vehicle_id, session_id = str(message.get("vehicleId", "")), str(message.get("sessionId", ""))
+    candidate_at = int(message.get("candidateAt", 0))
+    item = sessions.get_item(Key={"vehicleId": vehicle_id}, ConsistentRead=True).get("Item", {})
+    state = _summary_state(item)
+    return send_charging_summaries(vehicle_id, state, candidate_at, "timeout") if charging_summary_due(state, session_id, candidate_at, now_ms) else 0
 
 
 def charging_stop_event_id(preference, vehicle_id, state, threshold):
@@ -532,14 +688,14 @@ def dispatch_journey(preference, identifier, vehicle_id, summary):
     return deliveries
 
 
-def finalize_journey(vehicle_id, now_ms):
+def finalize_journey(vehicle_id, now_ms, finalize_stable_stop=False):
     """Atomically close one due journey and emit each user's email once."""
-    for _ in range(4):
-        current = sessions.get_item(
-            Key={"vehicleId": vehicle_id}, ConsistentRead=True
-        ).get("Item", {})
+    for attempt in range(JOURNEY_UPDATE_ATTEMPTS):
+        current = _read_journey_session(vehicle_id)
         state = apply_inactivity_timeout(_journey_state(current), now_ms)
-        summary, reason = summarize_journey(state, now_ms)
+        summary, reason = summarize_journey(
+            state, now_ms, finalize_stable_stop=finalize_stable_stop
+        )
         if reason == "not_due":
             return 0, reason
         try:
@@ -551,6 +707,7 @@ def finalize_journey(vehicle_id, now_ms):
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
                 raise
+            _journey_retry_delay(attempt)
     else:
         raise RuntimeError("journey finalization contention")
     if not summary:
@@ -573,10 +730,22 @@ def finalize_due_journeys(now_ms):
         result = sessions.scan(**scan)
         for item in result.get("Items", []):
             state = _journey_state(item)
-            if state.active_id:
-                count, _ = finalize_journey(item["vehicleId"], now_ms)
+            journey_vehicle_id = item.get("journeyVehicleId")
+            if journey_vehicle_id and state.active_id:
+                count, _ = finalize_journey(journey_vehicle_id, now_ms)
                 dispatched += count
                 evaluated += 1
+            elif state.active_id and not str(item.get("vehicleId", "")).startswith(
+                JOURNEY_SESSION_PREFIX
+            ):
+                isolated = sessions.get_item(
+                    Key={"vehicleId": _journey_session_id(item["vehicleId"])},
+                    ConsistentRead=True,
+                ).get("Item")
+                if not isolated:
+                    count, _ = finalize_journey(item["vehicleId"], now_ms)
+                    dispatched += count
+                    evaluated += 1
         key = result.get("LastEvaluatedKey")
         if not key:
             break
@@ -591,9 +760,10 @@ def handler(event, context):
     ):
         dispatched = 0
         for record in event["Records"]:
-            dispatched += validate_charging_stop(
-                json.loads(record.get("body") or "{}"), int(time.time() * 1000)
-            )
+            message = json.loads(record.get("body") or "{}")
+            dispatched += (validate_charging_summary(message, int(time.time() * 1000))
+                           if message.get("type") == "charging_summary" else
+                           validate_charging_stop(message, int(time.time() * 1000)))
         return {"accepted": True, "delayed": True, "deliveries": dispatched}
     if event.get("source") == "aws.events":
         return finalize_due_journeys(int(time.time() * 1000))
@@ -606,7 +776,10 @@ def handler(event, context):
     if suffix not in RELEVANT_SUFFIXES:
         return {"accepted": True, "relevant": False}
     received_at = int(event.get("receivedAt") or time.time() * 1000)
-    value = _decode(event.get("payloadBase64"))
+    value = _decode(
+        event.get("payloadBase64"),
+        allow_plain_counter_id=(suffix == "journey/energy_counter_id"),
+    )
     dispatched = 0
     if suffix in CHARGING_SUFFIXES:
         before, after = update_session(vehicle_id, suffix, value, received_at)
@@ -616,6 +789,11 @@ def handler(event, context):
             and after.stop_candidate_at == received_at
         ):
             enqueue_charging_stop(vehicle_id, after)
+    summary_before, summary_after = update_charging_summary(vehicle_id, suffix, value, received_at)
+    if suffix == "charging/is_charging" and value is False and summary_after.stop_candidate_at == received_at:
+        enqueue_charging_summary(vehicle_id, summary_after)
+    if suffix == "charging/plugged" and value is False and summary_before.active:
+        dispatched += send_charging_summaries(vehicle_id, summary_before, received_at, "unplugged")
     if suffix == "display/soc":
         for preference in list_preferences(vehicle_id):
             threshold = float(preference.get("threshold", 80))
@@ -630,7 +808,15 @@ def handler(event, context):
                     preference, identifier, vehicle_id, threshold, crossing.current_soc
                 ))
     if suffix in JOURNEY_SUFFIXES:
-        state = update_journey(vehicle_id, suffix, value, received_at)
+        state, resumed_after_stable_stop = update_journey(
+            vehicle_id, suffix, value, received_at
+        )
+        if resumed_after_stable_stop:
+            completed, _ = finalize_journey(
+                vehicle_id, received_at, finalize_stable_stop=True
+            )
+            dispatched += completed
+            state, _ = update_journey(vehicle_id, suffix, value, received_at)
         if (
             state.active_id and state.stopped_at
             and (

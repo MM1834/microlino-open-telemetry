@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "board_config.h"
 #include "config/configuration_manager.h"
 #include "decoders/decoder_profile.h"
 
@@ -18,7 +19,7 @@ struct LilygoConfig {
     String mqttUser;
     String mqttPass;
     String deviceName;
-    String vehicleId = "pioneer-lilygo";
+    String vehicleId = LILYGO_DEFAULT_VEHICLE_ID;
     String mqttPrefix = "mot";
     bool otaEnabled = false;
     String otaPassword;

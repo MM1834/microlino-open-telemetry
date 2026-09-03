@@ -35,7 +35,7 @@ void setStringIfPresent(const JsonDocument& doc, const char* key, String& target
 
 String lilygoDeviceName()
 {
-    return ConfigurationManager::normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
+    return ConfigurationManager::normalizeIdentifier(config.deviceName, String(LILYGO_DEFAULT_DEVICE_PREFIX) + chipSuffix());
 }
 
 bool LilygoConfig::validLocalAdminPassword(const String& password)
@@ -55,8 +55,8 @@ bool LilygoConfig::localAdminConfigured() const
 
 void LilygoConfigurationManager::normalize()
 {
-    config.deviceName = normalizeIdentifier(config.deviceName, String("mot-lilygo-") + chipSuffix());
-    config.vehicleId = normalizeIdentifier(config.vehicleId, "pioneer-lilygo");
+    config.deviceName = normalizeIdentifier(config.deviceName, String(LILYGO_DEFAULT_DEVICE_PREFIX) + chipSuffix());
+    config.vehicleId = normalizeIdentifier(config.vehicleId, LILYGO_DEFAULT_VEHICLE_ID);
     config.mqttPrefix = normalizeTopicPrefix(config.mqttPrefix);
     config.mqttPort = normalizePort(config.mqttPort);
     config.lteApn.trim();
@@ -81,7 +81,7 @@ void LilygoConfigurationManager::load()
     config.mqttServiceEnabled = prefs.isKey("svcMqtt") ? prefs.getBool("svcMqtt", false) : !config.mqttHost.isEmpty();
     config.awsServiceEnabled = prefs.isKey("svcAws") ? prefs.getBool("svcAws", true) : true;
     config.deviceName = getStringOrDefault("deviceName", "");
-    config.vehicleId = getStringOrDefault("vehicleId", "pioneer-lilygo");
+    config.vehicleId = getStringOrDefault("vehicleId", LILYGO_DEFAULT_VEHICLE_ID);
     config.mqttPrefix = getStringOrDefault("mqttPrefix", "mot");
     const bool securityV1 = prefs.getBool("securityV1", false);
     config.otaEnabled = securityV1 && prefs.getBool("otaEnabled", false);

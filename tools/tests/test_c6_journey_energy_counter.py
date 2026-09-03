@@ -46,7 +46,8 @@ class C6JourneyEnergyCounterTests(unittest.TestCase):
 
     def test_checkpoint_is_bounded_and_non_retained(self) -> None:
         self.assertIn("CHECKPOINT_MS = 60000", COUNTER)
-        self.assertIn('"journey/energy_counter_id", String(state.counterId), false', COUNTER)
+        self.assertIn("counterIdJson += '\"';", COUNTER)
+        self.assertIn('"journey/energy_counter_id", counterIdJson, false', COUNTER)
         self.assertIn('"journey/energy_drawn_wh", drawnWh(), false', COUNTER)
         self.assertIn('"journey/energy_regen_wh", regenWh(), false', COUNTER)
 

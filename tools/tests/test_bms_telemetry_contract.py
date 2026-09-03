@@ -22,6 +22,9 @@ class BmsTelemetryContractTests(unittest.TestCase):
         self.assertIn("telemetry.bms.vehiclePowerW = -powerW", source)
         self.assertIn("telemetry.bms.isRegenerating", source)
         self.assertIn("telemetry.bms.isDischarging", source)
+        self.assertIn("frame.id == 0x48D", pioneer)
+        self.assertIn("telemetry.bms.socInternal = frame.data[6]", pioneer)
+        self.assertIn("telemetry.bms.socDisplay = frame.data[7]", pioneer)
 
     def test_v2_decoder_uses_large_battery_big_endian_layout(self) -> None:
         source = (ROOT / "firmware/common/decoders/decoder_standard_can_v2.cpp").read_text()
@@ -85,6 +88,10 @@ class BmsTelemetryContractTests(unittest.TestCase):
                     '"bms/cell_min_mv"',
                     '"bms/cell_max_mv"',
                     '"bms/cell_delta_mv"',
+                    '"bms/soc_internal"',
+                    '"bms/soc_display"',
+                    '"bms/standard_soc"',
+                    '"bms/soh_percent"',
                 ):
                     self.assertIn(topic, source)
 
@@ -100,8 +107,18 @@ class BmsTelemetryContractTests(unittest.TestCase):
             "bms/cell_min_mv",
             "bms/cell_max_mv",
             "bms/cell_delta_mv",
+            "bms/soc_internal",
+            "bms/soc_display",
+            "bms/standard_soc",
+            "bms/soh_percent",
         ):
             self.assertIn(topic, source)
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        self.assertIn('id="bms-soc-details"', html)
+        self.assertIn('id="bms-soc-internal-row" hidden', html)
+        self.assertIn('id="bms-soc-display-row" hidden', html)
+        self.assertIn('id="bms-standard-soc-row" hidden', html)
+        self.assertIn('id="bms-soh-row" hidden', html)
 
     def test_compatibility_power_uses_vehicle_sign_convention(self) -> None:
         for path in (

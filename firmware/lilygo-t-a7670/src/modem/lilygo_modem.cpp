@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <Client.h>
 
-#ifndef TINY_GSM_MODEM_A76XXSSL
+#if !defined(TINY_GSM_MODEM_SIM7670G) && !defined(TINY_GSM_MODEM_A76XXSSL)
 #define TINY_GSM_MODEM_A76XXSSL
 #endif
 
@@ -43,6 +43,12 @@ static uint32_t tcpOpenCount = 0;
 static uint32_t tcpFailCount = 0;
 static uint32_t bytesWritten = 0;
 static uint32_t bytesRead = 0;
+
+#if defined(TINY_GSM_MODEM_SIM7670G)
+static constexpr const char* MODEM_BACKEND = "LewisXhe TinyGSM SIM7670G";
+#else
+static constexpr const char* MODEM_BACKEND = "LewisXhe TinyGSM A76XXSSL";
+#endif
 
 static void traceAppend(const String& line)
 {
@@ -90,6 +96,12 @@ static void setupPins()
     pinMode(MODEM_DTR_PIN, OUTPUT);
     digitalWrite(MODEM_DTR_PIN, LOW);
 #endif
+
+#ifdef BOARD_POWER_SAVE_MODE_PIN
+    pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
+    // High selects the full-current modem supply mode required during LTE use.
+    digitalWrite(BOARD_POWER_SAVE_MODE_PIN, HIGH);
+#endif
 }
 
 static void powerKeyPulse()
@@ -104,14 +116,14 @@ static void powerKeyPulse()
     digitalWrite(MODEM_PWRKEY_PIN, LOW);
     delay(100);
     digitalWrite(MODEM_PWRKEY_PIN, HIGH);
-    delay(1000);
+    delay(MODEM_POWERON_PULSE_WIDTH_MS);
     digitalWrite(MODEM_PWRKEY_PIN, LOW);
 #endif
 }
 
 static bool initTinyGsmModem()
 {
-    Serial.println("Initializing modem with LewisXhe TinyGSM A76XXSSL...");
+    Serial.printf("Initializing modem with %s...\n", MODEM_BACKEND);
     traceAppend("modem.init");
 
     modemReadyFlag = modem.init();
@@ -201,7 +213,11 @@ static bool connectNetworkAndGprs(uint32_t timeoutMs = 15000)
 
 void setupLilygoModem()
 {
+#if defined(LILYGO_SIM7670G_S3_STANDARD)
+    Serial.println("LilyGO T-SIM7670G-S3: LTE modem setup");
+#else
     Serial.println("LilyGO T-A7670G: LTE modem setup");
+#endif
     Serial.printf(
         "Modem pins RX=%d TX=%d PWR=%d POWER_ON=%d RST=%d DTR=%d RI=%d\n",
         MODEM_RX_PIN,
@@ -240,6 +256,24 @@ void setupLilygoModem()
     SerialAT.begin(MODEM_BAUD, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
     delay(300);
 
+#if defined(LILYGO_SIM7670G_S3_STANDARD)
+    // PWRKEY toggles the modem state. Probe first so an already running modem
+    // is not accidentally switched off, then allow the cold boot enough time
+    // to expose its UART before calling the more extensive init sequence.
+    bool responding = modem.testAT(1000);
+    if (!responding) {
+        powerKeyPulse();
+        const uint32_t deadline = millis() + 15000;
+        while (!responding && static_cast<int32_t>(deadline - millis()) > 0) {
+            delay(500);
+            responding = modem.testAT(1000);
+        }
+    }
+    if (!responding) {
+        Serial.println("SIM7670G UART did not respond after power-on");
+    }
+    initTinyGsmModem();
+#else
     powerKeyPulse();
     delay(3000);
 
@@ -249,9 +283,44 @@ void setupLilygoModem()
         delay(5000);
         initTinyGsmModem();
     }
+#endif
 
     // Packet data is established by the WiFi-first network manager only when
     // WiFi is unavailable. Modem setup must not delay a working WiFi path.
+}
+
+bool lilygoConfigureIntegratedGpsNmea(bool enabled)
+{
+#if defined(LILYGO_SIM7670G_S3_STANDARD)
+    if (!modemReadyFlag) {
+        lastMessage = "SIM7670G GNSS unavailable: modem not ready";
+        traceAppend(lastMessage);
+        return false;
+    }
+
+    if (!enabled) {
+        modem.disableNMEA();
+        const bool disabled = modem.disableGPS(
+            MODEM_GPS_ENABLE_GPIO,
+            MODEM_GPS_ENABLE_LEVEL ? 0 : 1);
+        lastMessage = disabled ? "SIM7670G GNSS disabled" : "SIM7670G GNSS disable failed";
+        traceAppend(lastMessage);
+        return disabled;
+    }
+
+    bool ok = modem.enableGPS(MODEM_GPS_ENABLE_GPIO, MODEM_GPS_ENABLE_LEVEL);
+    if (ok) ok = modem.setGPSBaud(GPS_BAUD);
+    if (ok) ok = modem.setGPSMode(15);  // GPS + GLONASS + Galileo + BeiDou
+    if (ok) ok = modem.setGPSOutputRate(1);
+    if (ok) ok = modem.enableNMEA(false);  // route NMEA to GPIO48/45, not AT UART
+
+    lastMessage = ok ? "SIM7670G GNSS NMEA ready" : "SIM7670G GNSS NMEA setup failed";
+    traceAppend(lastMessage);
+    return ok;
+#else
+    (void)enabled;
+    return false;
+#endif
 }
 
 bool lilygoEnsureGprsConnected()
@@ -317,6 +386,23 @@ Client* lilygoTinyGsmSecureClient()
     return &lteSecureClient;
 }
 
+static bool uploadTlsFile(const char* filename, const String& contents)
+{
+#if defined(TINY_GSM_MODEM_SIM7670G)
+    // SIM7670G exposes the generic SIMCom filesystem API rather than the
+    // A76XX certificate download helpers. fs_del() may fail when the file is
+    // absent, which is harmless; fs_write() returns the written byte count.
+    modem.fs_del(filename);
+    return modem.fs_write(
+        filename,
+        reinterpret_cast<const uint8_t*>(contents.c_str()),
+        contents.length()) == contents.length();
+#else
+    modem.deleteCertificate(filename);
+    return modem.downloadCertificate(filename, contents.c_str());
+#endif
+}
+
 bool lilygoConfigureAwsTlsClient(
     const String& rootCa,
     const String& certificate,
@@ -330,20 +416,17 @@ bool lilygoConfigureAwsTlsClient(
 
     // SIMCom stores TLS material in its own filesystem. Never trace the
     // buffers; only report which upload stage failed.
-    modem.deleteCertificate(ROOT_CA_FILE);
-    if (!modem.downloadCertificate(ROOT_CA_FILE, rootCa.c_str())) {
+    if (!uploadTlsFile(ROOT_CA_FILE, rootCa)) {
         lastMessage = "AWS TLS: root CA upload failed";
         traceAppend(lastMessage);
         return false;
     }
-    modem.deleteCertificate(CLIENT_CERT_FILE);
-    if (!modem.downloadCertificate(CLIENT_CERT_FILE, certificate.c_str())) {
+    if (!uploadTlsFile(CLIENT_CERT_FILE, certificate)) {
         lastMessage = "AWS TLS: client certificate upload failed";
         traceAppend(lastMessage);
         return false;
     }
-    modem.deleteCertificate(PRIVATE_KEY_FILE);
-    if (!modem.downloadCertificate(PRIVATE_KEY_FILE, privateKey.c_str())) {
+    if (!uploadTlsFile(PRIVATE_KEY_FILE, privateKey)) {
         lastMessage = "AWS TLS: private key upload failed";
         traceAppend(lastMessage);
         return false;
@@ -460,7 +543,7 @@ String lilygoLteTcpTestJson(const String& host, uint16_t port)
     lilygoLteTcpClose();
 
     String json = "{";
-    json += "\"backend\":\"LewisXhe TinyGSM A76XXSSL\",";
+    json += "\"backend\":\"" + String(MODEM_BACKEND) + "\",";
     json += "\"host\":\"" + esc(host) + "\",";
     json += "\"port\":" + String(port) + ",";
     json += "\"tcpOpen\":" + String(ok ? "true" : "false") + ",";
@@ -477,7 +560,7 @@ String lilygoLteTcpTestJson(const String& host, uint16_t port)
 String lilygoLteRxDebugJson()
 {
     String json = "{";
-    json += "\"backend\":\"LewisXhe TinyGSM A76XXSSL\",";
+    json += "\"backend\":\"" + String(MODEM_BACKEND) + "\",";
     json += "\"tcpOpenFlag\":" + String(tcpOpenFlag ? "true" : "false") + ",";
     json += "\"available\":" + String(lteClient.available()) + ",";
     json += "\"connected\":" + String(lteClient.connected() ? "true" : "false") + ",";
@@ -511,7 +594,7 @@ String lilygoModemStatusJson()
     int signal = modemReadyFlag ? modem.getSignalQuality() : 99;
 
     String json = "{";
-    json += "\"backend\":\"LewisXhe TinyGSM A76XXSSL\",";
+    json += "\"backend\":\"" + String(MODEM_BACKEND) + "\",";
     json += "\"modemReady\":" + String(modemReadyFlag ? "true" : "false") + ",";
     json += "\"networkReady\":" + String(networkReadyFlag ? "true" : "false") + ",";
     json += "\"gprsAttached\":" + String(lilygoGprsConnected() ? "true" : "false") + ",";

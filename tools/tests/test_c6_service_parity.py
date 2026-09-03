@@ -180,8 +180,10 @@ class C6ServiceParityTests(unittest.TestCase):
 
     def test_gps_control_is_compact_and_can2_is_fixed_in_wizard(self) -> None:
         self.assertIn("class='compact-control'", WEB)
+        self.assertIn(".compact-control button{display:block;margin-top:10px}", WEB)
         self.assertIn("> Enable GPS</label>", WEB)
-        self.assertIn("class='secondary-small'>Save &amp; reboot", WEB)
+        self.assertIn("action='/wizard/hardware'", WEB)
+        self.assertIn("class='secondary-small'>Save hardware &amp; continue", WEB)
         vehicle_page = WEB.split("case OnboardingStep::Vehicle:", 1)[1].split(
             "case OnboardingStep::Services:", 1
         )[0]
@@ -196,32 +198,41 @@ class C6ServiceParityTests(unittest.TestCase):
 
     def test_settings_steps_have_one_unambiguous_continue_action(self) -> None:
         self.assertIn("const bool settingsStep", WEB)
+        self.assertIn("step == onboardingStepNumber(OnboardingStep::Hardware)", WEB)
         self.assertIn("step == onboardingStepNumber(OnboardingStep::Connectivity)", WEB)
         self.assertIn("step == onboardingStepNumber(OnboardingStep::Vehicle)", WEB)
         self.assertIn("step == onboardingStepNumber(OnboardingStep::Services)", WEB)
+        self.assertIn("step == onboardingStepNumber(OnboardingStep::Validation)", WEB)
         self.assertIn("Save WiFi &amp; continue", WEB)
         self.assertIn("Save CAN &amp; continue", WEB)
         self.assertNotIn("Save, reboot &amp; continue", WEB)
 
-    def test_unchanged_can_wizard_settings_continue_without_reboot(self) -> None:
+    def test_wizard_configuration_steps_never_reboot_individually(self) -> None:
+        hardware_handler = WEB.split("void wizardHardwareSave()", 1)[1].split("void onboardingStep()", 1)[0]
+        self.assertNotIn("scheduleReboot();", hardware_handler)
         handler = WEB.split("void wizardVehicleSave()", 1)[1].split("void wizardServicesSave()", 1)[0]
-        self.assertIn("const bool profilesChanged", handler)
-        self.assertIn("if (!profilesChanged)", handler)
-        self.assertLess(handler.index("if (!profilesChanged)"), handler.index("scheduleReboot();"))
+        self.assertNotIn("scheduleReboot();", handler)
         self.assertIn('server.sendHeader("Location", "/wizard")', handler)
-        self.assertIn("restarts only if a CAN profile was changed", WEB)
-
-    def test_unchanged_wifi_continues_and_cloud_toggle_reboots_before_validation(self) -> None:
         wifi_handler = WEB.split("void wizardConnectivitySave()", 1)[1].split("void wizardVehicleSave()", 1)[0]
-        self.assertIn("const bool settingsChanged", wifi_handler)
-        self.assertIn("if (!settingsChanged)", wifi_handler)
-        self.assertLess(wifi_handler.index("if (!settingsChanged)"), wifi_handler.index("scheduleReboot();"))
-        services_handler = WEB.split("void wizardServicesSave()", 1)[1].split("void onboardingStatus()", 1)[0]
-        self.assertIn("const bool motCloudChanged", services_handler)
-        self.assertIn("if (motCloudChanged)", services_handler)
-        self.assertIn("scheduleReboot();", services_handler)
-        self.assertIn("continue at validation", services_handler)
-        self.assertIn("applies immediately without another restart", WEB)
+        self.assertNotIn("scheduleReboot();", wifi_handler)
+        services_handler = WEB.split("void wizardServicesSave()", 1)[1].split("void wizardApply()", 1)[0]
+        self.assertNotIn("scheduleReboot();", services_handler)
+
+    def test_wizard_applies_all_settings_with_one_final_restart(self) -> None:
+        self.assertIn("<h2>Review and apply</h2>", WEB)
+        self.assertIn("action='/wizard/apply'", WEB)
+        self.assertIn("Apply settings &amp; restart", WEB)
+        self.assertIn("actual IP address is assigned by the router only after a real connection", WEB)
+        self.assertIn("One final device restart is required", WEB)
+        self.assertIn("After the device restart, reconnect to", WEB)
+        self.assertIn("sign in as <b>admin</b> to complete device onboarding", WEB)
+        apply_handler = WEB.split("void wizardApply()", 1)[1].split("void onboardingStatus()", 1)[0]
+        self.assertIn("OnboardingStep::Finish", apply_handler)
+        self.assertIn("scheduleReboot();", apply_handler)
+        self.assertIn("restarting once", apply_handler)
+        finish_page = WEB.split("case OnboardingStep::Finish:", 1)[1].split("break;", 1)[0]
+        self.assertIn("Device and telemetry validation", finish_page)
+        self.assertIn("c6WizardAccessNotice()", finish_page)
 
     def test_aws_status_exposes_tls_failure_diagnostics(self) -> None:
         aws_header = (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.h").read_text(encoding="utf-8")

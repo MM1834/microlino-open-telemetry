@@ -45,8 +45,10 @@ class Table:
         return self.fixture.get("access_scan", {"Items": []})
 
     def get_item(self, **kwargs):
-        key = next(iter(kwargs["Key"].values()))
-        item = self.fixture.get(self.name, {}).get(key)
+        values = kwargs["Key"]
+        key = (values.get("userSub"), values.get("target"))
+        items = self.fixture.get(self.name, {})
+        item = items.get(key, items.get(values.get("userSub", next(iter(values.values())))))
         return {"Item": item} if item else {}
 
 
@@ -66,10 +68,31 @@ class Client:
         self.transactions.append(kwargs["TransactItems"])
 
 
+class CognitoClient:
+    def __init__(self, users=None):
+        self.users = users or {}
+
+    def admin_get_user(self, **kwargs):
+        user = self.users.get(kwargs["Username"])
+        if not user:
+            raise ClientError()
+        return {
+            "Enabled": True,
+            "UserAttributes": [{"Name": "sub", "Value": user}],
+        }
+
+
+class S3Client:
+    def generate_presigned_url(self, operation, **kwargs):
+        assert operation == "get_object"
+        assert kwargs["ExpiresIn"] <= 300
+        return "https://private.example/short-lived"
+
+
 def load_handler():
     boto3 = types.ModuleType("boto3")
     boto3.resource = lambda _name: Resource({})
-    boto3.client = lambda _name: Client()
+    boto3.client = lambda _name, **_kwargs: Client()
     dynamodb = types.ModuleType("boto3.dynamodb")
     types_module = types.ModuleType("boto3.dynamodb.types")
     types_module.TypeSerializer = Serializer
@@ -101,6 +124,24 @@ def load_handler():
     module.ACCESS_TABLE = "access"
     module.AUDIT_TABLE = "audit"
     module.STATE_TABLE = "state-table"
+    module.FIRMWARE_GRANTS_TABLE = "firmware-grants"
+    module.FIRMWARE_BUCKET = "private-firmware"
+    module.FIRMWARE_ARTIFACT_KEY = "releases/n16.bin"
+    module.FIRMWARE_TARGET = "nanoesp32c6-n16"
+    module.FIRMWARE_FLASH_SIZE_BYTES = 16 * 1024 * 1024
+    module.FIRMWARE_VERSION = "C6-001-REV14-AWS"
+    module.FIRMWARE_SHA256 = "a" * 64
+    module.FIRMWARE_SIZE = 123456
+    module.FIRMWARE_SECONDARY_ARTIFACT_KEY = ""
+    module.FIRMWARE_SECONDARY_TARGET = ""
+    module.FIRMWARE_SECONDARY_FLASH_SIZE_BYTES = 0
+    module.FIRMWARE_SECONDARY_VERSION = ""
+    module.FIRMWARE_SECONDARY_SHA256 = ""
+    module.FIRMWARE_SECONDARY_SIZE = 0
+    module.FIRMWARE_URL_TTL_SECONDS = 300
+    module.COGNITO_USER_POOL_ID = "pool"
+    module.cognito_client = CognitoClient({"pilot@example.com": "pilot-sub"})
+    module.s3_client = S3Client()
     return module
 
 
@@ -232,6 +273,98 @@ class ClaimHandlerTests(unittest.TestCase):
             {"error": "claim_invalid_or_unavailable"}, json.loads(result["body"])
         )
         self.assertEqual(2, len(self.client.transactions[0]))
+
+    def test_firmware_grant_requires_admin_and_is_exact_and_expiring(self):
+        denied = self.module.handler(event(
+            "POST /api/firmware/grants",
+            {"username": "pilot@example.com", "expiresInHours": 48},
+        ), None)
+        self.assertEqual(403, denied["statusCode"])
+        granted = self.module.handler(event(
+            "POST /api/firmware/grants",
+            {"username": "pilot@example.com", "target": "nanoesp32c6-n16", "expiresInHours": 48},
+            subject="admin-sub", groups=["mot-beta-admins"],
+        ), None)
+        self.assertEqual(200, granted["statusCode"])
+        stored = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "pilot-sub"}, stored["userSub"])
+        self.assertEqual({"S": "nanoesp32c6-n16"}, stored["target"])
+        self.assertEqual({"S": "a" * 64}, stored["sha256"])
+
+    def test_firmware_access_is_hidden_without_active_exact_grant(self):
+        self.module.dynamodb = Resource({})
+        result = self.module.handler(event("GET /api/firmware/access", {}), None)
+        self.assertEqual({"authorized": False}, json.loads(result["body"]))
+        self.module.dynamodb = Resource({
+            "firmware-grants": {"user-a": {
+                "status": "ACTIVE", "expiresAt": int(self.module.time.time()) + 100,
+                "version": self.module.FIRMWARE_VERSION,
+                "sha256": self.module.FIRMWARE_SHA256,
+            }}
+        })
+        result = self.module.handler(event("GET /api/firmware/access", {}), None)
+        self.assertTrue(json.loads(result["body"])["authorized"])
+
+    def test_parallel_users_receive_only_their_exact_target_release(self):
+        self.module.FIRMWARE_SECONDARY_ARTIFACT_KEY = "releases/xiao.bin"
+        self.module.FIRMWARE_SECONDARY_TARGET = "xiao-esp32c6"
+        self.module.FIRMWARE_SECONDARY_FLASH_SIZE_BYTES = 4 * 1024 * 1024
+        self.module.FIRMWARE_SECONDARY_VERSION = "C6-001-REV14-AWS"
+        self.module.FIRMWARE_SECONDARY_SHA256 = "b" * 64
+        self.module.FIRMWARE_SECONDARY_SIZE = 120000
+        expires = int(self.module.time.time()) + 100
+        self.module.dynamodb = Resource({"firmware-grants": {
+            ("n16-user", "nanoesp32c6-n16"): {
+                "status": "ACTIVE", "expiresAt": expires,
+                "version": self.module.FIRMWARE_VERSION,
+                "sha256": self.module.FIRMWARE_SHA256,
+            },
+            ("xiao-user", "xiao-esp32c6"): {
+                "status": "ACTIVE", "expiresAt": expires,
+                "version": self.module.FIRMWARE_SECONDARY_VERSION,
+                "sha256": self.module.FIRMWARE_SECONDARY_SHA256,
+            },
+        }})
+        n16 = self.module.handler(event(
+            "GET /api/firmware/access", {}, subject="n16-user"
+        ), None)
+        xiao = self.module.handler(event(
+            "GET /api/firmware/access", {}, subject="xiao-user"
+        ), None)
+        self.assertEqual("nanoesp32c6-n16", json.loads(n16["body"])["release"]["target"])
+        self.assertEqual("xiao-esp32c6", json.loads(xiao["body"])["release"]["target"])
+        self.assertNotIn("artifactKey", json.loads(xiao["body"])["release"])
+
+    def test_firmware_download_requires_grant_and_returns_only_short_lived_url(self):
+        self.module.dynamodb = Resource({})
+        denied = self.module.handler(event("POST /api/firmware/download", {}), None)
+        self.assertEqual(403, denied["statusCode"])
+        self.module.dynamodb = Resource({
+            "firmware-grants": {"user-a": {
+                "status": "ACTIVE", "expiresAt": int(self.module.time.time()) + 100,
+                "version": self.module.FIRMWARE_VERSION,
+                "sha256": self.module.FIRMWARE_SHA256,
+            }}
+        })
+        result = self.module.handler(event("POST /api/firmware/download", {}), None)
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertEqual("https://private.example/short-lived", body["url"])
+        self.assertLessEqual(body["urlExpiresAt"] - int(self.module.time.time()), 300)
+        self.assertEqual(1, len(self.client.transactions[-1]))
+
+    def test_firmware_result_accepts_only_bounded_outcomes(self):
+        bad = self.module.handler(event(
+            "POST /api/firmware/result", {"operationId": "short", "result": "ERASED"}
+        ), None)
+        self.assertEqual(400, bad["statusCode"])
+        good = self.module.handler(event(
+            "POST /api/firmware/result",
+            {"operationId": "A" * 24, "result": "SUCCEEDED", "target": "nanoesp32c6-n16"},
+        ), None)
+        self.assertEqual(200, good["statusCode"])
+        audit = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "FIRMWARE_FLASH_SUCCEEDED"}, audit["eventType"])
 
 
 if __name__ == "__main__":

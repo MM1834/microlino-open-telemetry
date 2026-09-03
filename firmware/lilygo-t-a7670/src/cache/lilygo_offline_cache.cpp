@@ -9,7 +9,10 @@
 #include "telemetry/telemetry.h"
 
 namespace {
-constexpr size_t MAX_BYTES = 131072;
+#ifndef MOT_OFFLINE_CACHE_MAX_BYTES
+#define MOT_OFFLINE_CACHE_MAX_BYTES 131072
+#endif
+constexpr size_t MAX_BYTES = MOT_OFFLINE_CACHE_MAX_BYTES;
 constexpr char DIRECTORY[] = "/offline-cache";
 constexpr char PATH[] = "/offline-cache/history.bin";
 constexpr char NEXT_PATH[] = "/offline-cache/history.next";

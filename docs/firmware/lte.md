@@ -12,6 +12,9 @@ management, TCP client diagnostics and an AWS IoT X.509 transport.
 - `T-A7670X-AWS` prefers WiFi and falls back to the A7670 secure client when GPRS
   is connected. It uploads the per-device CA/certificate/private-key material to
   the modem certificate store and reports the active `WiFi` or `LTE` transport.
+- `T-SIM7670G-S3-Standard-AWS` preserves that policy on the 16 MB ESP32-S3 board.
+  It uses the SIM7670 generic modem filesystem for TLS material and remains a
+  build-qualified candidate pending physical AWS TLS/failover acceptance.
 - `lilygo-t-a7670` contains legacy MQTT transport selection preferring WiFi and
   falling back to an LTE client when GPRS is connected.
 

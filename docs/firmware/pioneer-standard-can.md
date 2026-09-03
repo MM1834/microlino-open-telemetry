@@ -15,6 +15,23 @@ Only standard frames with DLC 8 are accepted.
 | `data[6]` | `0x10` unplugged, `0x20` plugged | stable plug state | Confirmed; `0x04` is transitional |
 | `data[7]` | source-specific byte | Standard-CAN SOC field | Not Pioneer display SOC; must not replace Display-CAN SOC |
 
+## Confirmed Pioneer `0x48D` SOC fields
+
+Controlled driving, rest and charging runs on 2026-09-03 established two separate
+whole-percent values in the Pioneer-only `0x48D` frame:
+
+| Byte | MOT value | Evidence status |
+|---|---|---|
+| `data[6]` | `bms/soc_internal` | Internally transmitted SOC-like value; meaning remains provisional |
+| `data[7]` | `bms/soc_display` | Confirmed to follow the visible Pioneer SOC exactly |
+
+The internal value changed independently and remained about 6–8 percentage points
+below the display value during the controlled run. It must not be described as a
+true SOC until its BMS semantics are independently confirmed. `bms/soc_display`
+is diagnostic corroboration only; `display/soc` remains the product SOC source.
+The large-battery V2 capture contained no `0x48D` frames and instead exposes its
+SOC/SOH pair on `0x1B1`, so this decoding is deliberately confined to Pioneer V1.
+
 Pack power is derived as `current_A × voltage_V`. This field uses the battery
 convention: positive current/power flows into the pack during charging or
 regeneration; negative current/power leaves the pack during traction. MOT also
@@ -100,6 +117,8 @@ The shared WROOM, LilyGO and C6 publishers use:
 | `bms/cell_min_mv` | mV |
 | `bms/cell_max_mv` | mV |
 | `bms/cell_delta_mv` | mV |
+| `bms/soc_internal` | whole percent; Pioneer-only candidate |
+| `bms/soc_display` | whole percent; Pioneer display-correlated |
 | `charging/plugged` | boolean |
 | `charging/is_charging` | boolean |
 | `charging/power_signed` | signed 0.1 kW compatibility value; consumption positive, charge/regen negative |

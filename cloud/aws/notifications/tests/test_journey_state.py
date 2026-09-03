@@ -5,13 +5,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from journey_state import (  # noqa: E402
-    CHARGING_MOVEMENT_GUARD_MS, INACTIVITY_TIMEOUT_MS, JourneyState, STOP_DELAY_MS,
+    CHARGING_MOVEMENT_GUARD_MS, FIRMWARE_COUNTER_GRACE_MS,
+    FIRMWARE_COUNTER_WAIT_MS, INACTIVITY_TIMEOUT_MS, JourneyState, STOP_DELAY_MS,
     apply_inactivity_timeout, apply_journey_update, clear_journey,
     summarize_journey,
 )
 
 
 class JourneyStateTests(unittest.TestCase):
+    def test_charging_counter_grace_allows_ten_minutes_for_delayed_upload(self):
+        self.assertEqual(10 * 60 * 1000, FIRMWARE_COUNTER_GRACE_MS)
+
     def update(self, state, suffix, value, timestamp):
         return apply_journey_update(state, suffix, value, timestamp)
 
@@ -31,7 +35,9 @@ class JourneyStateTests(unittest.TestCase):
 
     def test_existing_telemetry_yields_labelled_estimate(self):
         state = self.eligible_estimate()
-        summary, reason = summarize_journey(state, state.stopped_at + STOP_DELAY_MS)
+        summary, reason = summarize_journey(
+            state, state.stopped_at + STOP_DELAY_MS + FIRMWARE_COUNTER_WAIT_MS
+        )
         self.assertEqual("eligible", reason)
         self.assertEqual("telemetry_estimate", summary.energy_source)
         self.assertEqual("Telemetrie-Schätzung", summary.source_flag)
@@ -124,7 +130,9 @@ class JourneyStateTests(unittest.TestCase):
         state = self.update(state, "journey/energy_regen_wh", 150, 32_020)
         state = self.update(state, "display/speed_kmh", 20, 34_000)
         state = self.update(state, "display/speed_kmh", 0, 34_020)
-        summary, reason = summarize_journey(state, state.stopped_at + STOP_DELAY_MS)
+        summary, reason = summarize_journey(
+            state, state.stopped_at + STOP_DELAY_MS + FIRMWARE_COUNTER_WAIT_MS
+        )
         self.assertEqual("eligible", reason)
         self.assertEqual("telemetry_estimate", summary.energy_source)
         self.assertEqual("Telemetrie-Schätzung", summary.source_flag)
@@ -134,9 +142,38 @@ class JourneyStateTests(unittest.TestCase):
         state = self.update(state, "journey/energy_counter_id", "one", 33_100)
         state = self.update(state, "journey/energy_counter_id", "two", 33_110)
         state = self.update(state, "journey/energy_net_wh", 600, 33_120)
-        summary, _ = summarize_journey(state, state.stopped_at + STOP_DELAY_MS)
+        summary, _ = summarize_journey(
+            state, state.stopped_at + STOP_DELAY_MS + FIRMWARE_COUNTER_WAIT_MS
+        )
         self.assertEqual("Telemetrie-Schätzung", summary.source_flag)
         self.assertEqual("speed_zero", summary.completion_trigger)
+
+    def test_normal_stop_waits_for_late_firmware_counter(self):
+        state = self.eligible_estimate()
+        summary, reason = summarize_journey(
+            state, state.stopped_at + STOP_DELAY_MS
+        )
+        self.assertIsNone(summary)
+        self.assertEqual("not_due", reason)
+
+        counter_at = state.stopped_at + STOP_DELAY_MS + 6 * 60 * 1000
+        state = self.update(state, "journey/energy_counter_id", "late-trip", counter_at)
+        state = self.update(state, "journey/energy_drawn_wh", 823, counter_at + 1)
+        state = self.update(state, "journey/energy_regen_wh", 163, counter_at + 2)
+        summary, reason = summarize_journey(state, counter_at + 2)
+        self.assertEqual("eligible", reason)
+        self.assertEqual("firmware_counter", summary.energy_source)
+        self.assertAlmostEqual(0.66, summary.energy_net_kwh)
+
+    def test_resumed_movement_can_finalize_stable_stop_before_counter_wait(self):
+        state = self.eligible_estimate()
+        resumed_at = state.stopped_at + STOP_DELAY_MS + 4 * 60 * 1000
+        summary, reason = summarize_journey(
+            state, resumed_at, finalize_stable_stop=True
+        )
+        self.assertEqual("eligible", reason)
+        self.assertEqual("telemetry_estimate", summary.energy_source)
+        self.assertEqual(state.stopped_at, summary.ended_at)
 
     def test_standard_can_charging_seals_active_journey(self):
         state = self.started()
@@ -148,16 +185,42 @@ class JourneyStateTests(unittest.TestCase):
         self.assertFalse(state.charging_after_stop)
         accepted_at = state.last_moving_at + CHARGING_MOVEMENT_GUARD_MS
         state = self.update(state, "charging/is_charging", True, accepted_at)
-        summary, reason = summarize_journey(state, accepted_at)
+        summary, reason = summarize_journey(
+            state, accepted_at + FIRMWARE_COUNTER_GRACE_MS
+        )
         self.assertIsNotNone(summary)
         self.assertEqual("eligible", reason)
         self.assertTrue(state.charging_after_stop)
 
-    def test_standard_can_charging_after_speed_zero_is_immediate(self):
+    def test_standard_can_charging_after_speed_zero_seals_immediately(self):
         state = self.eligible_estimate()
         state = self.update(state, "charging/plugged", True, 34_000)
         self.assertTrue(state.charging_after_stop)
         self.assertEqual("speed_zero", state.stop_trigger)
+        summary, reason = summarize_journey(state, 34_000)
+        self.assertIsNone(summary)
+        self.assertEqual("not_due", reason)
+
+    def test_legacy_firmware_falls_back_after_counter_grace(self):
+        state = self.eligible_estimate()
+        state = self.update(state, "charging/plugged", True, 34_000)
+        repeated = self.update(state, "charging/is_charging", True, 39_000)
+        self.assertEqual(state.firmware_wait_until, repeated.firmware_wait_until)
+        summary, reason = summarize_journey(
+            repeated, 34_000 + FIRMWARE_COUNTER_GRACE_MS
+        )
+        self.assertEqual("eligible", reason)
+        self.assertEqual("telemetry_estimate", summary.energy_source)
+
+    def test_complete_firmware_counter_ends_grace_early(self):
+        state = self.eligible_estimate()
+        state = self.update(state, "charging/plugged", True, 34_000)
+        state = self.update(state, "journey/energy_counter_id", "boot-trip", 34_010)
+        state = self.update(state, "journey/energy_drawn_wh", 750, 34_020)
+        state = self.update(state, "journey/energy_regen_wh", 150, 34_030)
+        summary, reason = summarize_journey(state, 34_030)
+        self.assertEqual("eligible", reason)
+        self.assertEqual("firmware_counter", summary.energy_source)
 
     def test_charging_glitch_during_recent_movement_does_not_split_journey(self):
         state = self.started()
@@ -171,7 +234,9 @@ class JourneyStateTests(unittest.TestCase):
     def test_charging_after_stop_does_not_reject_completed_journey(self):
         state = self.eligible_estimate()
         state = self.update(state, "charging/is_charging", True, 34_000)
-        summary, reason = summarize_journey(state, 34_000)
+        summary, reason = summarize_journey(
+            state, 34_000 + FIRMWARE_COUNTER_GRACE_MS
+        )
         self.assertEqual("eligible", reason)
         self.assertIsNotNone(summary)
 
@@ -182,7 +247,9 @@ class JourneyStateTests(unittest.TestCase):
         state = self.update(state, "display/speed_kmh", 10, 40_000)
         self.assertEqual(sealed_stop, state.stopped_at)
         self.assertTrue(state.charging_after_stop)
-        summary, reason = summarize_journey(state, 40_000)
+        summary, reason = summarize_journey(
+            state, 34_000 + FIRMWARE_COUNTER_GRACE_MS
+        )
         self.assertIsNotNone(summary)
         self.assertEqual("eligible", reason)
 

@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-27
+**Last reviewed:** 2026-09-01
 
 ## Purpose
 
@@ -18,6 +18,70 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+The controlled 2026-09-03 Pioneer SOC run established `0x48D data[7]` as an
+exact Standard-CAN copy of the visible whole-percent SOC and `data[6]` as a
+separate internal SOC-like value that remained roughly 6–8 points lower. The V1
+decoder now publishes these optional values as `bms/soc_display` and
+`bms/soc_internal` without replacing canonical Display-CAN `display/soc`. The
+portal renders them only when present. The large-battery capture contained no
+`0x48D`; its independent `0x1B1` SOC/SOH fields are also optional portal details.
+
+CHG-SUM-001 adds an optional email-only summary for qualified charging sessions.
+It deliberately uses only the normal notification telemetry stream and never
+reads diagnostic history: SOC is `display/soc` from Display CAN, with normal
+charging state and power topics used for qualification and estimated energy.
+Charging qualifies after 45 continuous seconds and completes on unplug or ten
+continuous minutes after charging stops. The backend deployed through
+`mot-dev-notifications` and reached `UPDATE_COMPLETE`. A conditional migration
+enabled the option for all 9 existing records that already had both email and
+journey summaries enabled; no non-matching record was changed. The repository
+checkbox and three-language text pass validation. Hosted portal upload and live
+end-of-charge email acceptance remain open.
+
+DBG-001 started on 2026-09-01 after `xrpioneer2` reported an SOC rise from roughly
+45% to 75% while charging followed by an immediate return to roughly 45% at
+vehicle switch-on. The normal History reproduces the transition but does not
+retain voltage/current/cell-extrema series. The repository now contains a
+separate fail-closed raw diagnostic path for numeric/boolean `display/*`,
+`charging/*` and `bms/*` telemetry, with exact vehicle allowlist, absolute expiry,
+seven-day TTL, dedicated alarm and bounded CSV export. GPS and structured payloads
+are excluded. The replacement-free Change Set
+`dbg-001-xrpioneer2-20260901` deployed successfully to `mot-aws-3-1`. The
+encrypted on-demand table, seven-day TTL and 250,000-write alarm read back, and
+capture is active only for `xrpioneer2`. The replacement-free parameter Change
+Set `dbg-001-extend-xrpioneer2-20260910` extended its absolute deadline through
+2026-09-10 23:59:59 CEST while leaving the seven-day per-row TTL unchanged. The first
+consistent query returned 221 rows including pack voltage/current,
+pack/vehicle power, cell minimum/maximum/delta, SOC and charging states;
+`pioneer` returned zero rows and no debug-ingest error appeared. A bounded CSV
+smoke export returned 408 rows. Automatic expiry evidence and the later
+diagnostic handoff remain open.
+
+WEBFLASH-001 started on 2026-09-01 to provide an administrator-approved C6 USB
+firmware update inside authenticated portal settings. The accepted flow is
+Chrome/Edge only, uses a private immutable image and expiring per-user backend
+grant, verifies ESP32-C6 plus target-specific flash geometry and SHA-256, and
+writes only the application at `0x10000`. It deliberately exposes no factory
+erase, arbitrary file/offset or public firmware download. The server slice is
+deployed: private encrypted/versioned S3, TTL grants, admin-only grant/revoke,
+authenticated access/download/result routes, five-minute presigned delivery and
+bounded audit. The physical B025 N16 update passed with progress and technical
+logging. Replacement-free Change Set `webflash-xiao-20260901` then activated the
+immutable 4 MB `C6-001-REV14-AWS` XIAO image. A second replacement-free update
+added the exact N16 release in parallel: Gino receives XIAO while
+`info@muehlberg.ch` receives N16. The unauthenticated access route still returns 401. The repository
+portal now includes the role-protected admin grant/revoke form and a three-language
+pilot flasher that remains hidden without positive backend authorization. Its
+vendored `esptool-js` flow checks the exact N16/CH343 or XIAO native-USB identity,
+ESP32-C6, 16 MB or 4 MB flash, release metadata, image length and SHA-256 before
+the fixed configuration-preserving write. Repository tests pass; hosted portal
+upload and physical XIAO acceptance remain open. The SOC-decoder successor
+`C6-001-REV15-AWS` is now built, packaged and active for both WebFlash targets.
+The replacement-free Change Set `webflash-rev15-20260903` changed only the exact
+release parameters, Lambda environment and object-key-scoped IAM reads; the
+stack returned to `UPDATE_COMPLETE`. Existing REV14 grant records remain stored
+but require an explicitly audited REV15 regrant before use.
 
 I18N-001 has a repository-complete portal localization slice. German remains the
 project language and the dashboard default/fallback; a persisted selector adds
@@ -35,7 +99,10 @@ upload and maintainer acceptance remain pending.
 ONB-UX-001 completed the guided C6 local-onboarding flow on 2026-08-25. The
 one-time credential transition now requires confirmation, the authenticated
 wizard owns WiFi, CAN, services and validation, and its progress survives required
-reboots. The protected local access point remains reachable until explicit
+reboots. A 2026-09-01 N16 refinement now saves every wizard section without an
+intermediate restart, presents a non-secret review, and applies GPS, WiFi, CAN and
+services with one consolidated restart before real-IP and runtime validation. The
+protected local access point remains reachable until explicit
 completion; the final handoff reports the active profile, SSID and current IP
 without exposing a secret. Factory-first-run acceptance passed repeatedly on B025,
 and B021, B023 and B024 received the configuration-preserving firmware update.
@@ -59,9 +126,10 @@ remain open.
 
 The first productive Pioneer mode-switch exercise found two local-wizard defects:
 an unchanged WiFi form still forced a misleading reboot/AP handoff, and enabling
-MOT Cloud inside an already running wizard did not reboot to initialize the AWS
-client. Both paths are corrected: unchanged WiFi continues immediately, while a
-MOT Cloud state change reboots and resumes at validation. AWS status now retains
+MOT Cloud inside an already running wizard did not initialize the AWS client.
+The consolidated apply step supersedes both special cases: every section continues
+immediately and one final restart initializes all selected runtime services before
+validation. AWS status now retains
 the last TLS error code and detail after a bounded connect failure. Repository
 tests and both C6 builds pass. The observed Pioneer `rc=-2` failure ended at the
 former five-second TLS-handshake boundary despite adequate Home WiFi; the bound
@@ -292,6 +360,15 @@ allowlists and their derived IoT rules without replacement; the stack returned t
 successful updates. The adapter-side cache remains a separate, default-off local
 setting and must be enabled in the authenticated device wizard before any offline
 samples are collected.
+The confirmed pilot account `be07@microlino-open-telemetry.ch` owns active vehicle
+`ml-pilot-027`. On 2026-09-01 the reviewed no-replacement Change Set
+`enable-ml-pilot-027-history-20260901` added that vehicle to operational History
+and Backfill; only the two Lambda functions and their IoT rules were modified, and
+the stack returned to `UPDATE_COMPLETE`. Email notification is enabled but its
+destination remains unconfirmed. SMS remains safely disabled because no German
+destination has yet been entered and confirmed; administrator approval follows
+that user-controlled verification. Device-side cache collection remains a separate
+wizard switch.
 B025 was assigned to the confirmed `news@muehlberg.ch` portal account through an
 `ACTIVE/OWNER` UserVehicleAccess record after an empty conflict check.
 
@@ -398,6 +475,66 @@ bytes RAM and 1,377,732 bytes application flash. XIAO keeps the counter disabled
 builds successfully and passes the 85% OTA-slot gate at 83.40%. Physical runtime
 heap and road comparison remain open before wider rollout.
 
+The first REV13 road comparison recorded 4.798 kWh drawn, 0.979 kWh regenerated
+and 3.819 kWh net in the firmware counter, but the already dispatched email used
+the 3.126 kWh telemetry estimate. The charge boundary had finalized before the
+last counter topics were persisted. The repository backend now seals the journey
+at that boundary while allowing a bounded 15-second final-checkpoint grace:
+complete fresh firmware data takes priority immediately, while missing or old
+firmware data falls back automatically to the estimate. All 72 notification
+tests cover both paths. The isolated Notification Lambda update is deployed and
+reports `Active`/`Successful`; another physical comparison remains open.
+
+The next 10.0 km REV13 journey still used the 0.790 kWh telemetry estimate because
+its final 0.823 kWh drawn / 0.163 kWh regenerated checkpoint arrived about
+5 minutes 40 seconds after dispatch. The repository normal-stop path now waits up
+to another ten minutes after the existing stop confirmation, but finalizes as
+soon as a complete fresh counter arrives. Older firmware falls back after the
+bound; telemetry-timeout completions and real exclusions remain immediate. All
+73 notification tests pass. The isolated Notification Lambda update is deployed
+and reports `Active`/`Successful`; only road validation remains open.
+
+A following 47.0 km REV13 journey had its complete 3.331 kWh net firmware
+checkpoint in AWS roughly 7.5 minutes before dispatch, but the email still used
+the 3.450 kWh estimate. CloudWatch isolated the cause: REV13's bare-text
+`energy_counter_id` was not valid JSON and failed before reaching the Journey
+session. REV14 publishes the ID as a quoted JSON string. The deployed Notification
+Lambda now also accepts only the bounded legacy ID format on that exact topic,
+allowing existing REV13 devices to work immediately. The function is
+`Active`/`Successful`, a live legacy-format probe returns 200 without error, both
+C6 builds pass, and the suites report 74 notification plus six firmware-counter
+tests passing. Physical journey validation remains open.
+
+The same drive contained a confirmed 13-minute 52-second intermediate stop. It
+was incorrectly merged because the new optional counter wait allowed resumed
+movement to clear a stop older than ten minutes. The repository backend now
+finalizes that old journey first and reprocesses the same movement as the start of
+a new journey; continued standstill can still use the full firmware wait. All 80
+notification tests pass. The isolated Notification Lambda update is deployed and
+reports `Active`/`Successful`; physical validation remains open.
+
+The following 13 km REV14 journey still fell back although its complete counter
+arrived during the wait. CloudWatch recorded repeated `journey session
+contention` while connectivity recovery delivered many topics concurrently. The
+repository backend now isolates Journey state in `journey#<vehicleId>` items in
+the existing table, migrates legacy endpoint/active state on first access (or by
+the scheduler), and applies twelve bounded exponential-jitter retries to
+remaining Journey-only collisions. No schema or new resource is required. All 81
+notification tests and Python syntax validation pass. The isolated Lambda update
+is deployed and `Active`/`Successful`; a synthetic namespaced-session smoke test
+passed and its test item was removed without residue. A physical
+connectivity-recovery repeat remains open.
+
+A following short REV14 journey with immediate charging confirmed that the
+former 15-second charge-boundary grace was too short for the garage
+mobile-to-Home transition: the complete local counter arrived about 6 minutes
+45 seconds after the telemetry email. The repository now keeps the already
+sealed journey pending for up to ten minutes at an authoritative charge boundary,
+finishes early when a complete fresh counter arrives, and preserves the bounded
+telemetry fallback for legacy firmware. All 82 notification tests pass. The
+isolated Notification Lambda update is deployed and reports
+`Active`/`Successful`; physical road validation remains open.
+
 The first JNY-001 road observation identified and corrected a post-stop charging
 edge: plugging in during the stability window no longer invalidates the completed
 journey. That intermediate resume rule was later superseded by the authoritative
@@ -454,6 +591,15 @@ occupies 78.2% of its enlarged OTA slot. TERM-open and SLNT-high hardware
 interlocks remain mandatory. Simultaneous dual-bus vehicle reception, cache
 outage/replay and OTA-after-migration remain physical gates, so this does not
 change the C6 product direction.
+
+LG-S3-001 adds a bounded 16 MB T-SIM7670G-S3-Standard candidate to that sustain
+line. The full LilyGO feature set builds at 25.2% of each 5 MB OTA slot, including
+WiFi-preferred/LTE-fallback AWS, authenticated portal/OTA, integrated GNSS,
+dual CAN and a default-off 256 KiB cache. The existing A7670 AWS image still
+builds at 78.4%. Board-specific pins, SIM7670 filesystem-based TLS upload, S3 OTA
+header validation and isolated fresh defaults (`mot-sim7670-*` /
+`pioneer-sim7670`) are implemented. Hardware flash, AWS TLS/failover, GNSS,
+dual-CAN and cache/OTA acceptance remain open; this is not a production claim.
 
 The separated LilyGO namespace is operationally prepared in AWS. Thing metadata
 and least-privilege IoT policy version 5 now use only `pioneer-lilygo`, including

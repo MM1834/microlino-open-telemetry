@@ -11,6 +11,8 @@ inline uint16_t otaRunningChipId()
 {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
     return 13;
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+    return 9;
 #elif defined(CONFIG_IDF_TARGET_ESP32)
     return 0;
 #else

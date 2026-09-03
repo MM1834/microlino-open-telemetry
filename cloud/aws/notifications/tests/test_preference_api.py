@@ -116,6 +116,7 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         self.assertEqual(200, result["statusCode"])
         body = json.loads(result["body"])
         self.assertFalse(body["journeyEmailEnabled"])
+        self.assertFalse(body["chargingSummaryEmailEnabled"])
         self.assertFalse(body["chargingStopEmailEnabled"])
         self.assertEqual(80, body["chargingStopThreshold"])
         self.assertEqual(140, body["rangeKmAt100"])
@@ -199,6 +200,21 @@ class JourneyPreferenceApiTests(unittest.TestCase):
             "charging_stop_email_requires_email",
             json.loads(result["body"])["error"],
         )
+
+    def test_charging_summary_requires_email_and_persists(self):
+        module, _, _ = load_module()
+        denied = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "chargingSummaryEmailEnabled": True,
+        }), None)
+        self.assertEqual("charging_summary_email_requires_email", json.loads(denied["body"])["error"])
+        module, preference, _ = load_module()
+        accepted = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": True,
+            "chargingSummaryEmailEnabled": True, "email": "driver@example.com",
+        }), None)
+        self.assertEqual(200, accepted["statusCode"])
+        self.assertTrue(preference.item["chargingSummaryEmailEnabled"])
 
     def test_charging_stop_has_independent_threshold(self):
         module, preference, _ = load_module()

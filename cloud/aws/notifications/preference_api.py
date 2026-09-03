@@ -57,6 +57,7 @@ def public(item):
             "rangeKmAt100": 140, "rangeReserveSoc": 0,
             "emailEnabled": False, "smsEnabled": False,
             "journeyEmailEnabled": False,
+            "chargingSummaryEmailEnabled": False,
             "chargingStopEmailEnabled": False, "chargingStopThreshold": 80,
             "emailConfirmed": False, "smsConfirmed": False,
             "readOnly": False,
@@ -64,12 +65,13 @@ def public(item):
     result = {
         key: item.get(key) for key in (
             "vehicleId", "enabled", "threshold", "emailEnabled", "smsEnabled",
-            "journeyEmailEnabled", "email", "phoneE164", "emailConfirmed",
+            "journeyEmailEnabled", "chargingSummaryEmailEnabled", "email", "phoneE164", "emailConfirmed",
             "chargingStopEmailEnabled", "chargingStopThreshold",
             "smsConfirmed", "rangeKmAt100", "rangeReserveSoc", "updatedAt"
         )
     }
     result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
+    result["chargingSummaryEmailEnabled"] = item.get("chargingSummaryEmailEnabled") is True
     result["chargingStopEmailEnabled"] = item.get("chargingStopEmailEnabled") is True
     result["readOnly"] = False
     result["threshold"] = int(result.get("threshold") or 80)
@@ -171,6 +173,10 @@ def handler(event, context):
         "journeyEmailEnabled", previous.get("journeyEmailEnabled", False)
     ) is True
     journey_email_enabled = journey_email_requested and email_enabled
+    charging_summary_requested = body.get(
+        "chargingSummaryEmailEnabled", previous.get("chargingSummaryEmailEnabled", False)
+    ) is True
+    charging_summary_email_enabled = charging_summary_requested and email_enabled
     charging_stop_requested = body.get(
         "chargingStopEmailEnabled", previous.get("chargingStopEmailEnabled", False)
     ) is True
@@ -186,6 +192,8 @@ def handler(event, context):
         return response(409, {"error": "sms_verification_required"})
     if "journeyEmailEnabled" in body and journey_email_requested and not email_enabled:
         return response(400, {"error": "journey_email_requires_email"})
+    if charging_summary_requested and not email_enabled:
+        return response(400, {"error": "charging_summary_email_requires_email"})
     if charging_stop_requested and not email_enabled:
         return response(400, {"error": "charging_stop_email_requires_email"})
 
@@ -195,6 +203,7 @@ def handler(event, context):
         "threshold": threshold,
         "emailEnabled": email_enabled,
         "journeyEmailEnabled": journey_email_enabled,
+        "chargingSummaryEmailEnabled": charging_summary_email_enabled,
         "chargingStopEmailEnabled": charging_stop_email_enabled,
         "chargingStopThreshold": charging_stop_threshold,
         "rangeKmAt100": range_km_at_100,

@@ -12,6 +12,7 @@ are published only with a valid location fix.
 |---|---:|---:|---:|---|
 | ESP32-WROOM | 16 | 17 | 9600 | Optional external GPS |
 | LilyGO | 22 | 21 | 9600 | External L76K; PPS 23, wakeup 19 |
+| LilyGO T-SIM7670G-S3 | 48 | 45 | 115200 | SIM7670G integrated GNSS NMEA; PPS 17 unused |
 | nanoESP32-C6-N16 | 20 | 21 | 9600 | Same optional receiver and detection states as WROOM |
 | Seeed XIAO ESP32-C6 | 17 | 16 | 9600 | Candidate compact-board wiring |
 

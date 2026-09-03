@@ -67,8 +67,8 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260824-ops1", source)
-        self.assertIn("app.js?v=20260830-odometer1", source)
+        self.assertIn("aws-backend-provider.js?v=20260901-webflash2", source)
+        self.assertIn("app.js?v=20260901-webflash10", source)
 
 
 class DashboardNotificationSettingsTests(unittest.TestCase):
@@ -79,6 +79,7 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn('id="notification-email"', html)
         self.assertIn('id="notification-journey-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-email-enabled"', html)
+        self.assertIn('id="notification-charging-summary-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-threshold"', html)
         self.assertIn('id="range-km-at-100"', html)
         self.assertIn('id="range-reserve-soc"', html)
@@ -128,6 +129,7 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn("saveNotificationPreferences", app)
         self.assertIn("journeyEmailEnabled: $('notification-journey-email-enabled').checked", app)
         self.assertIn("chargingStopEmailEnabled: $('notification-charging-stop-email-enabled').checked", app)
+        self.assertIn("chargingSummaryEmailEnabled: $('notification-charging-summary-email-enabled').checked", app)
         self.assertIn("chargingStopThreshold: Number($('notification-charging-stop-threshold').value)", app)
         self.assertIn("rangeKmAt100: Number($('range-km-at-100').value)", app)
         self.assertIn("rangeReserveSoc: Number($('range-reserve-soc').value)", app)
@@ -220,13 +222,13 @@ class DashboardOnboardingTests(unittest.TestCase):
         self.assertIn('id="onboarding-admin"', html)
         self.assertIn('id="admin-claim-output"', html)
 
-    def test_admin_claim_ui_follows_notifications_and_precedes_status(self) -> None:
+    def test_admin_claim_ui_follows_notifications_without_legacy_status_card(self) -> None:
         html = (ROOT / "build/dashboard/current/index.html").read_text()
         css = (ROOT / "build/dashboard/current/css/dashboard.css").read_text()
         self.assertLess(html.index('id="settings"'), html.index('id="onboarding-admin"'))
-        self.assertLess(html.index('id="onboarding-admin"'), html.index('class="card panel status-panel"'))
         self.assertIn('#onboarding-admin{order:75}', css)
-        self.assertIn('.main>.status-panel{order:80;width:100%}', css)
+        self.assertNotIn('class="card panel status-panel"', html)
+        self.assertNotIn('.main>.status-panel{order:80;width:100%}', css)
 
 
 class DashboardRangeForecastTests(unittest.TestCase):

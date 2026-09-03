@@ -79,6 +79,18 @@ flat-road traction/regeneration test. The completed 2026-08-06 test confirmed
 negative pack current during traction, positive pack current during regeneration
 and increased electrical regeneration under light braking.
 
+### Dedicated B.025 SOC-discovery image
+
+The `nanoesp32c6-n16-soc-diagnostic` environment adds a passive, RAM-only scan of
+all 11-bit CAN1 identifiers. It is intended for the B.025 test adapter and reports
+itself as `C6-001-REV14-SOC-DIAG-B025`; it does not change decoder or AWS topic
+semantics. At a stable displayed SOC, run `soc reset`, wait for all buses to be
+active, then run `soc mark`. After driving or charging changes the displayed SOC,
+run `soc dump`. The comparison lists byte and 16-bit little-/big-endian fields
+whose delta exactly matches 1, 2, 10 or 100 raw units per percentage point.
+Repeating the process across several SOC transitions eliminates rolling counters
+and other coincidental matches. State is lost on restart.
+
 ## WiFi and AWS qualification
 
 For first setup, connect to the WPA2-protected `MOT-XXXXXX` AP. Its device-specific
@@ -152,7 +164,11 @@ accounts, vehicle ownership and certificate assignment remain external admin wor
 
 First setup now performs only the one-time transition from the device-specific
 `setup` credential to the user-selected `admin` credential. WiFi, CAN and optional
-services are edited inside the wizard, whose current step persists across reboots.
+services are edited inside the wizard without intermediate restarts. A review page
+shows the future SSIDs and non-secret settings, then applies hardware, WiFi, CAN and
+services with one consolidated restart. The real router-assigned IP and runtime
+validation are shown only after that connection attempt and restart. Wizard progress
+persists throughout the flow.
 Until explicit completion, the protected `MOT-*` AP remains active at
 `192.168.4.1` alongside a successful station connection. The final page shows the
 active Home or Mobile/WiFi2 SSID and current station IP when connected, plus the

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260829-vehicle-image1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260901-webflash1" />
   <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
@@ -180,6 +180,7 @@
             </div>
             <div class="ring big" id="soc-ring-2"><span id="soc-battery">--%</span><small>SoC</small></div>
           </div>
+          <div id="bms-soc-details" class="cell-meta" hidden><span id="bms-soc-internal-row" hidden>Interner Batterie-SoC: <b id="bms-soc-internal">--</b></span><span id="bms-soc-display-row" hidden>Standard-CAN Anzeige-SoC: <b id="bms-soc-display">--</b></span><span id="bms-standard-soc-row" hidden>BMS-SoC: <b id="bms-standard-soc">--</b></span><span id="bms-soh-row" hidden>Batteriezustand (SoH): <b id="bms-soh">--</b></span></div>
         </article>
         <article id="vehicle" class="card panel">
           <h2>▱ Fahrzeug</h2>
@@ -319,6 +320,14 @@
       <small id="notification-charging-stop-state" class="connection-detail">Nur wenn das Fahrzeug weiterhin eingesteckt ist. Ein manueller Stopp, Lastmanagement oder Solar-Nulleinspeisung kann dieselbe Meldung auslösen. Pro durchgehend eingesteckter Ladesession wird höchstens eine Ladestopp-Meldung versendet; erst Ausstecken und erneutes Einstecken startet eine neue Session.</small>
     </fieldset>
     <fieldset class="journey-notification-setting">
+      <legend>Ladezusammenfassung</legend>
+      <label class="settings-toggle">
+        <input id="notification-charging-summary-email-enabled" type="checkbox" aria-describedby="notification-charging-summary-state" />
+        <span>Zusammenfassung abgeschlossener Ladevorgänge per E-Mail</span>
+      </label>
+      <small id="notification-charging-summary-state" class="connection-detail">Versand beim Ausstecken oder nach 10 Minuten ohne Laden · ausschließlich Standard-Telemetrie.</small>
+    </fieldset>
+    <fieldset class="journey-notification-setting">
       <legend>Fahrtzusammenfassung</legend>
       <label class="settings-toggle">
         <input id="notification-journey-email-enabled" type="checkbox" aria-describedby="notification-journey-state" />
@@ -360,6 +369,45 @@
   </form>
 </section>
 
+<section id="firmware-flasher" class="card firmware-card" hidden>
+  <div class="card-header">
+    <div>
+      <h2>Adapter-Firmware</h2>
+      <span class="muted">Freigegebenes Update · Konfiguration bleibt erhalten</span>
+    </div>
+    <strong id="firmware-release-version">--</strong>
+  </div>
+  <div id="firmware-browser-warning" class="firmware-warning" hidden>
+    Dieser Browser unterstützt Web Serial nicht. Bitte Chrome oder Edge über HTTPS auf macOS oder Windows verwenden.
+  </div>
+  <ol class="firmware-steps">
+    <li>Adapter vom Fahrzeug trennen und nur über ein USB-C-Datenkabel mit dem Computer verbinden.</li>
+    <li><strong>Adapter verbinden und prüfen</strong> wählen und im Browser das USB-Gerät auswählen.</li>
+    <li>Nach erfolgreicher Prüfung die Sicherheitsbestätigung aktivieren und das Update starten.</li>
+  </ol>
+  <dl class="firmware-meta">
+    <div><dt>Ziel</dt><dd id="firmware-release-target">--</dd></div>
+    <div><dt>Flash-Bereich</dt><dd>Applikation ab 0x10000 · kein Factory Reset</dd></div>
+    <div><dt>Freigabe gültig bis</dt><dd id="firmware-access-expiry">--</dd></div>
+    <div><dt>SHA-256</dt><dd><code id="firmware-release-sha">--</code></dd></div>
+    <div><dt>Erkanntes Gerät</dt><dd id="firmware-device">Noch nicht geprüft</dd></div>
+  </dl>
+  <div class="firmware-actions">
+    <button id="firmware-connect" class="auth-button secondary" type="button">Adapter verbinden und prüfen</button>
+    <label class="firmware-confirmation">
+      <input id="firmware-confirm" type="checkbox" disabled />
+      <span>Der Adapter ist vom Fahrzeug getrennt und bleibt während des Updates per USB verbunden.</span>
+    </label>
+    <button id="firmware-flash" class="auth-button" type="button" disabled>Firmware aktualisieren – Konfiguration behalten</button>
+  </div>
+  <progress id="firmware-progress" max="100" value="0" hidden></progress>
+  <p id="firmware-status" class="connection-detail" aria-live="polite">Bereit für die Adapterprüfung.</p>
+  <details class="firmware-log-wrap">
+    <summary>Technische Details</summary>
+    <pre id="firmware-log" class="firmware-log"></pre>
+  </details>
+</section>
+
 <section id="onboarding-admin" class="card onboarding-card" hidden>
   <div>
     <h1>Beta-Onboarding verwalten</h1>
@@ -375,11 +423,29 @@
     <button id="admin-claim-clear" class="auth-button" type="button">Claim-Anzeige leeren</button>
     <span id="admin-claim-status" class="connection-detail" aria-live="polite"></span>
   </form>
-</section>
-
-<section class="card panel status-panel">
-  <h2>Status</h2>
-  <ul class="data-list"><li><span>Firmware</span><strong id="fw-version">--</strong></li><li><span>Device</span><strong id="device-id">--</strong></li><li><span>RSSI</span><strong id="rssi">-- dBm</strong></li><li><span>Uptime</span><strong id="uptime">--</strong></li></ul>
+  <hr class="admin-divider" />
+  <div>
+    <h2>Web-Flasher freigeben</h2>
+    <p>Schaltet eine freigegebene Adapter-Firmware zeitlich begrenzt für einen Portal-Benutzer frei.</p>
+  </div>
+  <form id="admin-firmware-form" class="onboarding-form" autocomplete="off">
+    <label for="admin-firmware-user">Benutzer-E-Mail</label>
+    <div class="admin-firmware-row">
+      <input id="admin-firmware-user" name="username" type="email" required autocomplete="off" />
+      <label for="admin-firmware-target">Adaptertyp</label>
+      <select id="admin-firmware-target" name="target" required>
+        <option value="nanoesp32c6-n16">nanoESP32-C6 N16</option>
+        <option value="xiao-esp32c6">XIAO ESP32-C6</option>
+      </select>
+      <label for="admin-firmware-hours">Gültigkeit (Stunden)</label>
+      <input id="admin-firmware-hours" name="expiresInHours" type="number" min="1" max="168" value="48" required />
+    </div>
+    <div class="settings-actions">
+      <button id="admin-firmware-grant" class="auth-button" type="submit">Web-Flasher freigeben</button>
+      <button id="admin-firmware-revoke" class="auth-button secondary" type="button">Freigabe entziehen</button>
+      <span id="admin-firmware-status" class="connection-detail" aria-live="polite"></span>
+    </div>
+  </form>
 </section>
 
 </main>
@@ -390,8 +456,8 @@
   <script src="js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260824-ops1"></script>
-  <script src="js/app.js?v=20260830-odometer1"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260901-webflash2"></script>
+  <script src="js/app.js?v=20260901-webflash10"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260824-power-freshness1"></script>

@@ -76,6 +76,23 @@
       return response.json();
     }
 
+    async function firmwareRequest(path, method = 'GET', body = null) {
+      if (!onboardingBaseUrl()) throw new Error('Onboarding API URL fehlt');
+      const response = await fetch(`${onboardingBaseUrl()}${path}`, {
+        method,
+        headers: { ...(await headers()), ...(body ? { 'content-type': 'application/json' } : {}) },
+        cache: 'no-store',
+        body: body ? JSON.stringify(body) : null
+      });
+      if (!response.ok) {
+        const error = new Error(`Firmware API HTTP ${response.status}`);
+        error.status = response.status;
+        if (response.status === 401) config.onUnauthorized?.(error);
+        throw error;
+      }
+      return response.json();
+    }
+
     async function notificationRequest(path, method = 'GET', body = null) {
       if (!notificationBaseUrl()) throw new Error('Notification API URL fehlt');
       const options = {
@@ -252,6 +269,28 @@
 
       async issueClaim(vehicleId) {
         return post('/api/onboarding/claims', { vehicleId });
+      },
+
+      async getFirmwareAccess() {
+        return firmwareRequest('/api/firmware/access');
+      },
+
+      async authorizeFirmwareDownload() {
+        return firmwareRequest('/api/firmware/download', 'POST', {});
+      },
+
+      async reportFirmwareResult(operationId, result, target) {
+        return firmwareRequest('/api/firmware/result', 'POST', { operationId, result, target });
+      },
+
+      async grantFirmware(username, target, expiresInHours = 48) {
+        return firmwareRequest('/api/firmware/grants', 'POST', {
+          username, expiresInHours, target
+        });
+      },
+
+      async revokeFirmware(username, target) {
+        return firmwareRequest('/api/firmware/grants/revoke', 'POST', { username, target });
       },
 
       async getNotificationPreferences() {

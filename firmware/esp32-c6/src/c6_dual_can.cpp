@@ -5,6 +5,7 @@
 #include "c6_config.h"
 #include "c6_can_scan.h"
 #include "c6_drive_capture.h"
+#include "c6_soc_discovery.h"
 #include "decoders/decoder_engine.h"
 
 namespace {
@@ -88,6 +89,7 @@ void receiveChannel(size_t index)
     }
     c6CanScanObserve(index, frame);
     c6DriveCaptureObserve(index, frame);
+    c6SocDiscoveryObserve(index, frame);
     const bool displayChargingFrame = frame.id == 0x603 || frame.id == 0x604;
     if (!(standardCanConfigured() &&
           channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&

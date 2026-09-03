@@ -17,5 +17,12 @@ static constexpr MotStandardCanBms::DecoderRules PIONEER_RULES = {
 
 void decoderStandardCanV1PioneerHandleFrame(const MotCanFrame &frame)
 {
+    if (!frame.extended && frame.id == 0x48D && frame.dlc == 8) {
+        telemetry.bms.pioneerSocValid = true;
+        telemetry.bms.socInternal = frame.data[6];
+        telemetry.bms.socDisplay = frame.data[7];
+        telemetry.bms.pioneerSocLastUpdateMs = millis();
+        return;
+    }
     MotStandardCanBms::handleFrame(frame, PIONEER_RULES);
 }

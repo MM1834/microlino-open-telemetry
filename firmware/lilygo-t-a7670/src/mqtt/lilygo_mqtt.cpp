@@ -224,6 +224,14 @@ void publishLilygoTelemetry()
         awsClient.publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
         awsClient.publishInt("bms/status_byte", telemetry.bms.statusByte);
     }
+    if (telemetry.bms.pioneerSocValid) {
+        awsClient.publishFloat("bms/soc_internal", telemetry.bms.socInternal, 1);
+        awsClient.publishFloat("bms/soc_display", telemetry.bms.socDisplay, 1);
+    }
+    if (telemetry.bms.standardSocValid)
+        awsClient.publishFloat("bms/standard_soc", telemetry.bms.socPercent, 2);
+    if (telemetry.bms.sohValid)
+        awsClient.publishFloat("bms/soh_percent", telemetry.bms.sohPercent, 2);
     if (telemetry.bms.packCurrentValid) {
         awsClient.publishFloat("bms/pack_current", telemetry.bms.packCurrentA, 1);
         awsClient.publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);
@@ -655,6 +663,14 @@ void publishLilygoTelemetry()
         publishLegacyFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
         publishLegacyInt("bms/status_byte", telemetry.bms.statusByte);
     }
+    if (telemetry.bms.pioneerSocValid) {
+        publishLegacyFloat("bms/soc_internal", telemetry.bms.socInternal, 1);
+        publishLegacyFloat("bms/soc_display", telemetry.bms.socDisplay, 1);
+    }
+    if (telemetry.bms.standardSocValid)
+        publishLegacyFloat("bms/standard_soc", telemetry.bms.socPercent, 2);
+    if (telemetry.bms.sohValid)
+        publishLegacyFloat("bms/soh_percent", telemetry.bms.sohPercent, 2);
     if (telemetry.bms.packCurrentValid) {
         publishLegacyFloat("bms/pack_current", telemetry.bms.packCurrentA);
         publishLegacyFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);

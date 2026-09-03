@@ -75,7 +75,7 @@ String header(const char *title)
 {
     String out = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>";
     out += title;
-    out += "</title><style>body{font-family:system-ui;margin:24px;max-width:820px;background:#f7f8fa;color:#18202b}.card{background:white;border:1px solid #d9dee7;border-radius:12px;padding:16px;margin:12px 0}input,select,textarea{width:100%;padding:9px;margin:4px 0 12px;box-sizing:border-box}button{padding:10px 16px;transition:background-color .15s,color .15s,opacity .15s}.primary{background:#175cd3;color:#fff;border:1px solid #175cd3;border-radius:4px}.secondary-small{background:#e4e7ec;color:#344054;border:1px solid #d0d5dd;border-radius:4px;padding:6px 10px;font-size:.85rem}button:active,button.is-pending{background:#344054!important;color:#fff!important;opacity:.82;cursor:progress}button.is-pending:after{content:' …'}.compact-control{margin:12px 0 4px 18px;padding-left:12px;border-left:3px solid #d0d5dd}.compact-control label{display:inline-flex;align-items:center;gap:7px;font-size:.95rem}.compact-control input{width:auto;margin:0}.fixed-value{margin:4px 0 12px;padding:9px;background:#f2f4f7;border:1px solid #d0d5dd;border-radius:4px}.muted{color:#667085}pre{white-space:pre-wrap;background:#101828;color:#e4e7ec;padding:12px;border-radius:8px}a{color:#175cd3}</style><script>document.addEventListener('submit',function(e){const f=e.target,b=e.submitter;if(!b||f.dataset.submitting==='1')return;e.preventDefault();b.classList.add('is-pending');b.setAttribute('aria-busy','true');f.dataset.submitting='1';setTimeout(function(){f.requestSubmit(b)},120)})</script></head><body>";
+    out += "</title><style>body{font-family:system-ui;margin:24px;max-width:820px;background:#f7f8fa;color:#18202b}.card{background:white;border:1px solid #d9dee7;border-radius:12px;padding:16px;margin:12px 0}input,select,textarea{width:100%;padding:9px;margin:4px 0 12px;box-sizing:border-box}button{padding:10px 16px;transition:background-color .15s,color .15s,opacity .15s}.primary{background:#175cd3;color:#fff;border:1px solid #175cd3;border-radius:4px}.secondary-small{background:#e4e7ec;color:#344054;border:1px solid #d0d5dd;border-radius:4px;padding:6px 10px;font-size:.85rem}button:active,button.is-pending{background:#344054!important;color:#fff!important;opacity:.82;cursor:progress}button.is-pending:after{content:' …'}.compact-control{margin:12px 0 4px 18px;padding-left:12px;border-left:3px solid #d0d5dd}.compact-control label{display:inline-flex;align-items:center;gap:7px;font-size:.95rem}.compact-control input{width:auto;margin:0}.compact-control button{display:block;margin-top:10px}.fixed-value{margin:4px 0 12px;padding:9px;background:#f2f4f7;border:1px solid #d0d5dd;border-radius:4px}.muted{color:#667085}pre{white-space:pre-wrap;background:#101828;color:#e4e7ec;padding:12px;border-radius:8px}a{color:#175cd3}</style><script>document.addEventListener('submit',function(e){const f=e.target,b=e.submitter;if(!b||f.dataset.submitting==='1')return;e.preventDefault();b.classList.add('is-pending');b.setAttribute('aria-busy','true');f.dataset.submitting='1';setTimeout(function(){f.requestSubmit(b)},120)})</script></head><body>";
     return out;
 }
 
@@ -263,9 +263,11 @@ String c6WizardNavigation(uint8_t step)
 {
     String out = "<form method='POST' action='/api/onboarding/step'><p>";
     if (step > 1) out += "<button name='step' value='" + String(step - 1) + "'>Back</button> ";
-    const bool settingsStep = step == onboardingStepNumber(OnboardingStep::Connectivity) ||
+    const bool settingsStep = step == onboardingStepNumber(OnboardingStep::Hardware) ||
+                              step == onboardingStepNumber(OnboardingStep::Connectivity) ||
                               step == onboardingStepNumber(OnboardingStep::Vehicle) ||
-                              step == onboardingStepNumber(OnboardingStep::Services);
+                              step == onboardingStepNumber(OnboardingStep::Services) ||
+                              step == onboardingStepNumber(OnboardingStep::Validation);
     if (step < onboardingStepCount() && !settingsStep) {
         out += "<button name='step' value='" + String(step + 1) + "'>Next</button>";
     }
@@ -307,30 +309,39 @@ void wizardPage()
             break;
         case OnboardingStep::Hardware:
             out += "<h2>Detected hardware</h2><ul><li>Board: <b>" MOT_BOARD "</b></li><li>WiFi: available</li><li>CAN channels: 2</li><li>GPS: " + htmlEscape(c6GpsState()) + "</li></ul>";
-            if (c6GpsDetected() || !c6Config.gpsEnabled) out += "<form class='compact-control' method='POST' action='/api/gps/toggle'><label><input type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable GPS</label> <button class='secondary-small'>Save &amp; reboot</button></form>";
+            if (c6GpsDetected() || !c6Config.gpsEnabled) out += "<form class='compact-control' method='POST' action='/wizard/hardware'><label><input type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable GPS</label> <button class='secondary-small'>Save hardware &amp; continue</button></form>";
             break;
         case OnboardingStep::Connectivity:
             out += "<h2>Connectivity</h2><p>During onboarding the protected hotspot <b>" + htmlEscape(c6NetworkApSsid()) + "</b> remains active at <b>" + localHttpLink("192.168.4.1") + "</b>. After completion it normally becomes inactive while Home or Mobile/WiFi2 is connected and returns when neither network is reachable.</p>";
             out += "<p class='muted'>Use a 2.4 GHz WiFi network. For an iPhone Personal Hotspot, enable <b>Maximize Compatibility</b> so the hotspot offers a compatible 2.4 GHz connection.</p>";
             out += "<p>Current state: <b>" + htmlEscape(c6NetworkStateName()) + "</b> via " + htmlEscape(c6NetworkProfileName()) + "</p>";
-            out += "<form method='POST' action='/wizard/connectivity'><label>Home WiFi SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Home WiFi password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'><label>Mobile/WiFi2 SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'><label>Mobile/WiFi2 password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'><button>Save WiFi &amp; continue</button><p class='muted'>The device restarts automatically to apply network changes. Reconnect as admin; the wizard then continues at the next step.</p></form>";
+            out += "<form method='POST' action='/wizard/connectivity'><label>Home WiFi SSID</label><input name='ssid' maxlength='32' value='" + htmlEscape(c6Config.wifiSsid) + "'><label>Home WiFi password</label><input type='password' name='wifiPassword' maxlength='63' placeholder='Leave blank to keep current'><label>Mobile/WiFi2 SSID</label><input name='ssid2' maxlength='32' value='" + htmlEscape(c6Config.wifi2Ssid) + "'><label>Mobile/WiFi2 password</label><input type='password' name='wifi2Password' maxlength='63' placeholder='Leave blank to keep current'><button>Save WiFi &amp; continue</button><p class='muted'>These settings are saved now and applied together at the final restart. You can continue through the wizard without restarting.</p></form>";
             break;
         case OnboardingStep::Vehicle:
-            out += "<h2>Vehicle and CAN</h2><form method='POST' action='/wizard/vehicle'><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><input type='hidden' name='can2' value='" + String(static_cast<int>(DECODER_PROFILE_DISPLAY_CAN)) + "'><div class='fixed-value'><b>Microlino Display CAN</b><br><span class='muted'>Fixed wiring for Microlino use.</span></div><button>Save CAN &amp; continue</button><p class='muted'>The device restarts only if a CAN profile was changed. With unchanged settings, the wizard continues immediately.</p></form>";
+            out += "<h2>Vehicle and CAN</h2><form method='POST' action='/wizard/vehicle'><label>CAN1</label><select name='can1'>" + profileOptions(c6Config.can1Profile) + "</select><label>CAN2</label><input type='hidden' name='can2' value='" + String(static_cast<int>(DECODER_PROFILE_DISPLAY_CAN)) + "'><div class='fixed-value'><b>Microlino Display CAN</b><br><span class='muted'>Fixed wiring for Microlino use.</span></div><button>Save CAN &amp; continue</button><p class='muted'>These settings are saved now and applied together at the final restart.</p></form>";
             break;
         case OnboardingStep::Services:
             out += "<h2>Telemetry services</h2><p>AWS: " + htmlEscape(c6AwsStatus()) + "</p><form method='POST' action='/wizard/services'><h3>MOT Cloud (AWS IoT)</h3><label><input style='width:auto' type='checkbox' name='motCloudEnabled'" + String(c6Config.motCloudEnabled ? " checked" : "") + "> Enable MOT Cloud</label><p class='muted'>Default: enabled. The adapter remains AWS ready when disabled; provisioned certificates and vehicle assignment are retained.</p><hr><h3>History cache</h3><label><input style='width:auto' type='checkbox' name='offlineCacheEnabled'" + String(c6Config.offlineCacheEnabled ? " checked" : "") + "> Enable offline History cache</label><p class='muted'>Temporarily stores supported telemetry while MOT Cloud is enabled and the Internet connection is unavailable. Existing queued samples are retained while MOT Cloud is disabled.</p><hr><h3>ABRP (optional)</h3><p class='muted'>A Better Routeplanner integration operates independently over WiFi and is optional. Empty fields retain stored values.</p><label><input style='width:auto' type='checkbox' name='abrpEnabled'" + String(c6Config.abrpEnabled ? " checked" : "") + "> Enable ABRP</label> <label>ABRP API key</label><input type='password' name='abrpApiKey' maxlength='192' placeholder='Leave blank to keep current'><label>ABRP user token</label><input type='password' name='abrpUserToken' maxlength='192' placeholder='Leave blank to keep current'><input type='hidden' name='returnTo' value='/wizard'><button class='primary'>Save &amp; continue</button> <button class='secondary-small' type='submit' formaction='/api/abrp/clear' formmethod='post' onclick=\"return confirm('Delete the stored ABRP API key and user token and disable ABRP?')\">Delete ABRP credentials</button></form>";
             break;
         case OnboardingStep::Validation:
-            out += "<h2>Device and telemetry validation</h2><p>Start the validation to review device identity, network connection, CAN channels, optional GPS, AWS telemetry and runtime health before completing onboarding.</p><p class='muted'>Some telemetry checks can remain inactive until the adapter is connected to the vehicle or AWS credentials have been provisioned.</p><button id='validation-button' type='button' onclick='validateDevice()'>Start validation</button><pre id='validation'>Validation has not been started.</pre><script>async function validateDevice(){const b=document.getElementById('validation-button'),o=document.getElementById('validation');b.classList.add('is-pending');b.setAttribute('aria-busy','true');b.textContent='Validation running';o.textContent='Reading device and telemetry status…';try{let r=await fetch('/api/status'),d=await r.json();o.textContent=JSON.stringify(d,null,2);b.textContent='Validation complete'}catch(e){o.textContent='Validation failed: '+e.message;b.textContent='Try validation again'}finally{b.classList.remove('is-pending');b.removeAttribute('aria-busy')}}</script>";
+            out += "<h2>Review and apply</h2><p>Review the settings below. Passwords and service credentials are intentionally not shown.</p><ul><li>Home WiFi: <b>" + (c6Config.wifiSsid.isEmpty() ? String("Not configured") : htmlEscape(c6Config.wifiSsid)) + "</b></li><li>Mobile/WiFi2: <b>" + (c6Config.wifi2Ssid.isEmpty() ? String("Not configured") : htmlEscape(c6Config.wifi2Ssid)) + "</b></li><li>CAN1: <b>" + htmlEscape(decoderProfileName(c6Config.can1Profile)) + "</b></li><li>CAN2: <b>Microlino Display CAN</b></li><li>GPS: <b>" + String(c6Config.gpsEnabled ? "Enabled" : "Disabled") + "</b></li><li>MOT Cloud: <b>" + String(c6Config.motCloudEnabled ? "Enabled" : "Disabled") + "</b></li><li>History cache: <b>" + String(c6Config.offlineCacheEnabled ? "Enabled" : "Disabled") + "</b></li><li>ABRP: <b>" + String(c6Config.abrpEnabled ? "Enabled" : "Disabled") + "</b></li></ul><p><b>One final device restart is required to apply these settings.</b> Your browser will temporarily lose its connection.</p><p>During onboarding, the protected <b>" + htmlEscape(c6NetworkApSsid()) + "</b> hotspot remains available at <b>" + localHttpLink("192.168.4.1") + "</b>.</p><p>After the device restart, reconnect to <b>" + htmlEscape(c6NetworkApSsid()) + "</b>, open <b>" + localHttpLink("192.168.4.1") + "</b>, and sign in as <b>admin</b> to complete device onboarding.</p><p class='muted'>The future WLAN names can be shown now. The actual IP address is assigned by the router only after a real connection and is displayed after the restart.</p><form method='POST' action='/wizard/apply'><button>Apply settings &amp; restart</button></form>";
             break;
         case OnboardingStep::Finish:
-            out += "<h2>Finish</h2><p>Completing onboarding disables automatic wizard launch and applies immediately without another restart. A required restart has already occurred at the changed WiFi, CAN or MOT Cloud step. All settings remain editable.</p>" + c6WizardAccessNotice() + "<form method='POST' action='/api/onboarding/complete'><button>Complete onboarding</button></form>";
+            out += "<h2>Validate and finish</h2><p>The saved hardware, WiFi, CAN and service settings were applied together during the restart. Review the actual connection and runtime state before completing onboarding.</p>" + c6WizardAccessNotice() + "<h2>Device and telemetry validation</h2><p>Start the validation to review device identity, network connection, CAN channels, optional GPS, AWS telemetry and runtime health.</p><p class='muted'>Some telemetry checks can remain inactive until the adapter is connected to the vehicle or AWS credentials have been provisioned.</p><button id='validation-button' type='button' onclick='validateDevice()'>Start validation</button><pre id='validation'>Validation has not been started.</pre><script>async function validateDevice(){const b=document.getElementById('validation-button'),o=document.getElementById('validation');b.classList.add('is-pending');b.setAttribute('aria-busy','true');b.textContent='Validation running';o.textContent='Reading device and telemetry status…';try{let r=await fetch('/api/status'),d=await r.json();o.textContent=JSON.stringify(d,null,2);b.textContent='Validation complete'}catch(e){o.textContent='Validation failed: '+e.message;b.textContent='Try validation again'}finally{b.classList.remove('is-pending');b.removeAttribute('aria-busy')}}</script><form method='POST' action='/api/onboarding/complete'><button>Complete onboarding</button></form>";
             break;
     }
     out += c6WizardNavigation(step);
     out += "<hr><form method='POST' action='/api/onboarding/restart'><button>Restart wizard</button></form></div><p><a href='/status'>Skip to status</a></p></body></html>";
     server.send(200, "text/html", out);
+}
+
+void wizardHardwareSave()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6Config.gpsEnabled = server.hasArg("gpsEnabled");
+    c6Config.onboardingStep = 3;
+    c6ConfigSave();
+    server.sendHeader("Location", "/wizard"); server.send(303);
 }
 
 void onboardingStep()
@@ -347,9 +358,6 @@ void wizardConnectivitySave()
     String ssid = server.arg("ssid"); ssid.trim();
     String ssid2 = server.arg("ssid2"); ssid2.trim();
     if (ssid.length() > 32 || ssid2.length() > 32 || server.arg("wifiPassword").length() > 63 || server.arg("wifi2Password").length() > 63) { server.send(400, "text/plain", "Invalid WiFi configuration"); return; }
-    const bool settingsChanged = ssid != c6Config.wifiSsid || ssid2 != c6Config.wifi2Ssid ||
-        (!server.arg("wifiPassword").isEmpty() && server.arg("wifiPassword") != c6Config.wifiPassword) ||
-        (!server.arg("wifi2Password").isEmpty() && server.arg("wifi2Password") != c6Config.wifi2Password);
     c6Config.wifiSsid = ssid;
     if (!server.arg("wifiPassword").isEmpty()) c6Config.wifiPassword = server.arg("wifiPassword");
     if (ssid.isEmpty()) c6Config.wifiPassword = "";
@@ -358,12 +366,7 @@ void wizardConnectivitySave()
     if (ssid2.isEmpty()) c6Config.wifi2Password = "";
     c6Config.onboardingStep = 4;
     c6ConfigSave();
-    if (!settingsChanged) {
-        server.sendHeader("Location", "/wizard"); server.send(303);
-        return;
-    }
-    server.send(200, "text/html", header("WiFi saved") + "<h1>WiFi saved</h1><p>Rebooting. The protected <b>" + htmlEscape(c6NetworkApSsid()) + "</b> hotspot remains available during onboarding. Reconnect at <b>" + localHttpLink("192.168.4.1") + "</b> and sign in as <b>admin</b>; the wizard will continue automatically.</p></body></html>");
-    scheduleReboot();
+    server.sendHeader("Location", "/wizard"); server.send(303);
 }
 
 void wizardVehicleSave()
@@ -371,17 +374,11 @@ void wizardVehicleSave()
     if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
     const DecoderProfile can1 = decoderProfileNormalize(server.arg("can1").toInt());
     const DecoderProfile can2 = DECODER_PROFILE_DISPLAY_CAN;
-    const bool profilesChanged = can1 != c6Config.can1Profile || can2 != c6Config.can2Profile;
     c6Config.can1Profile = can1;
     c6Config.can2Profile = can2;
     c6Config.onboardingStep = 5;
     c6ConfigSave();
-    if (!profilesChanged) {
-        server.sendHeader("Location", "/wizard"); server.send(303);
-        return;
-    }
-    server.send(200, "text/html", header("CAN saved") + "<h1>CAN settings saved</h1><p>Rebooting. Reconnect as <b>admin</b>; onboarding will continue automatically.</p></body></html>");
-    scheduleReboot();
+    server.sendHeader("Location", "/wizard"); server.send(303);
 }
 
 void wizardServicesSave()
@@ -392,19 +389,21 @@ void wizardServicesSave()
     if (!server.arg("abrpApiKey").isEmpty()) abrpKey = server.arg("abrpApiKey");
     if (!server.arg("abrpUserToken").isEmpty()) abrpToken = server.arg("abrpUserToken");
     if (!c6ConfigSetAbrpCredentials(abrpKey, abrpToken)) { server.send(400, "text/plain", "Invalid ABRP credentials"); return; }
-    const bool motCloudEnabled = server.hasArg("motCloudEnabled");
-    const bool motCloudChanged = motCloudEnabled != c6Config.motCloudEnabled;
-    c6Config.motCloudEnabled = motCloudEnabled;
+    c6Config.motCloudEnabled = server.hasArg("motCloudEnabled");
     c6Config.abrpEnabled = server.hasArg("abrpEnabled");
     c6ConfigSetOfflineCacheEnabled(server.hasArg("offlineCacheEnabled"));
     c6Config.onboardingStep = 6;
     c6ConfigSave();
-    if (motCloudChanged) {
-        server.send(200, "text/html", header("Services saved") + "<h1>Services saved</h1><p>Rebooting to apply the MOT Cloud change. Reconnect as <b>admin</b>; the wizard will continue at validation.</p></body></html>");
-        scheduleReboot();
-        return;
-    }
     server.sendHeader("Location", "/wizard"); server.send(303);
+}
+
+void wizardApply()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6Config.onboardingStep = onboardingStepNumber(OnboardingStep::Finish);
+    c6ConfigSave();
+    server.send(200, "text/html", header("Applying settings") + "<h1>Applying settings</h1><p>The adapter is restarting once to activate the saved hardware, WiFi, CAN and service settings. Your browser will temporarily lose its connection.</p><p>During onboarding, the protected <b>" + htmlEscape(c6NetworkApSsid()) + "</b> hotspot remains available at <b>" + localHttpLink("192.168.4.1") + "</b>.</p><p><b>After the device restart, reconnect to " + htmlEscape(c6NetworkApSsid()) + ", open " + localHttpLink("192.168.4.1") + ", and sign in as admin to complete device onboarding.</b></p></body></html>");
+    scheduleReboot();
 }
 
 void onboardingStatus()
@@ -469,9 +468,11 @@ void c6WebSetup()
     server.on("/status", HTTP_GET, statusPage);
     server.on("/api/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", diagnosticsJson()); });
     server.on("/wizard", HTTP_GET, wizardPage);
+    server.on("/wizard/hardware", HTTP_POST, wizardHardwareSave);
     server.on("/wizard/connectivity", HTTP_POST, wizardConnectivitySave);
     server.on("/wizard/vehicle", HTTP_POST, wizardVehicleSave);
     server.on("/wizard/services", HTTP_POST, wizardServicesSave);
+    server.on("/wizard/apply", HTTP_POST, wizardApply);
     server.on("/api/onboarding", HTTP_GET, onboardingStatus);
     server.on("/api/onboarding/step", HTTP_POST, onboardingStep);
     server.on("/api/onboarding/complete", HTTP_POST, onboardingComplete);

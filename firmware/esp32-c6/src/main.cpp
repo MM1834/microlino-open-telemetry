@@ -5,6 +5,7 @@
 #include "c6_aws.h"
 #include "c6_can_scan.h"
 #include "c6_drive_capture.h"
+#include "c6_soc_discovery.h"
 #include "c6_config.h"
 #include "c6_dual_can.h"
 #include "c6_gps.h"
@@ -73,6 +74,22 @@ void handleSerialCommand(String command)
     }
     if (normalized == "drive trace") {
         c6DriveCaptureTraceDump();
+        return;
+    }
+    if (normalized == "soc reset") {
+        c6SocDiscoveryReset();
+        return;
+    }
+    if (normalized == "soc mark") {
+        c6SocDiscoveryMark();
+        return;
+    }
+    if (normalized == "soc dump") {
+        c6SocDiscoveryDump();
+        return;
+    }
+    if (normalized == "soc 48d") {
+        c6SocDiscovery48dDump();
         return;
     }
 
@@ -180,7 +197,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
+        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc 48d | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
         return;
     }
 

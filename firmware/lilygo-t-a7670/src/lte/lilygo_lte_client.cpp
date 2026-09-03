@@ -1,6 +1,13 @@
 #include "lilygo_lte_client.h"
 
+#include "board_config.h"
 #include "modem/lilygo_modem.h"
+
+#if defined(LILYGO_SIM7670G_S3_STANDARD)
+static constexpr const char* LTE_CLIENT_BACKEND = "LewisXhe TinyGSM SIM7670G wrapper";
+#else
+static constexpr const char* LTE_CLIENT_BACKEND = "LewisXhe TinyGSM A76XXSSL wrapper";
+#endif
 
 static uint32_t connectCalls = 0;
 static uint32_t writeCalls = 0;
@@ -33,7 +40,7 @@ static String esc(String value)
 String lilygoLteClientTraceJson()
 {
     String json = "{";
-    json += "\"backend\":\"LewisXhe TinyGSM A76XXSSL wrapper\",";
+    json += "\"backend\":\"" + String(LTE_CLIENT_BACKEND) + "\",";
     json += "\"connectCalls\":" + String(connectCalls) + ",";
     json += "\"writeCalls\":" + String(writeCalls) + ",";
     json += "\"readCalls\":" + String(readCalls) + ",";

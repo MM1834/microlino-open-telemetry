@@ -21,6 +21,7 @@ The current remote-pilot assembly and validation reference is documented in
 | ESP32-WROOM + SN65HVD230 | Yes | Yes | No | Optional | Development, garage and WiFi telemetry |
 | WeAct Studio ESP32 CAN485 | Yes | Yes | No | Optional | Compact WiFi CAN telemetry |
 | LilyGO T-A7670G | Two in active pilot | Yes | Functional pilot path | L76K | Mobile AWS telemetry; dual-CAN extension awaiting hardware acceptance |
+| LilyGO T-SIM7670G-S3 N16R2 | Two planned | Yes | Build-qualified candidate | Integrated | 16 MB mobile dual-CAN pilot; physical acceptance open |
 | nanoESP32-C6-N16 | Two | Yes | No | Optional | Recommended dual-CAN WiFi pilot; WebUI/OTA parity open |
 
 ## Which hardware should I choose?
@@ -55,6 +56,7 @@ flowchart LR
 | ESP32-WROOM + SN65HVD230 | Verified | Reference WiFi/CAN baseline |
 | WeAct Studio ESP32 CAN485 | Compatible | Same CAN GPIO mapping |
 | LilyGO T-A7670G + L76K | Pilot candidate | AWS IoT LTE/TLS and live CAN/GPS portal path validated; soak/power tests open |
+| LilyGO T-SIM7670G-S3 N16R2 | Build-qualified candidate | Full feature image fits; modem TLS, GNSS and dual-CAN physical acceptance open |
 | nanoESP32-C6-N16 + two CAN transceivers | Qualified pilot candidate | Simultaneous Pioneer dual-CAN, WiFi/AWS and portal path validated; production wiring/soak/WebUI/OTA open |
 | Seeed XIAO ESP32-C6 | Compatibility candidate | 4 MB flash and GPS validated; vehicle dual-CAN/AWS run not completed |
 | L76K GPS | Verified | Valid GPS fix and location telemetry |

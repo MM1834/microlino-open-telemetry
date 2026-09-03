@@ -7,6 +7,7 @@
 #include <MotAwsIot.h>
 #include <esp_system.h>
 #include <math.h>
+#include <string.h>
 
 namespace {
 constexpr float MOVING_SPEED_KMH = 1.0f;
@@ -135,8 +136,13 @@ bool c6JourneyEnergyPublish(MotAwsIotClient &client)
     if (!state.publishPending && state.lastPublishMs != 0 &&
         !elapsedAtLeast(nowMs, state.lastPublishMs, CHECKPOINT_MS)) return false;
 
+    String counterIdJson;
+    counterIdJson.reserve(strlen(state.counterId) + 3);
+    counterIdJson += '"';
+    counterIdJson += state.counterId;
+    counterIdJson += '"';
     const bool idOk = client.publish(
-        "journey/energy_counter_id", String(state.counterId), false);
+        "journey/energy_counter_id", counterIdJson, false);
     const bool drawnOk = client.publishInt(
         "journey/energy_drawn_wh", drawnWh(), false);
     const bool regenOk = client.publishInt(

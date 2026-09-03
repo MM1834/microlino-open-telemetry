@@ -90,7 +90,11 @@ order and stale Display-CAN fallback cannot overwrite them.
 
 `standard-can-v1-pioneer` decodes the physically confirmed `0x18D` pack voltage,
 current scale, derived power and plug/charge states. It also exposes the observed
-but still provisional `0x4AD` cell pair. `standard-can-v2` is now an independent
+but still provisional `0x4AD` cell pair. Pioneer-only `0x48D data[6]` is exposed
+as the internal SOC candidate `bms/soc_internal`; `data[7]` is exposed separately
+as `bms/soc_display` after matching the visible SOC through controlled driving,
+rest and charging. Neither replaces the canonical Display-CAN `display/soc`.
+`standard-can-v2` is now an independent
 large-battery decoder based on the recovered source workbook and a 16,675-frame
 capture from that vehicle generation. It does not reuse the Pioneer `0x18D` or
 `0x4AD` layout.
@@ -98,7 +102,7 @@ capture from that vehicle generation. It does not reuse the Pioneer `0x18D` or
 | CAN ID | Standard-CAN V2 large-battery values | Evidence status |
 |---:|---|---|
 | `0x1B0` | bytes 2–3 pack mV, 4–5 minimum cell mV, 6–7 maximum cell mV; all big-endian | Source workbook plus plausible 47.317–47.326 V and 3,635–3,643 mV live values |
-| `0x1B1` | bytes 0–1 SOC ×100 and 2–3 SOH ×100; big-endian | Source workbook plus stable 32.15% SOC and 97.01% SOH sample |
+| `0x1B1` | bytes 0–1 SOC ×100 and 2–3 SOH ×100; big-endian | Source workbook plus 83 identical captured frames at 32.15% SOC and 97.01% SOH |
 | `0x2BA` | bytes 0–1 signed big-endian battery current ×10 | Flespi source explicitly uses signed 16-bit big-endian; stationary sample -1.9 to -2.1 A supports `/10` |
 | `0x18D` | retained as raw discovery data only | Large-battery payload is incompatible with Pioneer scaling |
 | `0x4AD` | not decoded | Absent from both available large-battery captures |

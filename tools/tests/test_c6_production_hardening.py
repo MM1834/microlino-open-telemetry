@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -27,9 +28,10 @@ class C6ProductionHardeningTests(unittest.TestCase):
         self.assertIn('WiFi antenna: internal ceramic', BOARD)
 
     def test_c6_has_exactly_two_unified_board_environments(self) -> None:
-        self.assertEqual(PLATFORMIO.count("[env:"), 2)
-        self.assertIn("[env:nanoesp32c6-n16]", PLATFORMIO)
-        self.assertIn("[env:xiao-esp32c6]", PLATFORMIO)
+        environments = re.findall(r"^\[env:([^]]+)]$", PLATFORMIO, re.MULTILINE)
+        canonical = [name for name in environments if not name.endswith("-diagnostic")]
+        self.assertEqual(canonical, ["nanoesp32c6-n16", "xiao-esp32c6"])
+        self.assertIn("nanoesp32c6-n16-soc-diagnostic", environments)
         self.assertNotIn("nanoesp32c6-n16-aws", PLATFORMIO)
         self.assertNotIn("xiao-esp32c6-aws", PLATFORMIO)
 

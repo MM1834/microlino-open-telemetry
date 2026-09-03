@@ -49,6 +49,10 @@ published only after the relevant decoder validity gate passes.
 | `bms/cell_min_mv` | mV | Provisional `0x4AD` pair |
 | `bms/cell_max_mv` | mV | Provisional `0x4AD` pair |
 | `bms/cell_delta_mv` | mV | Provisional derived delta |
+| `bms/soc_internal` | percent | Pioneer-only internal SOC candidate from `0x48D data[6]` |
+| `bms/soc_display` | percent | Pioneer-only display-correlated SOC from `0x48D data[7]` |
+| `bms/standard_soc` | percent | V2 `0x1B1` SOC candidate; two decimals |
+| `bms/soh_percent` | percent | V2 `0x1B1` SOH candidate; two decimals |
 
 The C6 AWS profiles are repository-build validated but not yet physically
 provisioned or connected to AWS. See the

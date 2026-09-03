@@ -14,18 +14,18 @@ class OnboardingTemplateTests(unittest.TestCase):
         self.assertNotIn("ZipFile:", TEMPLATE)
 
     def test_tables_are_on_demand_encrypted_and_claims_use_ttl(self):
-        self.assertEqual(3, TEMPLATE.count("Type: AWS::DynamoDB::Table"))
-        self.assertEqual(3, TEMPLATE.count("BillingMode: PAY_PER_REQUEST"))
-        self.assertGreaterEqual(TEMPLATE.count("SSEEnabled: true"), 3)
+        self.assertEqual(4, TEMPLATE.count("Type: AWS::DynamoDB::Table"))
+        self.assertEqual(4, TEMPLATE.count("BillingMode: PAY_PER_REQUEST"))
+        self.assertGreaterEqual(TEMPLATE.count("SSEEnabled: true"), 4)
         self.assertIn("TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}", TEMPLATE)
         self.assertIn("AuditRetentionDays:", TEMPLATE)
         audit_parameter = TEMPLATE.split("AuditRetentionDays:", 1)[1].split("LogRetentionDays:", 1)[0]
         self.assertNotIn("Default:", audit_parameter)
 
-    def test_both_routes_require_jwt_and_api_is_throttled(self):
+    def test_all_routes_require_jwt_and_api_is_throttled(self):
         self.assertIn('RouteKey: "POST /api/onboarding/claims"', TEMPLATE)
         self.assertIn('RouteKey: "POST /api/onboarding/claim"', TEMPLATE)
-        self.assertEqual(2, TEMPLATE.count("AuthorizationType: JWT"))
+        self.assertEqual(7, TEMPLATE.count("AuthorizationType: JWT"))
         self.assertIn("ThrottlingRateLimit: 2", TEMPLATE)
         self.assertNotIn("AllowOrigins: ['*']", TEMPLATE)
 

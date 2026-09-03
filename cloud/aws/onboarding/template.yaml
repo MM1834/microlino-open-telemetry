@@ -25,6 +25,61 @@ Parameters:
     Type: String
   ArtifactKey:
     Type: String
+  FirmwareArtifactKey:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^releases/(nanoesp32c6-n16|xiao-esp32c6)/[A-Za-z0-9._/-]+\.bin$'
+  FirmwareTarget:
+    Type: String
+    Default: nanoesp32c6-n16
+    AllowedValues: [nanoesp32c6-n16, xiao-esp32c6]
+  FirmwareFlashSizeBytes:
+    Type: Number
+    Default: 16777216
+    AllowedValues: [4194304, 16777216]
+  FirmwareVersion:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+  FirmwareSha256:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[0-9a-f]{64}$'
+  FirmwareSize:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 5242880
+  FirmwareSecondaryArtifactKey:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^releases/(nanoesp32c6-n16|xiao-esp32c6)/[A-Za-z0-9._/-]+\.bin$'
+  FirmwareSecondaryTarget:
+    Type: String
+    Default: ""
+    AllowedValues: ["", nanoesp32c6-n16, xiao-esp32c6]
+  FirmwareSecondaryFlashSizeBytes:
+    Type: Number
+    Default: 0
+    AllowedValues: [0, 4194304, 16777216]
+  FirmwareSecondaryVersion:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+  FirmwareSecondarySha256:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[0-9a-f]{64}$'
+  FirmwareSecondarySize:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 5242880
+  FirmwareUrlTtlSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 60
+    MaxValue: 300
   AdminGroupName:
     Type: String
     Default: mot-beta-admins
@@ -89,6 +144,45 @@ Resources:
         - {AttributeName: eventKey, KeyType: RANGE}
       TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
       SSESpecification: {SSEEnabled: true}
+  FirmwareGrantsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-firmware-grants"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: userSub, AttributeType: S}
+        - {AttributeName: target, AttributeType: S}
+      KeySchema:
+        - {AttributeName: userSub, KeyType: HASH}
+        - {AttributeName: target, KeyType: RANGE}
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+  FirmwareArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration: {Status: Enabled}
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-noncurrent-firmware
+            Status: Enabled
+            NoncurrentVersionExpiration: {NoncurrentDays: 30}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref ApiAllowedOrigin]
+            AllowedMethods: [GET]
+            AllowedHeaders: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 300
   OnboardingRole:
     Type: AWS::IAM::Role
     Properties:
@@ -114,6 +208,7 @@ Resources:
                   - !GetAtt ClaimsTable.Arn
                   - !GetAtt VehicleOwnershipTable.Arn
                   - !GetAtt AuditTable.Arn
+                  - !GetAtt FirmwareGrantsTable.Arn
                   - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${VehicleStateTableName}"
                   - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserVehicleAccessTableName}"
               - Effect: Allow
@@ -122,7 +217,24 @@ Resources:
                   - !GetAtt ClaimsTable.Arn
                   - !GetAtt VehicleOwnershipTable.Arn
                   - !GetAtt AuditTable.Arn
+                  - !GetAtt FirmwareGrantsTable.Arn
                   - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserVehicleAccessTableName}"
+        - PolicyName: firmware-artifact
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub "${FirmwareArtifactBucket.Arn}/${FirmwareArtifactKey}"
+                  - !Sub "${FirmwareArtifactBucket.Arn}/${FirmwareSecondaryArtifactKey}"
+        - PolicyName: firmware-user-resolution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cognito-idp:AdminGetUser
+                Resource: !Sub "arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
         - PolicyName: logs
           PolicyDocument:
             Version: "2012-10-17"
@@ -154,6 +266,22 @@ Resources:
           MAX_ATTEMPTS: !Ref MaxClaimAttempts
           AUDIT_RETENTION_DAYS: !Ref AuditRetentionDays
           CLAIM_READ_ONLY_VEHICLE_IDS: !Ref ClaimReadOnlyVehicleIds
+          FIRMWARE_GRANTS_TABLE: !Ref FirmwareGrantsTable
+          FIRMWARE_BUCKET: !Ref FirmwareArtifactBucket
+          FIRMWARE_ARTIFACT_KEY: !Ref FirmwareArtifactKey
+          FIRMWARE_TARGET: !Ref FirmwareTarget
+          FIRMWARE_FLASH_SIZE_BYTES: !Ref FirmwareFlashSizeBytes
+          FIRMWARE_VERSION: !Ref FirmwareVersion
+          FIRMWARE_SHA256: !Ref FirmwareSha256
+          FIRMWARE_SIZE: !Ref FirmwareSize
+          FIRMWARE_SECONDARY_ARTIFACT_KEY: !Ref FirmwareSecondaryArtifactKey
+          FIRMWARE_SECONDARY_TARGET: !Ref FirmwareSecondaryTarget
+          FIRMWARE_SECONDARY_FLASH_SIZE_BYTES: !Ref FirmwareSecondaryFlashSizeBytes
+          FIRMWARE_SECONDARY_VERSION: !Ref FirmwareSecondaryVersion
+          FIRMWARE_SECONDARY_SHA256: !Ref FirmwareSecondarySha256
+          FIRMWARE_SECONDARY_SIZE: !Ref FirmwareSecondarySize
+          FIRMWARE_URL_TTL_SECONDS: !Ref FirmwareUrlTtlSeconds
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
   OnboardingLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -167,7 +295,7 @@ Resources:
       CorsConfiguration:
         AllowOrigins:
           - !Ref ApiAllowedOrigin
-        AllowMethods: [POST, OPTIONS]
+        AllowMethods: [GET, POST, OPTIONS]
         AllowHeaders: [authorization, content-type]
         MaxAge: 300
   JwtAuthorizer:
@@ -203,6 +331,46 @@ Resources:
       AuthorizationType: JWT
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub "integrations/${OnboardingIntegration}"
+  FirmwareGrantRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/firmware/grants"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  FirmwareRevokeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/firmware/grants/revoke"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  FirmwareAccessRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "GET /api/firmware/access"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  FirmwareDownloadRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/firmware/download"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  FirmwareResultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/firmware/result"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -229,3 +397,7 @@ Outputs:
     Value: !Ref VehicleOwnershipTable
   AuditTableName:
     Value: !Ref AuditTable
+  FirmwareGrantsTableName:
+    Value: !Ref FirmwareGrantsTable
+  FirmwareArtifactBucketName:
+    Value: !Ref FirmwareArtifactBucket

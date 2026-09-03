@@ -62,6 +62,37 @@ Parameters:
     MinValue: 1
     Description: Alarm when history table writes exceed this daily pilot budget.
 
+  EnableTelemetryDebug:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Enables bounded raw diagnostic capture. Vehicle allowlist and expiry remain mandatory.
+
+  TelemetryDebugVehicleAllowlist:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[a-z0-9][a-z0-9_-]{0,63}(,[a-z0-9][a-z0-9_-]{0,63})*$'
+    Description: Comma-separated diagnostic vehicles. Empty means no debug writes.
+
+  TelemetryDebugCaptureUntilEpochSeconds:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Absolute UTC epoch-second deadline. Zero is fail-closed.
+
+  TelemetryDebugRetentionDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 14
+    Description: DynamoDB TTL horizon for raw diagnostic rows after receipt.
+
+  TelemetryDebugDailyWriteAlarmThreshold:
+    Type: Number
+    Default: 250000
+    MinValue: 1
+    Description: Dedicated diagnostic-table daily write guardrail.
+
   EnableOfflineHistoryBackfill:
     Type: String
     Default: "false"
@@ -350,6 +381,56 @@ Resources:
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
 
+  VehicleDebugHistoryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-vehicle-debug-history"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: vehicleId
+          AttributeType: S
+        - AttributeName: sampleKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: vehicleId
+          KeyType: HASH
+        - AttributeName: sampleKey
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+        - Key: environment
+          Value: !Ref Environment
+        - Key: component
+          Value: bounded-telemetry-debug
+
+  VehicleDebugHistoryDailyWriteAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-debug-history-daily-writes"
+      AlarmDescription: Dedicated raw diagnostic capture guardrail.
+      Namespace: AWS/DynamoDB
+      MetricName: ConsumedWriteCapacityUnits
+      Dimensions:
+        - Name: TableName
+          Value: !Ref VehicleDebugHistoryTable
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: !Ref TelemetryDebugDailyWriteAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
   UserVehicleAccessTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -432,6 +513,9 @@ Resources:
                   Resource: !GetAtt VehicleHistoryTable.Arn
                 - !Ref AWS::NoValue
               - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt VehicleDebugHistoryTable.Arn
+              - Effect: Allow
                 Action:
                   - dynamodb:Query
                   - dynamodb:GetItem
@@ -470,6 +554,11 @@ Resources:
           HISTORY_VEHICLE_ALLOWLIST: !Ref HistoryVehicleAllowlist
           HISTORY_CORE_INTERVAL_SECONDS: !Ref HistoryCoreIntervalSeconds
           HISTORY_MOTION_INTERVAL_SECONDS: !Ref HistoryMotionIntervalSeconds
+          DEBUG_ENABLED: !Ref EnableTelemetryDebug
+          DEBUG_TABLE_NAME: !Ref VehicleDebugHistoryTable
+          DEBUG_VEHICLE_ALLOWLIST: !Ref TelemetryDebugVehicleAllowlist
+          DEBUG_CAPTURE_UNTIL_EPOCH_SECONDS: !Ref TelemetryDebugCaptureUntilEpochSeconds
+          DEBUG_RETENTION_DAYS: !Ref TelemetryDebugRetentionDays
       Code:
         ZipFile: |
           import base64
@@ -486,6 +575,7 @@ Resources:
           connections = dynamodb.Table(os.environ["CONNECTION_TABLE_NAME"])
           access = dynamodb.Table(os.environ["ACCESS_TABLE_NAME"])
           history = dynamodb.Table(os.environ["HISTORY_TABLE_NAME"])
+          debug_history = dynamodb.Table(os.environ["DEBUG_TABLE_NAME"])
           management = boto3.client(
               "apigatewaymanagementapi",
               endpoint_url=(
@@ -503,6 +593,17 @@ Resources:
           history_retention_days = min(31, max(1, int(os.environ.get("HISTORY_RETENTION_DAYS", "31"))))
           history_core_interval = int(os.environ.get("HISTORY_CORE_INTERVAL_SECONDS", "300"))
           history_motion_interval = int(os.environ.get("HISTORY_MOTION_INTERVAL_SECONDS", "60"))
+          debug_enabled = os.environ.get("DEBUG_ENABLED", "false").lower() == "true"
+          debug_vehicle_allowlist = {
+              item.strip() for item in os.environ.get("DEBUG_VEHICLE_ALLOWLIST", "").split(",")
+              if item.strip()
+          }
+          debug_capture_until = max(
+              0, int(os.environ.get("DEBUG_CAPTURE_UNTIL_EPOCH_SECONDS", "0"))
+          )
+          debug_retention_days = min(
+              14, max(1, int(os.environ.get("DEBUG_RETENTION_DAYS", "7")))
+          )
 
           HISTORY_SIGNALS = {
               "display/soc": ("soc", history_core_interval),
@@ -524,6 +625,43 @@ Resources:
                   return False
               signal = HISTORY_SIGNALS[topic_suffix][0]
               return signal not in ("speed", "power") or history_motion_enabled
+
+          def is_debug_candidate(vehicle_id, topic_suffix, value, received_at):
+              if (
+                  not debug_enabled
+                  or not debug_vehicle_allowlist
+                  or vehicle_id not in debug_vehicle_allowlist
+                  or debug_capture_until <= 0
+                  or int(time.time()) > debug_capture_until
+                  or received_at > debug_capture_until * 1000
+                  or not topic_suffix.startswith(("display/", "charging/", "bms/"))
+              ):
+                  return False
+              return isinstance(value, (bool, int, Decimal))
+
+          def store_debug(vehicle_id, topic_suffix, value, value_type, received_at):
+              if not is_debug_candidate(vehicle_id, topic_suffix, value, received_at):
+                  return False
+              received_seconds = received_at // 1000
+              try:
+                  debug_history.put_item(
+                      Item={
+                          "vehicleId": vehicle_id,
+                          "sampleKey": f"{received_at:013d}#{topic_suffix}",
+                          "topicSuffix": topic_suffix,
+                          "sampledAt": received_at,
+                          "receivedAt": received_at,
+                          "value": value,
+                          "valueType": value_type,
+                          "expiresAt": received_seconds + debug_retention_days * 86400,
+                      },
+                      ConditionExpression="attribute_not_exists(sampleKey)"
+                  )
+                  return True
+              except ClientError as error:
+                  if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                      return False
+                  raise
 
           def store_history(
               vehicle_id, topic_suffix, value, value_type, received_at,
@@ -726,6 +864,7 @@ Resources:
 
               fanout = {"sent": 0, "removed": 0}
               history_stored = False
+              debug_stored = False
               if stored:
                   try:
                       history_stored = store_history(
@@ -735,6 +874,17 @@ Resources:
                   except Exception as error:
                       print(json.dumps({
                           "eventType": "history_ingest_failed",
+                          "vehicleId": vehicle_id,
+                          "topicSuffix": topic_suffix,
+                          "error": str(error)
+                      }, separators=(",", ":")))
+                  try:
+                      debug_stored = store_debug(
+                          vehicle_id, topic_suffix, value, value_type, received_at
+                      )
+                  except Exception as error:
+                      print(json.dumps({
+                          "eventType": "debug_ingest_failed",
                           "vehicleId": vehicle_id,
                           "topicSuffix": topic_suffix,
                           "error": str(error)
@@ -760,11 +910,16 @@ Resources:
                       "receivedAt":received_at,
                       "stored":stored,
                       "historyStored":history_stored,
+                      "debugStored":debug_stored,
                       "liveSent":fanout["sent"],
                       "staleConnectionsRemoved":fanout["removed"]
                   }, default=str, separators=(",", ":")))
 
-              return {"accepted": True, "stored": stored, "historyStored": history_stored, "live": fanout}
+              return {
+                  "accepted": True, "stored": stored,
+                  "historyStored": history_stored, "debugStored": debug_stored,
+                  "live": fanout
+              }
 
   StateIngestLogGroup:
     Type: AWS::Logs::LogGroup
@@ -2087,6 +2242,12 @@ Outputs:
     Value: !GetAtt VehicleHistoryTable.Arn
   VehicleHistoryDailyWriteAlarmName:
     Value: !Ref VehicleHistoryDailyWriteAlarm
+  VehicleDebugHistoryTableName:
+    Value: !Ref VehicleDebugHistoryTable
+  VehicleDebugHistoryTableArn:
+    Value: !GetAtt VehicleDebugHistoryTable.Arn
+  VehicleDebugHistoryDailyWriteAlarmName:
+    Value: !Ref VehicleDebugHistoryDailyWriteAlarm
   UserVehicleAccessTableName:
     Description: Controlled user-to-vehicle assignment table for ONB-001.A.
     Value: !Ref UserVehicleAccessTable

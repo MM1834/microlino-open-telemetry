@@ -10,6 +10,9 @@
 
 ## Active implementation work
 
+- [CHG-SUM-001 — email-only charging summary](CHG-SUM-001.md)
+- [DBG-001 — bounded vehicle telemetry debug capture](DBG-001.md)
+- [WEBFLASH-001 — controlled portal Web Flasher](WEBFLASH-001.md)
 - [RNG-SET-001 — personal range settings](RNG-SET-001.md)
 - [OPS-001 — Lambda capacity and portal resilience](OPS-001.md)
 - [SMS-001 — controlled SMS notification pilot](SMS-001.md)
@@ -22,6 +25,7 @@
 - [SPR-0005 — ESP32-WROOM beta readiness and portal onboarding](SPR-0005.md)
 - [ONB-001.B — Controlled User and Device Onboarding](ONB-001-B.md)
 - [LG-CAN2-001 — LilyGO mobile dual-CAN pilot](LG-CAN2-001.md)
+- [LG-S3-001 — T-SIM7670G-S3 firmware pilot](LG-S3-001.md)
 
 ## Completed predecessors
 
@@ -74,5 +78,7 @@ as parallel status documents in the working tree.
 
 ## Parked work
 
+- [FW-CHECK-001](FW-CHECK-001.md) is retained as the superseded informational
+  precursor absorbed into active WEBFLASH-001.
 - [LTE-001](LTE-001.md) retains the functionally validated LilyGO A7670 baseline;
   extended production qualification is parked while feature work focuses on C6.

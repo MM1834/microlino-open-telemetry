@@ -25,6 +25,7 @@ struct MotBmsTelemetry {
     bool packCurrentValid = false;
     bool cellVoltagesValid = false;
     bool standardSocValid = false;
+    bool pioneerSocValid = false;
     bool sohValid = false;
     uint32_t packVoltageMv = 0;
     int16_t packCurrentRaw = 0;
@@ -34,6 +35,8 @@ struct MotBmsTelemetry {
     bool isRegenerating = false;
     bool isDischarging = false;
     float socPercent = NAN;
+    float socInternal = NAN;
+    float socDisplay = NAN;
     float sohPercent = NAN;
     uint8_t statusByte = 0;
     bool plugged = false;
@@ -45,6 +48,7 @@ struct MotBmsTelemetry {
     uint32_t packStatusLastUpdateMs = 0;
     uint32_t packCurrentLastUpdateMs = 0;
     uint32_t statusLastUpdateMs = 0;
+    uint32_t pioneerSocLastUpdateMs = 0;
     uint32_t cellVoltagesLastUpdateMs = 0;
     uint32_t rejectedPackSamples = 0;
     uint32_t rejectedCurrentSamples = 0;

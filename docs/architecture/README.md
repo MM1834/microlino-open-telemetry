@@ -22,6 +22,7 @@
 - [Firmware architecture](../firmware/architecture.md)
 - [AWS IoT and portal architecture](aws-iot.md)
 - [Telemetry history pilot](telemetry-history.md)
+- [Bounded telemetry debug capture](telemetry-debug.md)
 - [Authentication](authentication.md)
 - [CAN profile framework](can-profile-framework.md)
 

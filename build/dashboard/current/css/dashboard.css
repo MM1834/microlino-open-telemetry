@@ -26,6 +26,33 @@
     cursor:pointer;
   }
 }
+
+.firmware-card { grid-column: 1 / -1; padding: 22px; }
+.firmware-warning { margin: 1rem 0; padding: .85rem 1rem; border: 1px solid #c47a18; border-radius: 10px; background: #fff4df; color: #653b00; }
+.firmware-steps { margin: 1rem 0 1.25rem; padding-left: 1.4rem; }
+.firmware-steps li + li { margin-top: .45rem; }
+.firmware-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem 1.25rem; margin: 0 0 1.25rem; }
+.firmware-meta div { min-width: 0; padding: .7rem .8rem; border: 1px solid var(--line, #d5dce5); border-radius: 10px; }
+.firmware-meta dt { color: var(--muted, #687386); font-size: .82rem; }
+.firmware-meta dd { margin: .2rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.firmware-meta code { font-size: .78rem; font-weight: 500; }
+.firmware-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; }
+.firmware-confirmation { display: flex; align-items: flex-start; gap: .55rem; flex: 1 1 28rem; }
+.firmware-confirmation input { margin-top: .2rem; }
+#firmware-progress { width: 100%; height: 1rem; margin-top: 1rem; accent-color: #16a3b6; }
+.firmware-log-wrap { margin-top: .75rem; }
+.firmware-log { max-height: 13rem; overflow: auto; padding: .75rem; border-radius: 8px; background: #111923; color: #d5eef2; white-space: pre-wrap; font-size: .75rem; }
+#firmware-status[data-level="success"] { color: var(--green); }
+#firmware-status[data-level="error"] { color: var(--red); }
+.admin-divider { width: 100%; margin: 1.4rem 0; border: 0; border-top: 1px solid var(--line, #d5dce5); }
+.admin-firmware-row { display: grid; grid-template-columns: minmax(15rem, 1fr) auto 7rem; gap: .6rem; align-items: center; }
+
+@media (max-width: 720px) {
+  .firmware-meta { grid-template-columns: 1fr; }
+  .firmware-actions { align-items: stretch; }
+  .firmware-actions .auth-button { width: 100%; }
+  .admin-firmware-row { grid-template-columns: 1fr; align-items: stretch; }
+}
 @media (max-width:520px){
   .topbar .mobile-device-detail{display:block}
 }
@@ -247,8 +274,6 @@
   #history{order:60}
   #settings{order:70}
   #onboarding-admin{order:75}
-  .grid>.status-panel{order:80}
-  .main>.status-panel{order:80;width:100%}
   #vehicle .speedo strong{position:absolute;top:48px;left:0;right:0;transform:none;text-align:center;line-height:1}
   #vehicle .speedo span{bottom:30px;left:0;right:0;text-align:center}
   .hero-image-wrap{order:90;width:100%;min-height:180px;border:1px solid var(--line);box-shadow:var(--shadow)}
@@ -333,6 +358,7 @@
   #charging .mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   #charging .mini-grid>div:last-child{grid-column:1/-1}
   .cell-meta>span{display:flex;flex-direction:column;gap:3px}
+  #bms-soc-details{flex-wrap:wrap}
 }
 .language-selector{display:flex;align-items:center;gap:.45rem;color:var(--muted);font-size:.78rem}.language-selector select{background:rgba(15,23,42,.75);border:1px solid rgba(148,163,184,.28);border-radius:.5rem;color:var(--text);padding:.35rem .5rem}.language-selector select:focus{outline:2px solid rgba(56,189,248,.65);outline-offset:2px}
 @media(min-width:901px){.topbar{flex-wrap:wrap}.connection-status{flex:1 1 560px}.connection-item{min-width:150px}.topbar .top-spacer{display:none}.language-selector{margin-top:10px}}

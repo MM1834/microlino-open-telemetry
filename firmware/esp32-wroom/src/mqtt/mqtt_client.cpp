@@ -158,6 +158,14 @@ void publishTelemetry()
         awsClient.publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
         awsClient.publishInt("bms/status_byte", telemetry.bms.statusByte);
     }
+    if (telemetry.bms.pioneerSocValid) {
+        awsClient.publishFloat("bms/soc_internal", telemetry.bms.socInternal, 1);
+        awsClient.publishFloat("bms/soc_display", telemetry.bms.socDisplay, 1);
+    }
+    if (telemetry.bms.standardSocValid)
+        awsClient.publishFloat("bms/standard_soc", telemetry.bms.socPercent, 2);
+    if (telemetry.bms.sohValid)
+        awsClient.publishFloat("bms/soh_percent", telemetry.bms.sohPercent, 2);
     if (telemetry.bms.packCurrentValid) {
         awsClient.publishFloat("bms/pack_current", telemetry.bms.packCurrentA, 1);
         awsClient.publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);
@@ -268,6 +276,14 @@ void publishTelemetry()
         publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
         publishInt("bms/status_byte", telemetry.bms.statusByte);
     }
+    if (telemetry.bms.pioneerSocValid) {
+        publishFloat("bms/soc_internal", telemetry.bms.socInternal, 1);
+        publishFloat("bms/soc_display", telemetry.bms.socDisplay, 1);
+    }
+    if (telemetry.bms.standardSocValid)
+        publishFloat("bms/standard_soc", telemetry.bms.socPercent, 2);
+    if (telemetry.bms.sohValid)
+        publishFloat("bms/soh_percent", telemetry.bms.sohPercent, 2);
     if (telemetry.bms.packCurrentValid) {
         publishFloat("bms/pack_current", telemetry.bms.packCurrentA);
         publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);

@@ -7,6 +7,7 @@
 ## Current source-based reference
 
 - [Overview and environments](overview.md)
+- [ESP32-C6 release notes and XIAO feature boundary](c6-release-notes.md)
 - [Architecture](architecture.md)
 - [CAN and decoder pipeline](can.md)
 - [Pioneer Standard-CAN decoder and charge evidence](pioneer-standard-can.md)

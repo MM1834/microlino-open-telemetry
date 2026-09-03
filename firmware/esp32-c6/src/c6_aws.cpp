@@ -62,6 +62,14 @@ bool publishTelemetry()
         published |= client.publishFloat("bms/pack_voltage", telemetry.bms.packVoltageMv / 1000.0f, 3);
         published |= client.publishInt("bms/status_byte", telemetry.bms.statusByte);
     }
+    if (telemetry.bms.pioneerSocValid) {
+        published |= client.publishFloat("bms/soc_internal", telemetry.bms.socInternal, 1);
+        published |= client.publishFloat("bms/soc_display", telemetry.bms.socDisplay, 1);
+    }
+    if (telemetry.bms.standardSocValid)
+        published |= client.publishFloat("bms/standard_soc", telemetry.bms.socPercent, 2);
+    if (telemetry.bms.sohValid)
+        published |= client.publishFloat("bms/soh_percent", telemetry.bms.sohPercent, 2);
     if (telemetry.bms.packCurrentValid) {
         published |= client.publishFloat("bms/pack_current", telemetry.bms.packCurrentA, 1);
         published |= client.publishFloat("bms/pack_power_w", telemetry.bms.packPowerW, 0);

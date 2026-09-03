@@ -8,9 +8,65 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-27
+**Last reviewed:** 2026-09-01
 
 ## High priority
+
+### Validate the optional charging-summary email
+
+**Active backend/portal sprint:** [CHG-SUM-001 — Email Charging Summary](../project/sprints/CHG-SUM-001.md)
+
+**Objective:** Send an optional email-only charging summary based exclusively on
+standard notification telemetry, with the same 45-second start qualification as
+charging-stop detection and completion on unplug or after ten stopped minutes.
+
+**Current status:** Backend deployed and preference migration complete. All 9
+existing profiles with both email notifications and journey summaries enabled
+now also have the charging summary enabled; no other profile was modified. The
+repository portal includes the checkbox and translated wording. Hosted portal
+release and acceptance of the first naturally completed charging session remain
+open. The implementation does not query the debug table.
+
+### Capture bounded raw telemetry for the xruser charging diagnosis
+
+**Active backend sprint:** [DBG-001 — Bounded Vehicle Telemetry Debug Capture](../project/sprints/DBG-001.md)
+
+**Objective:** Preserve short-lived five-second Display, charging and BMS scalar
+telemetry for the explicitly approved `xrpioneer2` identity so Microlino can
+diagnose the observed 75%-to-45% SOC reset with pack and cell context.
+
+**Current status:** Deployed and active. The fail-closed path
+uses a separate encrypted on-demand table, exact vehicle allowlist, absolute
+automatic deadline, seven-day TTL, dedicated write alarm and CSV exporter. GPS,
+structured payloads and unrelated vehicles are excluded. Local targeted tests
+pass. Replacement-free Change Set `dbg-001-xrpioneer2-20260901` deployed to
+`mot-aws-3-1`; the first live query returned 221 `xrpioneer2` rows across the
+expected electrical and vehicle signals, while `pioneer` returned zero and no
+debug-ingest error appeared. A parameter-only, replacement-free update extended
+capture through 2026-09-10 23:59:59 CEST while retaining seven-day per-row TTL;
+expiry-stop evidence and the later diagnostic export remain open.
+
+### Deliver a controlled portal Web Flasher
+
+**Active portal/firmware sprint:** [WEBFLASH-001 — Controlled Portal Web Flasher](../project/sprints/WEBFLASH-001.md)
+
+**Objective:** Let an explicitly approved portal user update a locally connected
+nanoESP32-C6-N16 or XIAO ESP32-C6 from Chrome or Edge before onboarding, without
+choosing a file and without erasing NVS, LittleFS or AWS credentials.
+
+**Current status:** Started on 2026-09-01. The accepted security contract uses a
+server-side expiring grant, private immutable application artifact, SHA-256 and
+target-specific ESP32-C6/flash preflight, fixed `0x10000` application-only write
+and bounded audit. Factory images, arbitrary binaries/offsets and erase controls
+remain excluded. The AWS backend is deployed with private versioned
+S3, TTL grants, admin grant/revoke, authenticated access/download/result routes and
+five-minute direct-download authorization. The bounded catalog now serves XIAO
+to Gino and N16 to `info@muehlberg.ch` in parallel with exact target grants.
+Portal integration is repository-
+complete: admin grant/revoke, authorization-gated German/English/French UI,
+vendored Web Serial flasher, exact hardware and SHA-256 preflight, fixed write
+range, progress and result audit. The physical B025 N16 update passed. Hosted
+portal upload and physical XIAO acceptance remain open.
 
 ### Reject OTA images built for incompatible adapter hardware
 
@@ -54,7 +110,7 @@ and maintainer acceptance remain open.
 
 **Objective:** Let a standard user complete protected local setup, connectivity,
 CAN selection, optional-service configuration and validation through one coherent
-flow that resumes safely after required reboots.
+flow with one consolidated apply-and-restart boundary.
 
 **Current status:** Repository implementation and physical acceptance completed
 on 2026-08-25. B025 passed repeated factory-first-run walkthroughs; B021, B023 and
@@ -64,6 +120,9 @@ activation stays in the future administrator-tool work package.
 The repository also contains the first pilot-feedback refinement: clickable local
 URLs, visible action progress, a compact GPS control and fixed Display-CAN
 presentation for the hard-wired CAN2 input. Physical acceptance remains pending.
+The 2026-09-01 N16 refinement also removes the intermediate WiFi, CAN and service
+restarts: the user reviews all non-secret settings, applies them once, then sees the
+real WLAN/IP state and performs runtime validation after the single restart.
 
 ### Make range basis and SOC reserve configurable
 
@@ -311,7 +370,50 @@ drawn/regenerated Wh counter for nanoESP32-C6-N16 with 60-second and journey-end
 checkpoints. The final N16 build uses 58,600 bytes RAM and 1,377,732 bytes flash;
 XIAO keeps the counter disabled and passes its 85% OTA-slot gate at 83.40%.
 Backend freshness fallback, physical runtime-heap observation and a controlled
-road comparison remain the rollout gates.
+road comparison remain the rollout gates. The first REV13 comparison showed that
+the final firmware checkpoint can follow the charge-boundary topic. The
+repository backend now seals immediately, waits at most 15 seconds for a complete
+fresh counter and otherwise retains the telemetry-estimate fallback for older
+firmware. The isolated Notification Lambda update is deployed and healthy;
+positive road validation remains open. A following 10 km journey delivered its
+final firmware checkpoint about 5 minutes 40 seconds after the telemetry summary.
+The repository now gives normal `speed_zero` completions a further bounded
+ten-minute firmware wait after stop confirmation, without delaying timeout or
+exclusion decisions. The isolated Notification Lambda update is deployed and
+healthy. A later 47 km journey exposed a separate payload-contract defect:
+REV13 published the counter ID as bare text although the Notification Lambda
+required JSON. REV14 publishes a quoted JSON string; the deployed backend also
+accepts the narrowly validated legacy ID only on that topic, so already deployed
+REV13 devices are immediately compatible. Both C6 builds, 74 notification tests,
+six firmware counter contract tests and a live REV13-format probe pass. Physical
+journey validation remains open.
+
+A subsequent REV14 drive isolated the remaining fallback cause as DynamoDB
+session contention during a burst after weak/mobile-to-Home connectivity. The
+Journey state previously shared one optimistic record with charging and summary
+updates, and some counter fields exhausted four lockstep retries. The repository
+now migrates Journey state into a namespaced per-vehicle item within the same
+table and uses twelve bounded jittered retries among Journey topics. Existing
+active/cache state remains compatible and the scheduler can migrate it without a
+new signal. All 81 notification tests and syntax validation pass; AWS deployment
+is complete and a synthetic isolated-session create/read/cleanup smoke test
+passes. Physical recovery validation remains open.
+
+A later short REV14 trip followed by immediate charging showed that its complete
+firmware checkpoint arrived about 6 minutes 45 seconds after the email during
+the mobile-to-Home transition. The former 15-second charge-boundary grace is now
+ten minutes: sealing remains immediate, complete fresh counters finish early,
+and older or delayed firmware retains the telemetry fallback after the bound.
+All 82 notification tests pass. The isolated Notification Lambda update is
+deployed and reports `Active`/`Successful`; road validation remains open.
+
+The 49 km History also showed a 13-minute 52-second intermediate stop that was
+incorrectly reopened because the optional firmware wait extended beyond the
+ten-minute journey boundary. The repository now finalizes the old journey before
+accepting resumed movement after ten stop minutes, then applies the same movement
+sample to a new journey. The extra counter wait remains available only while the
+vehicle stays stopped. All 80 notification tests pass; the isolated Notification
+Lambda update is deployed and healthy. Road validation remains open.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 
@@ -380,6 +482,13 @@ reception remains a hardware gate and WiFi/LTE switching passed on a road test.
 The measured OTA margin supports a bounded, default-off 128 KiB SOC/Speed cache
 follow-up under the separate `pioneer-lilygo` identity. This sustain-only package
 does not change the C6 strategic target.
+
+**Active bounded extension:** [LG-S3-001 — T-SIM7670G-S3 Firmware Pilot](../project/sprints/LG-S3-001.md)
+
+Prepare the newly available N16R2 board using the shared full LilyGO feature set,
+an isolated `pioneer-sim7670` default identity and board-specific SIM7670/GNSS/CAN
+integration. Source/build qualification is complete; perform the listed bench and
+vehicle gates before treating LTE TLS, GNSS or dual-CAN as physically accepted.
 
 ### Simplify maintained firmware environments
 

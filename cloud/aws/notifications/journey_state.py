@@ -12,6 +12,8 @@ MAX_POWER_GAP_MS = 90 * 1000
 MIN_ODOMETER_SAMPLE_MS = 30 * 1000
 MIN_MOVING_SAMPLE_MS = 60 * 1000
 CHARGING_MOVEMENT_GUARD_MS = 2 * 60 * 1000
+FIRMWARE_COUNTER_GRACE_MS = 10 * 60 * 1000
+FIRMWARE_COUNTER_WAIT_MS = 10 * 60 * 1000
 UNCHANGED_SOC_REFRESH_MS = 5 * 60 * 1000
 MIN_DISTANCE_KM = 3.0
 MIN_SOC_USED = 1.0
@@ -34,6 +36,7 @@ class JourneyState:
     odometer_valid: bool = True
     charging_observed: bool = False
     charging_after_stop: bool = False
+    firmware_wait_until: int = 0
     estimated_drawn_kwh: float = 0.0
     estimated_regen_kwh: float = 0.0
     power_source: Optional[str] = None
@@ -103,6 +106,7 @@ def _start(state, received_at):
         odometer_valid=True,
         charging_observed=False,
         charging_after_stop=False,
+        firmware_wait_until=0,
         estimated_drawn_kwh=0.0,
         estimated_regen_kwh=0.0,
         power_source=None,
@@ -239,6 +243,8 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
                 < CHARGING_MOVEMENT_GUARD_MS
             ):
                 return state
+            if state.charging_after_stop:
+                return state
             # Standard-CAN charging is a hard boundary, not activity inside a
             # drive. Preserve an earlier zero-speed stop when present; otherwise
             # seal at the charge observation using the last moving endpoints.
@@ -247,6 +253,7 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
                 stopped_at=(state.stopped_at or received_at),
                 stop_trigger=(state.stop_trigger or "standard_can_charging"),
                 charging_after_stop=True,
+                firmware_wait_until=received_at + FIRMWARE_COUNTER_GRACE_MS,
             )
         return state
     if suffix == "bms/vehicle_power_w":
@@ -278,7 +285,11 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
     return state
 
 
-def summarize_journey(state: JourneyState, now_ms: int):
+def summarize_journey(
+    state: JourneyState,
+    now_ms: int,
+    finalize_stable_stop: bool = False,
+):
     """Return (summary, reason) once an active journey has been stopped for 10 min."""
     if (
         not state.active_id
@@ -310,9 +321,25 @@ def summarize_journey(state: JourneyState, now_ms: int):
         firmware_counter_fresh = min(
             state.firmware_drawn_at, state.firmware_regen_at,
         ) >= state.last_moving_at
-    if (
+    firmware_counter_ready = (
         state.firmware_counter_id and not state.firmware_counter_invalid
         and firmware_net is not None and firmware_counter_fresh
+    )
+    if (
+        state.charging_after_stop and not firmware_counter_ready
+        and now_ms < state.firmware_wait_until
+    ):
+        return None, "not_due"
+    if (
+        not state.charging_after_stop
+        and state.stop_trigger != "telemetry_timeout"
+        and not firmware_counter_ready
+        and not finalize_stable_stop
+        and now_ms < state.stopped_at + STOP_DELAY_MS + FIRMWARE_COUNTER_WAIT_MS
+    ):
+        return None, "not_due"
+    if (
+        firmware_counter_ready
     ):
         drawn = (state.firmware_drawn_wh or max(firmware_net, 0.0)) / 1000.0
         regen = (state.firmware_regen_wh or max(-firmware_net, 0.0)) / 1000.0

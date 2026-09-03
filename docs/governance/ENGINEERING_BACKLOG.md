@@ -8,12 +8,19 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-08-29
+**Last reviewed:** 2026-09-01
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
 
 ## Cloud-managed firmware updates
+
+[FW-CHECK-001](../project/sprints/FW-CHECK-001.md) is a proposed, not-started
+informational portal check. It would add an exact platform/board/firmware-target
+identity contract and compare the installed version with a target-specific,
+versioned release manifest. It deliberately excludes downloads, portal-triggered
+updates and remote OTA. Start requires a separate prioritization decision and a
+defined owner/generation step for the manifest.
 
 Evaluate OTA distribution through the portal or AWS after beta onboarding is
 stable. The firmware already supports local WebUI OTA, but remote OTA additionally
@@ -98,6 +105,17 @@ formula unchanged while gathering evidence. After the cross-vehicle review,
 decide explicitly whether small segments need stronger weighting limits, whether
 confidence should increase more slowly, or whether the learned value needs a
 vehicle/battery-specific bound relative to the configured basis.
+
+Add a canonical vehicle profile for technical metadata that survives claims,
+owner changes and adapter replacement. Its first field should be the declared
+traction-battery capacity in kWh (`batteryCapacityKwh`), with schema version,
+source and update timestamp. Capture it during administrator vehicle
+provisioning or claim issuance and expose it in the later onboarding admin UI.
+The one-time claim may carry a snapshot for audit, but must not be the only
+storage location because it expires; the per-user range basis likewise remains a
+separate preference. A local CAN wizard may suggest or report the value, but CAN
+profile selection alone must not silently infer battery capacity unless that
+mapping is explicitly validated for the vehicle variant.
 
 Administrator functions must remain a separate least-privilege surface. A future
 admin UI may expose inventory, invitation/claim state, roles, delivery health and
@@ -503,6 +521,26 @@ external services only after the beta identity, authorization and connectivity
 foundations are reliable. SOC notification processing is tracked separately above
 because it is a plausible bounded pilot feature.
 
+### CarPlay status access
+
+**Priority:** Low. Revisit a driver-safe way to expose a deliberately small MOT
+status summary through Apple CarPlay only after the current portal, onboarding and
+operations work is stable. A first evaluation should prefer an iOS Siri Shortcut
+that calls a narrowly scoped read-only summary endpoint and speaks SOC, personal
+range, charging state and data freshness on request. It must not embed a reusable
+portal access token in a shared shortcut or disclose location or other sensitive
+telemetry without an explicit product and privacy decision.
+
+The existing bounded SMS events may remain useful as exceptional CarPlay-announced
+notifications, but periodic telemetry must not be converted into messages. If a
+persistent visual presentation later becomes worthwhile, evaluate a minimal iOS
+companion containing a small WidgetKit widget or Live Activity. Treat that as an
+iPhone application deliverable even when it needs no dedicated CarPlay app or
+CarPlay entitlement. A PWA or the existing browser portal is not a CarPlay display
+surface. Define supported iOS versions, authentication and token refresh, freshness
+presentation, update frequency, driving-distraction limits, distribution and
+maintenance ownership before promotion into `WORK_ORDER`.
+
 ### Secure local MQTT and Smart-Home integration
 
 Restore an optional local MQTT output in the shared C6 firmware so a user can
@@ -577,6 +615,11 @@ parked. Do not resume this qualification or add LilyGO-only features without a
 new priority decision. Near-term firmware feature work belongs in the shared C6
 line; the existing LilyGO implementation remains available for maintenance and
 regression fixes.
+
+The maintainer's 2026-09-02 decision authorizes LG-S3-001 as a bounded exception
+for the available 16 MB T-SIM7670G-S3 hardware. It reuses the LilyGO feature line
+and does not alter the C6 strategic direction. Its remaining physical acceptance
+gates are tracked in the work-package record rather than reopening LTE-001.
 
 ## Telemetry service groups and bundled state envelopes
 

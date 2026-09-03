@@ -30,6 +30,11 @@ String telemetryToJson(const MotTelemetry &state)
     }
     if (state.bms.standardSocValid)
         doc["bms"]["standard_soc"] = serialized(String(state.bms.socPercent, 2));
+    if (state.bms.pioneerSocValid) {
+        doc["bms"]["soc_internal"] = serialized(String(state.bms.socInternal, 1));
+        doc["bms"]["soc_display"] = serialized(String(state.bms.socDisplay, 1));
+        doc["bms"]["soc_last_update_ms"] = state.bms.pioneerSocLastUpdateMs;
+    }
     if (state.bms.sohValid)
         doc["bms"]["soh_percent"] = serialized(String(state.bms.sohPercent, 2));
     if (state.bms.packCurrentValid) {
