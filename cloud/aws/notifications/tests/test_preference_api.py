@@ -117,6 +117,7 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         body = json.loads(result["body"])
         self.assertFalse(body["journeyEmailEnabled"])
         self.assertFalse(body["chargingSummaryEmailEnabled"])
+        self.assertFalse(body["dailySummaryEmailEnabled"])
         self.assertFalse(body["chargingStopEmailEnabled"])
         self.assertEqual(80, body["chargingStopThreshold"])
         self.assertEqual(140, body["rangeKmAt100"])
@@ -216,6 +217,23 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         self.assertEqual(200, accepted["statusCode"])
         self.assertTrue(preference.item["chargingSummaryEmailEnabled"])
 
+    def test_daily_summary_requires_email_and_persists(self):
+        module, _, _ = load_module()
+        denied = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "dailySummaryEmailEnabled": True,
+        }), None)
+        self.assertEqual(
+            "daily_summary_email_requires_email", json.loads(denied["body"])["error"]
+        )
+        module, preference, _ = load_module()
+        accepted = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": True,
+            "dailySummaryEmailEnabled": True, "email": "driver@example.com",
+        }), None)
+        self.assertEqual(200, accepted["statusCode"])
+        self.assertTrue(preference.item["dailySummaryEmailEnabled"])
+
     def test_charging_stop_has_independent_threshold(self):
         module, preference, _ = load_module()
         result = module.handler(event("PUT", {
@@ -246,6 +264,7 @@ class JourneyPreferenceApiTests(unittest.TestCase):
         previous = {
             "vehicleId": "pioneer", "userSub": "user-a", "enabled": False,
             "threshold": 80, "emailEnabled": True, "journeyEmailEnabled": True,
+            "dailySummaryEmailEnabled": True,
             "email": "driver@example.com", "emailConfirmed": True,
         }
         module, preference, _ = load_module(previous)
@@ -254,12 +273,14 @@ class JourneyPreferenceApiTests(unittest.TestCase):
             "email": "driver@example.com",
         }), None)
         self.assertTrue(preference.item["journeyEmailEnabled"])
+        self.assertTrue(preference.item["dailySummaryEmailEnabled"])
 
         module.handler(event("PUT", {
             "enabled": False, "threshold": 80, "emailEnabled": False,
             "email": "driver@example.com",
         }), None)
         self.assertFalse(preference.item["journeyEmailEnabled"])
+        self.assertFalse(preference.item["dailySummaryEmailEnabled"])
 
 
 if __name__ == "__main__":

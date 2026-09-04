@@ -22,6 +22,9 @@ from charging_summary_state import (
     SUMMARY_DELAY_MS, ChargingSummaryState, apply as apply_charging_summary,
     delayed_due as charging_summary_due,
 )
+from daily_summary import aggregate as aggregate_daily
+from daily_summary import has_activity as daily_has_activity
+from daily_summary import report_window
 from journey_state import (
     STOP_DELAY_MS, JourneyState, apply_inactivity_timeout,
     apply_journey_update, clear_journey, summarize_journey,
@@ -466,17 +469,30 @@ def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
     identifier = hashlib.sha256(material).hexdigest()
     now = int(time.time())
     try:
-        events.put_item(Item={"eventId": identifier, "eventType": "CHARGING_SUMMARY",
+        duration = max(1, round((ended_at - state.started_at) / 60000))
+        soc_delta = (None if state.start_soc is None or state.last_soc is None
+                     else state.last_soc - state.start_soc)
+        item = {"eventId": identifier, "eventType": "CHARGING_SUMMARY",
             "userSub": preference["userSub"], "vehicleId": vehicle_id,
             "sessionId": state.session_id, "receivedAt": ended_at, "createdAt": now * 1000,
-            "expiresAt": now + event_retention_days * 86400, "status": "RESERVED"},
+            "durationMinutes": duration,
+            "energyChargedKwh": Decimal(str(state.energy_kwh)),
+            "expiresAt": now + event_retention_days * 86400, "status": "RECORDED"}
+        if state.start_soc is not None:
+            item["startSoc"] = Decimal(str(state.start_soc))
+        if state.last_soc is not None:
+            item["endSoc"] = Decimal(str(state.last_soc))
+        if soc_delta is not None:
+            item["socDelta"] = Decimal(str(soc_delta))
+        events.put_item(Item=item,
             ConditionExpression="attribute_not_exists(eventId)")
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
             return 0
         raise
+    if preference.get("chargingSummaryEmailEnabled") is not True:
+        return 0
     name = str(preference.get("vehicleName") or vehicle_id)[:40]
-    duration = max(1, round((ended_at - state.started_at) / 60000))
     start_soc = "unbekannt" if state.start_soc is None else f"{state.start_soc:g}%"
     end_soc = "unbekannt" if state.last_soc is None else f"{state.last_soc:g}%"
     delta = "unbekannt" if state.start_soc is None or state.last_soc is None else f"{state.last_soc-state.start_soc:+g} Prozentpunkte"
@@ -496,7 +512,10 @@ def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
 def send_charging_summaries(vehicle_id, state, ended_at, reason):
     return sum(dispatch_charging_summary(pref, vehicle_id, state, ended_at, reason)
                for pref in list_preferences(vehicle_id, None)
-               if pref.get("emailEnabled") is True and pref.get("chargingSummaryEmailEnabled") is True)
+               if pref.get("emailEnabled") is True and (
+                   pref.get("chargingSummaryEmailEnabled") is True
+                   or pref.get("dailySummaryEmailEnabled") is True
+               ))
 
 
 def validate_charging_summary(message, now_ms):
@@ -622,12 +641,15 @@ def reserve_journey_event(preference, vehicle_id, summary):
                 "journeyId": summary.journey_id,
                 "distanceKm": Decimal(str(summary.distance_km)),
                 "socUsed": Decimal(str(summary.soc_used)),
+                "durationMinutes": summary.duration_minutes,
+                "energyDrawnKwh": Decimal(str(summary.energy_drawn_kwh)),
+                "energyRegenKwh": Decimal(str(summary.energy_regen_kwh)),
                 "energyNetKwh": Decimal(str(summary.energy_net_kwh)),
                 "energySource": summary.energy_source,
                 "completionTrigger": summary.completion_trigger,
                 "receivedAt": summary.ended_at, "createdAt": now * 1000,
                 "expiresAt": now + event_retention_days * 86400,
-                "status": "RESERVED",
+                "status": "RECORDED",
             },
             ConditionExpression="attribute_not_exists(eventId)",
         )
@@ -640,6 +662,145 @@ def reserve_journey_event(preference, vehicle_id, summary):
 
 def _de(value, digits=1):
     return f"{value:.{digits}f}".replace(".", ",")
+
+
+def _scan_all(table):
+    result = []
+    scan = {}
+    while True:
+        page = table.scan(**scan)
+        result.extend(page.get("Items", []))
+        key = page.get("LastEvaluatedKey")
+        if not key:
+            return result
+        scan["ExclusiveStartKey"] = key
+
+
+def _daily_event_id(user_sub, vehicle_id, report_date):
+    material = f"{user_sub}|{vehicle_id}|daily-summary|{report_date}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
+
+
+def _daily_activity_in_progress(vehicle_id, now_ms):
+    session_item = sessions.get_item(
+        Key={"vehicleId": vehicle_id}, ConsistentRead=True
+    ).get("Item", {})
+    charging = _summary_state(session_item)
+    charging_active = charging.active and (
+        charging.is_charging is True or charging.stop_candidate_at == 0
+    )
+    journey_item = sessions.get_item(
+        Key={"vehicleId": _journey_session_id(vehicle_id)}, ConsistentRead=True
+    ).get("Item", {})
+    if not journey_item:
+        journey_item = session_item
+    journey_active = bool(_journey_state(journey_item).active_id)
+    return charging_active or journey_active
+
+
+def _reserve_daily_event(preference, report_date, now, status, summary):
+    identifier = _daily_event_id(
+        preference["userSub"], preference["vehicleId"], report_date
+    )
+    try:
+        events.put_item(
+            Item={
+                "eventId": identifier,
+                "eventType": "DAILY_SUMMARY",
+                "userSub": preference["userSub"],
+                "vehicleId": preference["vehicleId"],
+                "reportDate": report_date,
+                "createdAt": now * 1000,
+                "expiresAt": now + event_retention_days * 86400,
+                "status": status,
+                "journeyCount": summary["journeyCount"],
+                "chargingCount": summary["chargingCount"],
+                "distanceKm": Decimal(str(summary["distanceKm"])),
+                "journeyDurationMinutes": summary["journeyDurationMinutes"],
+                "energyNetKwh": Decimal(str(summary["energyNetKwh"])),
+                "chargingDurationMinutes": summary["chargingDurationMinutes"],
+                "energyChargedKwh": Decimal(str(summary["energyChargedKwh"])),
+            },
+            ConditionExpression="attribute_not_exists(eventId)",
+        )
+        return identifier
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return None
+        raise
+
+
+def _daily_text(preference, report_date, summary, ongoing):
+    name = str(preference.get("vehicleName") or preference["vehicleId"])[:40]
+    consumption = (
+        "--" if summary["netKwhPer100Km"] is None
+        else f"{_de(summary['netKwhPer100Km'], 1)} kWh/100 km"
+    )
+    ongoing_note = (
+        "\nHinweis: Eine Fahrt oder ein Ladevorgang läuft noch und ist in diesen "
+        "Summen nicht enthalten. Der Vorgang wird dem Tag seines Abschlusses zugerechnet.\n"
+        if ongoing else ""
+    )
+    return (
+        f"MOT Tagesübersicht für {name} ({preference['vehicleId']})\n"
+        f"Datum: {report_date[8:10]}.{report_date[5:7]}.{report_date[:4]}\n\n"
+        f"Fahrten: {summary['journeyCount']}\n"
+        f"Gesamtstrecke: {_de(summary['distanceKm'], 1)} km\n"
+        f"Gesamte Fahrzeit: {summary['journeyDurationMinutes']} Minuten\n"
+        f"Energie bezogen: {_de(summary['energyDrawnKwh'], 2)} kWh\n"
+        f"Rekuperiert: {_de(summary['energyRegenKwh'], 2)} kWh\n"
+        f"Nettoenergie: {_de(summary['energyNetKwh'], 2)} kWh\n"
+        f"Durchschnittlicher Nettoverbrauch: {consumption}\n\n"
+        f"Ladevorgänge: {summary['chargingCount']}\n"
+        f"Gesamte Ladezeit: {summary['chargingDurationMinutes']} Minuten\n"
+        f"Geschätzte geladene Energie: {_de(summary['energyChargedKwh'], 2)} kWh\n"
+        f"SOC-Zunahme: {_de(summary['chargingSocDelta'], 1)} Prozentpunkte\n"
+        f"{ongoing_note}\n"
+        "Passive Telemetrie; keine Abrechnungs- oder Präzisionsmessung."
+    )
+
+
+def send_daily_summaries(now_ms):
+    report_date, start_ms, end_ms, force_send = report_window(now_ms)
+    all_events = _scan_all(events)
+    now = int(time.time())
+    result = {"accepted": True, "daily": True, "date": report_date,
+              "evaluated": 0, "deferred": 0, "deliveries": 0}
+    for preference in _scan_all(preferences):
+        if not (
+            preference.get("dailySummaryEmailEnabled") is True
+            and preference.get("emailEnabled") is True
+        ):
+            continue
+        result["evaluated"] += 1
+        matching = [item for item in all_events if (
+            item.get("userSub") == preference.get("userSub")
+            and item.get("vehicleId") == preference.get("vehicleId")
+        )]
+        summary = aggregate_daily(matching, start_ms, end_ms)
+        ongoing = _daily_activity_in_progress(preference["vehicleId"], now_ms)
+        if ongoing and not force_send:
+            result["deferred"] += 1
+            continue
+        if not daily_has_activity(summary):
+            continue
+        identifier = _reserve_daily_event(
+            preference, report_date, now, "RECORDED", summary
+        )
+        if not identifier:
+            continue
+        message = sns.publish(
+            TopicArn=email_topic_arn,
+            Subject=f"MOT - Tagesübersicht {report_date} ({preference['vehicleId']})"[:100],
+            Message=_daily_text(preference, report_date, summary, ongoing),
+            MessageAttributes={"recipientKey": {
+                "DataType": "String",
+                "StringValue": str(preference["recipientKey"]),
+            }},
+        )
+        record_deliveries(identifier, [{"channel": "EMAIL", "messageId": message["MessageId"]}])
+        result["deliveries"] += 1
+    return result
 
 
 def dispatch_journey(preference, identifier, vehicle_id, summary):
@@ -713,9 +874,15 @@ def finalize_journey(vehicle_id, now_ms, finalize_stable_stop=False):
     if not summary:
         return 0, reason
     dispatched = 0
-    for preference in list_preferences(vehicle_id, "journeyEmailEnabled"):
+    for preference in list_preferences(vehicle_id, None):
+        if not (
+            preference.get("emailEnabled") is True
+            and (preference.get("journeyEmailEnabled") is True
+                 or preference.get("dailySummaryEmailEnabled") is True)
+        ):
+            continue
         identifier = reserve_journey_event(preference, vehicle_id, summary)
-        if identifier:
+        if identifier and preference.get("journeyEmailEnabled") is True:
             dispatched += len(dispatch_journey(
                 preference, identifier, vehicle_id, summary
             ))
@@ -755,6 +922,8 @@ def finalize_due_journeys(now_ms):
 
 
 def handler(event, context):
+    if event.get("type") == "daily_summary":
+        return send_daily_summaries(int(time.time() * 1000))
     if event.get("Records") and all(
         record.get("eventSource") == "aws:sqs" for record in event["Records"]
     ):

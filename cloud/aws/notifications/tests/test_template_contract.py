@@ -67,6 +67,18 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("chargingSummaryEmailEnabled", PREFERENCE_API)
         self.assertIn("CHARGING_SUMMARY_DELAY_SECONDS", HANDLER)
 
+    def test_daily_summary_is_email_only_zurich_scheduled_and_idempotent(self):
+        self.assertIn("DailySummarySchedule:", TEMPLATE)
+        self.assertIn('ScheduleExpression: "cron(5 0-8 * * ? *)"', TEMPLATE)
+        self.assertIn("ScheduleExpressionTimezone: Europe/Zurich", TEMPLATE)
+        self.assertIn("scheduler.amazonaws.com", TEMPLATE)
+        self.assertIn('event.get("type") == "daily_summary"', HANDLER)
+        daily = HANDLER.split("def send_daily_summaries", 1)[1].split("def dispatch_journey", 1)[0]
+        self.assertIn("sns.publish", daily)
+        self.assertNotIn("sms_delivery", daily)
+        self.assertIn("dailySummaryEmailEnabled", PREFERENCE_API)
+        self.assertIn("attribute_not_exists(eventId)", HANDLER)
+
     def test_legacy_plain_counter_id_is_narrowly_accepted(self):
         self.assertIn("allow_plain_counter_id", HANDLER)
         self.assertIn('r"[A-Za-z0-9_-]{1,80}"', HANDLER)

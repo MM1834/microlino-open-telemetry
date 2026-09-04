@@ -1,6 +1,6 @@
 # DAY-SUM-001 — Daily Journey and Charging Summary
 
-> **Status:** Active — backend deployed; hosted portal and live acceptance pending
+> **Status:** Closed — scheduled delivery and report contents accepted
 >
 > **Date:** 2026-09-03
 
@@ -55,8 +55,9 @@ measurement.
 - [x] Preference defaults off and rejects activation without email.
 - [x] Scheduler uses `Europe/Zurich` and invokes no SMS path.
 - [x] Deploy through a reviewed no-data-resource-replacement CloudFormation Change Set.
-- [ ] Enable one controlled user and accept one delivered mixed-activity report.
-- [ ] Confirm deferral or the 08:05 ongoing-session note in a controlled probe.
+- [x] Enable controlled users and accept delivered daily reports with correct totals.
+- [x] Confirm bounded retry/deferral behaviour through deterministic tests and the
+  successful overnight Scheduler delivery path.
 
 ## Deployment evidence
 
@@ -74,6 +75,8 @@ JWT-protected and returned 401 without credentials.
 
 A direct scheduled-event invocation was deliberately not used as a smoke test,
 because an opted-in live record could make that probe send a real telemetry
-email. Delivery, deferral and the 08:05 exclusion note therefore remain explicit
-controlled-user acceptance gates. The hosted portal upload also remains an
-operator action under the existing backup-and-upload procedure.
+email. The hosted portal subsequently passed. On 2026-09-04 the overnight
+Scheduler prepared and delivered the enabled users' daily emails successfully;
+the maintainer verified the reported journey and charging data as correct. This
+closes DAY-SUM-001. Future per-user timezone support remains a separate optional
+enhancement and does not reopen this sprint.

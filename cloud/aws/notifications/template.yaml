@@ -250,7 +250,7 @@ Resources:
                 Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Scan]
                 Resource: !GetAtt SessionTable.Arn
               - Effect: Allow
-                Action: [dynamodb:Query]
+                Action: [dynamodb:Query, dynamodb:Scan]
                 Resource: !GetAtt PreferenceTable.Arn
               - Effect: Allow
                 Action: [dynamodb:GetItem]
@@ -261,7 +261,7 @@ Resources:
                 Action: [dynamodb:UpdateItem]
                 Resource: !GetAtt SmsRateTable.Arn
               - Effect: Allow
-                Action: [dynamodb:PutItem, dynamodb:UpdateItem]
+                Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Scan]
                 Resource: !GetAtt EventTable.Arn
               - Effect: Allow
                 Action: [sns:Publish]
@@ -373,6 +373,37 @@ Resources:
       FunctionName: !Ref NotificationFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt JourneyFinalizerRule.Arn
+
+  DailySummarySchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [scheduler.amazonaws.com]}
+            Action: [sts:AssumeRole]
+      Policies:
+        - PolicyName: invoke-daily-summary
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [lambda:InvokeFunction]
+                Resource: !GetAtt NotificationFunction.Arn
+
+  DailySummarySchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: Retry the preceding Zurich calendar-day summary until 08:05.
+      ScheduleExpression: "cron(5 0-8 * * ? *)"
+      ScheduleExpressionTimezone: Europe/Zurich
+      FlexibleTimeWindow: {Mode: "OFF"}
+      State: ENABLED
+      Target:
+        Arn: !GetAtt NotificationFunction.Arn
+        RoleArn: !GetAtt DailySummarySchedulerRole.Arn
+        Input: '{"type":"daily_summary"}'
 
   PreferenceApiRole:
     Type: AWS::IAM::Role

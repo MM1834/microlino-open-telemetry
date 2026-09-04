@@ -58,6 +58,7 @@ def public(item):
             "emailEnabled": False, "smsEnabled": False,
             "journeyEmailEnabled": False,
             "chargingSummaryEmailEnabled": False,
+            "dailySummaryEmailEnabled": False,
             "chargingStopEmailEnabled": False, "chargingStopThreshold": 80,
             "emailConfirmed": False, "smsConfirmed": False,
             "readOnly": False,
@@ -65,13 +66,15 @@ def public(item):
     result = {
         key: item.get(key) for key in (
             "vehicleId", "enabled", "threshold", "emailEnabled", "smsEnabled",
-            "journeyEmailEnabled", "chargingSummaryEmailEnabled", "email", "phoneE164", "emailConfirmed",
+            "journeyEmailEnabled", "chargingSummaryEmailEnabled", "dailySummaryEmailEnabled",
+            "email", "phoneE164", "emailConfirmed",
             "chargingStopEmailEnabled", "chargingStopThreshold",
             "smsConfirmed", "rangeKmAt100", "rangeReserveSoc", "updatedAt"
         )
     }
     result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
     result["chargingSummaryEmailEnabled"] = item.get("chargingSummaryEmailEnabled") is True
+    result["dailySummaryEmailEnabled"] = item.get("dailySummaryEmailEnabled") is True
     result["chargingStopEmailEnabled"] = item.get("chargingStopEmailEnabled") is True
     result["readOnly"] = False
     result["threshold"] = int(result.get("threshold") or 80)
@@ -177,6 +180,10 @@ def handler(event, context):
         "chargingSummaryEmailEnabled", previous.get("chargingSummaryEmailEnabled", False)
     ) is True
     charging_summary_email_enabled = charging_summary_requested and email_enabled
+    daily_summary_requested = body.get(
+        "dailySummaryEmailEnabled", previous.get("dailySummaryEmailEnabled", False)
+    ) is True
+    daily_summary_email_enabled = daily_summary_requested and email_enabled
     charging_stop_requested = body.get(
         "chargingStopEmailEnabled", previous.get("chargingStopEmailEnabled", False)
     ) is True
@@ -194,6 +201,8 @@ def handler(event, context):
         return response(400, {"error": "journey_email_requires_email"})
     if charging_summary_requested and not email_enabled:
         return response(400, {"error": "charging_summary_email_requires_email"})
+    if "dailySummaryEmailEnabled" in body and daily_summary_requested and not email_enabled:
+        return response(400, {"error": "daily_summary_email_requires_email"})
     if charging_stop_requested and not email_enabled:
         return response(400, {"error": "charging_stop_email_requires_email"})
 
@@ -204,6 +213,7 @@ def handler(event, context):
         "emailEnabled": email_enabled,
         "journeyEmailEnabled": journey_email_enabled,
         "chargingSummaryEmailEnabled": charging_summary_email_enabled,
+        "dailySummaryEmailEnabled": daily_summary_email_enabled,
         "chargingStopEmailEnabled": charging_stop_email_enabled,
         "chargingStopThreshold": charging_stop_threshold,
         "rangeKmAt100": range_km_at_100,
