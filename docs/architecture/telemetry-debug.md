@@ -4,7 +4,7 @@
 >
 > **Audience:** Maintainer, administrator and diagnostic recipient
 >
-> **Last reviewed:** 2026-09-01
+> **Last reviewed:** 2026-09-03
 
 ## Purpose and boundary
 
@@ -20,15 +20,11 @@ objects. Location, system, status, credentials and other namespaces are excluded
 
 ## SOC source boundary
 
-`display/soc` is decoded from the Microlino Display-CAN port and is the only SOC
-value published to MOT Cloud and stored by normal or debug History. It must not be
-described as BMS SOC.
-
-The observed Standard-CAN/BMS SOC candidate is intentionally not published. Its
-semantics could not be mapped reliably to the vehicle's displayed SOC and it must
-not replace or be merged with `display/soc`. If Microlino later confirms a separate
-Standard-CAN SOC PID and scaling, it requires an explicitly named `bms/*` topic and
-separate validation before cloud publication.
+`display/soc` is decoded from the Microlino Display-CAN port and remains the
+canonical visible SOC. Pioneer V1 additionally publishes the separately observed
+`bms/soc_internal` from `0x48D data[6]`; it must not replace or be merged with
+`display/soc`. Both values are stored independently by normal and debug History
+when present. Debug capture also retains `bms/soc_display` from `0x48D data[7]`.
 
 ## Fail-closed controls
 
@@ -37,6 +33,7 @@ All of the following must be true for a write:
 - `EnableTelemetryDebug=true`;
 - the exact vehicle ID appears in `TelemetryDebugVehicleAllowlist`;
 - `TelemetryDebugCaptureUntilEpochSeconds` is non-zero and has not passed;
+- an optional per-vehicle expiry has not passed; it can only shorten the global deadline;
 - the message receipt timestamp is not later than the deadline;
 - the topic namespace and scalar type are allowed.
 
@@ -44,6 +41,9 @@ The default configuration is disabled, empty and expired. The absolute deadline
 stops writes without a second deployment. Debug rows use a separate encrypted,
 on-demand DynamoDB table and expire through TTL after seven days by default.
 Normal State, History, WebSocket and notification behaviour remain independent.
+`TelemetryDebugVehicleExpiryOverrides` accepts bounded `vehicle=epoch` entries so
+vehicles in one allowlist can stop automatically at different times without
+extending the global safety deadline.
 The deadline is not limited to 48 hours; 48 hours was the conservative first
 activation window. A later parameter-only update may set another explicit UTC
 deadline without changing the seven-day per-row retention.

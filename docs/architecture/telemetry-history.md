@@ -42,6 +42,7 @@ existing ACTIVE user/vehicle assignment.
 | Signal | MQTT topic | Stored cadence | Portal/API resolution |
 |---|---|---:|---|
 | SOC | `display/soc` | 5 minutes | 5 min / 30 min / 2 h |
+| Interner SOC (optional) | `bms/soc_internal` | 5 minutes | 5 min / 30 min / 2 h |
 | Charging | `charging/is_charging` | 5 minutes | 5 min / 30 min / 2 h |
 | Plugged | `charging/plugged` | 5 minutes | 5 min / 30 min / 2 h |
 | Speed | `display/speed_kmh` | 1 active-driving minute plus one stop marker | averaged 5 min / 30 min / 2 h |
@@ -87,12 +88,19 @@ authorizer and `has_active_access` check as snapshots. An inactive, unknown or
 unassigned vehicle returns the same non-enumerating 404. Queries are partition-key
 bound and eventually consistent.
 
-The portal draws SOC, averaged Speed, averaged signed power, charging-state and
-plugged-state charts. Vehicle
+The personal range forecast is deliberately decoupled from chart history through
+`GET /api/vehicles/{vehicleId}/range-forecast`. The portal loads it once per
+selected vehicle and keeps a forecast failure independent from chart rendering.
+History range changes therefore perform only the six chart-signal queries and no
+longer repeat the three raw 30-day forecast queries.
+
+The portal draws the Display-CAN SOC and, when present, the separately labelled
+internal Standard-CAN SOC in the same chart. It also draws averaged Speed,
+averaged signed power, charging-state and plugged-state charts. Vehicle
 selection reloads history. No history request contains a user-selected vehicle
 without server-side authorization.
 
-The deployed range follow-up also returns `rangeForecast`. It is calculated
+The separate range-forecast response returns `rangeForecast`. It is calculated
 from raw 30-day SOC, changed-odometer and charging rows before chart aggregation.
 At most ten recent valid journeys and roughly 150 km are used. The result contains
 effective and historical kilometres per SOC point, confidence, total distance,
@@ -108,9 +116,9 @@ the configured 1.4 km/SOC-point baseline.
 - an explicit allowlist bounds the pilot cohort; an empty list is fail-closed;
 - DynamoDB uses pay per request, has no indexes and has PITR disabled for the MVP;
 - the 31-day TTL and fixed sampling buckets bound storage growth;
-- the API accepts only three fixed windows; the deployed charts perform five
-  partition queries and the range follow-up adds three bounded raw
-  signal queries;
+- the History API accepts only three fixed windows and performs six partition
+  queries; the independently loaded range forecast performs three bounded raw
+  signal queries once per selected vehicle;
 - `VehicleHistoryDailyWriteAlarm` defaults to 1,000 consumed writes/day;
 - `tools/aws/measure_history_pilot.sh` reports daily ingest invocations plus
   history read/write capacity.

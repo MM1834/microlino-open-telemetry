@@ -80,6 +80,12 @@ Parameters:
     MinValue: 0
     Description: Absolute UTC epoch-second deadline. Zero is fail-closed.
 
+  TelemetryDebugVehicleExpiryOverrides:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[a-z0-9][a-z0-9_-]{0,63}=[1-9][0-9]{0,11}(,[a-z0-9][a-z0-9_-]{0,63}=[1-9][0-9]{0,11})*$'
+    Description: Optional comma-separated vehicle=epoch deadlines that may only shorten the global deadline.
+
   TelemetryDebugRetentionDays:
     Type: Number
     Default: 7
@@ -558,6 +564,7 @@ Resources:
           DEBUG_TABLE_NAME: !Ref VehicleDebugHistoryTable
           DEBUG_VEHICLE_ALLOWLIST: !Ref TelemetryDebugVehicleAllowlist
           DEBUG_CAPTURE_UNTIL_EPOCH_SECONDS: !Ref TelemetryDebugCaptureUntilEpochSeconds
+          DEBUG_VEHICLE_EXPIRY_OVERRIDES: !Ref TelemetryDebugVehicleExpiryOverrides
           DEBUG_RETENTION_DAYS: !Ref TelemetryDebugRetentionDays
       Code:
         ZipFile: |
@@ -601,12 +608,18 @@ Resources:
           debug_capture_until = max(
               0, int(os.environ.get("DEBUG_CAPTURE_UNTIL_EPOCH_SECONDS", "0"))
           )
+          debug_vehicle_expiry_overrides = {}
+          for item in os.environ.get("DEBUG_VEHICLE_EXPIRY_OVERRIDES", "").split(","):
+              vehicle, separator, expiry = item.strip().partition("=")
+              if separator and vehicle and expiry.isdigit():
+                  debug_vehicle_expiry_overrides[vehicle] = int(expiry)
           debug_retention_days = min(
               14, max(1, int(os.environ.get("DEBUG_RETENTION_DAYS", "7")))
           )
 
           HISTORY_SIGNALS = {
               "display/soc": ("soc", history_core_interval),
+              "bms/soc_internal": ("socInternal", history_core_interval),
               "display/odometer_km": ("odometer", history_core_interval),
               "display/odo": ("odometer", history_core_interval),
               "charging/is_charging": ("charging", history_core_interval),
@@ -627,13 +640,17 @@ Resources:
               return signal not in ("speed", "power") or history_motion_enabled
 
           def is_debug_candidate(vehicle_id, topic_suffix, value, received_at):
+              vehicle_deadline = min(
+                  debug_capture_until,
+                  debug_vehicle_expiry_overrides.get(vehicle_id, debug_capture_until)
+              )
               if (
                   not debug_enabled
                   or not debug_vehicle_allowlist
                   or vehicle_id not in debug_vehicle_allowlist
-                  or debug_capture_until <= 0
-                  or int(time.time()) > debug_capture_until
-                  or received_at > debug_capture_until * 1000
+                  or vehicle_deadline <= 0
+                  or int(time.time()) > vehicle_deadline
+                  or received_at > vehicle_deadline * 1000
                   or not topic_suffix.startswith(("display/", "charging/", "bms/"))
               ):
                   return False
@@ -1489,7 +1506,7 @@ Resources:
               }
 
           def load_history(vehicle_id, since_ms, until_ms, resolution_seconds):
-              signals = ("soc", "charging", "plugged", "speed", "power")
+              signals = ("soc", "socInternal", "charging", "plugged", "speed", "power")
               buckets = {}
               aggregate_buckets = {}
               for signal in signals:
@@ -1596,6 +1613,25 @@ Resources:
               if (
                   method == "GET"
                   and path.startswith("/api/vehicles/")
+                  and path.endswith("/range-forecast")
+              ):
+                  vehicle_id = path_parameters.get("vehicleId")
+                  if not vehicle_id or not has_active_access(user_sub, vehicle_id):
+                      return response(404, {"error": "vehicle_not_found"})
+                  until_ms = int(time.time() * 1000)
+                  since_ms = until_ms - 30 * 24 * 3600000
+                  range_forecast = calculate_range_forecast(
+                      vehicle_id, since_ms, until_ms
+                  )
+                  return response(200, {
+                      "vehicleId": vehicle_id,
+                      "windowDays": 30,
+                      "rangeForecast": range_forecast
+                  })
+
+              if (
+                  method == "GET"
+                  and path.startswith("/api/vehicles/")
                   and path.endswith("/history")
               ):
                   vehicle_id = path_parameters.get("vehicleId")
@@ -1612,18 +1648,13 @@ Resources:
                   until_ms = int(time.time() * 1000)
                   since_ms = until_ms - hours * 3600000
                   points = load_history(vehicle_id, since_ms, until_ms, resolution_seconds)
-                  forecast_since_ms = until_ms - 30 * 24 * 3600000
-                  range_forecast = calculate_range_forecast(
-                      vehicle_id, forecast_since_ms, until_ms
-                  )
                   return response(200, {
                       "vehicleId": vehicle_id,
                       "hours": hours,
                       "resolutionSeconds": resolution_seconds,
                       "retentionDays": HISTORY_RETENTION_DAYS,
                       "count": len(points),
-                      "points": points,
-                      "rangeForecast": range_forecast
+                      "points": points
                   })
   
               return response(404, {
@@ -1721,6 +1752,15 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles/{vehicleId}/history"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
+      Target: !Sub "integrations/${VehicleApiIntegration}"
+
+  VehicleApiRangeForecastRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      RouteKey: "GET /api/vehicles/{vehicleId}/range-forecast"
       AuthorizationType: JWT
       AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"

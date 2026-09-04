@@ -298,6 +298,13 @@ On 2026-08-20:
   20:15, 20:20 and 20:25 CEST. All carry `source=offline-backfill-v1` and were
   received together only at 20:25:24 after HOME WiFi returned. This closes the
   independent GPS-time, local-journal and delayed-replay acceptance gate.
+- on 2026-09-03 replacement-free Change Set
+  `cache-xrpioneer2-backfill-20260903` added `xrpioneer2` to the existing
+  operational Backfill allowlist for diagnosis of recurring connectivity/power
+  gaps. No retention, table, debug or other vehicle parameter changed. Stack and
+  Lambda environment read-back pass. Subsequent maintainer acceptance confirmed
+  that the deployed cache and replay behaviour works as intended; no additional
+  CACHE-001 acceptance gate remains.
 
 ## Closure
 

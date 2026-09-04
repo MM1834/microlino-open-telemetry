@@ -83,7 +83,7 @@ and increased electrical regeneration under light braking.
 
 The `nanoesp32c6-n16-soc-diagnostic` environment adds a passive, RAM-only scan of
 all 11-bit CAN1 identifiers. It is intended for the B.025 test adapter and reports
-itself as `C6-001-REV14-SOC-DIAG-B025`; it does not change decoder or AWS topic
+itself as `C6-001-REV15-SOC-DIAG-B025`; it does not change decoder or AWS topic
 semantics. At a stable displayed SOC, run `soc reset`, wait for all buses to be
 active, then run `soc mark`. After driving or charging changes the displayed SOC,
 run `soc dump`. The comparison lists byte and 16-bit little-/big-endian fields

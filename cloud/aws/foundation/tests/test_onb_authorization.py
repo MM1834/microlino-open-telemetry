@@ -280,6 +280,12 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         self.assertEqual(404, result["statusCode"])
         self.assertNotIn("beta", result["body"])
 
+        result = self.module.handler(
+            rest_event("/api/vehicles/beta/range-forecast", "user-a", "beta"), None
+        )
+        self.assertEqual(404, result["statusCode"])
+        self.assertNotIn("beta", result["body"])
+
     def test_history_uses_existing_access_and_fixed_range(self):
         event = rest_event("/api/vehicles/alpha/history", "user-a", "alpha")
         event["queryStringParameters"] = {"hours": "24"}
@@ -288,10 +294,22 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         self.assertEqual(200, result["statusCode"])
         self.assertEqual(300, body["resolutionSeconds"])
         self.assertEqual(55, body["points"][0]["soc"])
+        self.assertNotIn("rangeForecast", body)
 
         event["queryStringParameters"] = {"hours": "25"}
         result = self.module.handler(event, None)
         self.assertEqual(400, result["statusCode"])
+
+    def test_range_forecast_is_loaded_through_separate_route(self):
+        event = rest_event(
+            "/api/vehicles/alpha/range-forecast", "user-a", "alpha"
+        )
+        result = self.module.handler(event, None)
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertEqual("alpha", body["vehicleId"])
+        self.assertEqual(30, body["windowDays"])
+        self.assertIn("rangeForecast", body)
 
     def test_speed_history_is_averaged_per_api_resolution(self):
         self.history.items.extend([
@@ -535,6 +553,10 @@ class IngestAuthorizationTests(unittest.TestCase):
         self.assertFalse(module.is_history_candidate("beta", "display/soc"))
         self.assertTrue(module.is_history_candidate("alpha", "display/soc"))
         self.assertEqual(300, module.HISTORY_SIGNALS["display/soc"][1])
+        self.assertEqual(("socInternal", 300), module.HISTORY_SIGNALS["bms/soc_internal"])
+        self.assertTrue(module.store_history(
+            "alpha", "bms/soc_internal", 48, "number", 1_700_000_301_000
+        ))
         self.assertEqual(300, module.HISTORY_SIGNALS["charging/plugged"][1])
         self.assertEqual(900, module.HISTORY_SIGNALS["display/speed_kmh"][1])
         self.assertEqual(900, module.HISTORY_SIGNALS["charging/power_signed"][1])
@@ -568,6 +590,7 @@ class IngestAuthorizationTests(unittest.TestCase):
                 "DEBUG_TABLE_NAME": "debug", "DEBUG_ENABLED": "true",
                 "DEBUG_VEHICLE_ALLOWLIST": "alpha",
                 "DEBUG_CAPTURE_UNTIL_EPOCH_SECONDS": "1700000100",
+                "DEBUG_VEHICLE_EXPIRY_OVERRIDES": "alpha=1700000050",
                 "DEBUG_RETENTION_DAYS": "7",
             },
         )
@@ -578,6 +601,9 @@ class IngestAuthorizationTests(unittest.TestCase):
         ))
         self.assertTrue(module.store_debug(
             "alpha", "bms/future_confirmed_pid", 123, "number", received_at + 1
+        ))
+        self.assertFalse(module.is_debug_candidate(
+            "alpha", "bms/soc_internal", 48, 1_700_000_051_000
         ))
         self.assertFalse(module.store_debug(
             "beta", "bms/pack_current", -20, "number", received_at + 2
@@ -759,12 +785,15 @@ class TemplateStructureTests(unittest.TestCase):
         self.assertIn("MaxValue: 31", template)
         self.assertIn("VehicleHistoryDailyWriteAlarm:", template)
         self.assertIn('RouteKey: "GET /api/vehicles/{vehicleId}/history"', template)
+        self.assertIn('RouteKey: "GET /api/vehicles/{vehicleId}/range-forecast"', template)
 
     def test_debug_guardrails_are_fail_closed_and_separate(self):
         template = TEMPLATE.read_text(encoding="utf-8")
         self.assertIn("EnableTelemetryDebug:", template)
         self.assertIn("TelemetryDebugVehicleAllowlist:", template)
         self.assertIn("TelemetryDebugCaptureUntilEpochSeconds:", template)
+        self.assertIn("TelemetryDebugVehicleExpiryOverrides:", template)
+        self.assertIn("DEBUG_VEHICLE_EXPIRY_OVERRIDES", template)
         self.assertIn("TelemetryDebugRetentionDays:", template)
         self.assertIn("VehicleDebugHistoryTable:", template)
         self.assertIn("VehicleDebugHistoryDailyWriteAlarm:", template)

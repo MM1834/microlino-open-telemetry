@@ -19,7 +19,7 @@ class N16WebflashReleaseTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.binary = self.root / "firmware.bin"
-        self.binary.write_bytes(b"application-image")
+        self.binary.write_bytes(b"application-image:C6-001-REV14-AWS")
         self.partitions = self.root / "partitions.csv"
         self.partitions.write_text(
             "nvs,data,nvs,0x9000,0x5000,\n"
@@ -45,7 +45,7 @@ class N16WebflashReleaseTests(unittest.TestCase):
         self.assertEqual(APPLICATION_OFFSET, manifest["writePlan"][0]["offset"])
         self.assertFalse(manifest["factoryErase"])
         self.assertEqual(
-            hashlib.sha256(b"application-image").hexdigest(),
+            hashlib.sha256(b"application-image:C6-001-REV14-AWS").hexdigest(),
             manifest["artifact"]["sha256"],
         )
         self.assertIn("awsCredentials", manifest["preserves"])
@@ -55,6 +55,11 @@ class N16WebflashReleaseTests(unittest.TestCase):
         factory.write_bytes(b"factory")
         with self.assertRaisesRegex(ValueError, "application firmware.bin"):
             build_manifest(factory, self.partitions, self.version)
+
+    def test_mislabeled_binary_is_rejected(self):
+        self.binary.write_bytes(b"application-image:C6-001-REV13-AWS")
+        with self.assertRaisesRegex(ValueError, "does not contain expected firmware version"):
+            build_manifest(self.binary, self.partitions, self.version)
 
     def test_xiao_manifest_uses_four_mb_geometry(self):
         manifest = build_manifest(

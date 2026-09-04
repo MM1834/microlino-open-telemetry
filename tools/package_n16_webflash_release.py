@@ -62,8 +62,13 @@ def build_manifest(binary: Path, partitions: Path, version_header: Path, target:
     size = binary.stat().st_size
     if size <= 0 or size > slot_size:
         raise ValueError(f"application size {size} exceeds slot {slot_size}")
-    digest = hashlib.sha256(binary.read_bytes()).hexdigest()
     version = firmware_version(version_header)
+    binary_bytes = binary.read_bytes()
+    if version.encode("ascii") not in binary_bytes:
+        raise ValueError(
+            f"application binary does not contain expected firmware version {version}"
+        )
+    digest = hashlib.sha256(binary_bytes).hexdigest()
     flash_size = PROFILES[target][2]
     artifact_name = f"mot-{target}-{version.lower()}-{digest[:12]}.bin"
     return {
