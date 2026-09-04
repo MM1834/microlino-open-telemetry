@@ -8,24 +8,25 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-01
+**Last reviewed:** 2026-09-04
 
 ## High priority
 
 ### Add an optional daily journey and charging summary
 
-**Active work package:** [DAY-SUM-001 — Daily Journey and Charging Summary](../project/sprints/DAY-SUM-001.md)
+**Completed work package:** [DAY-SUM-001 — Daily Journey and Charging Summary](../project/sprints/DAY-SUM-001.md)
 
 **Objective:** Send one optional email per user, vehicle and Zurich calendar day
 with totals from completed journey and charging events, while waiting for active
 sessions until a bounded 08:05 deadline.
 
-**Current status:** Backend deployment is complete. The additive default-off
+**Current status:** Complete. The additive default-off
 preference, event aggregation, `Europe/Zurich` Scheduler, retry/idempotency
 boundary and portal control are implemented. Reviewed Change Set
 `day-sum-001-20260903` reached `UPDATE_COMPLETE` without replacing a table or
 Lambda function; scheduler and JWT-protection read-backs pass. Hosted portal
-upload and controlled live email/deferral acceptance remain open.
+acceptance passed, and the 2026-09-04 overnight run delivered correctly prepared
+daily emails whose journey and charging data the maintainer verified.
 
 ### Validate the optional charging-summary email
 
@@ -44,13 +45,13 @@ open. The implementation does not query the debug table.
 
 ### Capture bounded raw telemetry for the xruser charging diagnosis
 
-**Active backend sprint:** [DBG-001 — Bounded Vehicle Telemetry Debug Capture](../project/sprints/DBG-001.md)
+**Completed backend sprint:** [DBG-001 — Bounded Vehicle Telemetry Debug Capture](../project/sprints/DBG-001.md)
 
 **Objective:** Preserve short-lived five-second Display, charging and BMS scalar
 telemetry for the explicitly approved `xrpioneer2` identity so Microlino can
 diagnose the observed 75%-to-45% SOC reset with pack and cell context.
 
-**Current status:** Deployed and active. The fail-closed path
+**Current status:** Complete. The fail-closed path
 uses a separate encrypted on-demand table, exact vehicle allowlist, absolute
 automatic deadline, seven-day TTL, dedicated write alarm and CSV exporter. GPS,
 structured payloads and unrelated vehicles are excluded. Local targeted tests
@@ -58,8 +59,9 @@ pass. Replacement-free Change Set `dbg-001-xrpioneer2-20260901` deployed to
 `mot-aws-3-1`; the first live query returned 221 `xrpioneer2` rows across the
 expected electrical and vehicle signals, while `pioneer` returned zero and no
 debug-ingest error appeared. A parameter-only, replacement-free update extended
-capture through 2026-09-10 23:59:59 CEST while retaining seven-day per-row TTL;
-expiry-stop evidence and the later diagnostic export remain open.
+capture through 2026-09-10 23:59:59 CEST while retaining seven-day per-row TTL.
+The capture/export tools remain reusable for future bounded operational
+diagnostics, which no longer reopen this implementation sprint.
 
 ### Deliver a controlled portal Web Flasher
 

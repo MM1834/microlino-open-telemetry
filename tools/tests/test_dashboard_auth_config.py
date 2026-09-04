@@ -67,8 +67,8 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260903-settings-page1", source)
-        self.assertIn("app.js?v=20260903-settings-page1", source)
+        self.assertIn("aws-backend-provider.js?v=20260904-history-split1", source)
+        self.assertIn("app.js?v=20260904-history-split1", source)
 
 
 class DashboardMobileMapInteractionTests(unittest.TestCase):
@@ -289,7 +289,11 @@ class DashboardRangeForecastTests(unittest.TestCase):
         self.assertIn("function renderRangeForecast()", app)
         self.assertIn("Persönliche Prognose", app)
         self.assertIn("Basierend auf ${fmtNum(forecast.distanceKm, 0)} km", app)
-        self.assertIn('new CustomEvent("mot-range-forecast"', history)
+        provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text()
+        self.assertIn("async function loadRangeForecast", app)
+        self.assertIn("state.dataProvider.getRangeForecast", app)
+        self.assertIn("/range-forecast", provider)
+        self.assertNotIn('new CustomEvent("mot-range-forecast"', history)
 
 
 class DashboardHistoryPowerSignTests(unittest.TestCase):

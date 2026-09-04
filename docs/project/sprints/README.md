@@ -10,9 +10,7 @@
 
 ## Active implementation work
 
-- [DAY-SUM-001 — daily journey and charging summary](DAY-SUM-001.md)
 - [CHG-SUM-001 — email-only charging summary](CHG-SUM-001.md)
-- [DBG-001 — bounded vehicle telemetry debug capture](DBG-001.md)
 - [WEBFLASH-001 — controlled portal Web Flasher](WEBFLASH-001.md)
 - [RNG-SET-001 — personal range settings](RNG-SET-001.md)
 - [OPS-001 — Lambda capacity and portal resilience](OPS-001.md)
@@ -30,6 +28,12 @@
 
 ## Completed predecessors
 
+- [DAY-SUM-001](DAY-SUM-001.md) delivers an optional Zurich-calendar-day journey
+  and charging email; overnight Scheduler delivery and report totals passed live
+  acceptance on 2026-09-04.
+- [DBG-001](DBG-001.md) delivered the bounded fail-closed raw telemetry capture,
+  export tooling and REV15 SOC diagnostic evidence; future bounded investigations
+  reuse the operational capability without reopening the sprint.
 - [SET-UX-001](SET-UX-001.md) moved all personal range and notification controls
   to a dedicated authenticated, vehicle-specific page; hosted `motbeta`
   desktop/smartphone acceptance and persistence passed on 2026-09-03.

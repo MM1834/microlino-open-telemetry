@@ -33,6 +33,9 @@
     notificationReadOnly: false,
     smsNotificationStatus: null,
     rangeForecast: null,
+    rangeForecastVehicleId: null,
+    rangeForecastLoadingVehicleId: null,
+    rangeForecastRequest: 0,
     rangeKmAt100: Number(vehicleCfg.defaultRangeKmAt100 || 140),
     rangeReserveSoc: 0
   };
@@ -630,10 +633,26 @@
       ? `Basierend auf ${fmtNum(forecast.distanceKm, 0)} km · ${forecast.tripCount} ${Number(forecast.tripCount) === 1 ? 'Fahrt' : 'Fahrten'}`
       : 'Noch keine ausreichende Fahrhistorie');
   }
-  window.addEventListener('mot-range-forecast', event => {
-    state.rangeForecast = event.detail || null;
-    renderRangeForecast();
-  });
+  async function loadRangeForecast(force = false) {
+    const vehicleId = state.selectedVehicleId;
+    if (!vehicleId || !state.dataProvider?.getRangeForecast) return;
+    if (!force && state.rangeForecastVehicleId === vehicleId) return;
+    if (!force && state.rangeForecastLoadingVehicleId === vehicleId) return;
+    const requestId = ++state.rangeForecastRequest;
+    state.rangeForecastLoadingVehicleId = vehicleId;
+    try {
+      const result = await state.dataProvider.getRangeForecast();
+      if (requestId !== state.rangeForecastRequest || vehicleId !== state.selectedVehicleId) return;
+      state.rangeForecast = result?.rangeForecast || null;
+      state.rangeForecastVehicleId = vehicleId;
+      renderRangeForecast();
+    } catch (error) {
+      if (requestId !== state.rangeForecastRequest || vehicleId !== state.selectedVehicleId) return;
+      console.warn('MOT range forecast request failed', error);
+    } finally {
+      if (requestId === state.rangeForecastRequest) state.rangeForecastLoadingVehicleId = null;
+    }
+  }
   window.addEventListener('mot-language-change', () => {
     updateClock();
     renderRangeForecast();
@@ -959,6 +978,9 @@ function resetDashboardForVehicle(vehicleId) {
   state.vehicleLastSeenMs = 0;
   state.vehicleLastSeenSource = '';
   state.rangeForecast = null;
+  state.rangeForecastVehicleId = null;
+  state.rangeForecastLoadingVehicleId = null;
+  state.rangeForecastRequest += 1;
   state.rangeKmAt100 = Number(vehicleCfg.defaultRangeKmAt100 || 140);
   state.rangeReserveSoc = 0;
 
@@ -1058,6 +1080,7 @@ async function selectVehicle(vehicleId) {
     await state.dataProvider.selectVehicle(vehicleId);
   }
   await loadNotificationPreferences(true);
+  loadRangeForecast().catch(error => console.warn('Range forecast failed:', error));
   window.MOTHistoryChart?.render?.();
 }
 
@@ -1335,6 +1358,7 @@ function startDataProvider() {
             resetDashboardForVehicle(selected);
             window.MOTHistoryChart?.render?.();
           }
+          loadRangeForecast().catch(error => console.warn('Range forecast failed:', error));
         }
         loadNotificationPreferences().catch(error => console.error('Notification settings failed:', error));
       },

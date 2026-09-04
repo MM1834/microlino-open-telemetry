@@ -258,6 +258,13 @@
         );
       },
 
+      async getRangeForecast() {
+        if (!activeVehicleId) return { rangeForecast: null };
+        return get(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/range-forecast`
+        );
+      },
+
       async getVehicles() {
         const result = await get('/api/vehicles');
         return Array.isArray(result) ? result : (result.vehicles || []);

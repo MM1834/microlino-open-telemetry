@@ -29,7 +29,6 @@ async function render(hours=currentRangeHours){
   const requestKey=`${vehicleId}|${hours}`;
   let samples=[];
   let resolutionSeconds=null;
-  let rangeForecast=null;
   let pendingHistory=null;
   try{
     if(!inFlightHistory||inFlightHistoryKey!==requestKey){
@@ -46,7 +45,6 @@ async function render(hours=currentRangeHours){
     if(result){
       samples=Array.isArray(result?.points)?result.points:[];
       resolutionSeconds=result?.resolutionSeconds||null;
-      rangeForecast=result?.rangeForecast||null;
     }
   }catch(error){
     if(inFlightHistory===pendingHistory){
@@ -59,8 +57,6 @@ async function render(hours=currentRangeHours){
     return false;
   }
   updateRequestStatus("",false);
-  window.dispatchEvent(new CustomEvent("mot-range-forecast",{detail:rangeForecast}));
-
   renderSeries({
     canvasId:"soc-history-chart",
     emptyId:"soc-history-empty",

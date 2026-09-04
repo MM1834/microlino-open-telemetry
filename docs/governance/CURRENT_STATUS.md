@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-01
+**Last reviewed:** 2026-09-04
 
 ## Purpose
 
@@ -18,6 +18,18 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+OPS-001 now decouples the interactive History diagrams from the personal
+30-day range forecast. `GET /api/vehicles/{vehicleId}/history` returns only the
+six chart series, while the separately JWT-authorized
+`GET /api/vehicles/{vehicleId}/range-forecast` is loaded once per selected
+vehicle and may fail without clearing or delaying the charts. The reviewed
+2026-09-04 Foundation Change Set modified only the existing Vehicle API and its
+integration without replacement and added the new route; stack `mot-aws-3-1`
+reached `UPDATE_COMPLETE`, the route reports JWT authorization, and anonymous
+requests to both endpoints return 401. Hosted `motbeta` and production
+`/dashboard/` acceptance passed on desktop and smartphone with two users on
+2026-09-04, closing this History/forecast slice of OPS-001.
 
 ADM-UX-001 completed a dedicated portal administration page.
 `Beta-Onboarding verwalten` and Web-Flasher grant/revoke are no longer embedded
@@ -39,7 +51,7 @@ and authorization are unchanged. Hosted `motbeta` desktop/smartphone acceptance
 and a persistence check passed on 2026-09-03; the same content is approved for
 the normal `/dashboard/` release.
 
-DAY-SUM-001 has a deployed optional daily email summary backend. It aggregates
+DAY-SUM-001 is closed with a deployed optional daily email summary backend. It aggregates
 per-user journey and charging completion events by their end date, uses
 `Europe/Zurich` calendar boundaries and retries hourly from 00:05 through 08:05
 while an activity is still running. At the deadline, completed activity is sent
@@ -48,8 +60,9 @@ The preference defaults off and is independent from individual reports. Reviewed
 Change Set `day-sum-001-20260903` added the Zurich scheduler and updated the
 shared Lambdas in place without replacing any table or function; stack
 `mot-dev-notifications` reached `UPDATE_COMPLETE`, the schedule is enabled and
-the public API remains JWT-protected. Hosted portal upload and controlled live
-delivery/deferral acceptance remain open.
+the public API remains JWT-protected. The hosted portal and overnight Scheduler
+path passed on 2026-09-04; enabled users received successfully prepared emails
+and the maintainer verified the reported journey and charging data as correct.
 
 The controlled 2026-09-03 Pioneer SOC run established `0x48D data[7]` as an
 exact Standard-CAN copy of the visible whole-percent SOC and `data[6]` as a
@@ -81,7 +94,8 @@ journey summaries enabled; no non-matching record was changed. The repository
 checkbox and three-language text pass validation. Hosted portal upload and live
 end-of-charge email acceptance remain open.
 
-DBG-001 started on 2026-09-01 after `xrpioneer2` reported an SOC rise from roughly
+DBG-001 closed after delivering the bounded MOT diagnostic path started on
+2026-09-01 when `xrpioneer2` reported an SOC rise from roughly
 45% to 75% while charging followed by an immediate return to roughly 45% at
 vehicle switch-on. The normal History reproduces the transition but does not
 retain voltage/current/cell-extrema series. The repository now contains a
@@ -97,8 +111,9 @@ Set `dbg-001-extend-xrpioneer2-20260910` extended its absolute deadline through
 consistent query returned 221 rows including pack voltage/current,
 pack/vehicle power, cell minimum/maximum/delta, SOC and charging states;
 `pioneer` returned zero rows and no debug-ingest error appeared. A bounded CSV
-smoke export returned 408 rows. Automatic expiry evidence and the later
-diagnostic handoff remain open.
+smoke export returned 408 rows. The capture and export tools remain available for
+future explicitly bounded operational investigations, but those uses no longer
+reopen DBG-001; new decoder or product behaviour requires its own work package.
 
 WEBFLASH-001 started on 2026-09-01 to provide an administrator-approved C6 USB
 firmware update inside authenticated portal settings. The accepted flow is
