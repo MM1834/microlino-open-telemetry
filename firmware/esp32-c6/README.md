@@ -9,7 +9,7 @@ Current implemented slice:
 - two concurrent ESP32-C6 TWAI controllers at 500 kbit/s;
 - listen-only operation with independent counters and decoder profiles;
 - persistent independent CAN1/CAN2 profile selection in Preferences/NVS;
-- Display-CAN, Standard-CAN V1 - Pioneer and Standard-CAN V2 shared decoders;
+- Display-CAN, Standard-CAN V1 - Pioneer / Gen1 Mid-Range and Standard-CAN V2 shared decoders;
 - board, flash, CAN and GPS pin diagnostics;
 - shared optional-GPS detection and NMEA fix-state handling;
 - bounded in-memory drive capture with on-demand summaries for known CAN IDs;
@@ -49,7 +49,7 @@ path are accepted; physical operation of the unified image without provisioned
 AWS credentials remains the C6-ENV-001 rollout gate. Physical USB is the supported
 recovery path and signed-image rollback is not claimed.
 
-Default decoder assignment is Standard-CAN V1 - Pioneer on CAN1 and Display-CAN
+Default decoder assignment is Standard-CAN V1 - Pioneer / Gen1 Mid-Range on CAN1 and Display-CAN
 on CAN2. Both channels accept any registered decoder profile at runtime; these are
 safe defaults for the intended dual-CAN adapter, not decoder-engine restrictions.
 

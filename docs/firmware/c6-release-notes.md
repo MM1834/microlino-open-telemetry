@@ -1,6 +1,6 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current release:** `C6-001-REV17-AWS`
+> **Current release:** `C6-001-REV18-AWS`
 >
 > **Targets:** nanoESP32-C6-N16 and Seeed XIAO ESP32-C6
 
@@ -137,6 +137,17 @@ REV15, so it was deliberately never packaged or activated for WebFlash. REV17 is
 the first immutable release containing both that journey fix and the CAN-profile
 telemetry.
 
+### `C6-001-REV18-AWS`
+
+- publishes the compile-time hardware identifier as retained AWS birth state at
+  `system/board`;
+- renames the V1 stable decoder key to
+  `standard-can-v1-pioneer-gen1-midrange` and its local UI label to
+  `Standard-CAN V1 - Pioneer / Gen1 Mid-Range`;
+- preserves numeric decoder profile value `2` and accepts the former
+  `standard-can-v1-pioneer` command alias, so stored configuration and service
+  workflows remain compatible.
+
 ### `C6-001-REV14-AWS`
 
 - publishes `journey/energy_counter_id` as a valid JSON string;
@@ -152,7 +163,7 @@ telemetry.
 - **Firmware journey-energy counter (REV11+):** the RAM Wh accumulator and its
   `journey/energy_*` checkpoints are N16-only. XIAO journey emails continue to use
   the compatible backend `Telemetrie-Schätzung` path.
-- **N16 firmware images:** REV17 deliberately rejects a 16 MB N16 OTA image on a
+- **N16 firmware images:** REV18 deliberately rejects a 16 MB N16 OTA image on a
   4 MB XIAO. XIAO requires the `xiao-esp32c6` image.
 
 ### Supported with a reduced limit
@@ -160,7 +171,7 @@ telemetry.
 - **Offline History cache:** supported, but capped at 128 KiB instead of the
   N16's 256 KiB because XIAO has only 4 MB flash.
 - **Firmware growth:** the XIAO image must remain below 85% of one OTA application
-  slot. REV17 remains subject to the 85% gate, so additional N16 features are not automatically
+slot. REV18 remains subject to the 85% gate, so additional N16 features are not automatically
   enabled on XIAO.
 
 ### Still supported in the current XIAO image

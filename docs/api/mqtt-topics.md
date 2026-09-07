@@ -85,6 +85,7 @@ current from last-known location.
 | `system/device_id` | Yes | Yes | LilyGO yes; ESP32 legacy does not publish it in current loop |
 | `system/device_name` | Yes | Yes | LilyGO yes; ESP32 legacy does not publish it in current loop |
 | `system/mqtt_client_id` | Birth message | Yes plus birth | AWS birth; not common legacy contract |
+| `system/board` | Birth message | Birth message | Compile-time board identifier; AWS only |
 | `system/firmware_version` | Yes | Yes | LilyGO yes |
 | `system/can1_profile` | Birth message | Birth message | Stable decoder key; AWS only |
 | `system/can2_profile` | Birth message | Birth message | Stable decoder key; `disabled` when unavailable; AWS only |
@@ -97,7 +98,7 @@ current from last-known location.
 
 The shared AWS transport publishes the selected CAN decoder profiles together
 with the firmware identity during its retained birth sequence. Values use stable
-keys such as `standard-can-v1-pioneer`, `standard-can-v2`,
+keys such as `standard-can-v1-pioneer-gen1-midrange`, `standard-can-v2`,
 `microlino-display-can` and `disabled`. Profile changes made through the local UI
 take effect with its configuration restart and therefore replace the retained
 AWS state on the following connection. The generic State ingestion path stores

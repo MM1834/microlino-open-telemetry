@@ -17,7 +17,7 @@ CAN frame -> selected DecoderProfile -> canonical Telemetry -> MQTT / ABRP / Web
 | ID | Key | Status | Purpose |
 |---:|---|---|---|
 | `0` | `display-can` | active | Current Microlino Display-CAN decoder (`0x602`, `0x603`, `0x604`). |
-| `2` | `standard-can-v1-pioneer` | active | Physically verified Pioneer `0x18D` decoder plus provisional `0x4AD` cell pair. Value `2` preserves stored configuration compatibility with the former generic template. |
+| `2` | `standard-can-v1-pioneer-gen1-midrange` | active | Physically verified Pioneer and first-generation Mid-Range `0x18D` decoder plus provisional `0x4AD` cell pair. Value `2` preserves stored configuration compatibility with the former generic template. |
 | `3` | `standard-can-v2` | pilot | Independent V2 implementation with provisional `0x18D`/`0x4AD` rules pending validation on a V2 vehicle. |
 | `255` | `disabled` | active | Disables decoding on a CAN input. |
 

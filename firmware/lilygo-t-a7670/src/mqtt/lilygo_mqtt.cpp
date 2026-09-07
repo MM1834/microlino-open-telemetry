@@ -121,6 +121,7 @@ static MotAwsRuntime awsRuntime()
     MotAwsRuntime runtime;
     runtime.deviceId = lilygoDeviceName();
     runtime.deviceName = lilygoDeviceName();
+    runtime.board = MOT_BOARD;
     runtime.firmwareVersion = telemetry.system.firmwareVersion;
     runtime.can1Profile = decoderProfileKey(config.canProfile);
     runtime.can2Profile = decoderProfileKey(config.can2Profile);

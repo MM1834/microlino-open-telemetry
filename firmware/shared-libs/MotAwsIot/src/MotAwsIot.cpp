@@ -440,6 +440,7 @@ void MotAwsIotClient::publishBirth() {
     publish("system/device_id", runtime_.deviceId, true);
     publish("system/device_name", runtime_.deviceName, true);
     publish("system/mqtt_client_id", credentials_.thingName, true);
+    publish("system/board", runtime_.board, true);
     publish("system/firmware_version", runtime_.firmwareVersion, true);
     publish("system/can1_profile", runtime_.can1Profile, true);
     publish("system/can2_profile", runtime_.can2Profile, true);

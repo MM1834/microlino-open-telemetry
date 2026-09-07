@@ -123,6 +123,20 @@ REV15 N16 grant was checked after activation and failed closed with
 `authorized:false`. No firmware grant was migrated automatically; the separate
 local-password-recovery grants are unaffected.
 
+`C6-001-REV18-AWS` was activated for both targets on 2026-09-07. It adds the
+retained `system/board` birth state and renames the V1 decoder identity to cover
+both confirmed first-generation vehicle groups. The N16 application is
+1,439,792 bytes with SHA-256
+`fa9e029e383e7734d2f9b113395646573bf4d3e7ce9792ad701be6579ed71d1d`;
+the XIAO application is 1,425,984 bytes with SHA-256
+`9c031c7743a84d40fdae6d86e2dead27a8537c81525f3d22d9986a8cd6e11391`.
+S3 download/read-back reproduced both hashes and confirmed AES256 encryption and
+versioned objects. Reviewed Change Set `webflash-rev18-20260907` modified the
+same three existing resources in place without replacement or deletion. Stack
+parameters and Lambda environment read back the exact REV18 keys, sizes and
+hashes; anonymous access returns 401 and an existing REV17 N16 grant fails closed
+with `authorized:false`.
+
 ### C — Portal flasher
 
 - **Implemented in the repository 2026-09-01:** authenticated settings card in

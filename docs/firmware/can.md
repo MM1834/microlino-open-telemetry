@@ -117,7 +117,7 @@ one or more of:
 The preferred result is a deterministic vehicle identifier or passive CAN signal,
 not inference from battery size, marketing range or the Pioneer badge.
 
-`standard-can-v1-pioneer` decodes the physically confirmed `0x18D` pack voltage,
+`standard-can-v1-pioneer-gen1-midrange` decodes the physically confirmed `0x18D` pack voltage,
 current scale, derived power and plug/charge states. It also exposes the observed
 but still provisional `0x4AD` cell pair. Pioneer-only `0x48D data[6]` is exposed
 as the internal SOC candidate `bms/soc_internal`; `data[7]` is exposed separately

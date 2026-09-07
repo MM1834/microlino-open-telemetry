@@ -171,7 +171,7 @@ static void handleConfig()
     s += "<label>Decoder profile</label><select name='can1Profile'>" + profileOptions(config.canProfile) + "</select>";
     s += "<p class='muted'>CAN1/TWAI is wired to Standard-CAN, matching the C6 mapping.</p><hr><h3>CAN 2</h3><p>Adafruit MCP2515 FeatherWing · SPI · Display-CAN · receive-only</p>";
     s += "<label>Decoder profile</label><select name='can2Profile'>" + profileOptions(config.can2Profile) + "</select>";
-    s += "<p class='muted'>Hardware requirement: TERM open and SLNT tied to 3.3 V. Default mapping: CAN1 Standard-CAN V1 - Pioneer, CAN2 Display-CAN.</p></div>";
+    s += "<p class='muted'>Hardware requirement: TERM open and SLNT tied to 3.3 V. Default mapping: CAN1 Standard-CAN V1 - Pioneer / Gen1 Mid-Range, CAN2 Display-CAN.</p></div>";
 
     s += "<div class='card'><h2>Services</h2>";
     s += "<label><input type='checkbox' style='width:auto' name='svcAws' value='1'" + String(config.awsServiceEnabled ? " checked" : "") + "> AWS IoT</label>";
