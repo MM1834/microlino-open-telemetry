@@ -979,14 +979,21 @@
     if (link) link.href = href;
   }
 
-  const mobileMapQuery = window.matchMedia('(max-width: 900px)');
+  const protectedMapInputQuery = window.matchMedia('(pointer: coarse), (hover: none)');
+
+  function syncLocationMapInputMode() {
+    const interaction = $('location-map-interaction');
+    if (!interaction) return;
+    interaction.classList.toggle('requires-activation', protectedMapInputQuery.matches);
+    setLocationMapInteractive(false);
+  }
 
   function setLocationMapInteractive(active) {
     const interaction = $('location-map-interaction');
     const button = $('location-map-activate');
     if (!interaction || !button) return;
 
-    const enabled = Boolean(active && mobileMapQuery.matches);
+    const enabled = Boolean(active && protectedMapInputQuery.matches);
     interaction.classList.toggle('is-interactive', enabled);
     button.setAttribute('aria-pressed', String(enabled));
     button.textContent = enabled ? 'Seitenscrollen' : 'Karte bedienen';
@@ -1007,13 +1014,12 @@
         setLocationMapInteractive(false);
       }
     });
-    const resetInteraction = () => setLocationMapInteractive(false);
-    if (typeof mobileMapQuery.addEventListener === 'function') {
-      mobileMapQuery.addEventListener('change', resetInteraction);
+    if (typeof protectedMapInputQuery.addEventListener === 'function') {
+      protectedMapInputQuery.addEventListener('change', syncLocationMapInputMode);
     } else {
-      mobileMapQuery.addListener?.(resetInteraction);
+      protectedMapInputQuery.addListener?.(syncLocationMapInputMode);
     }
-    setLocationMapInteractive(false);
+    syncLocationMapInputMode();
   }
 
   function updateCoords(source = 'mqtt') {

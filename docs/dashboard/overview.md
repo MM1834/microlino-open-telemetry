@@ -4,7 +4,7 @@
 
 The dashboard provides current and live telemetry through the configured provider.
 German remains the project language and the portal's default and fallback. A
-persisted dashboard selector additionally supports English and French. It applies
+persisted dashboard selector additionally supports English, French and Italian. It applies
 to static content, runtime status and error messages, accessibility labels,
 locale-sensitive dates and History chart annotations. The local firmware wizard
 is a separate surface and remains English-only.
@@ -31,6 +31,14 @@ kilometres and journey count and retains the fixed `SOC × configured 100% range
 result as a comparison. Before valid history exists, the fixed value remains the
 only displayed forecast. Both `/dashboard/` and `/motbeta/` consume this shared
 portal source.
+
+The authenticated Settings page ends with a read-only `MOT Adapter
+Informationen` block for the selected vehicle. It obtains DeviceId, Board,
+firmware version, CAN1/CAN2 decoder profile keys and the adapter's local IP
+address from the existing authorized snapshot. Missing retained topics from
+older firmware show `--`; REV18 publishes Board as `system/board`. Changing the
+Settings vehicle reloads both preferences and adapter information without
+starting live polling or a WebSocket.
 
 The backend derives the forecast from at most the ten newest valid journeys in
 the last 30 days and stops adding older journeys after about 150 km. Charging,
@@ -107,12 +115,14 @@ detail-card layout is unchanged by this desktop-only rule.
 - Cells
 - Location
 
-On smartphone-sized viewports, the embedded OpenStreetMap is non-interactive by
-default so vertical gestures continue scrolling the dashboard. The explicit
-`Karte bedienen` control enables map pan and zoom; the same control switches
-back to page scrolling, and touching outside the map also leaves interaction
-mode. Desktop map interaction remains immediate, while the external
-OpenStreetMap link is always available.
+On touch-oriented input devices (`pointer: coarse` or `hover: none`), the
+embedded OpenStreetMap is non-interactive by default so vertical gestures
+continue scrolling the dashboard. This is independent of the responsive layout
+and therefore also covers tablets such as an iPad that render the desktop view.
+The explicit `Karte bedienen` control enables map pan and zoom; the same control
+switches back to page scrolling, and touching outside the map also leaves
+interaction mode. Mouse/trackpad interaction remains immediate at every viewport
+width, while the external OpenStreetMap link is always available.
 
 ## Administration
 

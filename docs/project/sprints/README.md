@@ -28,6 +28,9 @@
 
 ## Completed predecessors
 
+- [ADP-INF-001](ADP-INF-001.md) adds read-only adapter identity and configuration
+  to Settings; desktop and smartphone layouts plus the older-firmware fallback
+  passed hosted acceptance on 2026-09-07.
 - [DAY-SUM-001](DAY-SUM-001.md) delivers an optional Zurich-calendar-day journey
   and charging email; overnight Scheduler delivery and report totals passed live
   acceptance on 2026-09-04.

@@ -270,6 +270,11 @@
         return Array.isArray(result) ? result : (result.vehicles || []);
       },
 
+      async getSnapshot() {
+        if (!activeVehicleId) return { vehicleId: null, values: {}, metadata: {} };
+        return get(`/api/vehicles/${encodeURIComponent(activeVehicleId)}/snapshot`);
+      },
+
       getSelectedVehicleId() { return activeVehicleId; },
 
       async claimVehicle(claim) {

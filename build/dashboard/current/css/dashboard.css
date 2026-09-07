@@ -383,7 +383,7 @@
 .settings-topbar h1{margin:0 0 4px;font-size:1.45rem}
 .settings-vehicle-selector{display:flex;flex-direction:column;gap:5px;min-width:180px}
 .settings-vehicle-selector select{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px;color:var(--text);background:var(--panel)}
-@media(max-width:900px){.settings-page .app-shell{padding:10px}.settings-page .settings-topbar{position:static;order:0;flex-wrap:wrap}.settings-page #settings,.settings-page #settings-denied{order:1}.settings-page .settings-topbar>div:first-child{flex:1 1 100%}.settings-page .settings-topbar .top-spacer{display:none}.settings-page .settings-topbar .language-selector,.settings-page .settings-topbar .auth-controls{order:initial}.settings-page .settings-card{padding:18px}.settings-page .settings-card .card-header{flex-direction:column}.settings-vehicle-selector{width:100%}}
+@media(max-width:900px){.settings-page .app-shell{padding:10px}.settings-page .settings-topbar{position:static;order:0;flex-wrap:wrap}.settings-page #settings,.settings-page #settings-denied{order:1}.settings-page #adapter-information{order:2}.settings-page .settings-topbar>div:first-child{flex:1 1 100%}.settings-page .settings-topbar .top-spacer{display:none}.settings-page .settings-topbar .language-selector,.settings-page .settings-topbar .auth-controls{order:initial}.settings-page .settings-card{padding:18px}.settings-page .settings-card .card-header{flex-direction:column}.settings-vehicle-selector{width:100%}}
 
 /* Blend the photographic vehicle teaser into the dashboard card. */
 .hero-image-wrap{background:rgba(5,16,29,.72)}
