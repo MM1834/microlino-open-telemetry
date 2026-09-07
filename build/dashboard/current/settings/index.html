@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Einstellungen</title>
-  <link rel="stylesheet" href="../css/dashboard.css?v=20260903-settings-page1" />
-  <script src="../js/i18n.js?v=20260903-settings-page1"></script>
+  <link rel="stylesheet" href="../css/dashboard.css?v=20260907-adapter-info2" />
+  <script src="../js/i18n.js?v=20260904-it1"></script>
 </head>
 <body class="settings-page">
   <div class="app-shell">
@@ -35,6 +35,7 @@
             <option value="de">Deutsch</option>
             <option value="en">Englisch</option>
             <option value="fr">Französisch</option>
+            <option value="it">Italienisch</option>
           </select>
         </label>
         <div class="auth-controls">
@@ -172,6 +173,24 @@
           </div>
         </form>
       </section>
+
+      <section id="adapter-information" class="card settings-card" hidden>
+        <div class="card-header">
+          <div>
+            <h2>MOT Adapter Informationen</h2>
+            <span class="muted">Vom Adapter über AWS gemeldete Konfiguration</span>
+          </div>
+        </div>
+        <dl class="firmware-meta">
+          <div><dt>DeviceId</dt><dd id="adapter-device-id">--</dd></div>
+          <div><dt>Board</dt><dd id="adapter-board">--</dd></div>
+          <div><dt>Firmware</dt><dd id="adapter-firmware">--</dd></div>
+          <div><dt>CAN1</dt><dd id="adapter-can1">--</dd></div>
+          <div><dt>CAN2</dt><dd id="adapter-can2">--</dd></div>
+          <div><dt>IP-Adresse</dt><dd id="adapter-ip-address">--</dd></div>
+        </dl>
+        <small id="adapter-information-status" class="connection-detail" aria-live="polite"></small>
+      </section>
     </main>
   </div>
   <script src="../config.js"></script>
@@ -179,7 +198,7 @@
   <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
   <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="../js/providers/provider-registry.js"></script>
-  <script src="../js/providers/aws-backend-provider.js?v=20260903-settings-page1"></script>
-  <script src="../js/settings.js?v=20260903-settings-page1"></script>
+  <script src="../js/providers/aws-backend-provider.js?v=20260907-adapter-info1"></script>
+  <script src="../js/settings.js?v=20260907-adapter-info2"></script>
 </body>
 </html>

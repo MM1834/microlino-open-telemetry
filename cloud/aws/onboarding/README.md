@@ -17,6 +17,9 @@ owns an encrypted TTL grant table, private encrypted/versioned firmware bucket,
 admin grant/revoke routes, authenticated access/download/result routes and bounded
 audit events. Firmware downloads use five-minute presigned S3 URLs; Lambda never
 proxies the binary.
+The deployed password-recovery extension uses a separate reserved grant target,
+five JWT-protected grant/access/start/result routes and the adapter's existing
+local USB console command. It never sends the generated password to AWS.
 
 Schemas:
 

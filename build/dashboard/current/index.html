@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260903-settings-page1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260907-password-recovery2" />
   <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
-  <link rel="stylesheet" href="css/location-map.css?v=20260903-mobile-interaction1">
+  <link rel="stylesheet" href="css/location-map.css?v=20260904-touch-interaction1">
   <link rel="stylesheet" href="css/location-map-cleanup.css">
-  <script src="js/i18n.js?v=20260903-settings-page1"></script>
+  <script src="js/i18n.js?v=20260907-password-recovery1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -93,6 +93,7 @@
             <option value="de">Deutsch</option>
             <option value="en">Englisch</option>
             <option value="fr">Französisch</option>
+            <option value="it">Italienisch</option>
           </select>
         </label>
         <div id="auth-controls" class="auth-controls" hidden>
@@ -302,6 +303,44 @@
   </details>
 </section>
 
+<section id="password-recovery" class="card firmware-card" hidden>
+  <div class="card-header">
+    <div>
+      <h2>Lokales Adapterpasswort</h2>
+      <span class="muted">Explizit freigegebene USB-Recovery · übrige Konfiguration bleibt erhalten</span>
+    </div>
+  </div>
+  <div id="password-recovery-browser-warning" class="firmware-warning" hidden>
+    Dieser Browser unterstützt Web Serial nicht. Bitte Chrome oder Edge über HTTPS auf macOS oder Windows verwenden.
+  </div>
+  <ol class="firmware-steps">
+    <li>Adapter normal starten und nur über ein USB-C-Datenkabel mit dem Computer verbinden. Nicht in den Bootloader wechseln.</li>
+    <li>Bestätigen, dass ausschließlich das lokale Administrator- und Hotspot-Passwort ersetzt werden soll.</li>
+    <li>USB-Gerät auswählen. Das neue Passwort wird einmalig nur in diesem Browser angezeigt.</li>
+  </ol>
+  <dl class="firmware-meta">
+    <div><dt>Änderung</dt><dd>Nur lokales Passwort · kein Factory Reset</dd></div>
+    <div><dt>Bleibt erhalten</dt><dd>WiFi, CAN, AWS-Zertifikate, Fahrzeugzuordnung und Dienste</dd></div>
+    <div><dt>Freigabe gültig bis</dt><dd id="password-recovery-expiry">--</dd></div>
+    <div><dt>Sicherheitsgrenze</dt><dd>Portal-Benutzerfreigabe; physischer USB-Zugriff bleibt separat möglich</dd></div>
+  </dl>
+  <div class="firmware-actions">
+    <label class="firmware-confirmation">
+      <input id="password-recovery-confirm" type="checkbox" />
+      <span>Ich bestätige den Passwortwechsel. Danach muss der lokale MOT-Hotspot mit dem neuen Passwort verbunden werden.</span>
+    </label>
+    <button id="password-recovery-start" class="auth-button" type="button" disabled>Neues lokales Passwort erzeugen</button>
+  </div>
+  <p id="password-recovery-status" class="connection-detail" aria-live="polite">Bereit für die USB-Recovery.</p>
+  <div id="password-recovery-result" hidden>
+    <p><strong>Neues lokales Passwort</strong><br><span>Jetzt in einem Passwortmanager sichern:</span></p>
+    <code id="password-recovery-output" class="claim-output password-recovery-output"></code>
+    <div class="password-recovery-confirmation-action">
+      <button id="password-recovery-clear" class="auth-button secondary" type="button" disabled>Passwort gesichert – Anzeige löschen</button>
+    </div>
+  </div>
+</section>
+
 </main>
   </div>
   <script src="config.js"></script>
@@ -310,8 +349,8 @@
   <script src="js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260904-history-split1"></script>
-  <script src="js/app.js?v=20260904-history-split1"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260907-adapter-info1"></script>
+  <script src="js/app.js?v=20260907-password-recovery1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260904-history-split1"></script>

@@ -9,6 +9,7 @@
 
 #include "telemetry/telemetry.h"
 #include "system/device_id.h"
+#include "system/version.h"
 #include "../gps/wroom_gps.h"
 
 #ifdef MOT_AWS_IOT
@@ -22,7 +23,10 @@ static MotAwsRuntime awsRuntime()
     MotAwsRuntime runtime;
     runtime.deviceId = motDeviceId();
     runtime.deviceName = config.deviceName;
+    runtime.board = MOT_BOARD;
     runtime.firmwareVersion = telemetry.system.firmwareVersion;
+    runtime.can1Profile = decoderProfileKey(config.can1Profile);
+    runtime.can2Profile = decoderProfileKey(config.can2Profile);
     runtime.networkMode = networkModeName();
     runtime.transport = "WiFi";
     runtime.ipAddress = networkIp();

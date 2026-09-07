@@ -90,6 +90,28 @@
     } finally { setBusy(false); }
   }
 
+  async function changePasswordRecoveryAccess(revoke = false) {
+    if (busy) return;
+    const username = String($('admin-password-recovery-user').value || '').trim();
+    const expiresInHours = Number($('admin-password-recovery-hours').value || 24);
+    if (!username) {
+      $('admin-password-recovery-status').textContent = 'Bitte Benutzer-E-Mail eingeben.';
+      return;
+    }
+    $('admin-password-recovery-status').textContent = revoke ? 'Freigabe wird entzogen…' : 'Freigabe wird erstellt…';
+    setBusy(true);
+    try {
+      const path = revoke ? '/api/password-recovery/grants/revoke' : '/api/password-recovery/grants';
+      const body = revoke ? { username } : { username, expiresInHours };
+      const result = await request(path, body);
+      $('admin-password-recovery-status').textContent = revoke
+        ? `Passwort-Recovery-Freigabe für ${username} entzogen.`
+        : `Passwort-Recovery für ${username} bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())} freigegeben.`;
+    } catch (error) {
+      $('admin-password-recovery-status').textContent = error.message || (revoke ? 'Freigabe konnte nicht entzogen werden.' : 'Freigabe fehlgeschlagen.');
+    } finally { setBusy(false); }
+  }
+
   async function bootstrap() {
     if (!auth?.isConfigured()) {
       showAccess('signed-out', 'Cognito ist nicht vollständig konfiguriert.');
@@ -121,5 +143,10 @@
     changeFirmwareAccess(false);
   });
   $('admin-firmware-revoke')?.addEventListener('click', () => changeFirmwareAccess(true));
+  $('admin-password-recovery-form')?.addEventListener('submit', event => {
+    event.preventDefault();
+    changePasswordRecoveryAccess(false);
+  });
+  $('admin-password-recovery-revoke')?.addEventListener('click', () => changePasswordRecoveryAccess(true));
   bootstrap().catch(error => showAccess('denied', error.message || 'Administration konnte nicht geladen werden.'));
 })();

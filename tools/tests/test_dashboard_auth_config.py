@@ -67,12 +67,12 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260904-history-split1", source)
-        self.assertIn("app.js?v=20260904-history-split1", source)
+        self.assertIn("aws-backend-provider.js?v=20260907-adapter-info1", source)
+        self.assertIn("app.js?v=20260907-password-recovery1", source)
 
 
-class DashboardMobileMapInteractionTests(unittest.TestCase):
-    def test_mobile_map_requires_deliberate_activation(self) -> None:
+class DashboardTouchMapInteractionTests(unittest.TestCase):
+    def test_touch_map_requires_deliberate_activation_independent_of_layout(self) -> None:
         html = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
         css = (ROOT / "build/dashboard/current/css/location-map.css").read_text(encoding="utf-8")
         app = (ROOT / "build/dashboard/current/js/app.js").read_text(encoding="utf-8")
@@ -80,13 +80,17 @@ class DashboardMobileMapInteractionTests(unittest.TestCase):
         self.assertIn('id="location-map-interaction"', html)
         self.assertIn('id="location-map-activate"', html)
         self.assertIn('aria-pressed="false"', html)
-        self.assertIn("@media (max-width:900px)", css)
-        self.assertIn(".location-map-interaction:not(.is-interactive) .location-map-frame", css)
+        self.assertIn(".location-map-interaction.requires-activation:not(.is-interactive) .location-map-frame", css)
+        self.assertIn(".location-map-interaction.requires-activation .location-map-activate", css)
         self.assertIn("pointer-events:none", css)
+        self.assertNotIn("@media (max-width:900px)", css)
         self.assertIn("function setLocationMapInteractive(active)", app)
+        self.assertIn("function syncLocationMapInputMode()", app)
+        self.assertIn("'(pointer: coarse), (hover: none)'", app)
+        self.assertIn("'requires-activation'", app)
         self.assertIn("!interaction.contains(event.target)", app)
-        self.assertIn("mobileMapQuery.addEventListener('change', resetInteraction)", app)
-        self.assertIn("mobileMapQuery.addListener?.(resetInteraction)", app)
+        self.assertIn("protectedMapInputQuery.addEventListener('change', syncLocationMapInputMode)", app)
+        self.assertIn("protectedMapInputQuery.addListener?.(syncLocationMapInputMode)", app)
 
 
 class DashboardNotificationSettingsTests(unittest.TestCase):
@@ -169,6 +173,34 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn("email.dataset.confirmedEmail", app)
         self.assertIn("help.hidden = stillConfirmed", app)
         self.assertIn("addEventListener('input', updateEmailConfirmationHelp)", app)
+
+
+class DashboardAdapterInformationTests(unittest.TestCase):
+    def test_settings_loads_rev17_adapter_state_for_selected_vehicle(self) -> None:
+        html = (ROOT / "build/dashboard/current/settings/index.html").read_text(encoding="utf-8")
+        app = (ROOT / "build/dashboard/current/js/settings.js").read_text(encoding="utf-8")
+        provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text(encoding="utf-8")
+        css = (ROOT / "build/dashboard/current/css/dashboard.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="adapter-information"', html)
+        self.assertIn('id="adapter-device-id"', html)
+        self.assertIn('id="adapter-board"', html)
+        self.assertIn('id="adapter-firmware"', html)
+        self.assertIn('id="adapter-can1"', html)
+        self.assertIn('id="adapter-can2"', html)
+        self.assertIn('id="adapter-ip-address"', html)
+        self.assertGreater(html.index('id="adapter-information"'), html.index('id="notification-form"'))
+        self.assertIn(".settings-page #adapter-information{order:2}", css)
+        self.assertIn("async getSnapshot()", provider)
+        self.assertIn("/snapshot`);", provider)
+        self.assertIn("system/device_id", app)
+        self.assertIn("system/board", app)
+        self.assertIn("system/firmware_version", app)
+        self.assertIn("system/can1_profile", app)
+        self.assertIn("system/can2_profile", app)
+        self.assertIn("system/ip_address", app)
+        self.assertIn("Promise.all([loadPreferences(), loadAdapterInformation()])", app)
+        self.assertIn("renderAdapterInformation(null", app)
 
     def test_sms_save_captures_opt_in_before_busy_render_and_hides_code(self) -> None:
         app = (ROOT / "build/dashboard/current/js/settings.js").read_text(encoding="utf-8")

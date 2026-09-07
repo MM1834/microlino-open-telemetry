@@ -17,7 +17,7 @@ It is a static, dependency-free website intended for the root of
 `https://www.microlino-open-telemetry.ch/`. The authenticated portal remains a
 separate application at `/dashboard/`.
 
-The current repository revision adds a persisted German, English and French
+The current repository revision adds a persisted German, English, French and Italian
 language selector and a dedicated interactive page at `/onboarding/`. The diagram
 distinguishes vehicle-to-adapter OBD-II/CAN and optional USB-C power, local AP
 access, direct access through the Home/Mobile-WiFi IP and normal user access to

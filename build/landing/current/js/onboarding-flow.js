@@ -28,6 +28,11 @@
       "1": "Phase 1 : Utilisateur → Internet → portail MOT. L’adaptateur peut encore être éteint.",
       "2": "Phase 2 : Utilisateur → AP local ou adresse IP WiFi domestique/mobile → adaptateur MOT.",
       "3": "Phase 3 : Utilisateur → portail MOT ; pour les réglages ultérieurs aussi directement → adresse IP locale de l’adaptateur."
+    },
+    it: {
+      "1": "Fase 1: Utente → Internet → portale MOT. L’adattatore può essere ancora spento.",
+      "2": "Fase 2: Utente → AP locale o indirizzo IP WiFi domestico/mobile → adattatore MOT.",
+      "3": "Fase 3: Utente → portale MOT; per le impostazioni successive anche direttamente → indirizzo IP locale dell’adattatore."
     }
   };
 

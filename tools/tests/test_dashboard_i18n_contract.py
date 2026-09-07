@@ -12,23 +12,25 @@ HISTORY = (ROOT / "build/dashboard/current/js/history/history-chart.js").read_te
 
 class DashboardI18nContractTests(unittest.TestCase):
     def test_german_is_stable_default_and_fallback(self):
-        self.assertIn("const SUPPORTED = ['de', 'en', 'fr'];", I18N)
+        self.assertIn("const SUPPORTED = ['de', 'en', 'fr', 'it'];", I18N)
         self.assertIn("[stored, configured, 'de']", I18N)
         self.assertIn("<html lang=\"de\">", INDEX)
 
     def test_language_selector_and_catalog_are_loaded(self):
-        self.assertIn('src="js/i18n.js?v=20260903-settings-page1"', INDEX)
+        self.assertIn('src="js/i18n.js?v=20260907-password-recovery1"', INDEX)
         self.assertIn('id="dashboard-language"', INDEX)
-        for language in ("de", "en", "fr"):
+        for language in ("de", "en", "fr", "it"):
             self.assertIn(f'<option value="{language}">', INDEX)
 
-    def test_english_and_french_cover_all_catalog_keys(self):
-        blocks = re.search(r"const en = \{(.*?)\n  \};\n\n  const fr = \{(.*?)\n  \};", I18N, re.S)
+    def test_all_translations_cover_the_same_catalog_keys(self):
+        blocks = re.search(r"const en = \{(.*?)\n  \};\n\n  const fr = \{(.*?)\n  \};\n\n  const it = \{(.*?)\n  \};", I18N, re.S)
         self.assertIsNotNone(blocks)
         key_pattern = re.compile(r"'((?:[^'\\]|\\.)*)'\s*:")
         english = set(key_pattern.findall(blocks.group(1)))
         french = set(key_pattern.findall(blocks.group(2)))
+        italian = set(key_pattern.findall(blocks.group(3)))
         self.assertEqual(english, french)
+        self.assertEqual(english, italian)
         self.assertGreaterEqual(len(english), 120)
 
     def test_dynamic_status_vocabulary_is_localized(self):
@@ -48,6 +50,7 @@ class DashboardI18nContractTests(unittest.TestCase):
             ".replace(/\\bvor (\\d+) min\\b/g, 'il y a $1 min')",
             ".replace(/ · bis (\\d+)%/g, ' · to $1%')",
             ".replace(/ · bis (\\d+)%/g, ' · jusqu’à $1 %')",
+            ".replace(/ · bis (\\d+)%/g, ' · fino al $1%')",
         ):
             self.assertIn(marker, I18N)
 

@@ -42,6 +42,23 @@ class WebflashBackendContractTests(unittest.TestCase):
             self.assertIn(route, TEMPLATE)
         self.assertGreaterEqual(TEMPLATE.count("AuthorizationType: JWT"), 7)
 
+    def test_every_password_recovery_route_requires_the_jwt_authorizer(self):
+        for route in (
+            "POST /api/password-recovery/grants",
+            "POST /api/password-recovery/grants/revoke",
+            "GET /api/password-recovery/access",
+            "POST /api/password-recovery/start",
+            "POST /api/password-recovery/result",
+        ):
+            self.assertIn(f'RouteKey: "{route}"', TEMPLATE)
+        self.assertGreaterEqual(TEMPLATE.count("AuthorizationType: JWT"), 12)
+
+    def test_password_recovery_is_a_separate_expiring_action_without_secret_audit(self):
+        self.assertIn('PASSWORD_RECOVERY_TARGET = "local-admin-password"', HANDLER)
+        self.assertIn('"PASSWORD_RECOVERY_GRANT_CREATED"', HANDLER)
+        self.assertIn('"PASSWORD_RECOVERY_AUTHORIZED"', HANDLER)
+        self.assertNotIn('body.get("password"', HANDLER)
+
     def test_download_is_short_lived_and_release_is_supported_c6_application_only(self):
         self.assertIn("MaxValue: 300", TEMPLATE)
         self.assertIn('AllowedValues: [nanoesp32c6-n16, xiao-esp32c6]', TEMPLATE)

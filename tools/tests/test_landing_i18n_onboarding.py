@@ -20,6 +20,7 @@ class LandingI18nOnboardingTests(unittest.TestCase):
         self.assertIn('<option value="de">DE</option>', HTML)
         self.assertIn('<option value="en">EN</option>', HTML)
         self.assertIn('<option value="fr">FR</option>', HTML)
+        self.assertIn('<option value="it">IT</option>', HTML)
         self.assertIn('href="onboarding/"', HOME_HTML)
         self.assertNotIn('data-flow-part="vehicle"', HOME_HTML)
         self.assertIn('src="../js/i18n.js?v=', ONBOARDING_HTML)
@@ -27,12 +28,12 @@ class LandingI18nOnboardingTests(unittest.TestCase):
         self.assertIn('href="../css/site.css?v=', ONBOARDING_HTML)
         self.assertNotIn("https://", I18N + FLOW)
 
-    def test_every_translation_key_exists_in_all_three_languages(self):
+    def test_every_translation_key_exists_in_all_four_languages(self):
         keys = set(re.findall(r'data-i18n(?:-aria-label|-alt)?="([A-Za-z0-9]+)"', HTML))
         self.assertGreater(len(keys), 70)
         for key in keys:
             with self.subTest(key=key):
-                self.assertGreaterEqual(I18N.count(f"{key}:"), 3)
+                self.assertGreaterEqual(I18N.count(f"{key}:"), 4)
 
     def test_onboarding_flow_keeps_user_centered_and_portal_on_right(self):
         self.assertIn("grid-template-columns: minmax(0,1.05fr)", CSS)
@@ -58,7 +59,7 @@ class LandingI18nOnboardingTests(unittest.TestCase):
         self.assertIn("activeAccess", FLOW)
         self.assertIn("aria-pressed", FLOW)
         self.assertIn("mot-language-change", FLOW)
-        for language in ('de:', 'en:', 'fr:'):
+        for language in ('de:', 'en:', 'fr:', 'it:'):
             self.assertIn(language, FLOW)
 
 

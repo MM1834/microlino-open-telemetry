@@ -25,7 +25,7 @@ class OnboardingTemplateTests(unittest.TestCase):
     def test_all_routes_require_jwt_and_api_is_throttled(self):
         self.assertIn('RouteKey: "POST /api/onboarding/claims"', TEMPLATE)
         self.assertIn('RouteKey: "POST /api/onboarding/claim"', TEMPLATE)
-        self.assertEqual(7, TEMPLATE.count("AuthorizationType: JWT"))
+        self.assertEqual(12, TEMPLATE.count("AuthorizationType: JWT"))
         self.assertIn("ThrottlingRateLimit: 2", TEMPLATE)
         self.assertNotIn("AllowOrigins: ['*']", TEMPLATE)
 

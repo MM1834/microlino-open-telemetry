@@ -88,16 +88,46 @@ order and stale Display-CAN fallback cannot overwrite them.
 
 ## Standard-CAN profiles
 
-`standard-can-v1-pioneer` decodes the physically confirmed `0x18D` pack voltage,
+### Vehicle-generation and profile-selection boundary
+
+Field evidence now shows that battery capacity is not a reliable decoder-profile
+selector. A second vehicle from the newer generation requires
+`standard-can-v2` despite having the small battery. At the same time, there are
+non-Pioneer vehicles with the medium battery whose Standard-CAN behaviour still
+matches the first-generation/Pioneer V1 decoder. The current working hypothesis
+is that the transition may correlate with model year 2023, but this is not yet
+confirmed and must not be automated.
+
+Until the manufacturer provides an authoritative discriminator, profile selection
+remains an explicit commissioning decision verified against plausible live data.
+AWS builds publish the configured stable decoder keys as retained
+`system/can1_profile` and `system/can2_profile` birth state. This makes remote
+diagnosis possible without adding the fields to the live dashboard; the generic
+AWS State ingestion stores them alongside `system/firmware_version`.
+The project must clarify whether the generation can be identified reliably from
+one or more of:
+
+- VIN/chassis-number ranges;
+- type approval or type-certificate data;
+- production/model year;
+- motor-controller generation;
+- BMS hardware or software generation;
+- a stable identification frame on Standard CAN.
+
+The preferred result is a deterministic vehicle identifier or passive CAN signal,
+not inference from battery size, marketing range or the Pioneer badge.
+
+`standard-can-v1-pioneer-gen1-midrange` decodes the physically confirmed `0x18D` pack voltage,
 current scale, derived power and plug/charge states. It also exposes the observed
 but still provisional `0x4AD` cell pair. Pioneer-only `0x48D data[6]` is exposed
 as the internal SOC candidate `bms/soc_internal`; `data[7]` is exposed separately
 as `bms/soc_display` after matching the visible SOC through controlled driving,
 rest and charging. Neither replaces the canonical Display-CAN `display/soc`.
 `standard-can-v2` is now an independent
-large-battery decoder based on the recovered source workbook and a 16,675-frame
-capture from that vehicle generation. It does not reuse the Pioneer `0x18D` or
-`0x4AD` layout.
+new-generation decoder based on the recovered source workbook and a 16,675-frame
+capture initially obtained from a large-battery vehicle. A second new-generation
+small-battery vehicle has since confirmed that V2 is not specific to the large
+battery. It does not reuse the Pioneer `0x18D` or `0x4AD` layout.
 
 | CAN ID | Standard-CAN V2 large-battery values | Evidence status |
 |---:|---|---|

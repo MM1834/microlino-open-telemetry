@@ -270,6 +270,11 @@
         return Array.isArray(result) ? result : (result.vehicles || []);
       },
 
+      async getSnapshot() {
+        if (!activeVehicleId) return { vehicleId: null, values: {}, metadata: {} };
+        return get(`/api/vehicles/${encodeURIComponent(activeVehicleId)}/snapshot`);
+      },
+
       getSelectedVehicleId() { return activeVehicleId; },
 
       async claimVehicle(claim) {
@@ -303,6 +308,18 @@
 
       async revokeFirmware(username, target) {
         return firmwareRequest('/api/firmware/grants/revoke', 'POST', { username, target });
+      },
+
+      async getPasswordRecoveryAccess() {
+        return firmwareRequest('/api/password-recovery/access');
+      },
+
+      async authorizePasswordRecovery() {
+        return firmwareRequest('/api/password-recovery/start', 'POST', {});
+      },
+
+      async reportPasswordRecoveryResult(operationId, result) {
+        return firmwareRequest('/api/password-recovery/result', 'POST', { operationId, result });
       },
 
       async getNotificationPreferences() {

@@ -28,6 +28,9 @@
     firmwareAccess: null,
     firmwareFlasher: null,
     firmwareBusy: false,
+    passwordRecoveryAccess: null,
+    passwordRecovery: null,
+    passwordRecoveryBusy: false,
     notificationBusy: false,
     notificationVehicleId: null,
     notificationReadOnly: false,
@@ -192,6 +195,86 @@
       state.firmwareAccess = null;
       renderFirmwareAccess();
     }
+  }
+
+  function setPasswordRecoveryStatus(message, level = 'info') {
+    const status = $('password-recovery-status');
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.level = level;
+  }
+
+  function renderPasswordRecoveryAccess(message = '') {
+    const panel = $('password-recovery');
+    const authorized = state.passwordRecoveryAccess?.authorized === true;
+    if (!panel) return;
+    panel.hidden = !authorized;
+    if (!authorized) return;
+    $('password-recovery-expiry').textContent = new Date(
+      state.passwordRecoveryAccess.expiresAt * 1000
+    ).toLocaleString(activeLocale());
+    const supported = Boolean(state.passwordRecovery?.supported());
+    $('password-recovery-browser-warning').hidden = supported;
+    $('password-recovery-confirm').disabled = state.passwordRecoveryBusy;
+    $('password-recovery-start').disabled = state.passwordRecoveryBusy
+      || !supported || !$('password-recovery-confirm').checked;
+    if (message) setPasswordRecoveryStatus(message);
+  }
+
+  async function loadPasswordRecoveryAccess() {
+    if (!state.dataProvider?.getPasswordRecoveryAccess) return;
+    try {
+      state.passwordRecoveryAccess = await state.dataProvider.getPasswordRecoveryAccess();
+      if (!state.passwordRecoveryAccess?.authorized) {
+        renderPasswordRecoveryAccess();
+        return;
+      }
+      const module = await import('./firmware/password-recovery.js?v=20260907-password-recovery1');
+      state.passwordRecovery = module.createPasswordRecovery({
+        onStatus: setPasswordRecoveryStatus,
+        onPassword: password => {
+          const output = $('password-recovery-output');
+          output.textContent = password;
+          $('password-recovery-result').hidden = false;
+          $('password-recovery-clear').disabled = false;
+        }
+      });
+      renderPasswordRecoveryAccess();
+    } catch (error) {
+      console.error('Password recovery access failed:', error);
+      state.passwordRecoveryAccess = null;
+      renderPasswordRecoveryAccess();
+    }
+  }
+
+  async function recoverLocalPassword() {
+    if (state.passwordRecoveryBusy || !state.passwordRecovery
+      || !$('password-recovery-confirm').checked) return;
+    state.passwordRecoveryBusy = true;
+    $('password-recovery-output').textContent = '';
+    $('password-recovery-result').hidden = true;
+    $('password-recovery-clear').disabled = true;
+    renderPasswordRecoveryAccess();
+    try {
+      await state.passwordRecovery.recover({
+        authorize: () => state.dataProvider.authorizePasswordRecovery(),
+        reportResult: (operationId, result) => state.dataProvider.reportPasswordRecoveryResult(operationId, result)
+      });
+      $('password-recovery-confirm').checked = false;
+    } catch (error) {
+      console.error('Password recovery failed:', error?.message || error);
+    } finally {
+      state.passwordRecoveryBusy = false;
+      renderPasswordRecoveryAccess();
+    }
+  }
+
+  function clearRecoveredPassword() {
+    const output = $('password-recovery-output');
+    output.textContent = '';
+    $('password-recovery-result').hidden = true;
+    $('password-recovery-clear').disabled = true;
+    setPasswordRecoveryStatus('Passwortanzeige wurde geleert.');
   }
 
   async function connectFirmwareAdapter() {
@@ -896,14 +979,21 @@
     if (link) link.href = href;
   }
 
-  const mobileMapQuery = window.matchMedia('(max-width: 900px)');
+  const protectedMapInputQuery = window.matchMedia('(pointer: coarse), (hover: none)');
+
+  function syncLocationMapInputMode() {
+    const interaction = $('location-map-interaction');
+    if (!interaction) return;
+    interaction.classList.toggle('requires-activation', protectedMapInputQuery.matches);
+    setLocationMapInteractive(false);
+  }
 
   function setLocationMapInteractive(active) {
     const interaction = $('location-map-interaction');
     const button = $('location-map-activate');
     if (!interaction || !button) return;
 
-    const enabled = Boolean(active && mobileMapQuery.matches);
+    const enabled = Boolean(active && protectedMapInputQuery.matches);
     interaction.classList.toggle('is-interactive', enabled);
     button.setAttribute('aria-pressed', String(enabled));
     button.textContent = enabled ? 'Seitenscrollen' : 'Karte bedienen';
@@ -924,13 +1014,12 @@
         setLocationMapInteractive(false);
       }
     });
-    const resetInteraction = () => setLocationMapInteractive(false);
-    if (typeof mobileMapQuery.addEventListener === 'function') {
-      mobileMapQuery.addEventListener('change', resetInteraction);
+    if (typeof protectedMapInputQuery.addEventListener === 'function') {
+      protectedMapInputQuery.addEventListener('change', syncLocationMapInputMode);
     } else {
-      mobileMapQuery.addListener?.(resetInteraction);
+      protectedMapInputQuery.addListener?.(syncLocationMapInputMode);
     }
-    setLocationMapInteractive(false);
+    syncLocationMapInputMode();
   }
 
   function updateCoords(source = 'mqtt') {
@@ -1393,6 +1482,9 @@ function startDataProvider() {
   $('firmware-connect')?.addEventListener('click', connectFirmwareAdapter);
   $('firmware-confirm')?.addEventListener('change', updateFirmwareConfirmation);
   $('firmware-flash')?.addEventListener('click', flashFirmware);
+  $('password-recovery-confirm')?.addEventListener('change', () => renderPasswordRecoveryAccess());
+  $('password-recovery-start')?.addEventListener('click', recoverLocalPassword);
+  $('password-recovery-clear')?.addEventListener('click', clearRecoveredPassword);
   $('notification-form')?.addEventListener('submit', saveNotificationPreferences);
   $('notification-email')?.addEventListener('input', updateEmailConfirmationHelp);
   $('notification-sms-request')?.addEventListener('click', requestSmsVerification);
@@ -1426,7 +1518,7 @@ function startDataProvider() {
     }
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();
-    await loadFirmwareAccess();
+    await Promise.all([loadFirmwareAccess(), loadPasswordRecoveryAccess()]);
   }
 
   bootstrap().catch(error => {

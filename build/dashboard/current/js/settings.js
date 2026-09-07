@@ -15,6 +15,7 @@
   function showAccess(mode, message = '') {
     const authorized = mode === 'authorized';
     $('settings').hidden = !authorized;
+    $('adapter-information').hidden = !authorized;
     $('settings-denied').hidden = authorized;
     $('settings-login').hidden = mode !== 'signed-out';
     $('settings-logout').hidden = mode === 'signed-out';
@@ -24,6 +25,34 @@
       link.hidden = !(authorized && auth?.hasGroup?.('mot-beta-admins'));
     });
     if (message) $('settings-denied-message').textContent = message;
+  }
+
+  function snapshotValue(snapshot, key) {
+    const value = snapshot?.values?.[key];
+    if (value === null || value === undefined || String(value).trim() === '') return '--';
+    return String(value);
+  }
+
+  function renderAdapterInformation(snapshot = null, message = '') {
+    $('adapter-device-id').textContent = snapshotValue(snapshot, 'system/device_id');
+    $('adapter-board').textContent = snapshotValue(snapshot, 'system/board');
+    $('adapter-firmware').textContent = snapshotValue(snapshot, 'system/firmware_version');
+    $('adapter-can1').textContent = snapshotValue(snapshot, 'system/can1_profile');
+    $('adapter-can2').textContent = snapshotValue(snapshot, 'system/can2_profile');
+    $('adapter-ip-address').textContent = snapshotValue(snapshot, 'system/ip_address');
+    $('adapter-information-status').textContent = message;
+  }
+
+  async function loadAdapterInformation() {
+    if (!state.provider || !state.vehicleId) return;
+    renderAdapterInformation(null, 'Adapterinformationen werden geladen…');
+    try {
+      const snapshot = await state.provider.getSnapshot();
+      if (snapshot?.vehicleId && snapshot.vehicleId !== state.vehicleId) return;
+      renderAdapterInformation(snapshot);
+    } catch (error) {
+      renderAdapterInformation(null, error.message || 'Adapterinformationen konnten nicht geladen werden.');
+    }
   }
 
   function setBusy(value) {
@@ -144,7 +173,7 @@
     state.smsStatus = null;
     $('notification-sms-phone').value = '';
     await state.provider.selectVehicle(vehicleId);
-    await loadPreferences();
+    await Promise.all([loadPreferences(), loadAdapterInformation()]);
   }
 
   function validateEmailDependencies() {
@@ -273,7 +302,7 @@
     select.value = state.vehicleId;
     await state.provider.selectVehicle(state.vehicleId);
     showAccess('authorized');
-    await loadPreferences();
+    await Promise.all([loadPreferences(), loadAdapterInformation()]);
   }
 
   $('settings-login')?.addEventListener('click', () => auth.login({ remember: false }));

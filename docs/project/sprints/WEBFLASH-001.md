@@ -105,6 +105,38 @@ occur in the application binary, preventing a recurrence. `xruser` received a
 new audited 48-hour XIAO grant for `xrpioneer2`; exact-principal access read-back
 returns only the corrected 4 MB XIAO artifact.
 
+`C6-001-REV16-AWS` remained an internal, unpublished revision: the journey fix
+had raised `MOT_REVISION`, but the application still embedded the REV15 runtime
+version and therefore could not pass the WebFlash packaging contract. It was
+never activated. The consolidated successor `C6-001-REV17-AWS` was built,
+packaged and activated on 2026-09-07 for both targets. The N16 application is
+1,439,600 bytes with SHA-256
+`7a206884b4cf029300173bee08d32a6f8b9c12224ad28a4364a29f16824e2a5f`;
+the XIAO application is 1,425,792 bytes with SHA-256
+`7ab81ba5620a6ae211e84c402e01058f457354dd98a97120a89c14693a759ad2`.
+S3 read-back reproduced both hashes and confirmed AES256 encryption. Reviewed
+replacement-free Change Set `webflash-rev17-20260907` modified only the existing
+Lambda, integration and object-key-scoped role; the stack returned to
+`UPDATE_COMPLETE`, and its parameters plus Lambda environment read back the
+exact REV17 keys, sizes and hashes. Anonymous access returns 401. An existing
+REV15 N16 grant was checked after activation and failed closed with
+`authorized:false`. No firmware grant was migrated automatically; the separate
+local-password-recovery grants are unaffected.
+
+`C6-001-REV18-AWS` was activated for both targets on 2026-09-07. It adds the
+retained `system/board` birth state and renames the V1 decoder identity to cover
+both confirmed first-generation vehicle groups. The N16 application is
+1,439,792 bytes with SHA-256
+`fa9e029e383e7734d2f9b113395646573bf4d3e7ce9792ad701be6579ed71d1d`;
+the XIAO application is 1,425,984 bytes with SHA-256
+`9c031c7743a84d40fdae6d86e2dead27a8537c81525f3d22d9986a8cd6e11391`.
+S3 download/read-back reproduced both hashes and confirmed AES256 encryption and
+versioned objects. Reviewed Change Set `webflash-rev18-20260907` modified the
+same three existing resources in place without replacement or deletion. Stack
+parameters and Lambda environment read back the exact REV18 keys, sizes and
+hashes; anonymous access returns 401 and an existing REV17 N16 grant fails closed
+with `authorized:false`.
+
 ### C — Portal flasher
 
 - **Implemented in the repository 2026-09-01:** authenticated settings card in
@@ -210,6 +242,37 @@ The maintainer additionally confirmed in the hosted portal that the unsupported-
 browser/device compatibility guard behaves as designed. The confirmed but still
 first-login-pending account `christian@reding.com` received a separate audited
 48-hour N16 grant; deployed Lambda read-back returned the exact 16 MB N16 release.
+
+## Password-recovery extension
+
+The repository now contains a separate administrator-approved local-password
+recovery flow. It deliberately does not reuse a firmware release grant: an
+administrator grants the exact portal principal the reserved
+`local-admin-password` action for 1–168 hours, and may revoke it independently.
+The authenticated portal checks that grant and records bounded authorization and
+success/failure events before and after opening Web Serial.
+
+The browser connects to the normally running adapter at 115200 baud and sends the
+existing physical `admin recover` console command. Firmware replaces only the
+`otaPass` value in NVS and returns the random replacement once over USB. The
+browser displays that secret in the Web-Flasher UI, never writes it to the
+technical/browser log and never sends it to AWS or audit data. After the user
+confirms that the password has been saved, the UI removes it from the DOM. WiFi
+profiles, CAN selection, service configuration, LittleFS AWS
+credentials and vehicle assignment remain unchanged. Because the same command is
+available to anyone with physical USB console access, USB hardware identification
+is an operational aid rather than a security boundary; the server-side grant
+controls only the supported portal workflow. The reviewed Change Set
+`webflash-password-recovery-20260907` added exactly five JWT-authorized routes
+and updated the existing Lambda/integration in place without replacement or
+deletion; stack `mot-dev-onboarding` reached `UPDATE_COMPLETE` on 2026-09-07.
+Anonymous access returns 401 and the production portal origin passes CORS
+preflight. A controlled `xruser` grant/access/start/result/revoke smoke test
+passed, ending with the test grant in `REVOKED` state. Productive portal
+acceptance then passed on 2026-09-07: the authorized UI completed a real local
+password replacement, showed the password above the saved/clear confirmation,
+and the administrator successfully revoked the grant afterwards. Function and
+GUI are accepted.
 
 ## Explicit exclusions
 

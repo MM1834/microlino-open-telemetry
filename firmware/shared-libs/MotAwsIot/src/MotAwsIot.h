@@ -21,7 +21,10 @@ struct MotAwsCredentials {
 struct MotAwsRuntime {
     String deviceId;
     String deviceName;
+    String board;
     String firmwareVersion;
+    String can1Profile;
+    String can2Profile;
     String networkMode;
     String transport = "WiFi";
     String ipAddress;

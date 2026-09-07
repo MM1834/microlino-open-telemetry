@@ -10,9 +10,9 @@ static const DecoderProfileDescriptor PROFILES[] = {
     },
     {
         DECODER_PROFILE_STANDARD_CAN_V1_PIONEER,
-        "standard-can-v1-pioneer",
-        "Standard-CAN V1 - Pioneer",
-        "Verified Pioneer BMS decoder; provisional cell pair.",
+        "standard-can-v1-pioneer-gen1-midrange",
+        "Standard-CAN V1 - Pioneer / Gen1 Mid-Range",
+        "Verified Pioneer and first-generation Mid-Range BMS decoder; provisional cell pair.",
         true
     },
     {

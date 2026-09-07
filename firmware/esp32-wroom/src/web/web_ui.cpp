@@ -326,7 +326,7 @@ static void handleConfig()
     s += "Active CAN profile<select name='can1Profile'>";
     s += profileOptions(config.can1Profile, false);
     s += "</select>";
-    s += "<p class='muted'>Display-CAN is the single-CAN default. Standard-CAN V1 - Pioneer decodes the verified battery energy-flow fields; Standard-CAN V2 uses the same provisional layout pending validation on a V2 vehicle.</p>";
+    s += "<p class='muted'>Display-CAN is the single-CAN default. Standard-CAN V1 - Pioneer / Gen1 Mid-Range decodes the verified first-generation battery energy-flow fields; Standard-CAN V2 uses the independent new-generation layout.</p>";
     s += "<input type='hidden' name='can2Profile' value='255'>";
     s += "<hr><h3>CAN 2</h3><p class='muted'>Reserved · not available on ESP32-WROOM hardware. Future multi-CAN targets can assign an independent decoder profile here.</p>";
     s += "</div>";

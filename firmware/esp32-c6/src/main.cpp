@@ -25,7 +25,8 @@ DecoderProfile parseProfile(const String &value, bool &valid)
     if (value == "display" || value == "display-can" || value == "0") {
         return DECODER_PROFILE_DISPLAY_CAN;
     }
-    if (value == "v1" || value == "standard-can-v1-pioneer" || value == "2") {
+    if (value == "v1" || value == "standard-can-v1-pioneer" ||
+        value == "standard-can-v1-pioneer-gen1-midrange" || value == "2") {
         return DECODER_PROFILE_STANDARD_CAN_V1_PIONEER;
     }
     if (value == "v2" || value == "standard-can-v2" || value == "3") {
