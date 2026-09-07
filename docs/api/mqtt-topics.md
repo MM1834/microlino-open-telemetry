@@ -86,6 +86,8 @@ current from last-known location.
 | `system/device_name` | Yes | Yes | LilyGO yes; ESP32 legacy does not publish it in current loop |
 | `system/mqtt_client_id` | Birth message | Yes plus birth | AWS birth; not common legacy contract |
 | `system/firmware_version` | Yes | Yes | LilyGO yes |
+| `system/can1_profile` | Birth message | Birth message | Stable decoder key; AWS only |
+| `system/can2_profile` | Birth message | Birth message | Stable decoder key; `disabled` when unavailable; AWS only |
 | `system/ip_address` | Yes | Yes | LilyGO yes |
 | `system/network_mode` | Yes | Yes | LilyGO yes |
 | `system/mqtt_transport` | `WiFi` | `WiFi` | LilyGO active WiFi/LTE transport |
@@ -93,8 +95,14 @@ current from last-known location.
 | `system/uptime_sec` | Yes | Yes | LilyGO yes |
 | `system/last_seen_utc` | Yes | Yes | AWS shared transport only |
 
-The shared AWS transport may publish system identity fields both during its birth
-sequence and later telemetry cycles.
+The shared AWS transport publishes the selected CAN decoder profiles together
+with the firmware identity during its retained birth sequence. Values use stable
+keys such as `standard-can-v1-pioneer`, `standard-can-v2`,
+`microlino-display-can` and `disabled`. Profile changes made through the local UI
+take effect with its configuration restart and therefore replace the retained
+AWS state on the following connection. The generic State ingestion path stores
+both suffixes without a backend schema migration. Other system identity fields
+may be published both during birth and later telemetry cycles.
 
 ## AWS presence and heartbeat
 

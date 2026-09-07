@@ -24,6 +24,8 @@ MotAwsRuntime runtime()
     value.deviceId = motDeviceId();
     value.deviceName = motHostname();
     value.firmwareVersion = MOT_VERSION;
+    value.can1Profile = decoderProfileKey(c6Config.can1Profile);
+    value.can2Profile = decoderProfileKey(c6Config.can2Profile);
     value.networkMode = "WiFi STA";
     value.transport = "WiFi";
     value.ipAddress = c6NetworkIp();

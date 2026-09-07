@@ -44,6 +44,16 @@ class C6JourneyEnergyCounterTests(unittest.TestCase):
         self.assertIn("state.journeySequence++", COUNTER)
         self.assertIn("state.bootNonce = esp_random()", COUNTER)
 
+    def test_stop_and_charging_have_distinct_authoritative_boundaries(self) -> None:
+        self.assertIn('sealJourney(nowMs, "charging")', COUNTER)
+        self.assertIn('sealJourney(nowMs, "10-minute-stop")', COUNTER)
+        stop_candidate = COUNTER.split("state.stoppedSinceMs = nowMs;", 1)[1].split(
+            "} else if", 1
+        )[0]
+        self.assertNotIn("publishPending", stop_candidate)
+        self.assertIn("telemetry.bms.plugged || telemetryIsCharging()", COUNTER)
+        self.assertIn("restartAfterPublish", COUNTER)
+
     def test_checkpoint_is_bounded_and_non_retained(self) -> None:
         self.assertIn("CHECKPOINT_MS = 60000", COUNTER)
         self.assertIn("counterIdJson += '\"';", COUNTER)

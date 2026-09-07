@@ -105,6 +105,24 @@ occur in the application binary, preventing a recurrence. `xruser` received a
 new audited 48-hour XIAO grant for `xrpioneer2`; exact-principal access read-back
 returns only the corrected 4 MB XIAO artifact.
 
+`C6-001-REV16-AWS` remained an internal, unpublished revision: the journey fix
+had raised `MOT_REVISION`, but the application still embedded the REV15 runtime
+version and therefore could not pass the WebFlash packaging contract. It was
+never activated. The consolidated successor `C6-001-REV17-AWS` was built,
+packaged and activated on 2026-09-07 for both targets. The N16 application is
+1,439,600 bytes with SHA-256
+`7a206884b4cf029300173bee08d32a6f8b9c12224ad28a4364a29f16824e2a5f`;
+the XIAO application is 1,425,792 bytes with SHA-256
+`7ab81ba5620a6ae211e84c402e01058f457354dd98a97120a89c14693a759ad2`.
+S3 read-back reproduced both hashes and confirmed AES256 encryption. Reviewed
+replacement-free Change Set `webflash-rev17-20260907` modified only the existing
+Lambda, integration and object-key-scoped role; the stack returned to
+`UPDATE_COMPLETE`, and its parameters plus Lambda environment read back the
+exact REV17 keys, sizes and hashes. Anonymous access returns 401. An existing
+REV15 N16 grant was checked after activation and failed closed with
+`authorized:false`. No firmware grant was migrated automatically; the separate
+local-password-recovery grants are unaffected.
+
 ### C — Portal flasher
 
 - **Implemented in the repository 2026-09-01:** authenticated settings card in

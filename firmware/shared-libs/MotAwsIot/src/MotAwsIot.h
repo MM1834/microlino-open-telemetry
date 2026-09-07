@@ -22,6 +22,8 @@ struct MotAwsRuntime {
     String deviceId;
     String deviceName;
     String firmwareVersion;
+    String can1Profile;
+    String can2Profile;
     String networkMode;
     String transport = "WiFi";
     String ipAddress;

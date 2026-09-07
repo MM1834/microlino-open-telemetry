@@ -55,6 +55,8 @@ The current dashboard work expects these system suffixes:
 | `system/device_name` | Human-readable name |
 | `system/mqtt_client_id` | MQTT client identifier |
 | `system/firmware_version` | Firmware release |
+| `system/can1_profile` | Stable CAN1 decoder-profile key |
+| `system/can2_profile` | Stable CAN2 decoder-profile key or `disabled` |
 | `system/ip_address` | Current interface IP |
 | `system/network_mode` | `WiFi` or `LTE` |
 | `system/mqtt_transport` | MQTT transport |

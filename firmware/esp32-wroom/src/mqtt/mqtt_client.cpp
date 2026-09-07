@@ -23,6 +23,8 @@ static MotAwsRuntime awsRuntime()
     runtime.deviceId = motDeviceId();
     runtime.deviceName = config.deviceName;
     runtime.firmwareVersion = telemetry.system.firmwareVersion;
+    runtime.can1Profile = decoderProfileKey(config.can1Profile);
+    runtime.can2Profile = decoderProfileKey(config.can2Profile);
     runtime.networkMode = networkModeName();
     runtime.transport = "WiFi";
     runtime.ipAddress = networkIp();

@@ -141,6 +141,10 @@ same topic contract as the established devices.
 On `nanoesp32c6-n16`, REV11 additionally integrates fresh Standard-CAN vehicle
 power while moving and publishes non-decreasing drawn/regenerated Wh counters.
 The counter performs no flash writes and is intentionally disabled on XIAO.
+REV17 treats a first zero-speed sample only as a stop candidate, seals after ten
+continuous stopped minutes, and seals immediately on fresh Standard-CAN plug or
+charging state. A sealed final counter is published before a later journey may
+replace its identity.
 `energy status` prints its current RAM state over the USB serial console. Missing
 or incomplete firmware evidence remains compatible with the backend telemetry
 estimate.

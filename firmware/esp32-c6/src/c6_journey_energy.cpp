@@ -23,6 +23,7 @@ struct JourneyEnergyState {
     bool moving = false;
     bool sealed = false;
     bool publishPending = false;
+    bool restartAfterPublish = false;
     uint32_t bootNonce = 0;
     uint32_t journeySequence = 0;
     uint32_t stoppedSinceMs = 0;
@@ -45,6 +46,7 @@ void startJourney(uint32_t nowMs)
     state.active = true;
     state.sealed = false;
     state.publishPending = true;
+    state.restartAfterPublish = false;
     state.journeySequence++;
     state.stoppedSinceMs = 0;
     state.lastIntegrationMs = 0;
@@ -70,6 +72,18 @@ long regenWh()
 {
     return static_cast<long>(floor(state.regenWattMs / WATT_MS_PER_WH));
 }
+
+void sealJourney(uint32_t nowMs, const char *reason)
+{
+    if (!state.active || state.sealed) return;
+    state.sealed = true;
+    state.publishPending = true;
+    state.lastIntegrationMs = 0;
+    Serial.printf(
+        "Journey energy: sealed id=%s reason=%s at=%lu ms drawn=%ld Wh regen=%ld Wh\n",
+        state.counterId, reason, static_cast<unsigned long>(nowMs),
+        drawnWh(), regenWh());
+}
 }
 
 void c6JourneyEnergySetup()
@@ -86,26 +100,41 @@ void c6JourneyEnergyLoop()
         static_cast<uint32_t>(nowMs - telemetry.display.lastUpdateMs) <= DISPLAY_FRESH_MS;
     const bool movingNow = displayFresh && isfinite(telemetry.display.speedKmh) &&
         telemetry.display.speedKmh > MOVING_SPEED_KMH;
+    const bool freshChargeState = telemetry.bms.statusLastUpdateMs != 0 &&
+        static_cast<uint32_t>(nowMs - telemetry.bms.statusLastUpdateMs) <= POWER_FRESH_MS;
+    const bool chargingBoundary = freshChargeState &&
+        (telemetry.bms.plugged || telemetryIsCharging());
 
-    if (movingNow && (!state.active || state.sealed ||
-        elapsedAtLeast(nowMs, state.stoppedSinceMs, JOURNEY_STOP_MS))) {
-        startJourney(nowMs);
+    if (state.active && !state.sealed) {
+        if (chargingBoundary) {
+            sealJourney(nowMs, "charging");
+        } else if (elapsedAtLeast(nowMs, state.stoppedSinceMs, JOURNEY_STOP_MS)) {
+            sealJourney(nowMs, "10-minute-stop");
+        }
+    }
+
+    if (movingNow && !chargingBoundary) {
+        if (!state.active) {
+            startJourney(nowMs);
+        } else if (state.sealed) {
+            if (state.publishPending) state.restartAfterPublish = true;
+            else startJourney(nowMs);
+        }
     }
 
     if (state.active && state.moving && !movingNow && state.stoppedSinceMs == 0) {
         state.stoppedSinceMs = nowMs;
         state.lastIntegrationMs = 0;
-        state.publishPending = true;
-        Serial.printf("Journey energy: stopped id=%s drawn=%ld Wh regen=%ld Wh\n",
-                      state.counterId, drawnWh(), regenWh());
-    } else if (state.active && movingNow) {
+        Serial.printf("Journey energy: stop candidate id=%s at=%lu ms\n",
+                      state.counterId, static_cast<unsigned long>(nowMs));
+    } else if (state.active && !state.sealed && movingNow) {
         state.stoppedSinceMs = 0;
     }
 
     const bool freshPower = telemetry.bms.packCurrentValid &&
         isfinite(telemetry.bms.vehiclePowerW) &&
         static_cast<uint32_t>(nowMs - telemetry.bms.packCurrentLastUpdateMs) <= POWER_FRESH_MS;
-    if (state.active && movingNow && freshPower) {
+    if (state.active && !state.sealed && movingNow && freshPower) {
         if (state.lastIntegrationMs != 0) {
             const uint32_t stepMs = static_cast<uint32_t>(nowMs - state.lastIntegrationMs);
             if (stepMs <= MAX_INTEGRATION_STEP_MS) {
@@ -119,13 +148,6 @@ void c6JourneyEnergyLoop()
         state.lastIntegrationMs = 0;
     }
 
-    const bool freshPlugState = telemetry.bms.statusLastUpdateMs != 0 &&
-        static_cast<uint32_t>(nowMs - telemetry.bms.statusLastUpdateMs) <= POWER_FRESH_MS;
-    if (state.active && !state.sealed && !movingNow &&
-        freshPlugState && telemetry.bms.plugged) {
-        state.sealed = true;
-        state.publishPending = true;
-    }
     state.moving = movingNow;
 }
 
@@ -150,6 +172,9 @@ bool c6JourneyEnergyPublish(MotAwsIotClient &client)
     if (idOk && drawnOk && regenOk) {
         state.publishPending = false;
         state.lastPublishMs = nowMs;
+        if (state.sealed && state.restartAfterPublish && state.moving) {
+            startJourney(nowMs);
+        }
     }
     return idOk || drawnOk || regenOk;
 }

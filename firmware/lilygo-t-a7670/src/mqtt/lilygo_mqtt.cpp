@@ -122,6 +122,8 @@ static MotAwsRuntime awsRuntime()
     runtime.deviceId = lilygoDeviceName();
     runtime.deviceName = lilygoDeviceName();
     runtime.firmwareVersion = telemetry.system.firmwareVersion;
+    runtime.can1Profile = decoderProfileKey(config.canProfile);
+    runtime.can2Profile = decoderProfileKey(config.can2Profile);
     runtime.networkMode = lilygoNetworkModeName();
     runtime.transport = awsTransportName(activeAwsTransport);
     runtime.ipAddress = lilygoNetworkIp();
