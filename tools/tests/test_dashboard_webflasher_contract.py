@@ -79,7 +79,8 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertNotIn('id="settings"', html)
         self.assertIn('href="settings/"', html)
         self.assertIn("#firmware-flasher{order:71;width:100%}", css)
-        self.assertIn("dashboard.css?v=20260903-settings-page1", html)
+        self.assertIn("#password-recovery{order:72;width:100%}", css)
+        self.assertIn("dashboard.css?v=20260907-password-recovery2", html)
 
     def test_esptool_is_vendored_with_license(self) -> None:
         bundle = DASHBOARD / "vendor/esptool-js/bundle-0.6.0.js"
@@ -87,6 +88,30 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertTrue(bundle.is_file())
         self.assertTrue(license_file.is_file())
         self.assertIn("Apache License", license_file.read_text(encoding="utf-8"))
+
+    def test_password_recovery_has_separate_admin_grant_and_local_serial_flow(self) -> None:
+        html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        admin_html = (DASHBOARD / "administration/index.html").read_text(encoding="utf-8")
+        admin_js = (DASHBOARD / "js/administration.js").read_text(encoding="utf-8")
+        provider = (DASHBOARD / "js/providers/aws-backend-provider.js").read_text(encoding="utf-8")
+        recovery = (DASHBOARD / "js/firmware/password-recovery.js").read_text(encoding="utf-8")
+        self.assertIn('id="password-recovery"', html)
+        self.assertIn('id="admin-password-recovery-form"', admin_html)
+        self.assertIn("'/api/password-recovery/grants'", admin_js)
+        self.assertIn("'/api/password-recovery/grants/revoke'", admin_js)
+        for path in (
+            "/api/password-recovery/access", "/api/password-recovery/start",
+            "/api/password-recovery/result",
+        ):
+            self.assertIn(path, provider)
+        self.assertIn("const RECOVERY_COMMAND = 'admin recover'", recovery)
+        self.assertIn("const BAUD_RATE = 115200", recovery)
+        self.assertIn("NEW LOCAL ADMIN PASSWORD:", recovery)
+        self.assertNotIn("console.log", recovery)
+        self.assertIn('id="password-recovery-result" hidden', html)
+        self.assertLess(html.index('id="password-recovery-output"'), html.index('id="password-recovery-clear"'))
+        self.assertIn("output.textContent = password", (DASHBOARD / "js/app.js").read_text(encoding="utf-8"))
+        self.assertIn("$('password-recovery-result').hidden = true", (DASHBOARD / "js/app.js").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

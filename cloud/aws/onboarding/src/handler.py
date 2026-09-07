@@ -60,6 +60,7 @@ serializer = TypeSerializer()
 VEHICLE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 CLAIM_PART_RE = re.compile(r"^[A-Za-z0-9_-]{22,64}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+PASSWORD_RECOVERY_TARGET = "local-admin-password"
 
 
 def _json(status: int, body: dict) -> dict:
@@ -349,6 +350,129 @@ def firmware_result(event: dict, claims: dict) -> dict:
     return _json(200, {"status": "recorded"})
 
 
+def _password_recovery_grant(user_sub: str) -> dict:
+    return _firmware_grant(user_sub, PASSWORD_RECOVERY_TARGET)
+
+
+def _active_password_recovery_grant(user_sub: str, now: int) -> dict:
+    grant = _password_recovery_grant(user_sub)
+    if (
+        grant.get("status") == "ACTIVE"
+        and grant.get("action") == PASSWORD_RECOVERY_TARGET
+        and int(grant.get("expiresAt", 0)) > now
+    ):
+        return grant
+    return {}
+
+
+def password_recovery_grant(event: dict, claims: dict) -> dict:
+    if ADMIN_GROUP not in _groups(claims):
+        return _json(403, {"error": "forbidden"})
+    body = _body(event)
+    username = str(body.get("username", "")).strip()
+    hours = body.get("expiresInHours", 24)
+    if not isinstance(hours, int) or isinstance(hours, bool) or not 1 <= hours <= 168:
+        return _json(400, {"error": "invalid_request"})
+    user_sub = _resolve_user_sub(username)
+    if not user_sub:
+        return _json(404, {"error": "user_not_found"})
+    now = int(time.time())
+    expires_at = now + hours * 3600
+    item = {
+        "schemaVersion": 1, "userSub": user_sub,
+        "target": PASSWORD_RECOVERY_TARGET, "action": PASSWORD_RECOVERY_TARGET,
+        "status": "ACTIVE", "grantedAt": now,
+        "grantedBySub": claims["sub"], "expiresAt": expires_at,
+        "ttl": expires_at + 86400,
+    }
+    audit = _audit(
+        f"password-recovery#{user_sub}", "PASSWORD_RECOVERY_GRANT_CREATED", now,
+        actorType="ADMIN", actorSub=claims["sub"], expiresAt=expires_at,
+    )
+    ddb_client.transact_write_items(TransactItems=[
+        {"Put": {"TableName": FIRMWARE_GRANTS_TABLE, "Item": _ddb(item)}},
+        {"Put": {"TableName": AUDIT_TABLE, "Item": _ddb(audit),
+                 "ConditionExpression": "attribute_not_exists(entityId) AND attribute_not_exists(eventKey)"}},
+    ])
+    return _json(200, {"status": "ACTIVE", "expiresAt": expires_at})
+
+
+def password_recovery_revoke(event: dict, claims: dict) -> dict:
+    if ADMIN_GROUP not in _groups(claims):
+        return _json(403, {"error": "forbidden"})
+    username = str(_body(event).get("username", "")).strip()
+    user_sub = _resolve_user_sub(username)
+    if not user_sub:
+        return _json(404, {"error": "user_not_found"})
+    now = int(time.time())
+    audit = _audit(
+        f"password-recovery#{user_sub}", "PASSWORD_RECOVERY_GRANT_REVOKED", now,
+        actorType="ADMIN", actorSub=claims["sub"],
+    )
+    try:
+        ddb_client.transact_write_items(TransactItems=[
+            {"Update": {
+                "TableName": FIRMWARE_GRANTS_TABLE,
+                "Key": _ddb({"userSub": user_sub, "target": PASSWORD_RECOVERY_TARGET}),
+                "UpdateExpression": "SET #s=:revoked, revokedAt=:now, revokedBySub=:actor",
+                "ConditionExpression": "attribute_exists(userSub)",
+                "ExpressionAttributeNames": {"#s": "status"},
+                "ExpressionAttributeValues": _ddb({
+                    ":revoked": "REVOKED", ":now": now, ":actor": claims["sub"],
+                }),
+            }},
+            {"Put": {"TableName": AUDIT_TABLE, "Item": _ddb(audit),
+                     "ConditionExpression": "attribute_not_exists(entityId) AND attribute_not_exists(eventKey)"}},
+        ])
+    except ClientError:
+        return _json(404, {"error": "grant_not_found"})
+    return _json(200, {"status": "REVOKED"})
+
+
+def password_recovery_access(claims: dict) -> dict:
+    grant = _active_password_recovery_grant(str(claims["sub"]), int(time.time()))
+    if not grant:
+        return _json(200, {"authorized": False})
+    return _json(200, {
+        "authorized": True, "expiresAt": int(grant["expiresAt"]),
+        "action": PASSWORD_RECOVERY_TARGET,
+    })
+
+
+def password_recovery_start(claims: dict) -> dict:
+    now = int(time.time())
+    if not _active_password_recovery_grant(str(claims["sub"]), now):
+        return _json(403, {"error": "password_recovery_not_authorized"})
+    operation_id = secrets.token_urlsafe(18)
+    audit = _audit(
+        f"password-recovery#{claims['sub']}", "PASSWORD_RECOVERY_AUTHORIZED", now,
+        actorSub=claims["sub"], operationId=operation_id,
+    )
+    ddb_client.transact_write_items(TransactItems=[
+        {"Put": {"TableName": AUDIT_TABLE, "Item": _ddb(audit),
+                 "ConditionExpression": "attribute_not_exists(entityId) AND attribute_not_exists(eventKey)"}},
+    ])
+    return _json(200, {"operationId": operation_id})
+
+
+def password_recovery_result(event: dict, claims: dict) -> dict:
+    body = _body(event)
+    operation_id = str(body.get("operationId", ""))
+    result = str(body.get("result", ""))
+    if not CLAIM_PART_RE.fullmatch(operation_id) or result not in {"SUCCEEDED", "FAILED"}:
+        return _json(400, {"error": "invalid_request"})
+    now = int(time.time())
+    audit = _audit(
+        f"password-recovery#{claims['sub']}", f"PASSWORD_RECOVERY_{result}", now,
+        actorSub=claims["sub"], operationId=operation_id, result=result,
+    )
+    ddb_client.transact_write_items(TransactItems=[
+        {"Put": {"TableName": AUDIT_TABLE, "Item": _ddb(audit),
+                 "ConditionExpression": "attribute_not_exists(entityId) AND attribute_not_exists(eventKey)"}},
+    ])
+    return _json(200, {"status": "recorded"})
+
+
 def issue_claim(event: dict, claims: dict) -> dict:
     if ADMIN_GROUP not in _groups(claims):
         return _json(403, {"error": "forbidden"})
@@ -518,4 +642,14 @@ def handler(event: dict, _context) -> dict:
         return firmware_download(claims)
     if route == "POST /api/firmware/result":
         return firmware_result(event, claims)
+    if route == "POST /api/password-recovery/grants":
+        return password_recovery_grant(event, claims)
+    if route == "POST /api/password-recovery/grants/revoke":
+        return password_recovery_revoke(event, claims)
+    if route == "GET /api/password-recovery/access":
+        return password_recovery_access(claims)
+    if route == "POST /api/password-recovery/start":
+        return password_recovery_start(claims)
+    if route == "POST /api/password-recovery/result":
+        return password_recovery_result(event, claims)
     return _json(404, {"error": "not_found"})

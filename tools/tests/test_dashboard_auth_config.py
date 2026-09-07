@@ -67,8 +67,8 @@ class DashboardRevocationTests(unittest.TestCase):
 
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
-        self.assertIn("aws-backend-provider.js?v=20260904-history-split1", source)
-        self.assertIn("app.js?v=20260904-history-split1", source)
+        self.assertIn("aws-backend-provider.js?v=20260907-password-recovery1", source)
+        self.assertIn("app.js?v=20260907-password-recovery1", source)
 
 
 class DashboardMobileMapInteractionTests(unittest.TestCase):

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07111f" />
   <title>MOT Administration</title>
   <link rel="stylesheet" href="../css/dashboard.css?v=20260903-settings-page1" />
-  <script src="../js/i18n.js?v=20260903-settings-page1"></script>
+  <script src="../js/i18n.js?v=20260907-password-recovery1"></script>
 </head>
 <body class="admin-page">
   <div class="app-shell">
@@ -90,6 +90,24 @@
             <span id="admin-firmware-status" class="connection-detail" aria-live="polite"></span>
           </form>
         </section>
+
+        <section class="card onboarding-card admin-function-card">
+          <div>
+            <h1>Lokales Passwort zurücksetzen</h1>
+            <p>Erlaubt einem Portal-Benutzer zeitlich begrenzt, über eine lokale USB-Verbindung ein neues Adapterpasswort zu erzeugen. Die übrige Konfiguration bleibt erhalten.</p>
+          </div>
+          <form id="admin-password-recovery-form" class="onboarding-form" autocomplete="off">
+            <label for="admin-password-recovery-user">Benutzer-E-Mail</label>
+            <input id="admin-password-recovery-user" name="username" type="email" required autocomplete="off" />
+            <label for="admin-password-recovery-hours">Gültigkeit (Stunden)</label>
+            <input id="admin-password-recovery-hours" name="expiresInHours" type="number" min="1" max="168" value="24" required />
+            <div class="settings-actions">
+              <button id="admin-password-recovery-grant" class="auth-button" type="submit">Passwort-Recovery freigeben</button>
+              <button id="admin-password-recovery-revoke" class="auth-button secondary" type="button">Freigabe entziehen</button>
+            </div>
+            <span id="admin-password-recovery-status" class="connection-detail" aria-live="polite"></span>
+          </form>
+        </section>
       </div>
     </main>
   </div>
@@ -97,6 +115,6 @@
   <script src="../js/auth/pkce.js"></script>
   <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
   <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
-  <script src="../js/administration.js?v=20260903-admin-page1"></script>
+  <script src="../js/administration.js?v=20260907-password-recovery1"></script>
 </body>
 </html>

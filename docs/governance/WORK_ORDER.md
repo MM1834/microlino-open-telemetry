@@ -89,6 +89,22 @@ activated exact new object hashes without replacement and added a packaging gate
 against manifest/binary version mismatch. `xruser` now has a bounded audited
 grant for the corrected XIAO image associated with `xrpioneer2`.
 
+An additive local-password recovery extension is repository-complete. It uses a
+separate expiring admin grant, JWT-protected access/start/result routes and bounded
+audit events. The authorized browser sends the already supported `admin recover`
+command over local 115200-baud USB serial; the new random password remains local
+and only the password key changes. A firmware grant does not authorize recovery.
+Physical USB console access can invoke the same firmware command directly and is
+therefore documented as a parallel physical-access boundary, not prevented by a
+portal-side adapter check. Reviewed Change Set
+`webflash-password-recovery-20260907` deployed the five new JWT routes and the
+existing Lambda/integration in place without replacement or deletion. The stack
+reached `UPDATE_COMPLETE`; anonymous access and portal-origin CORS pass. A
+controlled `xruser` grant/access/start/result/revoke smoke test succeeded and left
+the temporary grant revoked. Productive acceptance passed on 2026-09-07 with a
+real password change, accepted GUI and successful administrator grant revocation;
+the password-recovery extension is complete.
+
 ### Reject OTA images built for incompatible adapter hardware
 
 **Completed firmware sprint:** [OTA-HW-001 — Hardware-aware local OTA guard](../project/sprints/OTA-HW-001.md)

@@ -305,6 +305,18 @@
         return firmwareRequest('/api/firmware/grants/revoke', 'POST', { username, target });
       },
 
+      async getPasswordRecoveryAccess() {
+        return firmwareRequest('/api/password-recovery/access');
+      },
+
+      async authorizePasswordRecovery() {
+        return firmwareRequest('/api/password-recovery/start', 'POST', {});
+      },
+
+      async reportPasswordRecoveryResult(operationId, result) {
+        return firmwareRequest('/api/password-recovery/result', 'POST', { operationId, result });
+      },
+
       async getNotificationPreferences() {
         if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
         return notificationRequest(`/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications`);

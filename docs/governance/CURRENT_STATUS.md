@@ -145,6 +145,23 @@ the REV14 runtime string. Correctly rebuilt XIAO and N16 images now embed
 new exact object keys and hashes. The packaging tool rejects binaries that do
 not contain the declared version. `xruser` has an audited 48-hour XIAO grant, and
 principal-specific read-back returns only the corrected 4 MB artifact.
+The repository additionally provides an independently authorized Web-Serial
+recovery for a lost local adapter password. A time-limited admin grant is required
+for the exact portal user and is separate from every firmware release grant. The
+browser sends the existing `admin recover` command to the normally running adapter
+at 115200 baud, displays the replacement only locally and sends no password to
+AWS or audit storage. Only the password-bearing NVS key changes; WiFi, CAN,
+services, AWS credentials and assignment remain intact. Direct physical console
+access remains an acknowledged parallel path rather than a claimed hardware
+security boundary. The reviewed Change Set
+`webflash-password-recovery-20260907` added the five JWT-protected routes and
+updated the existing Lambda/integration in place without replacement or deletion;
+`mot-dev-onboarding` reached `UPDATE_COMPLETE`. Anonymous access returns 401,
+portal-origin CORS passes, and a controlled `xruser` grant/access/start/result/
+revoke smoke test ended with the temporary grant revoked. Repository tests pass;
+productive browser/adapter acceptance passed on 2026-09-07, including a real
+password replacement, the final password-display/confirmation layout and
+subsequent administrator grant revocation. Function and GUI are accepted.
 
 I18N-001 has a repository-complete portal localization slice. German remains the
 project language and the dashboard default/fallback; a persisted selector adds

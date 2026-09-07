@@ -44,6 +44,10 @@
 .firmware-log { max-height: 13rem; overflow: auto; padding: .75rem; border-radius: 8px; background: #111923; color: #d5eef2; white-space: pre-wrap; font-size: .75rem; }
 #firmware-status[data-level="success"] { color: var(--green); }
 #firmware-status[data-level="error"] { color: var(--red); }
+#password-recovery-status[data-level="success"] { color: var(--green); }
+#password-recovery-status[data-level="error"] { color: var(--red); }
+.password-recovery-output { margin-top: 1rem; font-size: 1.05rem; user-select: all; }
+.password-recovery-confirmation-action { margin-top: .85rem; }
 @media (max-width: 720px) {
   .firmware-meta { grid-template-columns: 1fr; }
   .firmware-actions { align-items: stretch; }
@@ -269,6 +273,7 @@
   #cells{order:54}
   #history{order:60}
   #firmware-flasher{order:71;width:100%}
+  #password-recovery{order:72;width:100%}
   #vehicle .speedo strong{position:absolute;top:48px;left:0;right:0;transform:none;text-align:center;line-height:1}
   #vehicle .speedo span{bottom:30px;left:0;right:0;text-align:center}
   .hero-image-wrap{order:90;width:100%;min-height:180px;border:1px solid var(--line);box-shadow:var(--shadow)}

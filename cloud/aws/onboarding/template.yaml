@@ -371,6 +371,46 @@ Resources:
       AuthorizationType: JWT
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub "integrations/${OnboardingIntegration}"
+  PasswordRecoveryGrantRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/password-recovery/grants"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  PasswordRecoveryRevokeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/password-recovery/grants/revoke"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  PasswordRecoveryAccessRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "GET /api/password-recovery/access"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  PasswordRecoveryStartRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/password-recovery/start"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  PasswordRecoveryResultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/password-recovery/result"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:

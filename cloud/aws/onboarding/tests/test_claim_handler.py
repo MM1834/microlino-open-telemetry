@@ -366,6 +366,61 @@ class ClaimHandlerTests(unittest.TestCase):
         audit = self.client.transactions[-1][0]["Put"]["Item"]
         self.assertEqual({"S": "FIRMWARE_FLASH_SUCCEEDED"}, audit["eventType"])
 
+    def test_password_recovery_grant_is_separate_admin_approved_action(self):
+        denied = self.module.handler(event(
+            "POST /api/password-recovery/grants",
+            {"username": "pilot@example.com", "expiresInHours": 24},
+        ), None)
+        self.assertEqual(403, denied["statusCode"])
+        granted = self.module.handler(event(
+            "POST /api/password-recovery/grants",
+            {"username": "pilot@example.com", "expiresInHours": 24},
+            subject="admin-sub", groups=["mot-beta-admins"],
+        ), None)
+        self.assertEqual(200, granted["statusCode"])
+        stored = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "pilot-sub"}, stored["userSub"])
+        self.assertEqual({"S": "local-admin-password"}, stored["target"])
+        self.assertEqual({"S": "local-admin-password"}, stored["action"])
+        self.assertNotIn("sha256", stored)
+
+    def test_password_recovery_start_requires_its_own_active_grant(self):
+        self.module.dynamodb = Resource({"firmware-grants": {
+            ("user-a", "nanoesp32c6-n16"): {
+                "status": "ACTIVE", "expiresAt": int(self.module.time.time()) + 100,
+                "version": self.module.FIRMWARE_VERSION,
+                "sha256": self.module.FIRMWARE_SHA256,
+            },
+        }})
+        firmware_only = self.module.handler(event("GET /api/password-recovery/access", {}), None)
+        self.assertEqual({"authorized": False}, json.loads(firmware_only["body"]))
+        denied = self.module.handler(event("POST /api/password-recovery/start", {}), None)
+        self.assertEqual(403, denied["statusCode"])
+
+        self.module.dynamodb = Resource({"firmware-grants": {
+            ("user-a", "local-admin-password"): {
+                "status": "ACTIVE", "action": "local-admin-password",
+                "expiresAt": int(self.module.time.time()) + 100,
+            },
+        }})
+        access = self.module.handler(event("GET /api/password-recovery/access", {}), None)
+        self.assertTrue(json.loads(access["body"])["authorized"])
+        started = self.module.handler(event("POST /api/password-recovery/start", {}), None)
+        self.assertEqual(200, started["statusCode"])
+        self.assertRegex(json.loads(started["body"])["operationId"], r"^[A-Za-z0-9_-]{22,64}$")
+        audit = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "PASSWORD_RECOVERY_AUTHORIZED"}, audit["eventType"])
+
+    def test_password_recovery_result_never_contains_the_password(self):
+        result = self.module.handler(event(
+            "POST /api/password-recovery/result",
+            {"operationId": "A" * 24, "result": "SUCCEEDED", "password": "must-not-be-stored"},
+        ), None)
+        self.assertEqual(200, result["statusCode"])
+        audit = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "PASSWORD_RECOVERY_SUCCEEDED"}, audit["eventType"])
+        self.assertNotIn("password", audit)
+
 
 if __name__ == "__main__":
     unittest.main()
