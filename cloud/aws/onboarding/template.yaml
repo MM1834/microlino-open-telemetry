@@ -233,7 +233,9 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: cognito-idp:AdminGetUser
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:ListUsers
                 Resource: !Sub "arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
         - PolicyName: logs
           PolicyDocument:
@@ -336,6 +338,14 @@ Resources:
     Properties:
       ApiId: !Ref OnboardingApi
       RouteKey: "POST /api/firmware/grants"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  ActiveGrantsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "GET /api/admin/grants"
       AuthorizationType: JWT
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub "integrations/${OnboardingIntegration}"

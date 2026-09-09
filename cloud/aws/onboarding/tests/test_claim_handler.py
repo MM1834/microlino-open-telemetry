@@ -42,6 +42,8 @@ class Table:
         return {"Items": self.fixture.get("state", [])}
 
     def scan(self, **_kwargs):
+        if self.name == "firmware-grants" and "grant_scan" in self.fixture:
+            return self.fixture["grant_scan"]
         return self.fixture.get("access_scan", {"Items": []})
 
     def get_item(self, **kwargs):
@@ -80,6 +82,15 @@ class CognitoClient:
             "Enabled": True,
             "UserAttributes": [{"Name": "sub", "Value": user}],
         }
+
+    def list_users(self, **_kwargs):
+        return {"Users": [
+            {"Attributes": [
+                {"Name": "sub", "Value": user_sub},
+                {"Name": "email", "Value": email},
+            ]}
+            for email, user_sub in self.users.items()
+        ]}
 
 
 class S3Client:
@@ -290,6 +301,44 @@ class ClaimHandlerTests(unittest.TestCase):
         self.assertEqual({"S": "pilot-sub"}, stored["userSub"])
         self.assertEqual({"S": "nanoesp32c6-n16"}, stored["target"])
         self.assertEqual({"S": "a" * 64}, stored["sha256"])
+
+    def test_active_grant_list_is_admin_only_and_filters_expired_or_stale_records(self):
+        now = 2_000_000_000
+        self.module.time.time = lambda: now
+        self.module.dynamodb = Resource({"grant_scan": {"Items": [
+            {"userSub": "pilot-sub", "target": "nanoesp32c6-n16", "status": "ACTIVE",
+             "version": self.module.FIRMWARE_VERSION, "sha256": self.module.FIRMWARE_SHA256,
+             "grantedAt": now - 10, "expiresAt": now + 100},
+            {"userSub": "expired", "target": "local-admin-password", "status": "ACTIVE",
+             "action": "local-admin-password", "grantedAt": now - 200, "expiresAt": now - 1},
+            {"userSub": "old-release", "target": "nanoesp32c6-n16", "status": "ACTIVE",
+             "version": "C6-001-OLD", "sha256": "b" * 64,
+             "grantedAt": now - 10, "expiresAt": now + 100},
+            {"userSub": "pilot-sub", "target": "local-admin-password", "status": "ACTIVE",
+             "action": "local-admin-password", "grantedAt": now - 5, "expiresAt": now + 200},
+        ]}})
+        denied = self.module.handler(event("GET /api/admin/grants", {}), None)
+        self.assertEqual(403, denied["statusCode"])
+        result = self.module.handler(event(
+            "GET /api/admin/grants", {}, subject="admin-sub", groups=["mot-beta-admins"]
+        ), None)
+        self.assertEqual(200, result["statusCode"])
+        body = json.loads(result["body"])
+        self.assertEqual("pilot@example.com", body["firmware"][0]["email"])
+        self.assertEqual("nanoesp32c6-n16", body["firmware"][0]["target"])
+        self.assertEqual(1, len(body["firmware"]))
+        self.assertEqual(1, len(body["passwordRecovery"]))
+        self.assertEqual(now, body["generatedAt"])
+        self.assertNotIn("userSub", result["body"])
+
+    def test_active_grant_list_fails_closed_when_scan_is_truncated(self):
+        self.module.dynamodb = Resource({"grant_scan": {
+            "Items": [], "LastEvaluatedKey": {"userSub": "cursor", "target": "cursor"},
+        }})
+        result = self.module.handler(event(
+            "GET /api/admin/grants", {}, subject="admin-sub", groups=["mot-beta-admins"]
+        ), None)
+        self.assertEqual(503, result["statusCode"])
 
     def test_firmware_access_is_hidden_without_active_exact_grant(self):
         self.module.dynamodb = Resource({})

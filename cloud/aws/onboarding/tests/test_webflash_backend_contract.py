@@ -73,8 +73,15 @@ class WebflashBackendContractTests(unittest.TestCase):
 
     def test_admin_resolution_is_server_side_and_group_restricted(self):
         self.assertIn("cognito-idp:AdminGetUser", TEMPLATE)
+        self.assertIn("cognito-idp:ListUsers", TEMPLATE)
         self.assertIn("if ADMIN_GROUP not in _groups(claims)", HANDLER)
         self.assertIn("cognito_client.admin_get_user", HANDLER)
+
+    def test_active_grant_inventory_is_jwt_and_admin_protected(self):
+        self.assertIn('RouteKey: "GET /api/admin/grants"', TEMPLATE)
+        self.assertIn('if route == "GET /api/admin/grants"', HANDLER)
+        self.assertIn("return active_grants(claims)", HANDLER)
+        self.assertIn("grant_list_too_large", HANDLER)
 
 
 if __name__ == "__main__":

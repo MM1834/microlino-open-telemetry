@@ -22,17 +22,19 @@
     if (message) $('admin-denied-message').textContent = message;
   }
 
-  async function request(path, body) {
+  async function request(path, body = undefined) {
     const base = String(cfg.awsBackend?.onboardingApiBaseUrl || '').replace(/\/$/, '');
     if (!base) throw new Error('Onboarding API URL fehlt');
     const token = await auth.getAccessToken();
     if (!token) throw new Error('Anmeldung erforderlich');
-    const response = await fetch(`${base}${path}`, {
-      method: 'POST',
+    const method = body === undefined ? 'GET' : 'POST';
+    const options = {
+      method,
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify(body)
-    });
+      cache: 'no-store'
+    };
+    if (body !== undefined) options.body = JSON.stringify(body);
+    const response = await fetch(`${base}${path}`, options);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 401) showAccess('signed-out', 'Die Sitzung ist abgelaufen. Bitte erneut anmelden.');
@@ -40,6 +42,52 @@
       throw new Error(payload.error || `Administrations-API HTTP ${response.status}`);
     }
     return payload;
+  }
+
+  function dateTime(timestamp) {
+    return timestamp ? new Date(timestamp * 1000).toLocaleString(activeLocale()) : '--';
+  }
+
+  function appendCells(row, values) {
+    values.forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = value || '--';
+      row.appendChild(cell);
+    });
+  }
+
+  function renderActiveGrants(result = {}) {
+    const firmware = Array.isArray(result.firmware) ? result.firmware : [];
+    const recovery = Array.isArray(result.passwordRecovery) ? result.passwordRecovery : [];
+    const firmwareBody = $('admin-firmware-grants');
+    const recoveryBody = $('admin-password-recovery-grants');
+    firmwareBody.replaceChildren();
+    recoveryBody.replaceChildren();
+    firmware.forEach(grant => {
+      const row = document.createElement('tr');
+      appendCells(row, [grant.email, grant.target, grant.version, dateTime(grant.expiresAt)]);
+      firmwareBody.appendChild(row);
+    });
+    recovery.forEach(grant => {
+      const row = document.createElement('tr');
+      appendCells(row, [grant.email, dateTime(grant.grantedAt), dateTime(grant.expiresAt)]);
+      recoveryBody.appendChild(row);
+    });
+    $('admin-firmware-grants-empty').hidden = firmware.length > 0;
+    $('admin-password-recovery-grants-empty').hidden = recovery.length > 0;
+    $('admin-firmware-grants-table').hidden = firmware.length === 0;
+    $('admin-password-recovery-grants-table').hidden = recovery.length === 0;
+  }
+
+  async function loadActiveGrants() {
+    $('admin-grants-status').textContent = 'Berechtigungen werden geladen…';
+    try {
+      const result = await request('/api/admin/grants');
+      renderActiveGrants(result);
+      $('admin-grants-status').textContent = `Stand: ${dateTime(result.generatedAt)}`;
+    } catch (error) {
+      $('admin-grants-status').textContent = error.message || 'Berechtigungen konnten nicht geladen werden.';
+    }
   }
 
   async function issueClaim(event) {
@@ -85,6 +133,7 @@
       $('admin-firmware-status').textContent = revoke
         ? `Web-Flasher-Freigabe ${target} für ${username} entzogen.`
         : `Web-Flasher ${target} für ${username} bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())} freigegeben.`;
+      await loadActiveGrants();
     } catch (error) {
       $('admin-firmware-status').textContent = error.message || (revoke ? 'Freigabe konnte nicht entzogen werden.' : 'Freigabe fehlgeschlagen.');
     } finally { setBusy(false); }
@@ -107,6 +156,7 @@
       $('admin-password-recovery-status').textContent = revoke
         ? `Passwort-Recovery-Freigabe für ${username} entzogen.`
         : `Passwort-Recovery für ${username} bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())} freigegeben.`;
+      await loadActiveGrants();
     } catch (error) {
       $('admin-password-recovery-status').textContent = error.message || (revoke ? 'Freigabe konnte nicht entzogen werden.' : 'Freigabe fehlgeschlagen.');
     } finally { setBusy(false); }
@@ -132,6 +182,7 @@
       return;
     }
     showAccess('authorized');
+    await loadActiveGrants();
   }
 
   $('admin-login')?.addEventListener('click', () => auth.login({ remember: false }));
@@ -148,5 +199,6 @@
     changePasswordRecoveryAccess(false);
   });
   $('admin-password-recovery-revoke')?.addEventListener('click', () => changePasswordRecoveryAccess(true));
+  $('admin-grants-refresh')?.addEventListener('click', loadActiveGrants);
   bootstrap().catch(error => showAccess('denied', error.message || 'Administration konnte nicht geladen werden.'));
 })();

@@ -19,6 +19,19 @@ revision.
 
 ## Current product direction
 
+ADM-GRANT-001 is complete. A new
+JWT-protected and `mot-beta-admins`-restricted endpoint lists only active,
+unexpired password-recovery grants and WebFlash grants that still exactly match
+the current release. The responsive Administration page refreshes the two lists
+on entry and after changes. All 27 onboarding tests, 32 focused portal/i18n tests,
+JavaScript/Python syntax checks and CloudFormation validation pass. Reviewed
+Change Set `adm-grant-001-20260909` added the JWT route and updated Lambda/IAM
+without replacement; `mot-dev-onboarding` is `UPDATE_COMPLETE`. Anonymous access
+returns `401`, non-admin validation returns `403`, and the live admin inventory
+returns `200`. The maintainer accepted the portal and AWS backend on 2026-09-09.
+Subsequent diverse WebFlash and password-recovery grant/revoke tests also passed,
+providing final productive acceptance.
+
 OPS-001 now decouples the interactive History diagrams from the personal
 30-day range forecast. `GET /api/vehicles/{vehicleId}/history` returns only the
 six chart series, while the separately JWT-authorized

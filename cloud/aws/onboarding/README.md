@@ -20,6 +20,11 @@ proxies the binary.
 The deployed password-recovery extension uses a separate reserved grant target,
 five JWT-protected grant/access/start/result routes and the adapter's existing
 local USB console command. It never sends the generated password to AWS.
+ADM-GRANT-001 adds an administrator-only inventory route over the same encrypted
+grant table. It evaluates status, expiry and current WebFlash release identity on
+the server and returns only the fields required by the Administration page. The
+route was deployed through no-replacement Change Set `adm-grant-001-20260909` and
+passed anonymous, non-admin and administrator smoke tests on 2026-09-09.
 
 Schemas:
 

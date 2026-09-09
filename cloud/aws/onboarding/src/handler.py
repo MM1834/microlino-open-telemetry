@@ -61,6 +61,7 @@ VEHICLE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 CLAIM_PART_RE = re.compile(r"^[A-Za-z0-9_-]{22,64}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PASSWORD_RECOVERY_TARGET = "local-admin-password"
+GRANT_LIST_MAX_ITEMS = 200
 
 
 def _json(status: int, body: dict) -> dict:
@@ -211,6 +212,84 @@ def _resolve_user_sub(username: str) -> str:
         return ""
     attributes = {item["Name"]: item["Value"] for item in result.get("UserAttributes", [])}
     return str(attributes.get("sub", "")) if result.get("Enabled") is not False else ""
+
+
+def _user_emails() -> dict[str, str]:
+    users = {}
+    token = None
+    while len(users) < GRANT_LIST_MAX_ITEMS:
+        request = {"UserPoolId": COGNITO_USER_POOL_ID, "Limit": 60}
+        if token:
+            request["PaginationToken"] = token
+        response = cognito_client.list_users(**request)
+        for user in response.get("Users", []):
+            if user.get("Enabled") is False:
+                continue
+            attributes = {item["Name"]: item["Value"] for item in user.get("Attributes", [])}
+            user_sub = str(attributes.get("sub", ""))
+            email = str(attributes.get("email", ""))
+            if user_sub and email:
+                users[user_sub] = email
+        token = response.get("PaginationToken")
+        if not token:
+            break
+    return users
+
+
+def active_grants(claims: dict) -> dict:
+    if ADMIN_GROUP not in _groups(claims):
+        return _json(403, {"error": "forbidden"})
+    table = dynamodb.Table(FIRMWARE_GRANTS_TABLE)
+    result = table.scan(
+        ProjectionExpression="userSub,target,#status,#action,version,sha256,grantedAt,expiresAt",
+        ExpressionAttributeNames={"#status": "status", "#action": "action"},
+        Limit=GRANT_LIST_MAX_ITEMS,
+    )
+    if result.get("LastEvaluatedKey"):
+        return _json(503, {"error": "grant_list_too_large"})
+    now = int(time.time())
+    releases = _firmware_releases()
+    emails = _user_emails()
+    firmware = []
+    password_recovery = []
+    for item in result.get("Items", []):
+        if item.get("status") != "ACTIVE" or int(item.get("expiresAt", 0)) <= now:
+            continue
+        user_sub = str(item.get("userSub", ""))
+        email = emails.get(user_sub, "")
+        if not email:
+            continue
+        common = {
+            "email": email,
+            "grantedAt": int(item.get("grantedAt", 0)),
+            "expiresAt": int(item["expiresAt"]),
+        }
+        if item.get("target") == PASSWORD_RECOVERY_TARGET:
+            if item.get("action") == PASSWORD_RECOVERY_TARGET:
+                password_recovery.append(common)
+            continue
+        release = releases.get(str(item.get("target", "")))
+        if not release or item.get("version") != release["version"] or item.get("sha256") != release["sha256"]:
+            continue
+        firmware.append({
+            **common,
+            "_userSub": user_sub,
+            "target": release["target"],
+            "version": release["version"],
+        })
+    firmware_counts = {}
+    for grant in firmware:
+        key = grant["_userSub"]
+        firmware_counts[key] = firmware_counts.get(key, 0) + 1
+    firmware = [grant for grant in firmware if firmware_counts[grant["_userSub"]] == 1]
+    for grant in firmware:
+        grant.pop("_userSub", None)
+    order = lambda item: (item.get("email", "").lower(), item.get("target", ""))
+    return _json(200, {
+        "firmware": sorted(firmware, key=order),
+        "passwordRecovery": sorted(password_recovery, key=order),
+        "generatedAt": now,
+    })
 
 
 def firmware_grant(event: dict, claims: dict) -> dict:
@@ -634,6 +713,8 @@ def handler(event: dict, _context) -> dict:
         return consume_claim(event, claims)
     if route == "POST /api/firmware/grants":
         return firmware_grant(event, claims)
+    if route == "GET /api/admin/grants":
+        return active_grants(claims)
     if route == "POST /api/firmware/grants/revoke":
         return firmware_revoke(event, claims)
     if route == "GET /api/firmware/access":

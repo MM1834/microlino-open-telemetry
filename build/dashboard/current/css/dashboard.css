@@ -376,7 +376,19 @@
 .admin-function-card{align-items:start}
 .admin-function-card input,.admin-function-card select{width:100%;min-width:0;border:1px solid var(--line);border-radius:9px;padding:11px;color:var(--text);background:var(--panel)}
 .admin-function-card .settings-actions{display:flex;flex-wrap:wrap;margin-top:8px}
+.admin-grants-card{padding:24px}
+.admin-grants-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.admin-grants-header h1{margin:0 0 8px}
+.admin-grants-header p{margin:0;color:var(--muted)}
+.admin-grants-section{margin-top:22px}
+.admin-grants-section h2{margin:0 0 10px;font-size:1.1rem}
+.admin-grants-table-wrap{overflow-x:auto}
+.admin-grants-table{width:100%;border-collapse:collapse;text-align:left}
+.admin-grants-table th,.admin-grants-table td{padding:10px 12px;border-bottom:1px solid rgba(158,176,199,.18);white-space:nowrap}
+.admin-grants-table th{color:var(--muted);font-size:.8rem;font-weight:650}
+.admin-grants-table td{font-size:.9rem}
 @media(max-width:900px){.admin-page .app-shell{padding:10px}.admin-page .admin-topbar{position:static;order:0;flex-wrap:wrap}.admin-page .admin-content,.admin-page .admin-access-card{order:1}.admin-page .admin-topbar>div:first-child{flex:1 1 100%}.admin-page .admin-topbar .top-spacer{display:none}.admin-page .admin-topbar .language-selector,.admin-page .admin-topbar .auth-controls{order:initial}.admin-function-card{padding:18px}}
+@media(max-width:600px){.admin-grants-card{padding:18px}.admin-grants-header{flex-direction:column}.admin-grants-header .auth-button{width:100%}}
 
 /* Dedicated authenticated personal-settings surface. */
 .settings-main{max-width:1180px;width:100%;margin:0 auto}

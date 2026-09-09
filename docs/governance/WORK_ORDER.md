@@ -12,6 +12,19 @@
 
 ## High priority
 
+### Show currently valid administrator grants
+
+**Completed portal sprint:** [ADM-GRANT-001 — Active administrator grant inventory](../project/sprints/ADM-GRANT-001.md)
+
+**Objective:** Give authorized administrators a responsive read-only inventory
+of valid WebFlash and local-password recovery permissions.
+
+**Current status:** Complete. Repository tests and CloudFormation validation pass;
+the reviewed no-replacement Change Set is deployed, JWT/admin denial smoke tests
+pass, and the maintainer accepted the portal and AWS backend on 2026-09-09.
+Diverse productive WebFlash and password-recovery grant/revoke tests subsequently
+passed as the final acceptance gate.
+
 ### Add an optional daily journey and charging summary
 
 **Completed work package:** [DAY-SUM-001 — Daily Journey and Charging Summary](../project/sprints/DAY-SUM-001.md)

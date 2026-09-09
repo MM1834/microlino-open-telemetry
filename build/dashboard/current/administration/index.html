@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Administration</title>
-  <link rel="stylesheet" href="../css/dashboard.css?v=20260903-settings-page1" />
-  <script src="../js/i18n.js?v=20260907-password-recovery1"></script>
+  <link rel="stylesheet" href="../css/dashboard.css?v=20260909-grant-list1" />
+  <script src="../js/i18n.js?v=20260909-grant-list1"></script>
 </head>
 <body class="admin-page">
   <div class="app-shell">
@@ -52,6 +52,37 @@
       </section>
 
       <div id="admin-content" class="admin-content" hidden>
+        <section class="card admin-grants-card">
+          <div class="admin-grants-header">
+            <div>
+              <h1>Aktive Berechtigungen</h1>
+              <p>Nur aktuell gültige WebFlash- und Passwort-Recovery-Freigaben.</p>
+            </div>
+            <button id="admin-grants-refresh" class="auth-button secondary" type="button">Aktualisieren</button>
+          </div>
+          <span id="admin-grants-status" class="connection-detail" aria-live="polite"></span>
+          <div class="admin-grants-section">
+            <h2>Web-Flasher</h2>
+            <div id="admin-firmware-grants-table" class="admin-grants-table-wrap">
+              <table class="admin-grants-table">
+                <thead><tr><th>Benutzer</th><th>Adaptertyp</th><th>Firmware</th><th>Gültig bis</th></tr></thead>
+                <tbody id="admin-firmware-grants"></tbody>
+              </table>
+            </div>
+            <p id="admin-firmware-grants-empty" class="muted" hidden>Keine aktive Web-Flasher-Freigabe.</p>
+          </div>
+          <div class="admin-grants-section">
+            <h2>Passwort-Recovery</h2>
+            <div id="admin-password-recovery-grants-table" class="admin-grants-table-wrap">
+              <table class="admin-grants-table">
+                <thead><tr><th>Benutzer</th><th>Erteilt am</th><th>Gültig bis</th></tr></thead>
+                <tbody id="admin-password-recovery-grants"></tbody>
+              </table>
+            </div>
+            <p id="admin-password-recovery-grants-empty" class="muted" hidden>Keine aktive Passwort-Recovery-Freigabe.</p>
+          </div>
+        </section>
+
         <section class="card onboarding-card admin-function-card">
           <div>
             <h1>Beta-Onboarding verwalten</h1>
@@ -116,6 +147,6 @@
   <script src="../js/auth/pkce.js"></script>
   <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
   <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
-  <script src="../js/administration.js?v=20260907-password-recovery1"></script>
+  <script src="../js/administration.js?v=20260909-grant-list1"></script>
 </body>
 </html>

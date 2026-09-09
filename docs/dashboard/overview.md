@@ -127,8 +127,12 @@ width, while the external OpenStreetMap link is always available.
 ## Administration
 
 Privileged beta-onboarding claim issuance and Web-Flasher grant/revoke controls
-live on the separate `/dashboard/administration/` page. The dashboard exposes its
-Administration navigation entry only when the restored Cognito access token
+live on the separate `/dashboard/administration/` page. The Administration page
+also contains separate read-only inventories of currently
+valid WebFlash and password-recovery grants. The server filters expiry and exact
+release compatibility, resolves user email through Cognito and returns the list
+only to `mot-beta-admins`; it refreshes after every grant or revoke operation.
+The dashboard exposes its Administration navigation entry only when the restored Cognito access token
 contains `mot-beta-admins`; the destination keeps all forms hidden until it has
 independently checked the same claim. Signed-out and non-administrator users see
 no privileged controls. The onboarding and firmware APIs remain the authoritative

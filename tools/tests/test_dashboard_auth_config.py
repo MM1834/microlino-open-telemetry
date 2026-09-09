@@ -297,6 +297,12 @@ class DashboardOnboardingTests(unittest.TestCase):
         self.assertIn('id="admin-content"', admin_html)
         self.assertIn('id="admin-claim-output"', admin_html)
         self.assertIn('id="admin-firmware-form"', admin_html)
+        self.assertIn('id="admin-firmware-grants"', admin_html)
+        self.assertIn('id="admin-password-recovery-grants"', admin_html)
+        self.assertIn("request('/api/admin/grants')", admin_js)
+        self.assertIn("await loadActiveGrants()", admin_js)
+        self.assertIn("document.createElement('td')", admin_js)
+        self.assertNotIn("innerHTML", admin_js)
         self.assertIn('id="admin-denied"', admin_html)
 
     def test_admin_functions_are_not_embedded_in_dashboard(self) -> None:

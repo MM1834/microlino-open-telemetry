@@ -28,6 +28,10 @@
 
 ## Completed predecessors
 
+- [ADM-GRANT-001](ADM-GRANT-001.md) provides the administrator-only active
+  WebFlash/password-recovery inventory; portal and AWS backend acceptance passed
+  on 2026-09-09.
+
 - [ADP-INF-001](ADP-INF-001.md) adds read-only adapter identity and configuration
   to Settings; desktop and smartphone layouts plus the older-firmware fallback
   passed hosted acceptance on 2026-09-07.
