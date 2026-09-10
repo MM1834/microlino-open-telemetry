@@ -80,3 +80,25 @@ Scheduler prepared and delivered the enabled users' daily emails successfully;
 the maintainer verified the reported journey and charging data as correct. This
 closes DAY-SUM-001. Future per-user timezone support remains a separate optional
 enhancement and does not reopen this sprint.
+
+On 2026-09-05 the next overnight observation exposed a transition gap:
+`xrpioneer2` stopped shortly before midnight and began charging shortly after it,
+but the 00:05 evaluation saw neither session as active and dispatched immediately.
+The repository follow-up retains the timestamp of the most recently observed real
+movement (`Speed > 1 km/h`) across journey cleanup and treats movement within the
+preceding 30 minutes as activity for daily-report deferral. Repeated zero-speed or
+online telemetry does not extend the guard. The normal hourly retry and bounded
+08:05 deadline remain unchanged. All 91 notification tests pass. The isolated
+Notification Lambda update is deployed and reports `Active`/`Successful`; its
+invalid-topic smoke probe returned 200 without a function error. The maintainer
+accepted the remaining low-risk transition case on 2026-09-10 and closed the
+follow-up without another overnight gate.
+
+Known residual case: when the adapter loses AWS reachability while arriving
+home, observes the end of a journey and `plugged`/charging locally, then reconnects
+through Home WiFi, AWS may receive an incomplete or reordered transition. This is
+primarily a journey-completion concern; it can also make the 00:05 daily view
+temporarily incomplete. The accepted daily-summary behaviour remains unchanged.
+If field evidence later makes this material, the preferred low-complexity
+mitigation is a general stabilization window with first delivery at 01:05 while
+retaining the existing hourly retries and 08:05 deadline.

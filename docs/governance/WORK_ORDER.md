@@ -110,8 +110,9 @@ The following overnight run exposed a short journey-to-charging transition gap a
 preceding 30 minutes even if both formal sessions are temporarily inactive;
 zero-speed and online messages do not extend it. All 91 notification tests pass.
 The isolated Notification Lambda update is deployed and reports
-`Active`/`Successful`; its invalid-topic smoke probe passed. The next overnight
-observation remains open.
+`Active`/`Successful`; its invalid-topic smoke probe passed. The maintainer
+accepted the remaining low-risk midnight/connectivity transition on 2026-09-10;
+the follow-up is closed without changing the 00:05 schedule.
 
 ### Validate the optional charging-summary email
 
@@ -477,7 +478,7 @@ remain part of the open HIS-001 work.
 
 ### Execute JNY-001 journey summary and energy email pilot
 
-**Active work package:** [JNY-001 — Journey Summary and Energy Email Pilot](../project/sprints/JNY-001.md)
+**Completed work package:** [JNY-001 — Journey Summary and Energy Email Pilot](../project/sprints/JNY-001.md)
 
 **Objective:** Add an optional qualifying-journey email centered on consumed net
 battery energy, while preserving explicit user consent, bounded AWS cost and
@@ -554,7 +555,10 @@ REV17 now seals and prioritizes the N16 counter immediately on fresh Standard-CA
 plug or charging state. `Speed = 0` only starts a candidate; sealing occurs after
 ten continuous stopped minutes. A sealed final triplet must publish successfully
 before later movement replaces its counter identity. N16 and XIAO builds pass;
-physical N16 installation and road validation remain open.
+the deployed firmware/backend path is accepted for the MOT pilot. A rare
+mobile-to-Home connectivity transition may delay or reorder the final counter and
+charging boundary; this documented residual risk is accepted and any material
+recurrence becomes a separate reliability work package.
 
 ### Execute SPR-0005 beta readiness and portal onboarding
 

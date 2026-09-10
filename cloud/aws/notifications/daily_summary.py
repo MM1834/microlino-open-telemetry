@@ -6,7 +6,16 @@ from zoneinfo import ZoneInfo
 
 REPORT_TIMEZONE = ZoneInfo("Europe/Zurich")
 FORCE_SEND_HOUR = 8
+RECENT_MOVEMENT_GRACE_MS = 30 * 60 * 1000
 SUMMARY_EVENT_TYPES = {"JOURNEY_SUMMARY", "CHARGING_SUMMARY"}
+
+
+def recent_movement(last_observed_moving_at, now_ms):
+    """Keep the daily report pending briefly after real vehicle movement."""
+    return bool(
+        last_observed_moving_at
+        and 0 <= now_ms - last_observed_moving_at < RECENT_MOVEMENT_GRACE_MS
+    )
 
 
 def report_window(now_ms):

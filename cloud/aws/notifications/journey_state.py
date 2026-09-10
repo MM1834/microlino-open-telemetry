@@ -56,6 +56,7 @@ class JourneyState:
     latest_odometer: Optional[float] = None
     latest_odometer_at: int = 0
     last_speed_at: int = 0
+    last_observed_moving_at: int = 0
     last_online_at: int = 0
     latest_online: Optional[bool] = None
     last_completed_journey_id: Optional[str] = None
@@ -199,6 +200,7 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
             return state
         updated = replace(state, last_speed_at=received_at)
         if float(value) > 1.0:
+            updated = replace(updated, last_observed_moving_at=received_at)
             # A confirmed charge/plug signal seals the preceding journey. Ignore
             # later speed noise until the sealed state has been finalized.
             if updated.active_id and updated.charging_after_stop:
@@ -208,7 +210,7 @@ def apply_journey_update(state: JourneyState, suffix: str, value, received_at: i
                 updated.active_id == state.active_id and not state.stopped_at
                 and received_at - state.last_speed_at < MIN_MOVING_SAMPLE_MS
             ):
-                return state
+                return updated
             return replace(
                 updated,
                 last_moving_at=received_at,
@@ -400,7 +402,9 @@ def clear_journey(
         latest_soc=state.latest_soc, latest_soc_at=state.latest_soc_at,
         latest_odometer=state.latest_odometer,
         latest_odometer_at=state.latest_odometer_at,
-        last_speed_at=state.last_speed_at, last_online_at=state.last_online_at,
+        last_speed_at=state.last_speed_at,
+        last_observed_moving_at=state.last_observed_moving_at,
+        last_online_at=state.last_online_at,
         latest_online=state.latest_online,
         last_completed_journey_id=(state.active_id or state.last_completed_journey_id),
         last_completion_at=(completed_at or state.last_completion_at),

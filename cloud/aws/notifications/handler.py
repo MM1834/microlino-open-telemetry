@@ -24,6 +24,7 @@ from charging_summary_state import (
 )
 from daily_summary import aggregate as aggregate_daily
 from daily_summary import has_activity as daily_has_activity
+from daily_summary import recent_movement as daily_recent_movement
 from daily_summary import report_window
 from journey_state import (
     STOP_DELAY_MS, JourneyState, apply_inactivity_timeout,
@@ -694,8 +695,12 @@ def _daily_activity_in_progress(vehicle_id, now_ms):
     ).get("Item", {})
     if not journey_item:
         journey_item = session_item
-    journey_active = bool(_journey_state(journey_item).active_id)
-    return charging_active or journey_active
+    journey = _journey_state(journey_item)
+    journey_active = bool(journey.active_id)
+    return (
+        charging_active or journey_active
+        or daily_recent_movement(journey.last_observed_moving_at, now_ms)
+    )
 
 
 def _reserve_daily_event(preference, report_date, now, status, summary):

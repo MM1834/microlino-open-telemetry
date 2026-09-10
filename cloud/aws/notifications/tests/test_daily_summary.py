@@ -5,7 +5,10 @@ from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from daily_summary import aggregate, has_activity, report_window  # noqa: E402
+from daily_summary import (  # noqa: E402
+    RECENT_MOVEMENT_GRACE_MS, aggregate, has_activity, recent_movement,
+    report_window,
+)
 
 
 def utc_ms(value):
@@ -57,6 +60,13 @@ class DailySummaryTests(unittest.TestCase):
 
     def test_empty_window_has_no_activity(self):
         self.assertFalse(has_activity(aggregate([], 1000, 2000)))
+
+    def test_recent_real_movement_defers_daily_summary_for_thirty_minutes(self):
+        now = utc_ms("2026-09-05T00:05:00")
+        moved = now - 12 * 60 * 1000
+        self.assertTrue(recent_movement(moved, now))
+        self.assertFalse(recent_movement(moved, moved + RECENT_MOVEMENT_GRACE_MS))
+        self.assertFalse(recent_movement(0, now))
 
 
 if __name__ == "__main__":

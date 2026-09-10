@@ -25,6 +25,12 @@ class JourneyStateTests(unittest.TestCase):
         state = self.update(state, "display/odometer_km", 100, 1_010)
         return self.update(state, "display/speed_kmh", 20, 1_020)
 
+    def test_recent_real_movement_marker_survives_journey_clear(self):
+        state = self.started()
+        self.assertEqual(1_020, state.last_observed_moving_at)
+        cleared = clear_journey(state, reason="distance_too_short", completed_at=2_000)
+        self.assertEqual(1_020, cleared.last_observed_moving_at)
+
     def eligible_estimate(self):
         state = self.started()
         state = self.update(state, "bms/vehicle_power_w", 8_000, 2_000)

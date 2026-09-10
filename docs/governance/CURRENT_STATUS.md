@@ -173,8 +173,9 @@ retains the last real movement (`Speed > 1 km/h`) across journey cleanup and
 defers when it is less than 30 minutes old. Zero-speed and mere online telemetry
 cannot prolong the guard; hourly retry and the 08:05 bound are unchanged. All 91
 notification tests pass. The isolated Notification Lambda update is deployed and
-reports `Active`/`Successful`; its invalid-topic smoke probe passed. Overnight
-validation remains open.
+reports `Active`/`Successful`; its invalid-topic smoke probe passed. The
+maintainer accepted the remaining low-risk midnight/connectivity transition on
+2026-09-10 and closed the follow-up without changing the 00:05 schedule.
 
 The controlled 2026-09-03 Pioneer SOC run established `0x48D data[7]` as an
 exact Standard-CAN copy of the visible whole-percent SOC and `data[6]` as a
@@ -694,7 +695,7 @@ authoritative SNS subscription state. The controlled `xrpioneer2` record changed
 from false to true while SNS remained confirmed; stack and Lambda health checks
 passed, followed by hosted portal acceptance after reload.
 
-JNY-001 is active as a separate journey-summary and energy-email pilot. Its
+JNY-001 is closed as an accepted journey-summary and energy-email pilot. Its
 default-off preference API is deployed and the first hosted checkbox is visible.
 The deployed backend now adds stable delayed completion, an explicitly labelled
 estimate from existing power telemetry, idempotent email delivery and automatic
@@ -778,6 +779,15 @@ continuous stopped minutes seal that path. A sealed final MQTT triplet is retain
 until accepted before later movement may replace its identity. The N16 build uses
 58,632 bytes RAM and 1,382,282 bytes flash; XIAO remains counter-disabled and also
 builds successfully. Physical installation and road validation remain open.
+
+The maintainer closed JNY-001 on 2026-09-10. Journeys with continuous AWS
+connectivity complete normally, and the deployed backend retains its isolated
+Journey session, ten-minute firmware-counter wait and 30-minute telemetry
+fallback. One rare arrival case remains explicitly accepted: loss of AWS access
+during the mobile-to-Home WiFi transition can reorder a locally observed stop,
+plug/charge boundary and final counter. REV17+ retains the sealed counter triplet
+until publication succeeds. Any material recurrence is a new reliability work
+package rather than an open JNY-001 acceptance gate.
 
 The first JNY-001 road observation identified and corrected a post-stop charging
 edge: plugging in during the stability window no longer invalidates the completed
