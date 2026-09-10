@@ -192,6 +192,15 @@ class VehicleHistoryTable:
         ]}
 
 
+class JourneySessionTable:
+    def __init__(self, items=None):
+        self.items = dict(items or {})
+
+    def get_item(self, **kwargs):
+        item = self.items.get(kwargs["Key"]["vehicleId"])
+        return {"Item": dict(item)} if item else {}
+
+
 class ConnectionTable:
     def __init__(self, items=None):
         self.items = {item["connectionId"]: dict(item) for item in (items or [])}
@@ -244,15 +253,17 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
             "signal": "soc", "sampledAt": 1_700_000_000_000,
             "receivedAt": 1_700_000_001_000, "value": 55,
         }])
+        self.journeys = JourneySessionTable()
         self.module = load_lambda(
             "VehicleApiFunction",
             {
                 "state": VehicleStateTable(), "access": access,
-                "history": self.history,
+                "history": self.history, "journeys": self.journeys,
             },
             {
                 "TABLE_NAME": "state", "ACCESS_TABLE_NAME": "access",
                 "HISTORY_TABLE_NAME": "history",
+                "JOURNEY_SESSION_TABLE_NAME": "journeys",
             },
         )
         self.module.time = types.SimpleNamespace(time=lambda: 1_700_000_100)
@@ -276,6 +287,12 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
     def test_history_of_unassigned_vehicle_is_not_disclosed(self):
         result = self.module.handler(
             rest_event("/api/vehicles/beta/history", "user-a", "beta"), None
+        )
+        self.assertEqual(404, result["statusCode"])
+        self.assertNotIn("beta", result["body"])
+
+        result = self.module.handler(
+            rest_event("/api/vehicles/beta/current-journey", "user-a", "beta"), None
         )
         self.assertEqual(404, result["statusCode"])
         self.assertNotIn("beta", result["body"])
@@ -310,6 +327,91 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         self.assertEqual("alpha", body["vehicleId"])
         self.assertEqual(30, body["windowDays"])
         self.assertIn("rangeForecast", body)
+
+    def test_current_journey_returns_inactive_without_session(self):
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertFalse(body["active"])
+        self.assertEqual([], body["points"])
+
+    def test_current_journey_uses_canonical_start_and_native_points(self):
+        self.journeys.items["journey#alpha"] = {"journey": {
+            "active_id": "journey-17",
+            "started_at": 1_700_000_040_000,
+            "last_moving_at": 1_700_000_090_000,
+            "stopped_at": 0,
+            "start_soc": 72,
+            "last_soc": 71,
+        }}
+        self.history.items.extend([
+            {
+                "vehicleId": "alpha", "sampleKey": "speed#1700000030",
+                "signal": "speed", "sampledAt": 1_700_000_030_000,
+                "receivedAt": 1_700_000_030_000, "value": 4,
+            },
+            {
+                "vehicleId": "alpha", "sampleKey": "speed#1700000060",
+                "signal": "speed", "sampledAt": 1_700_000_060_000,
+                "receivedAt": 1_700_000_060_000, "value": 23,
+            },
+            {
+                "vehicleId": "alpha", "sampleKey": "power#1700000060",
+                "signal": "power", "sampledAt": 1_700_000_060_000,
+                "receivedAt": 1_700_000_060_000, "value": 4200,
+            },
+        ])
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertTrue(body["active"])
+        self.assertEqual("journey-17", body["journeyId"])
+        self.assertEqual(1_700_000_040_000, body["startedAt"])
+        self.assertEqual(
+            [{"ts": 1_700_000_060_000, "speed": 23, "power": 4200}],
+            body["points"],
+        )
+
+    def test_current_journey_returns_last_completed_until_next_start(self):
+        self.journeys.items["journey#alpha"] = {"journey": {
+            "active_id": None,
+            "last_completed_journey_id": "1700000040000",
+            "last_completion_at": 1_700_000_095_000,
+            "last_completion_reason": "eligible",
+        }}
+        self.history.items.extend([
+            {
+                "vehicleId": "alpha", "sampleKey": "speed#1700000060",
+                "signal": "speed", "sampledAt": 1_700_000_060_000,
+                "receivedAt": 1_700_000_060_000, "value": 23,
+            },
+            {
+                "vehicleId": "alpha", "sampleKey": "power#1700000090",
+                "signal": "power", "sampledAt": 1_700_000_090_000,
+                "receivedAt": 1_700_000_090_000, "value": -1800,
+            },
+        ])
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual(200, result["statusCode"])
+        self.assertFalse(body["active"])
+        self.assertTrue(body["available"])
+        self.assertEqual("completed", body["status"])
+        self.assertEqual(1_700_000_040_000, body["startedAt"])
+        self.assertEqual(1_700_000_090_000, body["endedAt"])
+        self.assertEqual(2, len(body["points"]))
 
     def test_speed_history_is_averaged_per_api_resolution(self):
         self.history.items.extend([

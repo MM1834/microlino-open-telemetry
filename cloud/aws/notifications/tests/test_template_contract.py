@@ -6,6 +6,8 @@ TEMPLATE = (Path(__file__).resolve().parents[1] / "template.yaml").read_text()
 PREFERENCE_API = (Path(__file__).resolve().parents[1] / "preference_api.py").read_text()
 SMS_VERIFICATION_API = (Path(__file__).resolve().parents[1] / "sms_verification_api.py").read_text()
 HANDLER = (Path(__file__).resolve().parents[1] / "handler.py").read_text()
+FLEET = (Path(__file__).resolve().parents[1] / "fleet_efficiency.py").read_text()
+EFFICIENCY_API = (Path(__file__).resolve().parents[1] / "efficiency_api.py").read_text()
 
 
 class TemplateContractTests(unittest.TestCase):
@@ -20,6 +22,32 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("EventTable:", TEMPLATE)
         self.assertIn("AuthorizationType: JWT", TEMPLATE)
         self.assertIn("AccessTableArn", TEMPLATE)
+
+    def test_fleet_efficiency_is_durable_stream_driven_and_least_privilege(self):
+        self.assertIn("VehicleProfileTable:", TEMPLATE)
+        self.assertIn("FleetEfficiencyTable:", TEMPLATE)
+        self.assertIn("FleetJourneyMarkerTable:", TEMPLATE)
+        self.assertIn("StreamSpecification: {StreamViewType: NEW_IMAGE}", TEMPLATE)
+        self.assertIn("FleetEfficiencyEventSource:", TEMPLATE)
+        self.assertIn("Handler: fleet_efficiency.handler", TEMPLATE)
+        self.assertIn("PointInTimeRecoveryEnabled: true", TEMPLATE)
+        fleet_role = TEMPLATE.split("  FleetEfficiencyRole:", 1)[1].split("  FleetEfficiencyFunction:", 1)[0]
+        self.assertIn("dynamodb:GetItem", fleet_role)
+        self.assertIn("dynamodb:PutItem, dynamodb:UpdateItem", fleet_role)
+        self.assertNotIn("dynamodb:Scan", fleet_role)
+        self.assertIn('ConditionExpression": "attribute_not_exists(markerId)"', FLEET)
+        self.assertNotIn('"vehicleId": values', FLEET)
+
+    def test_personal_community_comparison_is_separate_and_jwt_authorized(self):
+        self.assertIn("UserEfficiencyTable:", TEMPLATE)
+        self.assertIn("EfficiencyApiFunction:", TEMPLATE)
+        self.assertIn('GET /api/vehicles/{vehicleId}/efficiency-comparison', TEMPLATE)
+        self.assertIn("AuthorizationType: JWT", TEMPLATE)
+        self.assertIn("FleetEfficiencyFinalizerSchedule:", TEMPLATE)
+        self.assertIn('ScheduleExpression: "cron(15 0 1 * ? *)"', TEMPLATE)
+        self.assertIn("averageNetKwhPer100Km", FLEET)
+        self.assertNotIn("soc", EFFICIENCY_API.lower())
+        self.assertNotIn("battery", EFFICIENCY_API.lower())
 
     def test_rule_only_consumes_four_level_mot_topics(self):
         self.assertIn("FROM 'mot/+/+/+'", TEMPLATE)

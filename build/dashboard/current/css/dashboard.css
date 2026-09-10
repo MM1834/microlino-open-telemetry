@@ -218,6 +218,10 @@
 .range-forecast label{color:var(--muted);font-size:.75rem}
 .range-forecast strong{font-size:1.55rem}
 .range-forecast span,.range-forecast small{color:var(--muted);font-size:.78rem}
+.efficiency-comparison{margin:0 0 12px;padding:10px;border:1px solid rgba(158,176,199,.14);border-radius:12px;background:rgba(255,255,255,.025)}
+.efficiency-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.efficiency-heading label{color:var(--muted);font-size:.75rem}.efficiency-heading strong{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;font-size:1.15rem;background:rgba(158,176,199,.16)}
+.efficiency-heading strong.is-positive{color:#63d8a4;background:rgba(49,176,125,.16)}.efficiency-heading strong.is-neutral{color:#f1c96b;background:rgba(225,174,51,.14)}.efficiency-heading strong.is-negative{color:#ff8b8b;background:rgba(220,70,70,.15)}
+.efficiency-comparison>small{display:block;margin-top:3px;color:var(--muted);font-size:.7rem}.efficiency-values{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.efficiency-values span{color:var(--muted);font-size:.72rem}.efficiency-values b{display:block;margin-top:2px;color:var(--text);font-size:.9rem}
 .overview-charging-stationary{display:flex;flex-direction:column;align-items:center;justify-content:center}
 .mobile-driving-flow{display:none}
 .metric-freshness{margin-top:7px;font-size:.72rem;line-height:1.25;text-align:center}

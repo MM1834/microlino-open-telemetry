@@ -265,6 +265,20 @@
         );
       },
 
+      async getCurrentJourney() {
+        if (!activeVehicleId) return { active: false, points: [] };
+        return get(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/current-journey`
+        );
+      },
+
+      async getEfficiencyComparison() {
+        if (!activeVehicleId) return { available: false, reason: 'vehicle_not_found' };
+        return notificationRequest(
+          `/api/vehicles/${encodeURIComponent(activeVehicleId)}/efficiency-comparison`
+        );
+      },
+
       async getVehicles() {
         const result = await get('/api/vehicles');
         return Array.isArray(result) ? result : (result.vehicles || []);

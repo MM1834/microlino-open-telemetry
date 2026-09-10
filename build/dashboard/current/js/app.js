@@ -39,6 +39,9 @@
     rangeForecastVehicleId: null,
     rangeForecastLoadingVehicleId: null,
     rangeForecastRequest: 0,
+    efficiencyComparison: null,
+    efficiencyComparisonVehicleId: null,
+    efficiencyComparisonRequest: 0,
     rangeKmAt100: Number(vehicleCfg.defaultRangeKmAt100 || 140),
     rangeReserveSoc: 0
   };
@@ -736,9 +739,61 @@
       if (requestId === state.rangeForecastRequest) state.rangeForecastLoadingVehicleId = null;
     }
   }
+  function renderEfficiencyComparison() {
+    const panel = $('efficiency-comparison');
+    if (!panel) return;
+    const comparison = state.efficiencyComparison;
+    panel.hidden = !comparison;
+    if (!comparison) return;
+    const translate = text => window.MOT_I18N?.translate?.(text) || text;
+    const month = /^\d{4}-\d{2}$/.test(String(comparison.month || ''))
+      ? new Intl.DateTimeFormat(activeLocale(), { month: 'long', year: 'numeric' })
+        .format(new Date(`${comparison.month}-01T12:00:00Z`))
+      : translate('Vormonat');
+    setText('efficiency-period', month);
+    const flag = $('efficiency-flag');
+    flag?.classList.remove('is-positive', 'is-neutral', 'is-negative');
+    if (!comparison.available) {
+      setText('efficiency-flag', '=');
+      flag?.classList.add('is-neutral');
+      setText('efficiency-personal', '--');
+      setText('efficiency-community', '--');
+      setText('efficiency-result', translate('Noch nicht genügend Vergleichsdaten'));
+      return;
+    }
+    const marker = ['+', '=', '-'].includes(comparison.flag) ? comparison.flag : '=';
+    setText('efficiency-flag', marker);
+    flag?.classList.add(marker === '+' ? 'is-positive' : (marker === '-' ? 'is-negative' : 'is-neutral'));
+    setText('efficiency-personal', `${fmtNum(comparison.personal?.averageNetKwhPer100Km, 2)} kWh/100 km`);
+    setText('efficiency-community', `${fmtNum(comparison.community?.averageNetKwhPer100Km, 2)} kWh/100 km`);
+    const label = marker === '+'
+      ? 'Effizienter als die Community'
+      : (marker === '-' ? 'Weniger effizient als die Community' : 'Ähnlich wie die Community');
+    const difference = Number(comparison.difference?.kwhPer100Km);
+    const signed = Number.isFinite(difference) ? `${difference >= 0 ? '+' : ''}${fmtNum(difference, 2)} kWh/100 km` : '--';
+    setText('efficiency-result', `${translate(label)} · ${signed}`);
+  }
+  async function loadEfficiencyComparison() {
+    const vehicleId = state.selectedVehicleId;
+    if (!vehicleId || !state.dataProvider?.getEfficiencyComparison || !auth?.isAuthenticated()) return;
+    const requestId = ++state.efficiencyComparisonRequest;
+    try {
+      const result = await state.dataProvider.getEfficiencyComparison();
+      if (requestId !== state.efficiencyComparisonRequest || vehicleId !== state.selectedVehicleId) return;
+      state.efficiencyComparison = result;
+      state.efficiencyComparisonVehicleId = vehicleId;
+      renderEfficiencyComparison();
+    } catch (error) {
+      if (requestId !== state.efficiencyComparisonRequest) return;
+      console.warn('MOT efficiency comparison request failed', error);
+      state.efficiencyComparison = null;
+      renderEfficiencyComparison();
+    }
+  }
   window.addEventListener('mot-language-change', () => {
     updateClock();
     renderRangeForecast();
+    renderEfficiencyComparison();
     updateDeviceInfo();
     window.MOTHistoryChart?.render?.();
   });
@@ -1070,6 +1125,9 @@ function resetDashboardForVehicle(vehicleId) {
   state.rangeForecastVehicleId = null;
   state.rangeForecastLoadingVehicleId = null;
   state.rangeForecastRequest += 1;
+  state.efficiencyComparison = null;
+  state.efficiencyComparisonVehicleId = null;
+  state.efficiencyComparisonRequest += 1;
   state.rangeKmAt100 = Number(vehicleCfg.defaultRangeKmAt100 || 140);
   state.rangeReserveSoc = 0;
 
@@ -1088,6 +1146,7 @@ function resetDashboardForVehicle(vehicleId) {
   setText('range-forecast-main', '-- km');
   setText('range-forecast-basis', 'Noch keine ausreichende Fahrhistorie');
   setText('range-soc-comparison', 'Nach SoC: -- km');
+  $('efficiency-comparison')?.setAttribute('hidden', '');
 
   setText('charging-main', 'Keine Daten');
   setText('charging-card', 'Keine Daten');
@@ -1170,6 +1229,7 @@ async function selectVehicle(vehicleId) {
   }
   await loadNotificationPreferences(true);
   loadRangeForecast().catch(error => console.warn('Range forecast failed:', error));
+  loadEfficiencyComparison().catch(error => console.warn('Efficiency comparison failed:', error));
   window.MOTHistoryChart?.render?.();
 }
 
@@ -1448,6 +1508,7 @@ function startDataProvider() {
             window.MOTHistoryChart?.render?.();
           }
           loadRangeForecast().catch(error => console.warn('Range forecast failed:', error));
+          loadEfficiencyComparison().catch(error => console.warn('Efficiency comparison failed:', error));
         }
         loadNotificationPreferences().catch(error => console.error('Notification settings failed:', error));
       },

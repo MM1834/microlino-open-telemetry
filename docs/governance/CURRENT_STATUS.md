@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-04
+**Last reviewed:** 2026-09-10
 
 ## Purpose
 
@@ -18,6 +18,63 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+DRV-001 is complete with a fully journey-related, smartphone-first live view.
+The repository route uses the canonical active journey ID/start maintained by
+the existing backend session state and returns only native Speed/Power History
+for that bounded journey. The separate read-only page emphasizes current power,
+an enlarged mode-specific bar and range to both zero and the configured SOC
+reserve; reloads and device changes retain the server-side journey boundary.
+Reviewed Change Set `drv-001-current-journey-20260910` added the JWT route and
+updated the existing Vehicle API Lambda/integration/IAM in place without
+replacement or deletion; `mot-aws-3-1` reached `UPDATE_COMPLETE`. Route and
+Lambda read-back plus anonymous `401` passed. The hosted no-data layout is
+accepted. The first road test accepted the journey start, Speed, range values
+and general smartphone presentation. A repository follow-up preserves browser
+Power points across the minutely current-journey refresh, makes direction
+explicit (`−` consumption; green `+` recuperation/charging) and adopts the
+persisted dashboard language. Productive retesting passed. A subsequent accepted
+repository/backend slice also retains the last
+completed journey and its Speed/Power diagram until a different journey ID
+starts. Reviewed Change Set `drv-001-last-journey-20260910` changed only the
+existing Vehicle API Lambda and integration in place; `mot-aws-3-1` returned to
+`UPDATE_COMPLETE`, health passed and anonymous access remains `401`. Portal
+upload and the final active/completed/new-journey transition test passed.
+The next accepted DRV-001 repository slice returns the last completed journey
+when no active journey exists, labels its end time and retains the chart until a
+new journey ID starts. It reuses the already persisted completion diagnostics
+and existing Speed/Power History rather than adding another table. Consumption
+is again unsigned while recuperation/charging retain green `+`. Persisted
+one-minute Power samples use colored bars, and the retained last journey has a
+muted grey card without removing chart colors. All 44 focused tests pass and the
+Foundation API update is deployed.
+
+FLEET-EFF-001 now preserves anonymized monthly fleet-efficiency evidence beyond
+the notification event table's maximum 31-day TTL. Reviewed Change Set
+`fleet-eff-001-a-narrow-20260910` added encrypted/PITR monthly and vehicle-profile
+tables, a 93-day TTL hash-marker table, a dedicated least-privilege Lambda and a
+`NEW_IMAGE` stream without replacing a table or function; the stack reached
+`UPDATE_COMPLETE`. Seven maintainer-declared capacity profiles and 190 unique
+logical journeys were backfilled into August and September totals. A full repeat
+recorded zero new journeys and 190 duplicates, the deployed Lambda duplicate
+smoke test passed and CloudWatch shows no error. Three subsequent natural
+journeys were present in September and already deduplicated by the live stream,
+closing that acceptance gate. The durable aggregate contains no user, vehicle,
+adapter, journey or location identifier. Multi-sample capacity plausibility
+and onboarding integration remain planned; production activation is blocked
+until versioned disclosure, consent/policy and withdrawal behaviour are accepted.
+FLEET-EFF-001.G additionally deploys the optional previous-month personal versus
+community comparison. A Zurich monthly finalizer stores both community and
+private vehicle averages; the JWT route performs a leave-one-out comparison and
+returns absolute kWh/100 km values plus a 5 percent `+ / = / -` flag without SOC
+or battery data. The private pseudonymous table has 400-day TTL, encryption and
+PITR. Six productive August comparisons passed (two `+`, one `=`, three `-`),
+anonymous HTTP returns 401 and error logs are empty. Repository portal and four-
+language wording pass focused tests. Hosted desktop and smartphone acceptance
+passed on 2026-09-10 after verifying that the parallel DRV-001 additions remain
+present; FLEET-EFF-001.G is complete. Versioned
+privacy/usage wording is a gate for production go-live after the MOT pilot, not
+for this controlled pilot deployment.
 
 ADM-GRANT-001 is complete. A new
 JWT-protected and `mot-beta-admins`-restricted endpoint lists only active,
@@ -31,6 +88,39 @@ returns `401`, non-admin validation returns `403`, and the live admin inventory
 returns `200`. The maintainer accepted the portal and AWS backend on 2026-09-09.
 Subsequent diverse WebFlash and password-recovery grant/revoke tests also passed,
 providing final productive acceptance.
+
+MQTT-001 has started with a first repository-build-qualified C6 secure local MQTT
+slice. It is default-off and uses verified TLS with a user-supplied trust anchor,
+dedicated username/password or checked mTLS credentials, a publish-only canonical
+vehicle namespace and retained online/freshness state. Credentials remain separate
+from AWS IoT and absent from backup/diagnostics. Location requires an independent
+authenticated local owner opt-in; revocation durably schedules retained broker
+topic cleanup. The complete focused C6 suite passes 60 tests.
+`nanoesp32c6-n16` builds at 1,404,108 application bytes (26.8%) with 59,096 bytes
+static RAM; compatibility-only `xiao-esp32c6` builds at 1,389,896 bytes (81.6%,
+below its 85% gate) with 58,356 bytes static RAM. No broker, ioBroker or physical
+N16 acceptance is claimed yet. Home Assistant remains a schema-compatibility
+target, and LilyGO plus mobile-network work is parked pending the hardware
+decision.
+
+ADP-INF-001 adds a read-only `MOT Adapter Informationen` block at the end of the
+authenticated Settings page. It reads DeviceId, Board, firmware version,
+CAN1/CAN2 decoder keys and local IP address from the existing authorized vehicle
+snapshot and reloads them with vehicle selection. Missing topics display `--`.
+REV18 now emits Board as retained `system/board` birth state. No backend route, schema or
+authorization change is required. The focused portal/i18n contracts and
+JavaScript syntax checks pass. Maintainer acceptance passed on 2026-09-07 with
+REV18, including the complete firmware-to-AWS-to-dashboard presentation path;
+desktop and smartphone layouts were also accepted with empty fields from older
+firmware. ADP-INF-001 is complete.
+
+Firmware now supplies the configured CAN1 and CAN2 decoder keys to the shared AWS
+client, which publishes them as retained birth state alongside the firmware
+version. The generic State ingestion requires no schema or deployment change.
+Repository contract tests pass and both C6 plus both LilyGO AWS targets compile;
+the WROOM AWS source integration is present, but its existing 4 MB default OTA
+partition is currently 4,156 bytes below the size required by the complete image
+and remains a release-boundary issue. No live-dashboard rendering is introduced.
 
 OPS-001 now decouples the interactive History diagrams from the personal
 30-day range forecast. `GET /api/vehicles/{vehicleId}/history` returns only the
@@ -76,6 +166,15 @@ shared Lambdas in place without replacing any table or function; stack
 the public API remains JWT-protected. The hosted portal and overnight Scheduler
 path passed on 2026-09-04; enabled users received successfully prepared emails
 and the maintainer verified the reported journey and charging data as correct.
+The 2026-09-05 overnight follow-up found one narrow transition gap: a journey
+stopped shortly before midnight and charging began shortly afterwards, while the
+00:05 check saw neither session as active. The repository now independently
+retains the last real movement (`Speed > 1 km/h`) across journey cleanup and
+defers when it is less than 30 minutes old. Zero-speed and mere online telemetry
+cannot prolong the guard; hourly retry and the 08:05 bound are unchanged. All 91
+notification tests pass. The isolated Notification Lambda update is deployed and
+reports `Active`/`Successful`; its invalid-topic smoke probe passed. Overnight
+validation remains open.
 
 The controlled 2026-09-03 Pioneer SOC run established `0x48D data[7]` as an
 exact Standard-CAN copy of the visible whole-percent SOC and `data[6]` as a
@@ -158,6 +257,22 @@ the REV14 runtime string. Correctly rebuilt XIAO and N16 images now embed
 new exact object keys and hashes. The packaging tool rejects binaries that do
 not contain the declared version. `xruser` has an audited 48-hour XIAO grant, and
 principal-specific read-back returns only the corrected 4 MB artifact.
+REV16 remained internal and unpublished because its binary/runtime release
+identity was still REV15. The consolidated `C6-001-REV17-AWS` release is active
+for both C6 WebFlash targets as of 2026-09-07. N16 is 1,439,600 bytes with
+SHA-256 `7a206884b4cf029300173bee08d32a6f8b9c12224ad28a4364a29f16824e2a5f`;
+XIAO is 1,425,792 bytes with SHA-256
+`7ab81ba5620a6ae211e84c402e01058f457354dd98a97120a89c14693a759ad2`.
+Replacement-free Change Set `webflash-rev17-20260907` completed successfully;
+S3, stack parameters and Lambda environment read back the exact immutable
+artifacts. REV15 firmware grants fail closed and require an explicit REV17
+regrant; password-recovery grants are independent and unchanged.
+The successor `C6-001-REV18-AWS` is active for N16 and XIAO. It adds retained
+`system/board` and identifies V1 as
+`standard-can-v1-pioneer-gen1-midrange` while preserving numeric profile value
+`2` and the former command alias. Replacement-free Change Set
+`webflash-rev18-20260907` completed successfully; exact S3 hashes, stack/Lambda
+configuration, anonymous 401 and fail-closed REV17-grant checks passed.
 The repository additionally provides an independently authorized Web-Serial
 recovery for a lost local adapter password. A time-limited admin grant is required
 for the exact portal user and is separate from every firmware release grant. The
@@ -178,16 +293,19 @@ subsequent administrator grant revocation. Function and GUI are accepted.
 
 I18N-001 has a repository-complete portal localization slice. German remains the
 project language and the dashboard default/fallback; a persisted selector adds
-English and French without changing the English-only local firmware wizard.
+English, French and Italian without changing the English-only local firmware wizard.
 Static labels, runtime state, accessibility labels, dates and History charts use
 the selected locale. Desktop and smartphone browser acceptance passed in all
-three languages. The German one-page pilot handout remains authoritative and the
+three previously deployed languages. The German one-page pilot handout remains authoritative and the
 same generator now produces reviewed English and French PDFs. Hosted portal
 upload and native-speaker review of the French wording remain open.
-The public landing page now mirrors the three-language choice and links to a
+The public landing page now mirrors the four-language choice and links to a
 dedicated `/onboarding/` page with prominent user-to-adapter and user-to-Portal
 paths plus high-contrast active states. Repository desktop and 390 px layout checks pass; hosted
-upload and maintainer acceptance remain pending.
+upload and maintainer acceptance remain pending. The 2026-09-04 Italian extension
+covers the landing page, onboarding diagram, dashboard, settings, administration,
+Web-Flasher, runtime states and locale-sensitive values; repository contracts pass,
+while hosted upload and native-language review remain open.
 
 ONB-UX-001 completed the guided C6 local-onboarding flow on 2026-08-25. The
 one-time credential transition now requires confirmation, the authenticated
@@ -459,6 +577,23 @@ allowlists and their derived IoT rules without replacement; the stack returned t
 successful updates. The adapter-side cache remains a separate, default-off local
 setting and must be enabled in the authenticated device wizard before any offline
 samples are collected.
+The active `ml-pilot-030` owner assignment is now also enabled for operational
+History and offline cache Backfill. The reviewed replacement-free Change Set
+`services-ml-pilot-030-20260905` modified only the two Lambda functions and their
+IoT rules; stack `mot-aws-3-1` returned to `UPDATE_COMPLETE`, both effective
+allowlists include `ml-pilot-030`, and the device policy already contains the exact
+Backfill-ACK subscribe/receive path. The adapter-side cache remains a separate
+local setting. No notification preference or verified SMS destination existed at
+the time of this server-side enablement, so email/SMS remain user-completed steps.
+The active `ml-pilot-026` owner assignment is likewise enabled for operational
+History and offline cache Backfill. Reviewed replacement-free Change Set
+`services-ml-pilot-026-20260905` changed only the same two Lambda functions and
+their derived IoT rules; stack `mot-aws-3-1` returned to `UPDATE_COMPLETE`, and
+the device policy already contains the exact vehicle-scoped Backfill-ACK
+subscribe/receive path. At verification time the adapter had published only
+system and connectivity telemetry on firmware `C6-001-REV10-AWS`; no CAN, trip,
+charging or GPS values and no notification preference record were present.
+Adapter-side caching and notification recipients remain user-completed steps.
 The confirmed pilot account `be07@microlino-open-telemetry.ch` owns active vehicle
 `ml-pilot-027`. On 2026-09-01 the reviewed no-replacement Change Set
 `enable-ml-pilot-027-history-20260901` added that vehicle to operational History
@@ -633,6 +768,16 @@ finishes early when a complete fresh counter arrives, and preserves the bounded
 telemetry fallback for legacy firmware. All 82 notification tests pass. The
 isolated Notification Lambda update is deployed and reports
 `Active`/`Successful`; physical road validation remains open.
+
+Three Pioneer summaries on 2026-09-07 then isolated a firmware-side boundary
+mismatch: two direct charging transitions had no timely final local checkpoint,
+and one preceding counter was still unavailable when the next real journey began.
+REV17 now seals and prioritizes the N16 counter immediately on fresh Standard-CAN
+plug or charging state. A zero-speed sample merely starts a candidate; only ten
+continuous stopped minutes seal that path. A sealed final MQTT triplet is retained
+until accepted before later movement may replace its identity. The N16 build uses
+58,632 bytes RAM and 1,382,282 bytes flash; XIAO remains counter-disabled and also
+builds successfully. Physical installation and road validation remain open.
 
 The first JNY-001 road observation identified and corrected a post-stop charging
 edge: plugging in during the stability window no longer invalidates the completed

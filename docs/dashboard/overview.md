@@ -32,6 +32,17 @@ result as a comparison. Before valid history exists, the fixed value remains the
 only displayed forecast. Both `/dashboard/` and `/motbeta/` consume this shared
 portal source.
 
+The Vehicle card also contains an authenticated previous-month efficiency
+comparison. It shows the selected vehicle's stored net kWh/100 km beside the
+anonymous community value after subtracting that vehicle's contribution. A `+`
+means at least five percent lower consumption, `=` is the five-percent neutral
+band and `-` means at least five percent higher consumption. The result is hidden
+behind an insufficient-data state unless at least three other vehicles, ten
+journeys and 100 km remain. SOC and battery capacity are never part of this API
+or card. German, English, French and Italian wording is included. Hosted desktop
+and smartphone acceptance passed on 2026-09-10, including coexistence with the
+separate DRV-001 live-journey page.
+
 The authenticated Settings page ends with a read-only `MOT Adapter
 Informationen` block for the selected vehicle. It obtains DeviceId, Board,
 firmware version, CAN1/CAN2 decoder profile keys and the adapter's local IP

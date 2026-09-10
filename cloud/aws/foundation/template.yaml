@@ -138,6 +138,12 @@ Parameters:
     Default: 7
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
 
+  NotificationSessionTableName:
+    Type: String
+    Default: mot-dev-notification-sessions
+    AllowedPattern: '^[A-Za-z0-9_.-]{3,255}$'
+    Description: Existing notification session table containing the canonical current journey boundary.
+
   CognitoSelfRegistrationEnabled:
     Type: String
     Default: "false"
@@ -1207,6 +1213,10 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:GetItem
                 Resource: !GetAtt UserVehicleAccessTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${NotificationSessionTableName}"
       Tags:
         - Key: project
           Value: !Ref ProjectName
@@ -1231,6 +1241,7 @@ Resources:
           ACCESS_TABLE_NAME: !Ref UserVehicleAccessTable
           HISTORY_TABLE_NAME: !Ref VehicleHistoryTable
           HISTORY_RETENTION_DAYS: !Ref HistoryRetentionDays
+          JOURNEY_SESSION_TABLE_NAME: !Ref NotificationSessionTableName
       Code:
         ZipFile: |
           import json
@@ -1248,6 +1259,9 @@ Resources:
   
           table = boto3.resource("dynamodb").Table(TABLE_NAME)
           history = boto3.resource("dynamodb").Table(os.environ["HISTORY_TABLE_NAME"])
+          journey_sessions = boto3.resource("dynamodb").Table(
+              os.environ["JOURNEY_SESSION_TABLE_NAME"]
+          )
           access = boto3.resource("dynamodb").Table(
               os.environ["ACCESS_TABLE_NAME"]
           )
@@ -1411,6 +1425,62 @@ Resources:
                   if not last_evaluated_key:
                       break
               return sorted(items, key=lambda item: int(item.get("sampledAt", 0)))
+
+          def load_current_journey(vehicle_id, until_ms):
+              result = journey_sessions.get_item(
+                  Key={"vehicleId": f"journey#{vehicle_id}"},
+                  ConsistentRead=True,
+                  ProjectionExpression="journey"
+              )
+              journey = json_value(result.get("Item", {}).get("journey") or {})
+              journey_id = str(journey.get("active_id") or "").strip()
+              started_at = int(journey.get("started_at") or 0)
+              active = bool(journey_id and started_at > 0)
+              completion_at = int(journey.get("last_completion_at") or 0)
+              if not active:
+                  journey_id = str(
+                      journey.get("last_completed_journey_id") or ""
+                  ).strip()
+                  try:
+                      started_at = int(journey_id)
+                  except (TypeError, ValueError):
+                      started_at = 0
+              if not journey_id or started_at <= 0:
+                  return {"vehicleId": vehicle_id, "active": False, "points": []}
+
+              # A real Microlino journey is bounded well below 24 hours. This
+              # cap prevents a stale notification session from turning a
+              # glance view into an unbounded History query.
+              query_until_ms = until_ms if active else max(started_at, completion_at)
+              query_since_ms = max(started_at, query_until_ms - 24 * 3600000)
+              points = {}
+              for signal in ("speed", "power"):
+                  for item in query_history_signal(
+                      vehicle_id, signal, query_since_ms, query_until_ms
+                  ):
+                      sampled_at = int(item.get("sampledAt", 0))
+                      point = points.setdefault(sampled_at, {"ts": sampled_at})
+                      point[signal] = json_value(item.get("value"))
+              return {
+                  "vehicleId": vehicle_id,
+                  "active": active,
+                  "available": True,
+                  "status": "active" if active else "completed",
+                  "journeyId": journey_id,
+                  "startedAt": started_at,
+                  "lastMovingAt": int(journey.get("last_moving_at") or 0) if active else 0,
+                  "stoppedAt": int(journey.get("stopped_at") or 0) if active else 0,
+                  "endedAt": (
+                      max(points) if not active and points else
+                      (completion_at if not active else 0)
+                  ),
+                  "startSoc": journey.get("start_soc"),
+                  "lastSoc": journey.get("last_soc"),
+                  "startOdometer": journey.get("start_odometer"),
+                  "lastOdometer": journey.get("last_odometer"),
+                  "truncated": query_since_ms > started_at,
+                  "points": [points[key] for key in sorted(points)]
+              }
 
           def calculate_range_forecast(vehicle_id, since_ms, until_ms):
               odometer = query_history_signal(
@@ -1613,6 +1683,18 @@ Resources:
               if (
                   method == "GET"
                   and path.startswith("/api/vehicles/")
+                  and path.endswith("/current-journey")
+              ):
+                  vehicle_id = path_parameters.get("vehicleId")
+                  if not vehicle_id or not has_active_access(user_sub, vehicle_id):
+                      return response(404, {"error": "vehicle_not_found"})
+                  return response(200, load_current_journey(
+                      vehicle_id, int(time.time() * 1000)
+                  ))
+
+              if (
+                  method == "GET"
+                  and path.startswith("/api/vehicles/")
                   and path.endswith("/range-forecast")
               ):
                   vehicle_id = path_parameters.get("vehicleId")
@@ -1761,6 +1843,15 @@ Resources:
     Properties:
       ApiId: !Ref VehicleHttpApi
       RouteKey: "GET /api/vehicles/{vehicleId}/range-forecast"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref VehicleApiJwtAuthorizer
+      Target: !Sub "integrations/${VehicleApiIntegration}"
+
+  VehicleApiCurrentJourneyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref VehicleHttpApi
+      RouteKey: "GET /api/vehicles/{vehicleId}/current-journey"
       AuthorizationType: JWT
       AuthorizerId: !Ref VehicleApiJwtAuthorizer
       Target: !Sub "integrations/${VehicleApiIntegration}"

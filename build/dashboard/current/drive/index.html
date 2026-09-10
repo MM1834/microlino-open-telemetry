@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07111f" />
+  <title>MOT Fahrt</title>
+  <link rel="stylesheet" href="../css/drive.css?v=20260910-drive2" />
+  <script src="../js/i18n.js?v=20260910-drive1"></script>
+</head>
+<body>
+  <main class="drive-shell">
+    <header class="drive-header">
+      <div><strong>MOT Fahrt</strong><span id="drive-status">Sitzung wird geprüft…</span></div>
+      <label>Fahrzeug<select id="drive-vehicle"></select></label>
+      <a href="../" class="quiet-link">Dashboard</a>
+    </header>
+
+    <section id="drive-denied" class="drive-card drive-message">
+      <p id="drive-denied-message">Bitte zuerst anmelden.</p>
+      <button id="drive-login" type="button">Anmelden</button>
+    </section>
+
+    <div id="drive-content" hidden>
+      <section class="drive-card power-card" aria-live="polite">
+        <span id="drive-power-mode" class="eyebrow">Bereit</span>
+        <strong id="drive-power">-- kW</strong>
+        <span id="drive-power-freshness" class="freshness"></span>
+        <div id="drive-power-meter" class="power-meter" role="meter" aria-label="Leistung" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0">
+          <i></i>
+        </div>
+      </section>
+
+      <section class="range-grid">
+        <article class="drive-card"><span>Restreichweite</span><strong id="drive-range-zero">-- km</strong><small>bis 0 %</small></article>
+        <article class="drive-card"><span>Nutzbare Reichweite</span><strong id="drive-range-reserve">-- km</strong><small id="drive-reserve-label">bis Reserve</small></article>
+      </section>
+
+      <section class="drive-card journey-card">
+        <div class="journey-heading">
+          <div><span id="drive-journey-mode" class="eyebrow">Aktuelle Fahrt</span><strong id="drive-journey-title">Keine laufende Fahrt</strong></div>
+          <span id="drive-speed">-- km/h</span>
+        </div>
+        <canvas id="drive-chart" aria-label="Geschwindigkeit und Leistung der aktuellen Fahrt"></canvas>
+        <div class="legend"><span><i class="speed"></i>Geschwindigkeit</span><span class="consumption-legend"><i class="consumption-low"></i><i class="consumption"></i><i class="consumption-high"></i>Verbrauch</span><span><i class="regen"></i>Rekuperation</span></div>
+      </section>
+    </div>
+  </main>
+  <script src="../config.js"></script>
+  <script src="../js/auth/pkce.js"></script>
+  <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
+  <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
+  <script src="../js/providers/provider-registry.js"></script>
+  <script src="../js/live/websocket-client.js"></script>
+  <script src="../js/providers/aws-backend-provider.js?v=20260910-drv-eff1"></script>
+  <script src="../js/drive.js?v=20260910-drive6"></script>
+</body>
+</html>

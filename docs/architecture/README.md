@@ -24,6 +24,7 @@
 - [Telemetry history pilot](telemetry-history.md)
 - [Bounded telemetry debug capture](telemetry-debug.md)
 - [Authentication](authentication.md)
+- [Service entitlements and automatic activation](service-entitlements.md)
 - [CAN profile framework](can-profile-framework.md)
 
 ## Architecture decisions

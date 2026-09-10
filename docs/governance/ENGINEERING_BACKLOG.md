@@ -8,10 +8,40 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-01
+**Last reviewed:** 2026-09-10
 
 This backlog contains relevant work that is not part of the immediate active
 delivery. Moving an item into `WORK_ORDER` requires an explicit priority decision.
+
+## Production data-use and privacy terms
+
+Before the production/public go-live after the MOT pilot phase, define and publish a versioned
+data-use/privacy disclosure for MOT. It must identify the responsible party and
+contact path and explain purposes, lawful/consent basis as applicable, telemetry
+categories, recipients/processors, storage regions, security, retention,
+aggregation/anonymization limits, user rights, withdrawal and deletion behaviour.
+
+Onboarding must present the applicable version before activation of optional
+cloud analytics and record the user's decision and timestamp without bundling it
+silently into unrelated email or service settings. A changed material purpose or
+retention rule requires a new version and an explicit migration/re-consent
+decision. The wording must distinguish truly anonymous monthly fleet totals from
+pseudonymous or small-cohort data that can still be linked in practice.
+
+Coordinate this gate with
+[FLEET-EFF-001](../project/sprints/FLEET-EFF-001.md), account deletion,
+vehicle/adapter reassignment and the future production onboarding flow. No
+production fleet-efficiency claim may rely on activity collected outside the
+accepted disclosure/policy boundary.
+
+The deployed pilot option `Deine Fahreffizienz im Vergleich zur Community` needs
+explicit post-pilot opt-in, retention and account-withdrawal deletion wording
+because its private monthly user total remains personal data even when the
+comparison baseline is anonymous. The pilot already enforces at least three
+other active vehicles, ten journeys and 100 km, a 5 percent neutral band and
+leave-one-out community totals. Reassess those thresholds before production.
+The API and UI expose only both absolute kWh/100 km values, their difference,
+period and availability state; SOC and battery capacity remain excluded.
 
 ## Cloud-managed firmware updates
 
@@ -122,6 +152,48 @@ admin UI may expose inventory, invitation/claim state, roles, delivery health an
 bounded support actions, but must not reveal device credentials or plaintext user
 contact destinations by default. Every administrative mutation requires explicit
 authorization and an audit record.
+
+### Service entitlements, subscriptions and isolated staging
+
+Implement the service-freigabe model defined in
+[Service entitlements and automatic activation](../architecture/service-entitlements.md)
+together with the future subscription model and central administration portal.
+An administrator or subscription may grant History, cache Backfill, email, report
+or SMS services before the user has supplied a destination. A granted service
+must activate automatically only after its user/device configuration and all
+technical verification, country, rate and spend prerequisites are satisfied.
+
+Do not retrofit this as an incomplete preference or destination record in the
+running pilot. `/motbeta/` is not a fully isolated backend. The first delivery
+slice is therefore a genuine staging environment with separate identity, data,
+API, notification and IoT test boundaries. The current pilot procedure remains
+authoritative until staged entitlement evaluation, migration, rollback and
+cross-user delivery-isolation tests pass.
+
+### Language-aware verification and notification messages
+
+Extend the portal's supported German, English, French and Italian locales to the
+complete transactional communication path. Store an explicit preferred
+communication locale per user or notification preference instead of relying on
+the browser language present during one session. Apply it consistently to account
+and destination verification, email and SMS confirmation flows, SOC/range and
+charging-stop alerts, and journey, charging and daily summary emails.
+
+Localize subjects, message bodies, action labels, expiry and support text, dates,
+times, decimal formatting and units without mixing languages inside one message.
+Define and test one deterministic fallback when the requested locale or template
+version is unavailable. A locale change must affect future messages without
+invalidating an existing verified destination, and queued/retried deliveries must
+have an explicit policy for whether they retain the original locale snapshot or
+use the current preference.
+
+Review provider-owned messages separately. In particular, determine whether the
+AWS-managed SNS email-subscription confirmation can meet the localization and
+branding requirements; if not, replace that user-facing verification step with a
+tokenized MOT-controlled flow using the approved email-delivery architecture.
+Keep verification tokens single-purpose, expiring and non-disclosing, preserve
+recipient isolation and rate limits, and add per-locale rendering, delivery and
+fallback tests in the isolated staging environment before production rollout.
 
 ### Pilot handoff and vehicle presentation
 
@@ -338,6 +410,33 @@ unplugged, plugged-idle, active-charging and charge-stop transitions before thos
 signals are considered verified or used as authoritative notification and journey
 boundaries.
 
+### Consent-bound remote CAN diagnostic capture
+
+**Priority:** High. Add a safe, remotely configurable diagnostic mode so distant
+pilot vehicles can contribute passive CAN evidence without receiving an ad-hoc
+diagnostic firmware build. The production firmware may contain the dormant
+capability, but each capture must require an explicit, authenticated user consent
+for the named vehicle plus a separate time-limited administrator authorization.
+
+The command and capture contract must be fail-closed and define the selected CAN
+channel, an allowlist of frame IDs or a deliberately bounded discovery mode,
+maximum runtime, maximum frame and byte counts, sampling/rate limits and an
+absolute expiry. Capture must remain listen-only, stop automatically on every
+limit, survive connectivity loss without unbounded storage, and expose a visible
+active/stopped state to the user. Do not collect GPS, WiFi credentials, tokens,
+certificates or unrelated device configuration. Encrypt transport and storage,
+apply short retention with automatic deletion, scope download to administrators,
+and audit consent, authorization, start, stop, expiry, access and deletion.
+
+Use the first suitable vehicle to compare V1 and V2 Standard-CAN generations and
+to isolate the missing V2 `charging/plugged` and `charging/is_charging` states
+across unplugged, plugged-idle, charging, charge-stop and unplug transitions.
+Keep battery capacity, production year, BMS supplier/generation, motor generation
+and selected decoder profile as separate evidence fields; do not infer the CAN
+generation from battery size alone. Before enabling this remotely for a pilot,
+validate command authentication, replay protection, resource bounds, automatic
+shutdown, privacy controls and rollback in an isolated test environment.
+
 Hardware options previously requiring evaluation:
 
 - rewire pins 1 and 9 of the current module to standard CAN;
@@ -381,7 +480,10 @@ LED meanings before adding it to unattended pilot hardware.
 
 **Priority:** High. Define and qualify an explicit energy-management policy for
 the nanoESP32-C6-N16 vehicle adapter before treating it as an unattended
-installation. The policy must distinguish at least these states:
+installation. The supply alternatives, sleep criteria, wake sources, standby
+budget and 12-V monitoring constraints are consolidated in
+[Vehicle board-network power and 12-V battery monitoring](../hardware/vehicle-board-power.md).
+The policy must distinguish at least these states:
 
 - **Driving/active:** CAN, GPS, WiFi, AWS and local diagnostics operate normally.
 - **Charging:** the vehicle's separate 12-V board-network battery is expected to
@@ -438,8 +540,11 @@ Turn the existing pilot wiring guidance into a qualified unattended power-input
 design for the separate 12-V board-network battery. Select and validate an
 automotive-suitable 12-V-to-5-V stage with input fuse, reverse-polarity and
 transient protection, adequate peak-current margin, low quiescent current and
-defined undervoltage behaviour. Measure the actual vehicle voltage range during
-standby, wake, driving and charging instead of relying on nominal 12 V.
+defined undervoltage behaviour. The shared option and qualification criteria are
+documented in
+[Vehicle board-network power and 12-V battery monitoring](../hardware/vehicle-board-power.md).
+Measure the actual vehicle voltage range during standby, wake, driving and
+charging instead of relying on nominal 12 V.
 
 Define connector pinning, wire gauge, fuse placement, grounding, isolation or
 common-ground requirements and the interaction with USB servicing. Prevent
@@ -541,44 +646,10 @@ surface. Define supported iOS versions, authentication and token refresh, freshn
 presentation, update frequency, driving-distraction limits, distribution and
 maintenance ownership before promotion into `WORK_ORDER`.
 
-### Secure local MQTT and Smart-Home integration
+### Cloud-side Smart-Home integration
 
-Restore an optional local MQTT output in the shared C6 firmware so a user can
-consume vehicle telemetry on a broker in the home network without depending on
-MOT Cloud. The older configurable legacy-MQTT path is implementation evidence,
-not an acceptable security baseline: the new path must be disabled by default and
-must not offer plaintext MQTT.
-
-Required security and lifecycle behavior:
-
-- require TLS with broker-hostname verification and a user-supplied trust anchor;
-  do not provide an `insecure` certificate-bypass mode;
-- authenticate every device with either a dedicated broker username/password or
-  a dedicated client certificate and private key. TLS server validation is
-  mandatory in both cases, and anonymous access is prohibited;
-- keep local-broker credentials separate from AWS IoT credentials, redact them
-  from status, logs and configuration exports, preserve stored secrets when an
-  authenticated form is submitted blank, and provide an explicit confirmed
-  delete/replace operation;
-- use a unique client ID and least-privilege broker ACL restricted to the selected
-  `mot/<vehicleId>/#` publish namespace. Local MQTT is telemetry output only and
-  must not create a generic command/control subscription;
-- allow MOT Cloud, local MQTT and ABRP to be enabled independently. Failure or
-  backoff of one service must not block CAN processing or the other services;
-- define bounded reconnect behavior, retained-state, Birth/Last-Will, freshness
-  metadata and payload types from the canonical MQTT topic contract, including a
-  versioned migration path where legacy and AWS boolean encodings differ;
-- document certificate upload, CA/server-certificate rotation and recovery from
-  expiry or broker replacement without requiring a firmware rebuild.
-
-The first consumer acceptance path should use the Home Assistant MQTT integration
-with a local Mosquitto broker and explicit entity mapping for SOC, range, charging,
-plugged, speed, power, odometer and online/freshness state. Prefer MQTT Discovery
-only after its stable unique IDs, device grouping, units, device/state classes,
-availability topic and retained discovery lifecycle have contract tests; manual
-configuration is the safer initial pilot. Verify the same broker contract with an
-ioBroker MQTT client/adapter. Neither integration may require AWS device
-certificates or expose the device-local HTTP API to another network.
+The local secure MQTT scope was promoted on 2026-09-08 into prepared work package
+[MQTT-001](../project/sprints/MQTT-001.md) and is now owned by `WORK_ORDER`.
 
 Separately evaluate a cloud-side Smart-Home adapter for users who cannot reach the
 vehicle's LAN broker. It should consume the authenticated Vehicle REST API for

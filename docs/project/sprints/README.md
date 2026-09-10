@@ -26,12 +26,30 @@
 - [LG-CAN2-001 — LilyGO mobile dual-CAN pilot](LG-CAN2-001.md)
 - [LG-S3-001 — T-SIM7670G-S3 firmware pilot](LG-S3-001.md)
 
+## Newly started work
+
+- [FLEET-EFF-001 - anonymized long-term fleet efficiency](FLEET-EFF-001.md)
+  preserves monthly distance and net-energy evidence beyond the 31-day event
+  TTL. It adds declared vehicle battery capacity with conservative plausibility
+  states, excludes uncertain capacity from SOC comparisons, counts each logical
+  journey once and requires a versioned data-use decision before production
+  onboarding. The current event backfill is time-critical before mid-September.
+- [MQTT-001 — secure local MQTT integration](MQTT-001.md) defines the
+  mandatory TLS, broker authentication, credential lifecycle, publish-only ACL,
+  local owner opt-in for location, ioBroker-first acceptance and Home Assistant
+  schema compatibility. C6 N16 is first; the shared 16 MB LilyGO/mobile-network
+  extension is parked pending the final hardware decision. The first C6
+  repository slice is build-qualified; physical broker/ioBroker acceptance is
+  open.
+
 ## Completed predecessors
 
+- [DRV-001](DRV-001.md) delivers the authenticated smartphone-first live and
+  retained-last-journey view; backend deployment, active/completed transition,
+  reload continuity and productive browser acceptance passed on 2026-09-10.
 - [ADM-GRANT-001](ADM-GRANT-001.md) provides the administrator-only active
   WebFlash/password-recovery inventory; portal and AWS backend acceptance passed
   on 2026-09-09.
-
 - [ADP-INF-001](ADP-INF-001.md) adds read-only adapter identity and configuration
   to Settings; desktop and smartphone layouts plus the older-firmware fallback
   passed hosted acceptance on 2026-09-07.

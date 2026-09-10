@@ -8,9 +8,59 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-04
+**Last reviewed:** 2026-09-10
 
 ## High priority
+
+### Add a dedicated current-journey live view
+
+**Completed portal/backend sprint:** [DRV-001 — Fahrtenbezogene Live-Ansicht](../project/sprints/DRV-001.md)
+
+**Objective:** Present current power, a large mode-specific bar, range to zero
+and personal SOC reserve, plus Speed/Power for the exact running journey in a
+glanceable smartphone-first page.
+
+**Current status:** Complete. Repository implementation and backend deployment are accepted. A minimized,
+JWT-protected Vehicle API route projects the canonical active journey boundary
+and native Speed/Power History; the separate read-only portal page resumes that
+same journey after reload. Reviewed Change Set
+`drv-001-current-journey-20260910` reached `UPDATE_COMPLETE` without replacement
+or deletion; route, Lambda and anonymous authorization read-backs pass. Hosted
+layout acceptance, productive smartphone road test, active/completed transition,
+retained last journey and subsequent new-journey transition passed.
+
+### Preserve anonymized long-term fleet efficiency evidence
+
+**Active work package:** [FLEET-EFF-001 - Anonymized Long-Term Fleet
+Efficiency](../project/sprints/FLEET-EFF-001.md)
+
+**Objective:** Preserve privacy-minimized monthly distance, energy and efficiency
+totals beyond the 31-day notification-event TTL, with no durable user, vehicle,
+adapter, journey or location identifiers.
+
+**Current status:** The additive backend and time-critical backfill are deployed.
+Seven declared vehicle-capacity profiles and 190 unique logical-journey markers
+produced separate August and September anonymous monthly totals before TTL loss.
+A repeated complete backfill recorded zero new journeys and 190 duplicates; a
+deployed-Lambda duplicate smoke test also left totals unchanged. The event-table
+stream, dedicated Lambda, encrypted/PITR durable tables and TTL marker table are
+active. Three later natural journeys were already present through the live
+stream, and all 102 focused backend tests pass. Onboarding capture, multi-sample capacity
+plausibility and the versioned data-use/consent decision remain subsequent
+slices; missing or conflicting capacity will exclude SOC comparison without
+discarding direct distance and net energy.
+
+FLEET-EFF-001.G is deployed in the backend and implemented in the repository
+dashboard. It uses the previous finalized month, stored personal and community
+averages, both absolute kWh/100 km values and a 5 percent `+ / = / -` tolerance.
+It excludes SOC and battery capacity, subtracts the requesting vehicle's
+contribution and suppresses small or insufficient cohorts. Productive validation
+returned six privacy-safe August comparisons and anonymous HTTP returns 401.
+Hosted desktop and smartphone acceptance passed on 2026-09-10; the shared
+dashboard assets were revalidated together with the parallel DRV-001 additions.
+FLEET-EFF-001.G is complete. Its private 400-day monthly record remains subject
+to the consent, retention and deletion wording required for production go-live
+after the MOT pilot.
 
 ### Show currently valid administrator grants
 
@@ -24,6 +74,21 @@ the reviewed no-replacement Change Set is deployed, JWT/admin denial smoke tests
 pass, and the maintainer accepted the portal and AWS backend on 2026-09-09.
 Diverse productive WebFlash and password-recovery grant/revoke tests subsequently
 passed as the final acceptance gate.
+
+### Show MOT adapter information in portal settings
+
+**Completed portal sprint:** [ADP-INF-001 — MOT Adapter Information in Portal Settings](../project/sprints/ADP-INF-001.md)
+
+**Objective:** Display DeviceId, Board, firmware version, CAN1/CAN2 decoder
+assignments and the adapter's local IP address for the selected assigned vehicle
+without adding a new backend interface.
+
+**Current status:** Repository implementation reads the six retained State
+topics through the existing JWT-protected vehicle snapshot and tolerates missing
+values. REV18 emits the previously absent retained `system/board` topic.
+Maintainer acceptance of firmware, retained AWS State and dashboard presentation
+passed together on 2026-09-07. Desktop and smartphone presentation also passed
+with empty data fields from older firmware.
 
 ### Add an optional daily journey and charging summary
 
@@ -40,6 +105,13 @@ boundary and portal control are implemented. Reviewed Change Set
 Lambda function; scheduler and JWT-protection read-backs pass. Hosted portal
 acceptance passed, and the 2026-09-04 overnight run delivered correctly prepared
 daily emails whose journey and charging data the maintainer verified.
+The following overnight run exposed a short journey-to-charging transition gap at
+00:05. A repository follow-up now defers for real movement observed during the
+preceding 30 minutes even if both formal sessions are temporarily inactive;
+zero-speed and online messages do not extend it. All 91 notification tests pass.
+The isolated Notification Lambda update is deployed and reports
+`Active`/`Successful`; its invalid-topic smoke probe passed. The next overnight
+observation remains open.
 
 ### Validate the optional charging-summary email
 
@@ -101,6 +173,14 @@ follow-up corrected stale embedded REV14 version strings in both catalog targets
 activated exact new object hashes without replacement and added a packaging gate
 against manifest/binary version mismatch. `xruser` now has a bounded audited
 grant for the corrected XIAO image associated with `xrpioneer2`.
+REV16 was not published because its embedded runtime identity remained REV15.
+The consolidated REV17 N16 and XIAO artifacts are now active through reviewed,
+replacement-free Change Set `webflash-rev17-20260907`; exact S3 and Lambda
+read-back passed. Existing REV15 firmware grants intentionally fail closed and
+must be reissued explicitly when a user should receive REV17.
+REV18 is now active for both WebFlash targets with retained Board identity and
+the V1 Pioneer/Gen1-Mid-Range decoder designation. The replacement-free Change
+Set and exact S3/Lambda read-backs pass; older REV17 grants fail closed.
 
 An additive local-password recovery extension is repository-complete. It uses a
 separate expiring admin grant, JWT-protected access/start/result routes and bounded
@@ -141,15 +221,17 @@ manifest.
 **Active portal work package:** I18N-001
 
 **Objective:** Keep German as the project language and dashboard default while
-making the pilot-facing portal and one-page handout available in English and
-French. The local firmware wizard remains English-only.
+making the pilot-facing portal available in English, French and Italian. The
+one-page handout remains available in German, English and French, and the local
+firmware wizard remains English-only.
 
 **Current status:** Repository implementation and visual desktop/smartphone
-acceptance are complete. The portal persists a `de`/`en`/`fr` selection, updates
+acceptance are complete for the established languages. The portal now persists a
+`de`/`en`/`fr`/`it` selection, updates
 locale-sensitive dates and History charts, and retains German as fallback. The
 reproducible one-page generator produces German, English and French A4 PDFs.
 Hosted upload and native-speaker review of French wording remain open.
-The public root landing page now also carries the persisted three-language
+The public root landing page now also carries the persisted four-language
 selector and links to the dedicated interactive `/onboarding/` page. Static contracts,
 JavaScript checks and local desktop/390 px browser acceptance pass; hosted upload
 and maintainer acceptance remain open.
@@ -465,6 +547,15 @@ sample to a new journey. The extra counter wait remains available only while the
 vehicle stays stopped. All 80 notification tests pass; the isolated Notification
 Lambda update is deployed and healthy. Road validation remains open.
 
+Three Pioneer summaries on 2026-09-07 exposed the remaining firmware-side
+boundary mismatch: two journeys entered charging before a final local checkpoint
+was available, while another was finalized when the next real journey began.
+REV17 now seals and prioritizes the N16 counter immediately on fresh Standard-CAN
+plug or charging state. `Speed = 0` only starts a candidate; sealing occurs after
+ten continuous stopped minutes. A sealed final triplet must publish successfully
+before later movement replaces its counter identity. N16 and XIAO builds pass;
+physical N16 installation and road validation remain open.
+
 ### Execute SPR-0005 beta readiness and portal onboarding
 
 **Active sprint:** [SPR-0005 — ESP32-WROOM Beta Readiness and Portal Onboarding](../project/sprints/SPR-0005.md)
@@ -519,6 +610,32 @@ ownership still uses the bounded compatibility guard until a reviewed migration
 is required by fleet growth.
 
 ## Medium priority
+
+### Restore secure local MQTT and Smart-Home integration
+
+**Prepared work package:** [MQTT-001 — Secure Local MQTT Integration](../project/sprints/MQTT-001.md)
+
+Restore local MQTT as an optional transport only with verified TLS and dedicated
+broker authentication. Plaintext MQTT, anonymous access, trust bypass and reuse
+of AWS IoT credentials are prohibited. The implementation must remain independent
+from MOT Cloud and ABRP, publish only to the exact vehicle namespace and preserve
+CAN/runtime operation during broker failure.
+
+Implement and physically qualify C6 N16 first. ioBroker is the primary real test
+consumer; Home Assistant must use the same state schema, with optional Discovery
+topics treated only as a later metadata layer. Location topics require a separate,
+default-off opt-in performed by the owner through the authenticated local adapter
+UI, including retained-topic cleanup when consent is revoked.
+
+Preserve the same shared client for the intended 16 MB T-SIM7670G-S3 target and
+require secure MQTT over both WiFi and the mobile network. Its implementation and
+acceptance are parked until the hardware decision is final and are not an initial
+C6 completion gate. The first C6 repository slice now implements default-off
+TLS-only MQTT, dedicated username/password or mTLS authentication, separate
+credential storage, canonical retained telemetry and local owner-controlled
+location consent. All 60 focused C6 tests and both maintained C6 builds pass; the
+XIAO compatibility image remains below its 85% gate. Broker/ioBroker, physical
+security-negative and soak acceptance remain open.
 
 ### Execute the bounded LilyGO mobile dual-CAN pilot
 

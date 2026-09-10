@@ -196,11 +196,87 @@ Resources:
       KeySchema:
         - {AttributeName: eventId, KeyType: HASH}
       TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      StreamSpecification: {StreamViewType: NEW_IMAGE}
       SSESpecification: {SSEEnabled: true}
       Tags:
         - {Key: project, Value: !Ref ProjectName}
         - {Key: environment, Value: !Ref Environment}
         - {Key: component, Value: notifications}
+
+  VehicleProfileTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-vehicle-profiles"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: vehicleId, AttributeType: S}
+      KeySchema:
+        - {AttributeName: vehicleId, KeyType: HASH}
+      SSESpecification: {SSEEnabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: fleet-efficiency}
+
+  FleetEfficiencyTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-fleet-efficiency-monthly"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: month, AttributeType: S}
+      KeySchema:
+        - {AttributeName: month, KeyType: HASH}
+      SSESpecification: {SSEEnabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: fleet-efficiency}
+
+  FleetJourneyMarkerTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-fleet-efficiency-markers"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: markerId, AttributeType: S}
+      KeySchema:
+        - {AttributeName: markerId, KeyType: HASH}
+      TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: fleet-efficiency}
+
+  UserEfficiencyTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-user-efficiency-monthly"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: month, AttributeType: S}
+        - {AttributeName: subjectVehicleKey, AttributeType: S}
+      KeySchema:
+        - {AttributeName: month, KeyType: HASH}
+        - {AttributeName: subjectVehicleKey, KeyType: RANGE}
+      TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+      Tags:
+        - {Key: project, Value: !Ref ProjectName}
+        - {Key: environment, Value: !Ref Environment}
+        - {Key: component, Value: personal-efficiency}
 
   EmailTopic:
     Type: AWS::SNS::Topic
@@ -229,6 +305,100 @@ Resources:
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt ChargingStopDeadLetterQueue.Arn
         maxReceiveCount: 3
+
+  FleetEfficiencyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [lambda.amazonaws.com]}
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: fleet-efficiency-runtime
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:DescribeStream, dynamodb:GetRecords, dynamodb:GetShardIterator, dynamodb:ListStreams]
+                Resource: !GetAtt EventTable.StreamArn
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt VehicleProfileTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Query]
+                Resource:
+                  - !GetAtt FleetJourneyMarkerTable.Arn
+                  - !GetAtt FleetEfficiencyTable.Arn
+                  - !GetAtt UserEfficiencyTable.Arn
+
+  FleetEfficiencyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-fleet-efficiency"
+      Runtime: python3.12
+      Handler: fleet_efficiency.handler
+      Timeout: 30
+      MemorySize: 128
+      Role: !GetAtt FleetEfficiencyRole.Arn
+      Environment:
+        Variables:
+          VEHICLE_PROFILE_TABLE_NAME: !Ref VehicleProfileTable
+          FLEET_MARKER_TABLE_NAME: !Ref FleetJourneyMarkerTable
+          FLEET_AGGREGATE_TABLE_NAME: !Ref FleetEfficiencyTable
+          USER_EFFICIENCY_TABLE_NAME: !Ref UserEfficiencyTable
+      Code: .
+
+  FleetEfficiencyEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      BisectBatchOnFunctionError: true
+      Enabled: true
+      EventSourceArn: !GetAtt EventTable.StreamArn
+      FunctionName: !Ref FleetEfficiencyFunction
+      MaximumRetryAttempts: 3
+      StartingPosition: LATEST
+
+  FleetEfficiencyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${FleetEfficiencyFunction}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  FleetEfficiencyFinalizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [scheduler.amazonaws.com]}
+            Action: [sts:AssumeRole]
+      Policies:
+        - PolicyName: invoke-fleet-efficiency-finalizer
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [lambda:InvokeFunction]
+                Resource: !GetAtt FleetEfficiencyFunction.Arn
+
+  FleetEfficiencyFinalizerSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: Finalize stored averages for the preceding Zurich calendar month.
+      ScheduleExpression: "cron(15 0 1 * ? *)"
+      ScheduleExpressionTimezone: Europe/Zurich
+      FlexibleTimeWindow: {Mode: "OFF"}
+      State: ENABLED
+      Target:
+        Arn: !GetAtt FleetEfficiencyFunction.Arn
+        RoleArn: !GetAtt FleetEfficiencyFinalizerRole.Arn
+        Input: '{"type":"finalize_month"}'
 
   NotificationRole:
     Type: AWS::IAM::Role
@@ -448,6 +618,45 @@ Resources:
           READ_ONLY_VEHICLE_IDS: !Ref ReadOnlyVehicleIds
       Code: .
 
+  EfficiencyApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [lambda.amazonaws.com]}
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: personal-community-efficiency-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource:
+                  - !Ref AccessTableArn
+                  - !GetAtt FleetEfficiencyTable.Arn
+                  - !GetAtt UserEfficiencyTable.Arn
+
+  EfficiencyApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-efficiency-comparison"
+      Runtime: python3.12
+      Handler: efficiency_api.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt EfficiencyApiRole.Arn
+      Environment:
+        Variables:
+          ACCESS_TABLE_NAME: !Ref AccessTableName
+          FLEET_AGGREGATE_TABLE_NAME: !Ref FleetEfficiencyTable
+          USER_EFFICIENCY_TABLE_NAME: !Ref UserEfficiencyTable
+      Code: .
+
   SmsVerificationRole:
     Type: AWS::IAM::Role
     Properties:
@@ -555,6 +764,23 @@ Resources:
       AuthorizerId: !Ref PreferenceAuthorizer
       Target: !Sub "integrations/${PreferenceIntegration}"
 
+  EfficiencyIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref PreferenceApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt EfficiencyApiFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  EfficiencyGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref PreferenceApi
+      RouteKey: "GET /api/vehicles/{vehicleId}/efficiency-comparison"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref PreferenceAuthorizer
+      Target: !Sub "integrations/${EfficiencyIntegration}"
+
   SmsVerificationIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -614,12 +840,25 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${PreferenceApi}/*/*"
 
+  EfficiencyInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref EfficiencyApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${PreferenceApi}/*/GET/api/vehicles/*/efficiency-comparison"
+
 Outputs:
   PreferenceApiBaseUrl:
     Value: !Sub "https://${PreferenceApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
   PreferenceTableName: {Value: !Ref PreferenceTable}
   EmailTopicArn: {Value: !Ref EmailTopic}
   EventTableName: {Value: !Ref EventTable}
+  VehicleProfileTableName: {Value: !Ref VehicleProfileTable}
+  FleetEfficiencyTableName: {Value: !Ref FleetEfficiencyTable}
+  FleetJourneyMarkerTableName: {Value: !Ref FleetJourneyMarkerTable}
+  FleetEfficiencyFunctionName: {Value: !Ref FleetEfficiencyFunction}
+  UserEfficiencyTableName: {Value: !Ref UserEfficiencyTable}
   SessionTableName: {Value: !Ref SessionTable}
   ChargingStopQueueUrl: {Value: !Ref ChargingStopQueue}
   SmsApprovalTableName: {Value: !Ref SmsApprovalTable}

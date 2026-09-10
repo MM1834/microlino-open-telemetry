@@ -26,6 +26,10 @@
     'Standort nicht verfügbar': 'Location unavailable', 'Verbindungsstatus': 'Connection status',
     'Spannung': 'Voltage', 'Strom': 'Current', 'Fahrzeugleistung': 'Vehicle power',
     'Reichweitenprognose': 'Range forecast', 'Noch keine ausreichende Fahrhistorie': 'Not enough driving history yet',
+    'Deine Fahreffizienz im Vergleich zur Community': 'Your driving efficiency compared with the community', 'Vormonat': 'Previous month',
+    'Du': 'You', 'Community': 'Community', 'Noch nicht genügend Vergleichsdaten': 'Not enough comparison data yet',
+    'Effizienter als die Community': 'More efficient than the community', 'Ähnlich wie die Community': 'Similar to the community',
+    'Weniger effizient als die Community': 'Less efficient than the community',
     'Nach SoC: -- km': 'By SOC: -- km', 'Verbrauch': 'Consumption', 'Fahrzeit': 'Driving time',
     'Ladestrom': 'Charging current', 'Ladespannung': 'Charging voltage', 'Energie': 'Energy',
     'Batterie Min': 'Battery min', 'Batterie Max': 'Battery max', 'Batterie Ø': 'Battery avg',
@@ -208,6 +212,10 @@
     'Standort nicht verfügbar': 'Position indisponible', 'Verbindungsstatus': 'État de connexion',
     'Spannung': 'Tension', 'Strom': 'Courant', 'Fahrzeugleistung': 'Puissance du véhicule',
     'Reichweitenprognose': 'Prévision d’autonomie', 'Noch keine ausreichende Fahrhistorie': 'Historique de conduite encore insuffisant',
+    'Deine Fahreffizienz im Vergleich zur Community': 'Votre efficacité de conduite par rapport à la communauté', 'Vormonat': 'Mois précédent',
+    'Du': 'Vous', 'Community': 'Communauté', 'Noch nicht genügend Vergleichsdaten': 'Pas encore assez de données comparatives',
+    'Effizienter als die Community': 'Plus efficace que la communauté', 'Ähnlich wie die Community': 'Similaire à la communauté',
+    'Weniger effizient als die Community': 'Moins efficace que la communauté',
     'Nach SoC: -- km': 'Selon le SOC : -- km', 'Verbrauch': 'Consommation', 'Fahrzeit': 'Temps de conduite',
     'Ladestrom': 'Courant de charge', 'Ladespannung': 'Tension de charge', 'Energie': 'Énergie',
     'Batterie Min': 'Batterie min.', 'Batterie Max': 'Batterie max.', 'Batterie Ø': 'Batterie moy.',
@@ -390,6 +398,10 @@
     'Standort nicht verfügbar': 'Posizione non disponibile', 'Verbindungsstatus': 'Stato della connessione',
     'Spannung': 'Tensione', 'Strom': 'Corrente', 'Fahrzeugleistung': 'Potenza del veicolo',
     'Reichweitenprognose': 'Previsione dell’autonomia', 'Noch keine ausreichende Fahrhistorie': 'Cronologia di guida ancora insufficiente',
+    'Deine Fahreffizienz im Vergleich zur Community': 'La tua efficienza di guida rispetto alla community', 'Vormonat': 'Mese precedente',
+    'Du': 'Tu', 'Community': 'Community', 'Noch nicht genügend Vergleichsdaten': 'Dati di confronto non ancora sufficienti',
+    'Effizienter als die Community': 'Più efficiente della community', 'Ähnlich wie die Community': 'Simile alla community',
+    'Weniger effizient als die Community': 'Meno efficiente della community',
     'Nach SoC: -- km': 'In base al SoC: -- km', 'Verbrauch': 'Consumo', 'Fahrzeit': 'Tempo di guida',
     'Ladestrom': 'Corrente di ricarica', 'Ladespannung': 'Tensione di ricarica', 'Energie': 'Energia',
     'Batterie Min': 'Batteria min', 'Batterie Max': 'Batteria max', 'Batterie Ø': 'Batteria media',
@@ -537,6 +549,31 @@
     'Flash-Speicher konnte nicht ausgelesen werden. Die Verbindung ist nicht stabil; es wurde nichts geschrieben.': 'Impossibile leggere la memoria flash. La connessione non è stabile; non è stato scritto nulla.',
     'Unbekannter Flash-Speicher erkannt': 'Rilevata memoria flash sconosciuta'
   };
+
+  Object.assign(en, {
+    'MOT Fahrt': 'MOT Drive', 'Live · fahrtenbezogen': 'Live · current journey',
+    'Restreichweite': 'Remaining range', 'Nutzbare Reichweite': 'Usable range',
+    'Aktuelle Fahrt': 'Current journey', 'Keine laufende Fahrt': 'No active journey',
+    'Noch keine Fahrdaten': 'No journey data yet', 'Letzte Fahrt': 'Last journey',
+    'Beendet um': 'Ended at', 'Reserve': 'reserve', 'Seit': 'Since',
+    'bis 0 %': 'to 0%'
+  });
+  Object.assign(fr, {
+    'MOT Fahrt': 'Trajet MOT', 'Live · fahrtenbezogen': 'En direct · trajet actuel',
+    'Restreichweite': 'Autonomie restante', 'Nutzbare Reichweite': 'Autonomie utilisable',
+    'Aktuelle Fahrt': 'Trajet actuel', 'Keine laufende Fahrt': 'Aucun trajet en cours',
+    'Noch keine Fahrdaten': 'Aucune donnée de trajet', 'Letzte Fahrt': 'Dernier trajet',
+    'Beendet um': 'Terminé à', 'Reserve': 'réserve', 'Seit': 'Depuis',
+    'bis 0 %': 'jusqu’à 0 %'
+  });
+  Object.assign(it, {
+    'MOT Fahrt': 'Viaggio MOT', 'Live · fahrtenbezogen': 'Live · viaggio attuale',
+    'Restreichweite': 'Autonomia residua', 'Nutzbare Reichweite': 'Autonomia utilizzabile',
+    'Aktuelle Fahrt': 'Viaggio attuale', 'Keine laufende Fahrt': 'Nessun viaggio in corso',
+    'Noch keine Fahrdaten': 'Nessun dato di viaggio', 'Letzte Fahrt': 'Ultimo viaggio',
+    'Beendet um': 'Terminato alle', 'Reserve': 'riserva', 'Seit': 'Dalle',
+    'bis 0 %': 'fino allo 0%'
+  });
 
   const dictionaries = { de: {}, en, fr, it };
   const sourceText = new WeakMap();

@@ -13,6 +13,7 @@ task. Follow links from that owner page instead of scanning adjacent directories
 | Firmware behaviour | `firmware/README.md` | Relevant subsystem page and source files |
 | Local WebUI | `webui/overview.md` | Relevant feature page and firmware route |
 | Portal/dashboard | `dashboard/overview.md` | `architecture/authentication.md`, relevant portal source |
+| Optional-service entitlements or subscriptions | `architecture/service-entitlements.md` | `governance/ENGINEERING_BACKLOG.md`, notification and administrator owner pages |
 | AWS/backend | `architecture/aws-iot.md` | `api/`, `administrator/aws/`, relevant template or handler |
 | Cognito and notification email delivery | `administrator/aws/email-delivery.md` | `project/sprints/SES-001.md`, foundation and notification templates |
 | SMS notification approval and operations | `administrator/aws/sms-approvals.md` | `project/sprints/SMS-001.md`, notification template and admin CLI |
