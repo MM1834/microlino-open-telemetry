@@ -165,4 +165,3 @@ cross-user isolation and fail-closed behavior when any dependency is unavailable
 Until this rollout begins, continue the current pilot procedure: administrators
 may enable History and cloud Backfill; users configure and confirm email; SMS is
 approved only after an eligible number has been entered and verified.
-
