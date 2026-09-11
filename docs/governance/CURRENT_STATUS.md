@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-10
+**Last reviewed:** 2026-09-11
 
 ## Purpose
 
@@ -18,6 +18,21 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+NTF-I18N-001 is complete with an additive per-user/vehicle notification-language
+preference for German, English, French and Italian. German is the server-side
+default for every missing or legacy value, so existing users retain their current
+delivery without migration or renewed SNS confirmation. All five MOT-generated
+email types and both existing SMS event types now use centralized localized
+templates. SMS stays ASCII-only, within one segment and restricted to approved
+`+41`/`+49` destinations; the AWS-managed subscription confirmation remains
+unchanged. Repository backend and portal tests pass. The reviewed broad Change
+Set was deleted rather than executing dynamic collateral updates; the exact
+tested package was deployed only to the two existing Lambdas. Both are
+`Active`/`Successful`, send-free and authorization smoke tests pass, and the
+stack remains `UPDATE_COMPLETE`. Hosted preference persistence and productive
+account updates passed technical acceptance. Native-language copy review remains
+a non-blocking editorial follow-up.
 
 DRV-001 is complete with a fully journey-related, smartphone-first live view.
 The repository route uses the canonical active journey ID/start maintained by

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07111f" />
   <title>MOT Einstellungen</title>
   <link rel="stylesheet" href="../css/dashboard.css?v=20260910-drv-eff1" />
-  <script src="../js/i18n.js?v=20260910-drv-eff1"></script>
+  <script src="../js/i18n.js?v=20260911-ntf-i18n2"></script>
 </head>
 <body class="settings-page">
   <div class="app-shell">
@@ -102,6 +102,15 @@
             <input id="notification-email" type="email" autocomplete="email" />
           </label>
           <div id="notification-email-state" class="connection-detail"></div>
+          <label>
+            Sprache der Benachrichtigungen
+            <select id="notification-language">
+              <option value="de">Deutsch</option>
+              <option value="en">Englisch</option>
+              <option value="fr">Französisch</option>
+              <option value="it">Italienisch</option>
+            </select>
+          </label>
           <fieldset class="journey-notification-setting">
             <legend>Ladestopp</legend>
             <label class="settings-toggle">
@@ -200,6 +209,6 @@
   <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="../js/providers/provider-registry.js"></script>
   <script src="../js/providers/aws-backend-provider.js?v=20260910-drv-eff1"></script>
-  <script src="../js/settings.js?v=20260907-adapter-info2"></script>
+  <script src="../js/settings.js?v=20260911-ntf-i18n1"></script>
 </body>
 </html>

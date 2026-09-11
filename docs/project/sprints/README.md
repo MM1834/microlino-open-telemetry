@@ -44,6 +44,10 @@
 
 ## Completed predecessors
 
+- [NTF-I18N-001](NTF-I18N-001.md) adds an independent per-user/vehicle
+  DE/EN/FR/IT preference for MOT email and SMS; German compatibility fallback,
+  isolated AWS deployment, hosted persistence and productive account updates
+  passed technical acceptance on 2026-09-11.
 - [DRV-001](DRV-001.md) delivers the authenticated smartphone-first live and
   retained-last-journey view; backend deployment, active/completed transition,
   reload continuity and productive browser acceptance passed on 2026-09-10.

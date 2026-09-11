@@ -87,6 +87,21 @@ def event(method="GET", body=None, vehicle_id="pioneer"):
 
 
 class JourneyPreferenceApiTests(unittest.TestCase):
+    def test_notification_language_defaults_to_german_and_is_validated(self):
+        module, preference, _ = load_module()
+        self.assertEqual("de", json.loads(module.handler(event(), None)["body"])["notificationLanguage"])
+        rejected = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "notificationLanguage": "es",
+        }), None)
+        self.assertEqual(400, rejected["statusCode"])
+        accepted = module.handler(event("PUT", {
+            "enabled": False, "threshold": 80, "emailEnabled": False,
+            "notificationLanguage": "fr",
+        }), None)
+        self.assertEqual(200, accepted["statusCode"])
+        self.assertEqual("fr", preference.item["notificationLanguage"])
+
     def test_read_only_vehicle_get_is_disabled_without_preference_lookup(self):
         module, preference, sns = load_module(
             {"emailEnabled": True, "email": "old@example.com"},

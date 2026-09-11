@@ -26,6 +26,15 @@ from daily_summary import aggregate as aggregate_daily
 from daily_summary import has_activity as daily_has_activity
 from daily_summary import recent_movement as daily_recent_movement
 from daily_summary import report_window
+from email_templates import (
+    charging_stop as charging_stop_email,
+    charging_summary as charging_summary_email,
+    daily_summary as daily_summary_email,
+    journey_summary as journey_summary_email,
+    sms_charging_stop,
+    sms_soc_target,
+    soc_target as soc_target_email,
+)
 from journey_state import (
     STOP_DELAY_MS, JourneyState, apply_inactivity_timeout,
     apply_journey_update, clear_journey, summarize_journey,
@@ -413,18 +422,16 @@ def reserve_event(preference, vehicle_id, crossing, threshold, received_at):
 
 def dispatch(preference, identifier, vehicle_id, threshold, reached_soc):
     vehicle_name = str(preference.get("vehicleName") or vehicle_id)[:40]
-    text = (
-        f"MOT: {vehicle_name} ({vehicle_id}) hat beim Laden "
-        f"{reached_soc:g}% SOC erreicht (Ziel {threshold:g}%). "
-        "Info, keine Ladesteuerung."
-    )
+    sms_text = sms_soc_target(preference, vehicle_id, reached_soc, threshold)
     deliveries = []
     # SNS itself suppresses delivery while the email subscription is pending.
     if preference.get("emailEnabled"):
+        subject, email_text = soc_target_email(
+            preference, vehicle_id, vehicle_name, threshold, reached_soc
+        )
         result = sns.publish(
             TopicArn=email_topic_arn,
-            Subject=f"MOT - {vehicle_id} hat {threshold:g}% erreicht"[:100],
-            Message=text,
+            Subject=subject[:100], Message=email_text,
             MessageAttributes={
                 "recipientKey": {
                     "DataType": "String",
@@ -433,7 +440,7 @@ def dispatch(preference, identifier, vehicle_id, threshold, reached_soc):
             },
         )
         deliveries.append({"channel": "EMAIL", "messageId": result["MessageId"]})
-    sms_result = sms_delivery(preference, vehicle_id, text)
+    sms_result = sms_delivery(preference, vehicle_id, sms_text)
     if sms_result:
         deliveries.append(sms_result)
     record_deliveries(identifier, deliveries)
@@ -494,17 +501,11 @@ def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
     if preference.get("chargingSummaryEmailEnabled") is not True:
         return 0
     name = str(preference.get("vehicleName") or vehicle_id)[:40]
-    start_soc = "unbekannt" if state.start_soc is None else f"{state.start_soc:g}%"
-    end_soc = "unbekannt" if state.last_soc is None else f"{state.last_soc:g}%"
-    delta = "unbekannt" if state.start_soc is None or state.last_soc is None else f"{state.last_soc-state.start_soc:+g} Prozentpunkte"
-    text = (f"MOT Ladezusammenfassung für {name} ({vehicle_id})\n\n"
-            f"Start-SOC (Display-CAN): {start_soc}\nEnd-SOC (Display-CAN): {end_soc}\n"
-            f"SOC-Änderung: {delta}\nDauer: {duration} Minuten\n"
-            f"Geschätzte geladene Energie: {state.energy_kwh:.2f} kWh\n"
-            f"Abschluss: {'Fahrzeug ausgesteckt' if reason == 'unplugged' else '10 Minuten nicht mehr geladen'}\n\n"
-            "Passive Telemetrie; keine Ladesteuerung.")
+    subject, text = charging_summary_email(
+        preference, vehicle_id, name, state, duration, reason
+    )
     result = sns.publish(TopicArn=email_topic_arn,
-        Subject=f"MOT - Ladezusammenfassung {end_soc} ({vehicle_id})"[:100], Message=text,
+        Subject=subject[:100], Message=text,
         MessageAttributes={"recipientKey": {"DataType": "String", "StringValue": str(preference["recipientKey"])}})
     record_deliveries(identifier, [{"channel": "EMAIL", "messageId": result["MessageId"]}])
     return 1
@@ -562,19 +563,14 @@ def reserve_charging_stop_event(preference, vehicle_id, state, threshold, now_ms
 
 def dispatch_charging_stop(preference, identifier, vehicle_id, state, threshold):
     vehicle_name = str(preference.get("vehicleName") or vehicle_id)[:40]
-    text = (
-        f"MOT: Der Ladevorgang von {vehicle_name} ({vehicle_id}) ist bei "
-        f"{state.previous_soc:g}% SOC seit mindestens 60 Sekunden gestoppt "
-        f"(Ladestopp-Ziel {threshold:g}%). Das Fahrzeug ist weiterhin eingesteckt. "
-        "Dies kann auch ein manueller Stopp oder externes Lastmanagement sein. "
-        "Info, keine Ladesteuerung."
-    )
     deliveries = []
     if preference.get("emailEnabled"):
+        subject, email_text = charging_stop_email(
+            preference, vehicle_id, vehicle_name, state.previous_soc, threshold
+        )
         result = sns.publish(
             TopicArn=email_topic_arn,
-            Subject=f"MOT - Ladestopp bei {state.previous_soc:g}% ({vehicle_id})"[:100],
-            Message=text,
+            Subject=subject[:100], Message=email_text,
             MessageAttributes={
                 "recipientKey": {
                     "DataType": "String",
@@ -583,10 +579,8 @@ def dispatch_charging_stop(preference, identifier, vehicle_id, state, threshold)
             },
         )
         deliveries.append({"channel": "EMAIL", "messageId": result["MessageId"]})
-    sms_text = (
-        f"MOT: {vehicle_id} Ladestopp bei {state.previous_soc:g}% "
-        f"(Ziel {threshold:g}%). Seit 60s nicht am Laden, weiterhin eingesteckt. "
-        "Info, keine Ladesteuerung."
+    sms_text = sms_charging_stop(
+        preference, vehicle_id, state.previous_soc, threshold
     )
     sms_result = sms_delivery(preference, vehicle_id, sms_text)
     if sms_result:
@@ -736,33 +730,7 @@ def _reserve_daily_event(preference, report_date, now, status, summary):
 
 
 def _daily_text(preference, report_date, summary, ongoing):
-    name = str(preference.get("vehicleName") or preference["vehicleId"])[:40]
-    consumption = (
-        "--" if summary["netKwhPer100Km"] is None
-        else f"{_de(summary['netKwhPer100Km'], 1)} kWh/100 km"
-    )
-    ongoing_note = (
-        "\nHinweis: Eine Fahrt oder ein Ladevorgang läuft noch und ist in diesen "
-        "Summen nicht enthalten. Der Vorgang wird dem Tag seines Abschlusses zugerechnet.\n"
-        if ongoing else ""
-    )
-    return (
-        f"MOT Tagesübersicht für {name} ({preference['vehicleId']})\n"
-        f"Datum: {report_date[8:10]}.{report_date[5:7]}.{report_date[:4]}\n\n"
-        f"Fahrten: {summary['journeyCount']}\n"
-        f"Gesamtstrecke: {_de(summary['distanceKm'], 1)} km\n"
-        f"Gesamte Fahrzeit: {summary['journeyDurationMinutes']} Minuten\n"
-        f"Energie bezogen: {_de(summary['energyDrawnKwh'], 2)} kWh\n"
-        f"Rekuperiert: {_de(summary['energyRegenKwh'], 2)} kWh\n"
-        f"Nettoenergie: {_de(summary['energyNetKwh'], 2)} kWh\n"
-        f"Durchschnittlicher Nettoverbrauch: {consumption}\n\n"
-        f"Ladevorgänge: {summary['chargingCount']}\n"
-        f"Gesamte Ladezeit: {summary['chargingDurationMinutes']} Minuten\n"
-        f"Geschätzte geladene Energie: {_de(summary['energyChargedKwh'], 2)} kWh\n"
-        f"SOC-Zunahme: {_de(summary['chargingSocDelta'], 1)} Prozentpunkte\n"
-        f"{ongoing_note}\n"
-        "Passive Telemetrie; keine Abrechnungs- oder Präzisionsmessung."
-    )
+    return daily_summary_email(preference, report_date, summary, ongoing)[1]
 
 
 def send_daily_summaries(now_ms):
@@ -794,10 +762,12 @@ def send_daily_summaries(now_ms):
         )
         if not identifier:
             continue
+        subject, text = daily_summary_email(
+            preference, report_date, summary, ongoing
+        )
         message = sns.publish(
             TopicArn=email_topic_arn,
-            Subject=f"MOT - Tagesübersicht {report_date} ({preference['vehicleId']})"[:100],
-            Message=_daily_text(preference, report_date, summary, ongoing),
+            Subject=subject[:100], Message=text,
             MessageAttributes={"recipientKey": {
                 "DataType": "String",
                 "StringValue": str(preference["recipientKey"]),
@@ -810,29 +780,14 @@ def send_daily_summaries(now_ms):
 
 def dispatch_journey(preference, identifier, vehicle_id, summary):
     vehicle_name = str(preference.get("vehicleName") or vehicle_id)[:40]
-    timeout_note = (
-        "Fahrtende: 30-Min.-Telemetrie-Timeout "
-        "(Werte bis zum letzten empfangenen Signal)\n\n"
-        if summary.completion_trigger == "telemetry_timeout" else ""
-    )
-    text = (
-        f"MOT: Fahrt mit {vehicle_name} ({vehicle_id}) abgeschlossen.\n\n"
-        f"Strecke: {_de(summary.distance_km)} km\n"
-        f"Fahrzeit: {summary.duration_minutes} min\n"
-        f"Verbrauchter SOC: {_de(summary.soc_used)} %-Punkte\n"
-        f"Energie bezogen: {_de(summary.energy_drawn_kwh, 2)} kWh\n"
-        f"Rekuperiert: {_de(summary.energy_regen_kwh, 2)} kWh\n"
-        f"Verbrauchte Netto-Leistung: {_de(summary.energy_net_kwh, 2)} kWh\n"
-        f"Nettoverbrauch: {_de(summary.net_kwh_per_100_km, 1)} kWh/100 km\n\n"
-        f"{timeout_note}"
-        f"Energiequelle: {summary.source_flag}\n"
-        "Info, keine Abrechnungs- oder Präzisionsmessung."
+    subject, text = journey_summary_email(
+        preference, vehicle_id, vehicle_name, summary
     )
     deliveries = []
     if preference.get("emailEnabled"):
         result = sns.publish(
             TopicArn=email_topic_arn,
-            Subject=f"MOT - Fahrt {summary.distance_km:.1f} km mit {vehicle_name}"[:100],
+            Subject=subject[:100],
             Message=text,
             MessageAttributes={
                 "recipientKey": {

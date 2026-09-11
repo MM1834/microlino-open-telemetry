@@ -97,6 +97,7 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
     def test_portal_exposes_vehicle_scoped_email_settings(self) -> None:
         dashboard = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
         html = (ROOT / "build/dashboard/current/settings/index.html").read_text(encoding="utf-8")
+        i18n_js = (ROOT / "build/dashboard/current/js/i18n.js").read_text(encoding="utf-8")
         self.assertIn('href="settings/"', dashboard)
         self.assertIn('data-settings-nav hidden', dashboard)
         self.assertNotIn('id="notification-form"', dashboard)
@@ -106,6 +107,10 @@ class DashboardNotificationSettingsTests(unittest.TestCase):
         self.assertIn('id="settings-vehicle"', html)
         self.assertIn('id="notification-threshold"', html)
         self.assertIn('id="notification-email"', html)
+        self.assertIn('id="notification-language"', html)
+        self.assertIn('Notification language', i18n_js)
+        self.assertIn('Langue des notifications', i18n_js)
+        self.assertIn('Lingua delle notifiche', i18n_js)
         self.assertIn('id="notification-journey-email-enabled"', html)
         self.assertIn('id="notification-daily-summary-email-enabled"', html)
         self.assertIn('id="notification-charging-stop-email-enabled"', html)

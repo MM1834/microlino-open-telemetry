@@ -8,9 +8,25 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-10
+**Last reviewed:** 2026-09-11
 
 ## High priority
+
+### Localize MOT notifications
+
+**Completed portal/backend sprint:** [NTF-I18N-001 — Multilingual Notifications](../project/sprints/NTF-I18N-001.md)
+
+**Objective:** Let each user/vehicle preference select German, English, French
+or Italian for MOT-generated emails and SMS independently of the portal language.
+
+**Current status:** Complete. Missing and legacy
+preferences resolve to German; five email types and both existing SMS event types
+use centralized localized templates, and Settings exposes the vehicle-scoped
+selector. SMS remains bounded to approved `+41`/`+49` destinations and one ASCII
+segment. The reviewed broad Change Set was rejected; an isolated code-only update
+of the two existing Lambdas is deployed and healthy without resource replacement.
+Hosted preference persistence and productive account updates passed technical
+acceptance. Native-language copy review is a non-blocking editorial follow-up.
 
 ### Add a dedicated current-journey live view
 

@@ -22,6 +22,7 @@ read_only_vehicle_ids = {
 
 EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PHONE = re.compile(r"^\+(41|49)[1-9][0-9]{7,11}$")
+NOTIFICATION_LANGUAGES = {"de", "en", "fr", "it"}
 
 
 def response(status, body):
@@ -60,6 +61,7 @@ def public(item):
             "chargingSummaryEmailEnabled": False,
             "dailySummaryEmailEnabled": False,
             "chargingStopEmailEnabled": False, "chargingStopThreshold": 80,
+            "notificationLanguage": "de",
             "emailConfirmed": False, "smsConfirmed": False,
             "readOnly": False,
         }
@@ -69,7 +71,8 @@ def public(item):
             "journeyEmailEnabled", "chargingSummaryEmailEnabled", "dailySummaryEmailEnabled",
             "email", "phoneE164", "emailConfirmed",
             "chargingStopEmailEnabled", "chargingStopThreshold",
-            "smsConfirmed", "rangeKmAt100", "rangeReserveSoc", "updatedAt"
+            "smsConfirmed", "rangeKmAt100", "rangeReserveSoc",
+            "notificationLanguage", "updatedAt"
         )
     }
     result["journeyEmailEnabled"] = item.get("journeyEmailEnabled") is True
@@ -81,6 +84,10 @@ def public(item):
     result["chargingStopThreshold"] = int(result.get("chargingStopThreshold") or 80)
     result["rangeKmAt100"] = int(result.get("rangeKmAt100") or 140)
     result["rangeReserveSoc"] = int(result.get("rangeReserveSoc") or 0)
+    result["notificationLanguage"] = (
+        item.get("notificationLanguage")
+        if item.get("notificationLanguage") in NOTIFICATION_LANGUAGES else "de"
+    )
     result["updatedAt"] = int(result.get("updatedAt") or 0)
     return result
 
@@ -189,6 +196,11 @@ def handler(event, context):
     ) is True
     charging_stop_email_enabled = charging_stop_requested and email_enabled
     sms_enabled = body.get("smsEnabled") is True
+    notification_language = str(body.get(
+        "notificationLanguage", previous.get("notificationLanguage", "de")
+    )).lower()
+    if notification_language not in NOTIFICATION_LANGUAGES:
+        return response(400, {"error": "invalid_notification_language"})
     if email_enabled and not EMAIL.fullmatch(email):
         return response(400, {"error": "invalid_email"})
     if sms_enabled and not PHONE.fullmatch(phone):
@@ -218,6 +230,7 @@ def handler(event, context):
         "chargingStopThreshold": charging_stop_threshold,
         "rangeKmAt100": range_km_at_100,
         "rangeReserveSoc": range_reserve_soc,
+        "notificationLanguage": notification_language,
         "smsEnabled": sms_enabled,
         "email": email,
         "phoneE164": phone,

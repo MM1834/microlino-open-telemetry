@@ -67,6 +67,7 @@
       'notification-journey-email-enabled', 'notification-charging-summary-email-enabled',
       'notification-daily-summary-email-enabled', 'notification-charging-stop-email-enabled',
       'notification-charging-stop-threshold', 'notification-email', 'notification-sms-phone',
+      'notification-language',
       'range-km-at-100', 'range-reserve-soc', 'notification-save'
     ].forEach(id => { if ($(id)) $(id).disabled = disabled; });
     $('settings-vehicle').disabled = state.busy;
@@ -127,6 +128,7 @@
       $('range-km-at-100').value = Number(preferences.rangeKmAt100 || cfg.vehicle?.defaultRangeKmAt100 || 140);
       $('range-reserve-soc').value = Number(preferences.rangeReserveSoc || 0);
       $('notification-email').value = preferences.email || '';
+      $('notification-language').value = preferences.notificationLanguage || 'de';
       $('notification-email-state').textContent = preferences.emailConfirmed
         ? 'E-Mail-Adresse bestätigt'
         : (preferences.emailEnabled ? 'Bestätigung ausstehend' : 'E-Mail deaktiviert');
@@ -209,6 +211,7 @@
       rangeKmAt100: Number($('range-km-at-100').value),
       rangeReserveSoc: Number($('range-reserve-soc').value),
       email: String($('notification-email').value || '').trim(),
+      notificationLanguage: $('notification-language').value || 'de',
       phoneE164: String($('notification-sms-phone').value || '').trim(),
       smsEnabled: $('notification-sms-enabled').checked
     };
