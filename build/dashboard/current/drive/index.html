@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Fahrt</title>
-  <link rel="stylesheet" href="../css/drive.css?v=20260910-drive2" />
-  <script src="../js/i18n.js?v=20260910-drive1"></script>
+  <link rel="stylesheet" href="../css/drive.css?v=20260913-charge-range1" />
+  <script src="../js/i18n.js?v=20260913-last-charge1"></script>
 </head>
 <body>
   <main class="drive-shell">
@@ -44,6 +44,25 @@
         <canvas id="drive-chart" aria-label="Geschwindigkeit und Leistung der aktuellen Fahrt"></canvas>
         <div class="legend"><span><i class="speed"></i>Geschwindigkeit</span><span class="consumption-legend"><i class="consumption-low"></i><i class="consumption"></i><i class="consumption-high"></i>Verbrauch</span><span><i class="regen"></i>Rekuperation</span></div>
       </section>
+
+      <section class="drive-metrics">
+        <article class="drive-card"><span>Gefahrene Strecke</span><strong id="drive-distance">-- km</strong><small id="drive-distance-context">Aktuelle Fahrt</small></article>
+        <article class="drive-card"><span>Kilometerstand</span><strong id="drive-odometer">-- km</strong><small>Aktueller Messwert</small></article>
+      </section>
+
+      <section class="drive-card charge-reference-card" aria-live="polite">
+        <div class="journey-heading">
+          <div><span id="drive-charge-heading" class="eyebrow">Seit letzter Ladung</span><strong id="drive-charge-summary">Noch keine Ladereferenz</strong></div>
+          <span id="drive-charge-soc">--</span>
+        </div>
+        <div class="charge-reference-values">
+          <div><span>Geladen gesamt</span><strong id="drive-last-charge-energy">-- kWh</strong><small id="drive-last-charge-detail">Noch keine abgeschlossene Ladung</small></div>
+          <div><span>Strecke</span><strong id="drive-since-charge-distance">-- km</strong></div>
+          <div><span>Erwartete Gesamtstrecke bis 0 %</span><strong id="drive-since-charge-zero">-- km</strong></div>
+          <div><span>Erwartete Gesamtstrecke bis Reserve</span><strong id="drive-since-charge-reserve">-- km</strong></div>
+        </div>
+        <small id="drive-charge-note">Hochrechnung ab 5 km und 5 verbrauchten SOC-Punkten</small>
+      </section>
     </div>
   </main>
   <script src="../config.js"></script>
@@ -53,6 +72,6 @@
   <script src="../js/providers/provider-registry.js"></script>
   <script src="../js/live/websocket-client.js"></script>
   <script src="../js/providers/aws-backend-provider.js?v=20260910-drv-eff1"></script>
-  <script src="../js/drive.js?v=20260910-drive6"></script>
+  <script src="../js/drive.js?v=20260914-whole-km1"></script>
 </body>
 </html>

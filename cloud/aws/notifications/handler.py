@@ -20,7 +20,16 @@ from notification_state import (
 )
 from charging_summary_state import (
     SUMMARY_DELAY_MS, ChargingSummaryState, apply as apply_charging_summary,
+    complete as complete_charging_summary,
     delayed_due as charging_summary_due,
+)
+from charging_display_state import (
+    ChargingDisplayState, apply as apply_charging_display,
+    attach_capacity as attach_charging_display_capacity,
+)
+from drive_since_charge_state import (
+    DriveSinceChargeState, accumulate as accumulate_drive_since_charge,
+    measurement_from_journey,
 )
 from daily_summary import aggregate as aggregate_daily
 from daily_summary import has_activity as daily_has_activity
@@ -45,6 +54,7 @@ dynamodb = boto3.resource("dynamodb")
 preferences = dynamodb.Table(os.environ["PREFERENCE_TABLE_NAME"])
 sessions = dynamodb.Table(os.environ["SESSION_TABLE_NAME"])
 events = dynamodb.Table(os.environ["EVENT_TABLE_NAME"])
+vehicle_profiles = dynamodb.Table(os.environ.get("VEHICLE_PROFILE_TABLE_NAME", "disabled"))
 sms_approvals = dynamodb.Table(os.environ.get("SMS_APPROVAL_TABLE_NAME", "disabled"))
 sms_destinations = dynamodb.Table(os.environ.get("SMS_DESTINATION_TABLE_NAME", "disabled"))
 sms_rate = dynamodb.Table(os.environ.get("SMS_RATE_TABLE_NAME", "disabled"))
@@ -65,7 +75,15 @@ sms_configuration_set = os.environ.get("SMS_CONFIGURATION_SET", "")
 sms_spend_alarm_name = os.environ.get("SMS_SPEND_ALARM_NAME", "")
 sms_expected_spend_limit = Decimal(os.environ.get("SMS_EXPECTED_SPEND_LIMIT_USD", "1"))
 
-CHARGING_SUFFIXES = {"charging/plugged", "charging/is_charging", "display/soc"}
+CHARGING_SUFFIXES = {
+    "charging/plugged", "charging/is_charging", "display/soc",
+    "display/odometer_km", "display/odo",
+}
+CHARGING_DISPLAY_SUFFIXES = {
+    "charging/plugged", "charging/is_charging", "charging/power_signed",
+    "bms/vehicle_power_w", "display/soc", "display/odometer_km",
+    "display/odo", "display/speed_kmh",
+}
 JOURNEY_SUFFIXES = {
     "charging/plugged", "charging/is_charging", "charging/power_signed",
     "bms/vehicle_power_w", "display/odometer_km", "display/soc",
@@ -73,7 +91,7 @@ JOURNEY_SUFFIXES = {
     "journey/energy_drawn_wh", "journey/energy_regen_wh",
     "journey/energy_net_wh",
 }
-RELEVANT_SUFFIXES = CHARGING_SUFFIXES | JOURNEY_SUFFIXES
+RELEVANT_SUFFIXES = CHARGING_SUFFIXES | CHARGING_DISPLAY_SUFFIXES | JOURNEY_SUFFIXES
 JOURNEY_SESSION_PREFIX = "journey#"
 JOURNEY_UPDATE_ATTEMPTS = 12
 
@@ -143,17 +161,46 @@ def _summary_state(item):
     })
 
 
-def update_charging_summary(vehicle_id, suffix, value, received_at):
+def _charging_display_state(item):
+    stored = item.get("chargingDisplay") or {}
+    names = {field.name for field in fields(ChargingDisplayState)}
+    return ChargingDisplayState(**{
+        key: _number(value) for key, value in stored.items() if key in names
+    })
+
+
+def update_charging_states(vehicle_id, suffix, value, received_at):
+    """Persist independent email and display charging states in one write."""
     for _ in range(4):
         current = sessions.get_item(Key={"vehicleId": vehicle_id}, ConsistentRead=True).get("Item", {})
         version = int(current.get("version", 0))
-        before = _summary_state(current)
-        after = apply_charging_summary(before, suffix, _number(value), received_at)
-        if after == before:
-            return before, after
+        summary_before = _summary_state(current)
+        summary_after = (
+            complete_charging_summary(
+                summary_before, received_at, plugged=False,
+                capacity_kwh=_charging_capacity_kwh(vehicle_id),
+            )
+            if suffix == "charging/plugged" and value is False and summary_before.active
+            else apply_charging_summary(summary_before, suffix, _number(value), received_at)
+        )
+        display_before = _charging_display_state(current)
+        display_after = apply_charging_display(
+            display_before, suffix, _number(value), received_at
+        )
+        if display_after.block_open and not display_before.block_open:
+            display_after = attach_charging_display_capacity(
+                display_after, _charging_capacity_kwh(vehicle_id)
+            )
+        if summary_after == summary_before and display_after == display_before:
+            return summary_before, summary_after
         item = dict(current)
-        item.update({"vehicleId": vehicle_id, "version": version + 1,
-                     "chargingSummary": _ddb(asdict(after)), "updatedAt": int(time.time() * 1000)})
+        item.update({
+            "vehicleId": vehicle_id,
+            "version": version + 1,
+            "chargingSummary": _ddb(asdict(summary_after)),
+            "chargingDisplay": _ddb(asdict(display_after)),
+            "updatedAt": int(time.time() * 1000),
+        })
         kwargs = {"Item": item, "ConditionExpression": "attribute_not_exists(vehicleId)"}
         if version:
             kwargs.update({"ConditionExpression": "#version=:version",
@@ -161,11 +208,11 @@ def update_charging_summary(vehicle_id, suffix, value, received_at):
                            "ExpressionAttributeValues": {":version": version}})
         try:
             sessions.put_item(**kwargs)
-            return before, after
+            return summary_before, summary_after
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
                 raise
-    raise RuntimeError("charging summary session contention")
+    raise RuntimeError("charging state contention")
 
 
 def update_session(vehicle_id, suffix, value, received_at):
@@ -289,6 +336,37 @@ def _journey_state(item):
     })
 
 
+def _drive_since_charge_state(item):
+    stored = item.get("driveSinceCharge") or {}
+    names = {field.name for field in fields(DriveSinceChargeState)}
+    return DriveSinceChargeState(**{
+        key: _number(value) for key, value in stored.items() if key in names
+    })
+
+
+def _charge_reference_at(vehicle_id):
+    item = sessions.get_item(
+        Key={"vehicleId": vehicle_id}, ConsistentRead=True
+    ).get("Item", {})
+    charging = item.get("chargingSummary") or {}
+    display = item.get("chargingDisplay") or {}
+    candidates = []
+    if (
+        display.get("last_reference_soc") is not None
+        and display.get("last_reference_odometer") is not None
+    ):
+        candidates.append(int(
+            _number(display.get("last_charge_at"))
+            or _number(display.get("last_finalized_at")) or 0
+        ))
+    if (
+        charging.get("last_charge_soc") is not None
+        and charging.get("last_charge_odometer") is not None
+    ):
+        candidates.append(int(_number(charging.get("last_charge_at")) or 0))
+    return max(candidates or [0])
+
+
 def _ddb(value):
     if isinstance(value, float):
         return Decimal(str(value))
@@ -338,7 +416,7 @@ def _read_journey_session(vehicle_id):
     ).get("Item", {})
 
 
-def _put_journey(vehicle_id, current, state):
+def _put_journey(vehicle_id, current, state, drive_since_charge=None):
     version = int(current.get("version", 0))
     item = {
         "vehicleId": _journey_session_id(vehicle_id),
@@ -346,6 +424,13 @@ def _put_journey(vehicle_id, current, state):
         "version": version + 1,
         "journey": _ddb(asdict(state)), "updatedAt": int(time.time() * 1000),
     }
+    aggregate = (
+        drive_since_charge
+        if drive_since_charge is not None
+        else _drive_since_charge_state(current)
+    )
+    if aggregate != DriveSinceChargeState():
+        item["driveSinceCharge"] = _ddb(asdict(aggregate))
     kwargs = {
         "Item": item, "ConditionExpression": "attribute_not_exists(vehicleId)"
     }
@@ -472,7 +557,28 @@ def enqueue_charging_summary(vehicle_id, state):
     return True
 
 
-def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
+def _charging_capacity_kwh(vehicle_id):
+    if os.environ.get("VEHICLE_PROFILE_TABLE_NAME") is None:
+        return None
+    item = vehicle_profiles.get_item(
+        Key={"vehicleId": vehicle_id}, ConsistentRead=True
+    ).get("Item", {})
+    value = _number(item.get("batteryCapacityKwh"))
+    return float(value) if isinstance(value, (int, float)) and value > 0 else None
+
+
+def _charging_quality(state, ended_at, capacity_kwh):
+    duration_ms = max(1, ended_at - state.started_at)
+    coverage = min(100.0, max(0.0, state.covered_power_ms * 100.0 / duration_ms))
+    soc_delta = (None if state.start_soc is None or state.last_soc is None
+                 else state.last_soc - state.start_soc)
+    estimate = (None if capacity_kwh is None or soc_delta is None or soc_delta < 0
+                else capacity_kwh * soc_delta / 100.0)
+    return coverage, estimate
+
+
+def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason,
+                              capacity_kwh=None):
     material = f'{preference["userSub"]}|{vehicle_id}|charging-summary|{state.session_id}'.encode()
     identifier = hashlib.sha256(material).hexdigest()
     now = int(time.time())
@@ -480,12 +586,20 @@ def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
         duration = max(1, round((ended_at - state.started_at) / 60000))
         soc_delta = (None if state.start_soc is None or state.last_soc is None
                      else state.last_soc - state.start_soc)
+        coverage, soc_estimate = _charging_quality(state, ended_at, capacity_kwh)
         item = {"eventId": identifier, "eventType": "CHARGING_SUMMARY",
             "userSub": preference["userSub"], "vehicleId": vehicle_id,
             "sessionId": state.session_id, "receivedAt": ended_at, "createdAt": now * 1000,
             "durationMinutes": duration,
             "energyChargedKwh": Decimal(str(state.energy_kwh)),
+            "energyCoveragePercent": Decimal(str(coverage)),
+            "largestPowerGapSeconds": Decimal(str(state.largest_power_gap_ms / 1000.0)),
+            "powerSampleCount": state.power_sample_count,
             "expiresAt": now + event_retention_days * 86400, "status": "RECORDED"}
+        if capacity_kwh is not None:
+            item["batteryCapacityKwh"] = Decimal(str(capacity_kwh))
+        if soc_estimate is not None:
+            item["socEstimatedEnergyKwh"] = Decimal(str(soc_estimate))
         if state.start_soc is not None:
             item["startSoc"] = Decimal(str(state.start_soc))
         if state.last_soc is not None:
@@ -502,7 +616,9 @@ def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
         return 0
     name = str(preference.get("vehicleName") or vehicle_id)[:40]
     subject, text = charging_summary_email(
-        preference, vehicle_id, name, state, duration, reason
+        preference, vehicle_id, name, state, duration, reason,
+        capacity_kwh=capacity_kwh, coverage_percent=coverage,
+        soc_estimate_kwh=soc_estimate,
     )
     result = sns.publish(TopicArn=email_topic_arn,
         Subject=subject[:100], Message=text,
@@ -512,7 +628,9 @@ def dispatch_charging_summary(preference, vehicle_id, state, ended_at, reason):
 
 
 def send_charging_summaries(vehicle_id, state, ended_at, reason):
-    return sum(dispatch_charging_summary(pref, vehicle_id, state, ended_at, reason)
+    capacity_kwh = _charging_capacity_kwh(vehicle_id)
+    return sum(dispatch_charging_summary(
+               pref, vehicle_id, state, ended_at, reason, capacity_kwh)
                for pref in list_preferences(vehicle_id, None)
                if pref.get("emailEnabled") is True and (
                    pref.get("chargingSummaryEmailEnabled") is True
@@ -523,9 +641,32 @@ def send_charging_summaries(vehicle_id, state, ended_at, reason):
 def validate_charging_summary(message, now_ms):
     vehicle_id, session_id = str(message.get("vehicleId", "")), str(message.get("sessionId", ""))
     candidate_at = int(message.get("candidateAt", 0))
-    item = sessions.get_item(Key={"vehicleId": vehicle_id}, ConsistentRead=True).get("Item", {})
-    state = _summary_state(item)
-    return send_charging_summaries(vehicle_id, state, candidate_at, "timeout") if charging_summary_due(state, session_id, candidate_at, now_ms) else 0
+    for _ in range(4):
+        item = sessions.get_item(Key={"vehicleId": vehicle_id}, ConsistentRead=True).get("Item", {})
+        version = int(item.get("version", 0))
+        state = _summary_state(item)
+        if not charging_summary_due(state, session_id, candidate_at, now_ms):
+            return 0
+        completed = complete_charging_summary(
+            state, candidate_at,
+            capacity_kwh=_charging_capacity_kwh(vehicle_id),
+        )
+        updated = dict(item)
+        updated.update({"vehicleId": vehicle_id, "version": version + 1,
+                        "chargingSummary": _ddb(asdict(completed)),
+                        "updatedAt": int(time.time() * 1000)})
+        try:
+            sessions.put_item(
+                Item=updated,
+                ConditionExpression="#version=:version",
+                ExpressionAttributeNames={"#version": "version"},
+                ExpressionAttributeValues={":version": version},
+            )
+            return send_charging_summaries(vehicle_id, state, candidate_at, "timeout")
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise
+    raise RuntimeError("charging summary completion contention")
 
 
 def charging_stop_event_id(preference, vehicle_id, state, threshold):
@@ -820,9 +961,16 @@ def finalize_journey(vehicle_id, now_ms, finalize_stable_stop=False):
         if reason == "not_due":
             return 0, reason
         try:
+            aggregate = _drive_since_charge_state(current)
+            measurement = measurement_from_journey(state)
+            if measurement:
+                aggregate = accumulate_drive_since_charge(
+                    aggregate, measurement, _charge_reference_at(vehicle_id)
+                )
             _put_journey(
                 vehicle_id, current,
                 clear_journey(state, reason=reason, completed_at=now_ms),
+                aggregate,
             )
             break
         except ClientError as error:
@@ -918,7 +1066,9 @@ def handler(event, context):
             and after.stop_candidate_at == received_at
         ):
             enqueue_charging_stop(vehicle_id, after)
-    summary_before, summary_after = update_charging_summary(vehicle_id, suffix, value, received_at)
+    summary_before, summary_after = update_charging_states(
+        vehicle_id, suffix, value, received_at
+    )
     if suffix == "charging/is_charging" and value is False and summary_after.stop_candidate_at == received_at:
         enqueue_charging_summary(vehicle_id, summary_after)
     if suffix == "charging/plugged" and value is False and summary_before.active:

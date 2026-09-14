@@ -4,6 +4,9 @@
 >
 > **Started:** 2026-09-01
 
+> **Successor:** [CHG-COV-001](CHG-COV-001.md) adds explicit power-data coverage
+> and a separate SOC-based estimate without changing the original session boundary.
+
 ## Objective
 
 Offer an optional email-only summary for completed charging sessions without
@@ -43,4 +46,3 @@ as one reviewed package.
 - dashboard authentication/settings contracts: 22 tests passed
 - dashboard JavaScript syntax checks passed
 - `git diff --check` passed
-

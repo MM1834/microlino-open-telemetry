@@ -60,17 +60,45 @@ def sms_charging_stop(preference, vehicle_id, stopped_soc, threshold):
     }[lang]
 
 
-def charging_summary(preference, vehicle_id, name, state, duration, reason):
+def charging_summary(preference, vehicle_id, name, state, duration, reason,
+                     capacity_kwh=None, coverage_percent=None,
+                     soc_estimate_kwh=None):
     lang = language(preference); unknown = _unknown(lang)
     start = unknown if state.start_soc is None else f"{state.start_soc:g}%"
     end = unknown if state.last_soc is None else f"{state.last_soc:g}%"
     delta = unknown if state.start_soc is None or state.last_soc is None else f"{state.last_soc-state.start_soc:+g}"
     n = lambda value, digits: number(value, digits, lang)
+    incomplete = coverage_percent is not None and coverage_percent < 95
+    measured_labels = {
+        "de": "Gemessene geladene Energie (Mindestwert)" if incomplete else "Gemessene geladene Energie",
+        "en": "Measured energy charged (minimum)" if incomplete else "Measured energy charged",
+        "fr": "Énergie rechargée mesurée (minimum)" if incomplete else "Énergie rechargée mesurée",
+        "it": "Energia caricata misurata (minimo)" if incomplete else "Energia caricata misurata",
+    }
+    estimate_labels = {"de": "SOC-basierte Schätzung", "en": "SOC-based estimate",
+                       "fr": "Estimation basée sur le SOC", "it": "Stima basata sul SOC"}
+    coverage_labels = {"de": "Datenabdeckung Leistung", "en": "Power-data coverage",
+                       "fr": "Couverture des données de puissance", "it": "Copertura dati di potenza"}
+    profile_labels = {"de": "Batterieprofil", "en": "battery profile",
+                      "fr": "profil de batterie", "it": "profilo batteria"}
+    quality_notes = {
+        "de": "Unvollständig wegen Telemetrieunterbruch." if incomplete else "Leistungsdaten weitgehend vollständig.",
+        "en": "Incomplete due to a telemetry interruption." if incomplete else "Power data largely complete.",
+        "fr": "Incomplète en raison d’une interruption de télémétrie." if incomplete else "Données de puissance largement complètes.",
+        "it": "Incompleta a causa di un’interruzione della telemetria." if incomplete else "Dati di potenza sostanzialmente completi.",
+    }
+    measured = f"{measured_labels[lang]}: {n(state.energy_kwh, 2)} kWh"
+    estimate = (f"{estimate_labels[lang]}: {n(soc_estimate_kwh, 2)} kWh "
+                f"({n(capacity_kwh, 1)} kWh {profile_labels[lang]})"
+                if soc_estimate_kwh is not None and capacity_kwh is not None
+                else f"{estimate_labels[lang]}: {unknown}")
+    coverage = (f"{coverage_labels[lang]}: {n(coverage_percent, 0)}% - {quality_notes[lang]}"
+                if coverage_percent is not None else f"{coverage_labels[lang]}: {unknown}")
     values = {
-        "de": (f"MOT - Ladezusammenfassung {end} ({vehicle_id})", f"MOT Ladezusammenfassung für {name} ({vehicle_id})\n\nStart-SOC (Display-CAN): {start}\nEnd-SOC (Display-CAN): {end}\nSOC-Änderung: {delta} Prozentpunkte\nDauer: {duration} Minuten\nGeschätzte geladene Energie: {n(state.energy_kwh, 2)} kWh\nAbschluss: {'Fahrzeug ausgesteckt' if reason == 'unplugged' else '10 Minuten nicht mehr geladen'}\n\nPassive Telemetrie; keine Ladesteuerung."),
-        "en": (f"MOT - Charging summary {end} ({vehicle_id})", f"MOT charging summary for {name} ({vehicle_id})\n\nStart SOC (Display CAN): {start}\nEnd SOC (Display CAN): {end}\nSOC change: {delta} percentage points\nDuration: {duration} minutes\nEstimated energy charged: {n(state.energy_kwh, 2)} kWh\nCompleted: {'vehicle unplugged' if reason == 'unplugged' else 'not charging for 10 minutes'}\n\nPassive telemetry; no charging control."),
-        "fr": (f"MOT - Résumé de recharge {end} ({vehicle_id})", f"Résumé de recharge MOT pour {name} ({vehicle_id})\n\nSOC initial (Display CAN) : {start}\nSOC final (Display CAN) : {end}\nVariation du SOC : {delta} points de pourcentage\nDurée : {duration} minutes\nÉnergie rechargée estimée : {n(state.energy_kwh, 2)} kWh\nFin : {'véhicule débranché' if reason == 'unplugged' else 'aucune recharge pendant 10 minutes'}\n\nTélémétrie passive ; aucune commande de recharge."),
-        "it": (f"MOT - Riepilogo ricarica {end} ({vehicle_id})", f"Riepilogo ricarica MOT per {name} ({vehicle_id})\n\nSOC iniziale (Display CAN): {start}\nSOC finale (Display CAN): {end}\nVariazione SOC: {delta} punti percentuali\nDurata: {duration} minuti\nEnergia caricata stimata: {n(state.energy_kwh, 2)} kWh\nConclusione: {'veicolo scollegato' if reason == 'unplugged' else 'nessuna ricarica per 10 minuti'}\n\nTelemetria passiva; nessun controllo della ricarica."),
+        "de": (f"MOT - Ladezusammenfassung {end} ({vehicle_id})", f"MOT Ladezusammenfassung für {name} ({vehicle_id})\n\nStart-SOC (Display-CAN): {start}\nEnd-SOC (Display-CAN): {end}\nSOC-Änderung: {delta} Prozentpunkte\nDauer: {duration} Minuten\n{measured}\n{estimate}\n{coverage}\nAbschluss: {'Fahrzeug ausgesteckt' if reason == 'unplugged' else '10 Minuten nicht mehr geladen'}\n\nPassive Telemetrie; keine Ladesteuerung."),
+        "en": (f"MOT - Charging summary {end} ({vehicle_id})", f"MOT charging summary for {name} ({vehicle_id})\n\nStart SOC (Display CAN): {start}\nEnd SOC (Display CAN): {end}\nSOC change: {delta} percentage points\nDuration: {duration} minutes\n{measured}\n{estimate}\n{coverage}\nCompleted: {'vehicle unplugged' if reason == 'unplugged' else 'not charging for 10 minutes'}\n\nPassive telemetry; no charging control."),
+        "fr": (f"MOT - Résumé de recharge {end} ({vehicle_id})", f"Résumé de recharge MOT pour {name} ({vehicle_id})\n\nSOC initial (Display CAN) : {start}\nSOC final (Display CAN) : {end}\nVariation du SOC : {delta} points de pourcentage\nDurée : {duration} minutes\n{measured}\n{estimate}\n{coverage}\nFin : {'véhicule débranché' if reason == 'unplugged' else 'aucune recharge pendant 10 minutes'}\n\nTélémétrie passive ; aucune commande de recharge."),
+        "it": (f"MOT - Riepilogo ricarica {end} ({vehicle_id})", f"Riepilogo ricarica MOT per {name} ({vehicle_id})\n\nSOC iniziale (Display CAN): {start}\nSOC finale (Display CAN): {end}\nVariazione SOC: {delta} punti percentuali\nDurata: {duration} minuti\n{measured}\n{estimate}\n{coverage}\nConclusione: {'veicolo scollegato' if reason == 'unplugged' else 'nessuna ricarica per 10 minuti'}\n\nTelemetria passiva; nessun controllo della ricarica."),
     }
     return values[lang]
 
@@ -86,10 +114,10 @@ def journey_summary(preference, vehicle_id, name, summary):
         "it": {"firmware": "contatore firmware", "telemetry": "stima telemetrica"},
     }[lang][source_key]
     values = {
-        "de": (f"MOT - Fahrt {summary.distance_km:.1f} km mit {name}", f"MOT: Fahrt mit {name} ({vehicle_id}) abgeschlossen.\n\nStrecke: {n(summary.distance_km)} km\nFahrzeit: {summary.duration_minutes} min\nVerbrauchter SOC: {n(summary.soc_used)} %-Punkte\nEnergie bezogen: {n(summary.energy_drawn_kwh, 2)} kWh\nRekuperiert: {n(summary.energy_regen_kwh, 2)} kWh\nVerbrauchte Netto-Leistung: {n(summary.energy_net_kwh, 2)} kWh\nNettoverbrauch: {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Fahrtende: 30-Min.-Telemetrie-Timeout (Werte bis zum letzten empfangenen Signal)\n\n' if timeout else ''}Energiequelle: {source}\nInfo, keine Abrechnungs- oder Präzisionsmessung."),
-        "en": (f"MOT - {summary.distance_km:.1f} km journey with {name}", f"MOT: Journey with {name} ({vehicle_id}) completed.\n\nDistance: {n(summary.distance_km)} km\nDriving time: {summary.duration_minutes} min\nSOC used: {n(summary.soc_used)} percentage points\nEnergy drawn: {n(summary.energy_drawn_kwh, 2)} kWh\nRecuperated: {n(summary.energy_regen_kwh, 2)} kWh\nNet energy used: {n(summary.energy_net_kwh, 2)} kWh\nNet consumption: {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Journey end: 30-minute telemetry timeout (values up to the last received signal)\n\n' if timeout else ''}Energy source: {source}\nInformation only; not a billing or precision measurement."),
-        "fr": (f"MOT - Trajet de {summary.distance_km:.1f} km avec {name}", f"MOT : trajet avec {name} ({vehicle_id}) terminé.\n\nDistance : {n(summary.distance_km)} km\nDurée de conduite : {summary.duration_minutes} min\nSOC consommé : {n(summary.soc_used)} points de pourcentage\nÉnergie prélevée : {n(summary.energy_drawn_kwh, 2)} kWh\nRécupération : {n(summary.energy_regen_kwh, 2)} kWh\nÉnergie nette consommée : {n(summary.energy_net_kwh, 2)} kWh\nConsommation nette : {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Fin du trajet : délai de télémétrie de 30 minutes (valeurs jusqu’au dernier signal reçu)\n\n' if timeout else ''}Source d’énergie : {source}\nInformation uniquement ; aucune mesure de facturation ou de précision."),
-        "it": (f"MOT - Viaggio di {summary.distance_km:.1f} km con {name}", f"MOT: viaggio con {name} ({vehicle_id}) concluso.\n\nDistanza: {n(summary.distance_km)} km\nTempo di guida: {summary.duration_minutes} min\nSOC utilizzato: {n(summary.soc_used)} punti percentuali\nEnergia prelevata: {n(summary.energy_drawn_kwh, 2)} kWh\nRecuperata: {n(summary.energy_regen_kwh, 2)} kWh\nEnergia netta utilizzata: {n(summary.energy_net_kwh, 2)} kWh\nConsumo netto: {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Fine viaggio: timeout telemetria di 30 minuti (valori fino all’ultimo segnale ricevuto)\n\n' if timeout else ''}Fonte energia: {source}\nSolo informazione; non è una misura fiscale o di precisione."),
+        "de": (f"MOT - Fahrt {summary.distance_km:.0f} km mit {name}", f"MOT: Fahrt mit {name} ({vehicle_id}) abgeschlossen.\n\nStrecke: {n(summary.distance_km, 0)} km\nFahrzeit: {summary.duration_minutes} min\nVerbrauchter SOC: {n(summary.soc_used)} %-Punkte\nEnergie bezogen: {n(summary.energy_drawn_kwh, 2)} kWh\nRekuperiert: {n(summary.energy_regen_kwh, 2)} kWh\nVerbrauchte Netto-Leistung: {n(summary.energy_net_kwh, 2)} kWh\nNettoverbrauch: {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Fahrtende: 30-Min.-Telemetrie-Timeout (Werte bis zum letzten empfangenen Signal)\n\n' if timeout else ''}Energiequelle: {source}\nInfo, keine Abrechnungs- oder Präzisionsmessung."),
+        "en": (f"MOT - {summary.distance_km:.0f} km journey with {name}", f"MOT: Journey with {name} ({vehicle_id}) completed.\n\nDistance: {n(summary.distance_km, 0)} km\nDriving time: {summary.duration_minutes} min\nSOC used: {n(summary.soc_used)} percentage points\nEnergy drawn: {n(summary.energy_drawn_kwh, 2)} kWh\nRecuperated: {n(summary.energy_regen_kwh, 2)} kWh\nNet energy used: {n(summary.energy_net_kwh, 2)} kWh\nNet consumption: {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Journey end: 30-minute telemetry timeout (values up to the last received signal)\n\n' if timeout else ''}Energy source: {source}\nInformation only; not a billing or precision measurement."),
+        "fr": (f"MOT - Trajet de {summary.distance_km:.0f} km avec {name}", f"MOT : trajet avec {name} ({vehicle_id}) terminé.\n\nDistance : {n(summary.distance_km, 0)} km\nDurée de conduite : {summary.duration_minutes} min\nSOC consommé : {n(summary.soc_used)} points de pourcentage\nÉnergie prélevée : {n(summary.energy_drawn_kwh, 2)} kWh\nRécupération : {n(summary.energy_regen_kwh, 2)} kWh\nÉnergie nette consommée : {n(summary.energy_net_kwh, 2)} kWh\nConsommation nette : {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Fin du trajet : délai de télémétrie de 30 minutes (valeurs jusqu’au dernier signal reçu)\n\n' if timeout else ''}Source d’énergie : {source}\nInformation uniquement ; aucune mesure de facturation ou de précision."),
+        "it": (f"MOT - Viaggio di {summary.distance_km:.0f} km con {name}", f"MOT: viaggio con {name} ({vehicle_id}) concluso.\n\nDistanza: {n(summary.distance_km, 0)} km\nTempo di guida: {summary.duration_minutes} min\nSOC utilizzato: {n(summary.soc_used)} punti percentuali\nEnergia prelevata: {n(summary.energy_drawn_kwh, 2)} kWh\nRecuperata: {n(summary.energy_regen_kwh, 2)} kWh\nEnergia netta utilizzata: {n(summary.energy_net_kwh, 2)} kWh\nConsumo netto: {n(summary.net_kwh_per_100_km)} kWh/100 km\n\n{'Fine viaggio: timeout telemetria di 30 minuti (valori fino all’ultimo segnale ricevuto)\n\n' if timeout else ''}Fonte energia: {source}\nSolo informazione; non è una misura fiscale o di precisione."),
     }
     return values[lang]
 
@@ -113,6 +141,6 @@ def daily_summary(preference, report_date, summary, ongoing):
         "it": ["Riepilogo giornaliero MOT per", "Data", "Viaggi", "Distanza totale", "Tempo di guida totale", "Energia prelevata", "Recuperata", "Energia netta", "Consumo netto medio", "Ricariche", "Tempo di ricarica totale", "Energia caricata stimata", "Aumento SOC", "Telemetria passiva; non è una misura fiscale o di precisione."],
     }[lang]
     point_units = {"de": "Prozentpunkte", "en": "percentage points", "fr": "points de pourcentage", "it": "punti percentuali"}
-    text = (f"{rows[0]} {name} ({preference['vehicleId']})\n{rows[1]}: {date}\n\n{rows[2]}: {summary['journeyCount']}\n{rows[3]}: {n(summary['distanceKm'])} km\n{rows[4]}: {summary['journeyDurationMinutes']} min\n{rows[5]}: {n(summary['energyDrawnKwh'], 2)} kWh\n{rows[6]}: {n(summary['energyRegenKwh'], 2)} kWh\n{rows[7]}: {n(summary['energyNetKwh'], 2)} kWh\n{rows[8]}: {consumption}\n\n{rows[9]}: {summary['chargingCount']}\n{rows[10]}: {summary['chargingDurationMinutes']} min\n{rows[11]}: {n(summary['energyChargedKwh'], 2)} kWh\n{rows[12]}: {n(summary['chargingSocDelta'])} {point_units[lang]}{note}\n\n{rows[13]}")
+    text = (f"{rows[0]} {name} ({preference['vehicleId']})\n{rows[1]}: {date}\n\n{rows[2]}: {summary['journeyCount']}\n{rows[3]}: {n(summary['distanceKm'], 0)} km\n{rows[4]}: {summary['journeyDurationMinutes']} min\n{rows[5]}: {n(summary['energyDrawnKwh'], 2)} kWh\n{rows[6]}: {n(summary['energyRegenKwh'], 2)} kWh\n{rows[7]}: {n(summary['energyNetKwh'], 2)} kWh\n{rows[8]}: {consumption}\n\n{rows[9]}: {summary['chargingCount']}\n{rows[10]}: {summary['chargingDurationMinutes']} min\n{rows[11]}: {n(summary['energyChargedKwh'], 2)} kWh\n{rows[12]}: {n(summary['chargingSocDelta'])} {point_units[lang]}{note}\n\n{rows[13]}")
     subjects = {"de": "Tagesübersicht", "en": "Daily summary", "fr": "Résumé quotidien", "it": "Riepilogo giornaliero"}
     return f"MOT - {subjects[lang]} {report_date} ({preference['vehicleId']})", text

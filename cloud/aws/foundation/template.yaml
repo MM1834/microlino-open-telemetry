@@ -1427,16 +1427,198 @@ Resources:
               return sorted(items, key=lambda item: int(item.get("sampledAt", 0)))
 
           def load_current_journey(vehicle_id, until_ms):
+              charge_result = journey_sessions.get_item(
+                  Key={"vehicleId": vehicle_id},
+                  ConsistentRead=True,
+                  ProjectionExpression="chargingSummary, chargingDisplay"
+              )
+              charging = json_value(
+                  charge_result.get("Item", {}).get("chargingSummary") or {}
+              )
+              display_charge = json_value(
+                  charge_result.get("Item", {}).get("chargingDisplay") or {}
+              )
+              last_charge = None
+              if display_charge.get("block_open") is True:
+                  gross = display_charge.get("block_gross_kwh")
+                  discharged = display_charge.get("block_discharged_kwh")
+                  started_at = int(display_charge.get("block_started_at") or 0)
+                  covered = display_charge.get("block_covered_ms")
+                  duration = max(1, until_ms - started_at)
+                  coverage = (
+                      min(100.0, max(0.0, float(covered) * 100.0 / duration))
+                      if isinstance(covered, (int, float)) and started_at > 0
+                      else None
+                  )
+                  start_soc = display_charge.get("block_start_soc")
+                  end_soc = display_charge.get("last_soc")
+                  capacity = display_charge.get("block_capacity_kwh")
+                  soc_estimate = (
+                      float(capacity) * (float(end_soc) - float(start_soc)) / 100.0
+                      if all(isinstance(value, (int, float)) for value in
+                             (capacity, start_soc, end_soc))
+                      and end_soc >= start_soc else None
+                  )
+                  if isinstance(gross, (int, float)):
+                      last_charge = {
+                          "energyKwh": gross,
+                          "dischargedKwh": discharged,
+                          "netKwh": (
+                              gross - discharged
+                              if isinstance(discharged, (int, float)) else None
+                          ),
+                          "at": int(display_charge.get("block_last_charge_at") or until_ms),
+                          "coveragePercent": coverage,
+                          "socEstimateKwh": soc_estimate,
+                          "startSoc": start_soc,
+                          "peakSoc": display_charge.get("block_peak_soc"),
+                          "endSoc": end_soc,
+                          "sessionCount": int(display_charge.get("block_session_count") or 0),
+                          "finalized": False,
+                      }
+              elif (
+                  isinstance(display_charge.get("last_energy_kwh"), (int, float))
+                  and int(display_charge.get("last_charge_at") or 0) > 0
+              ):
+                  last_charge = {
+                      "energyKwh": display_charge["last_energy_kwh"],
+                      "dischargedKwh": display_charge.get("last_discharged_kwh"),
+                      "netKwh": display_charge.get("last_net_kwh"),
+                      "at": int(display_charge["last_charge_at"]),
+                      "coveragePercent": display_charge.get("last_coverage_percent"),
+                      "socEstimateKwh": display_charge.get("last_soc_estimate_kwh"),
+                      "startSoc": display_charge.get("last_start_soc"),
+                      "peakSoc": display_charge.get("last_peak_soc"),
+                      "endSoc": display_charge.get("last_end_soc"),
+                      "sessionCount": int(display_charge.get("last_session_count") or 0),
+                      "finalized": True,
+                  }
+              elif (
+                  isinstance(charging.get("last_charge_energy_kwh"), (int, float))
+                  and int(charging.get("last_charge_energy_at") or 0) > 0
+              ):
+                  last_charge = {
+                      "energyKwh": charging["last_charge_energy_kwh"],
+                      "at": int(charging["last_charge_energy_at"]),
+                      "coveragePercent": charging.get("last_charge_coverage_percent"),
+                      "socEstimateKwh": charging.get("last_charge_soc_estimate_kwh"),
+                      "startSoc": charging.get("last_charge_start_soc"),
+                      "endSoc": charging.get("last_charge_end_soc"),
+                  }
+              charge_references = []
+              if (
+                  isinstance(display_charge.get("last_reference_soc"), (int, float))
+                  and isinstance(display_charge.get("last_reference_odometer"), (int, float))
+                  and int(display_charge.get("last_charge_at")
+                          or display_charge.get("last_finalized_at") or 0) > 0
+              ):
+                  charge_references.append({
+                      "soc": display_charge["last_reference_soc"],
+                      "odometer": display_charge["last_reference_odometer"],
+                      "at": int(display_charge.get("last_charge_at")
+                                or display_charge["last_finalized_at"]),
+                  })
+              if (
+                  isinstance(charging.get("last_charge_soc"), (int, float))
+                  and isinstance(charging.get("last_charge_odometer"), (int, float))
+                  and int(charging.get("last_charge_at") or 0) > 0
+              ):
+                  charge_references.append({
+                      "soc": charging["last_charge_soc"],
+                      "odometer": charging["last_charge_odometer"],
+                      "at": int(charging["last_charge_at"]),
+                  })
+              charge_reference = max(
+                  charge_references, key=lambda reference: reference["at"],
+                  default=None,
+              )
               result = journey_sessions.get_item(
                   Key={"vehicleId": f"journey#{vehicle_id}"},
                   ConsistentRead=True,
-                  ProjectionExpression="journey"
+                  ProjectionExpression="journey, driveSinceCharge"
               )
-              journey = json_value(result.get("Item", {}).get("journey") or {})
+              journey_item = result.get("Item", {})
+              journey = json_value(journey_item.get("journey") or {})
+              aggregate = json_value(
+                  journey_item.get("driveSinceCharge") or {}
+              )
               journey_id = str(journey.get("active_id") or "").strip()
               started_at = int(journey.get("started_at") or 0)
               active = bool(journey_id and started_at > 0)
               completion_at = int(journey.get("last_completion_at") or 0)
+              drive_since_charge = None
+              if charge_reference:
+                  reference_at = int(charge_reference["at"])
+                  matched = int(aggregate.get("reference_at") or 0) == reference_at
+                  duration = int(aggregate.get("duration_minutes") or 0) if matched else 0
+                  net = float(aggregate.get("energy_net_kwh") or 0) if matched else 0.0
+                  journey_count = int(aggregate.get("journey_count") or 0) if matched else 0
+                  active_not_finalized = (
+                      active and started_at + 120000 >= reference_at
+                      and str(aggregate.get("last_journey_id") or "") != journey_id
+                  )
+                  if active_not_finalized:
+                      duration += max(0, round(
+                          (int(journey.get("last_moving_at") or started_at)
+                           - started_at) / 60000
+                      ))
+                      firmware_net = journey.get("firmware_net_wh")
+                      last_moving_at = int(journey.get("last_moving_at") or 0)
+                      counter_ready = (
+                          bool(journey.get("firmware_counter_id"))
+                          and not journey.get("firmware_counter_invalid")
+                          and isinstance(firmware_net, (int, float))
+                          and int(journey.get("firmware_net_at") or 0) >= last_moving_at
+                      )
+                      if (
+                          counter_ready
+                      ):
+                          net += float(firmware_net) / 1000.0
+                      elif (
+                          bool(journey.get("firmware_counter_id"))
+                          and not journey.get("firmware_counter_invalid")
+                          and isinstance(journey.get("firmware_drawn_wh"), (int, float))
+                          and isinstance(journey.get("firmware_regen_wh"), (int, float))
+                          and min(
+                              int(journey.get("firmware_drawn_at") or 0),
+                              int(journey.get("firmware_regen_at") or 0),
+                          ) >= last_moving_at
+                      ):
+                          net += (
+                              float(journey["firmware_drawn_wh"])
+                              - float(journey["firmware_regen_wh"])
+                          ) / 1000.0
+                      else:
+                          net += (
+                              float(journey.get("estimated_drawn_kwh") or 0)
+                              - float(journey.get("estimated_regen_kwh") or 0)
+                          )
+                      journey_count += 1
+                  latest_odometer = journey.get("last_odometer")
+                  if not isinstance(latest_odometer, (int, float)):
+                      latest_odometer = journey.get("latest_odometer")
+                  distance = (
+                      float(latest_odometer) - float(charge_reference["odometer"])
+                      if isinstance(latest_odometer, (int, float)) else None
+                  )
+                  if distance is not None and distance < 0:
+                      distance = None
+                  rate = (
+                      net / distance * 100.0
+                      if distance is not None and distance > 0 and net > 0
+                      else None
+                  )
+                  if rate is not None and not 1.0 <= rate <= 50.0:
+                      rate = None
+                  drive_since_charge = {
+                      "referenceAt": reference_at,
+                      "distanceKm": distance,
+                      "durationMinutes": duration,
+                      "energyNetKwh": net,
+                      "consumptionKwhPer100Km": rate,
+                      "journeyCount": journey_count,
+                      "provisional": active_not_finalized,
+                  }
               if not active:
                   journey_id = str(
                       journey.get("last_completed_journey_id") or ""
@@ -1446,7 +1628,10 @@ Resources:
                   except (TypeError, ValueError):
                       started_at = 0
               if not journey_id or started_at <= 0:
-                  return {"vehicleId": vehicle_id, "active": False, "points": []}
+                  return {"vehicleId": vehicle_id, "active": False,
+                          "chargeReference": charge_reference,
+                          "lastCharge": last_charge,
+                          "driveSinceCharge": drive_since_charge, "points": []}
 
               # A real Microlino journey is bounded well below 24 hours. This
               # cap prevents a stale notification session from turning a
@@ -1478,6 +1663,9 @@ Resources:
                   "lastSoc": journey.get("last_soc"),
                   "startOdometer": journey.get("start_odometer"),
                   "lastOdometer": journey.get("last_odometer"),
+                  "chargeReference": charge_reference,
+                  "lastCharge": last_charge,
+                  "driveSinceCharge": drive_since_charge,
                   "truncated": query_since_ms > started_at,
                   "points": [points[key] for key in sorted(points)]
               }

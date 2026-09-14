@@ -42,6 +42,10 @@
     efficiencyComparison: null,
     efficiencyComparisonVehicleId: null,
     efficiencyComparisonRequest: 0,
+    lastCharge: null,
+    lastChargeVehicleId: null,
+    lastChargeRequest: 0,
+    driveSinceCharge: null,
     rangeKmAt100: Number(vehicleCfg.defaultRangeKmAt100 || 140),
     rangeReserveSoc: 0
   };
@@ -790,10 +794,87 @@
       renderEfficiencyComparison();
     }
   }
+  function renderLastCharge() {
+    const translate = text => window.MOT_I18N?.translate?.(text) || text;
+    const charge = state.lastCharge;
+    const chargeNumber = value => {
+      if (value === null || value === undefined || value === '') return NaN;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    };
+    const energy = chargeNumber(charge?.energyKwh);
+    const discharged = chargeNumber(charge?.dischargedKwh);
+    const net = chargeNumber(charge?.netKwh);
+    const coverage = chargeNumber(charge?.coveragePercent);
+    const estimate = chargeNumber(charge?.socEstimateKwh);
+    const startSoc = chargeNumber(charge?.startSoc);
+    const peakSoc = chargeNumber(charge?.peakSoc);
+    const endSoc = chargeNumber(charge?.endSoc);
+    const sessions = chargeNumber(charge?.sessionCount);
+    const minimum = Number.isFinite(coverage) && coverage < 95;
+    setText('charge-energy', Number.isFinite(energy)
+      ? `${minimum ? `${translate('mind.')} ` : ''}${fmtNum(energy, 2)} kWh`
+      : '-- kWh');
+    const details = [];
+    if (Number.isFinite(net)) details.push(`${translate('Netto im Akku')} ${fmtNum(net, 2)} kWh`);
+    if (Number.isFinite(discharged) && discharged > 0.005) details.push(`${translate('Entladung vor Fahrt')} ${fmtNum(discharged, 2)} kWh`);
+    if (Number.isFinite(estimate)) details.push(`${translate('SoC-Schätzung')} ${fmtNum(estimate, 2)} kWh`);
+    if (Number.isFinite(startSoc) && Number.isFinite(peakSoc) && Number.isFinite(endSoc)) details.push(`SoC ${fmtNum(startSoc, 0)} → max. ${fmtNum(peakSoc, 0)} → ${fmtNum(endSoc, 0)} %`);
+    if (Number.isFinite(sessions) && sessions > 1) details.push(`${fmtNum(sessions, 0)} ${translate('Ladevorgänge')}`);
+    if (Number.isFinite(coverage)) details.push(`${translate('Datenabdeckung')} ${fmtNum(coverage, 0)} %`);
+    if (charge?.finalized === false) details.push(translate('Ladebilanz offen'));
+    if (Number.isFinite(Number(charge?.at))) details.push(new Date(Number(charge.at)).toLocaleString(activeLocale(), {
+      day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'
+    }));
+    setText('charge-energy-detail', details.length ? details.join(' · ') : translate('Noch keine abgeschlossene Ladung'));
+  }
+  function renderDriveSinceCharge() {
+    const summary = state.driveSinceCharge;
+    const number = value => {
+      if (value === null || value === undefined || value === '') return NaN;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    };
+    const distance = number(summary?.distanceKm);
+    const consumption = number(summary?.consumptionKwhPer100Km);
+    const duration = number(summary?.durationMinutes);
+    setText('trip', Number.isFinite(distance) ? `${fmtNum(distance, 0)} km` : '-- km');
+    setText('consumption', Number.isFinite(consumption)
+      ? `${fmtNum(consumption, 2)} kWh/100 km`
+      : '--');
+    if (!Number.isFinite(duration)) {
+      setText('drive-time', '--');
+    } else {
+      const minutes = Math.max(0, Math.round(duration));
+      const hours = Math.floor(minutes / 60);
+      setText('drive-time', hours
+        ? `${hours} h ${minutes % 60} min`
+        : `${minutes} min`);
+    }
+  }
+  async function loadLastCharge() {
+    const vehicleId = state.selectedVehicleId;
+    if (!vehicleId || !state.dataProvider?.getCurrentJourney) return;
+    const requestId = ++state.lastChargeRequest;
+    try {
+      const result = await state.dataProvider.getCurrentJourney();
+      if (requestId !== state.lastChargeRequest || vehicleId !== state.selectedVehicleId) return;
+      state.lastCharge = result?.lastCharge || null;
+      state.driveSinceCharge = result?.driveSinceCharge || null;
+      state.lastChargeVehicleId = vehicleId;
+      renderLastCharge();
+      renderDriveSinceCharge();
+    } catch (error) {
+      if (requestId !== state.lastChargeRequest) return;
+      console.warn('MOT last charge request failed', error);
+    }
+  }
   window.addEventListener('mot-language-change', () => {
     updateClock();
     renderRangeForecast();
     renderEfficiencyComparison();
+    renderLastCharge();
+    renderDriveSinceCharge();
     updateDeviceInfo();
     window.MOTHistoryChart?.render?.();
   });
@@ -1128,6 +1209,10 @@ function resetDashboardForVehicle(vehicleId) {
   state.efficiencyComparison = null;
   state.efficiencyComparisonVehicleId = null;
   state.efficiencyComparisonRequest += 1;
+  state.lastCharge = null;
+  state.driveSinceCharge = null;
+  state.lastChargeVehicleId = null;
+  state.lastChargeRequest += 1;
   state.rangeKmAt100 = Number(vehicleCfg.defaultRangeKmAt100 || 140);
   state.rangeReserveSoc = 0;
 
@@ -1146,6 +1231,9 @@ function resetDashboardForVehicle(vehicleId) {
   setText('range-forecast-main', '-- km');
   setText('range-forecast-basis', 'Noch keine ausreichende Fahrhistorie');
   setText('range-soc-comparison', 'Nach SoC: -- km');
+  setText('trip', '-- km');
+  setText('consumption', '--');
+  setText('drive-time', '--');
   $('efficiency-comparison')?.setAttribute('hidden', '');
 
   setText('charging-main', 'Keine Daten');
@@ -1164,6 +1252,8 @@ function resetDashboardForVehicle(vehicleId) {
   setText('charge-voltage', '-- V');
   setText('current', '-- A');
   setText('charge-current', '-- A');
+  setText('charge-energy', '-- kWh');
+  setText('charge-energy-detail', 'Noch keine abgeschlossene Ladung');
   $('bms-soc-details')?.setAttribute('hidden', '');
   for (const id of ['bms-soc-internal-row', 'bms-soc-display-row', 'bms-standard-soc-row', 'bms-soh-row']) {
     $(id)?.setAttribute('hidden', '');
@@ -1230,6 +1320,7 @@ async function selectVehicle(vehicleId) {
   await loadNotificationPreferences(true);
   loadRangeForecast().catch(error => console.warn('Range forecast failed:', error));
   loadEfficiencyComparison().catch(error => console.warn('Efficiency comparison failed:', error));
+  loadLastCharge().catch(error => console.warn('Last charge failed:', error));
   window.MOTHistoryChart?.render?.();
 }
 
@@ -1509,6 +1600,7 @@ function startDataProvider() {
           }
           loadRangeForecast().catch(error => console.warn('Range forecast failed:', error));
           loadEfficiencyComparison().catch(error => console.warn('Efficiency comparison failed:', error));
+          loadLastCharge().catch(error => console.warn('Last charge failed:', error));
         }
         loadNotificationPreferences().catch(error => console.error('Notification settings failed:', error));
       },
@@ -1579,6 +1671,7 @@ function startDataProvider() {
     }
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();
+    window.setInterval(() => loadLastCharge().catch(error => console.warn('Last charge refresh failed:', error)), 60000);
     await Promise.all([loadFirmwareAccess(), loadPasswordRecoveryAccess()]);
   }
 

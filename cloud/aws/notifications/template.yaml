@@ -434,6 +434,9 @@ Resources:
                 Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Scan]
                 Resource: !GetAtt EventTable.Arn
               - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt VehicleProfileTable.Arn
+              - Effect: Allow
                 Action: [sns:Publish]
                 Resource: !Ref EmailTopic
               - Effect: Allow
@@ -468,6 +471,7 @@ Resources:
           PREFERENCE_TABLE_NAME: !Ref PreferenceTable
           SESSION_TABLE_NAME: !Ref SessionTable
           EVENT_TABLE_NAME: !Ref EventTable
+          VEHICLE_PROFILE_TABLE_NAME: !Ref VehicleProfileTable
           EMAIL_TOPIC_ARN: !Ref EmailTopic
           CHARGING_STOP_QUEUE_URL: !Ref ChargingStopQueue
           EVENT_RETENTION_DAYS: !Ref EventRetentionDays

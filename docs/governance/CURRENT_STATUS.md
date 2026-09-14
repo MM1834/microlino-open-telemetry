@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-11
+**Last reviewed:** 2026-09-14
 
 ## Purpose
 
@@ -18,6 +18,87 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+VEH-TRIP-001 is repository-complete. The existing Vehicle-card `Trip`,
+`Verbrauch` and `Fahrzeit` fields now share one period since the latest qualified
+charging completion. A versioned aggregate on the isolated Journey item retains
+odometer-valid finalized drives exactly once, including usable short drives that
+do not qualify for notification email. The protected current-journey API adds an
+active drive provisionally and calculates net kWh/100 km from the real odometer
+delta. A newer charge-reference identity hides earlier totals immediately. No
+firmware, table, route, IAM or preference change is introduced. The authorized
+code-only update changed only the existing Vehicle API and Notification Lambdas;
+both are `Active`/`Successful`, anonymous API access remains `401` and the
+send-free Notification probe passed. Hosted multi-journey aggregation and the
+5 km qualification boundary passed field acceptance. Kilometre values are now
+rounded to whole kilometres only at dashboard and notification presentation;
+stored evidence, thresholds and calculations retain available precision.
+The first productive drive then identified a legacy charge-reference timestamp
+finalized 75 seconds after movement began. A bounded two-minute compatibility
+window is deployed and regression-tested; the exact already-recorded 5.1 km
+journey totals were conditionally restored to the missing `pioneer` aggregate.
+
+CHG-BAL-001 is repository-complete and backend-deployed. It separates the dashboard's
+cumulative charge balance from the unchanged per-session email process. The new
+additive `chargingDisplay` state spans repeated charging, unplug/replug, top-ups
+and measured standby discharge until real odometer movement or a bounded
+sustained-speed fallback. It records gross, discharged and net kWh, first/peak/
+drive-start SOC, data coverage and session count. The protected existing journey
+API prefers this current/final balance and falls back to legacy charging-summary
+snapshots without migration. Main and journey views use the same localized data.
+No diagnostic path, firmware topic, table, route, IAM or preference changes. The
+code-only Vehicle API and Notification Lambda updates are `Active`/`Successful`,
+and a send-free invalid-topic probe passed. Existing records remain untouched and
+create `chargingDisplay` only on later relevant telemetry. Portal upload and
+natural field acceptance remain open.
+
+CHG-DASH-001 is backend-deployed and uploaded to the MOT beta portal. The previously unused energy field in the
+main charging box now shows the last qualified completed charge, while the
+adjusted DRV-CHG-001 `Seit letzter Ladung` card presents the same evidence. The
+existing notification session retains measured energy, completion time, coverage
+and the optional SOC estimate; the already protected current-journey response
+exposes a minimized nullable `lastCharge` object. Coverage below 95 percent is
+labelled `mind.` in both views. No diagnostic data, new table, route, firmware
+topic or authorization boundary is introduced. All 110 notification, 30
+Foundation and 47 focused dashboard tests pass; JavaScript/Python syntax and both
+AWS template validations pass. The authorized code-only rollout updated the
+existing Vehicle API and Notification Lambdas without infrastructure or stored
+data changes; both report `Active`/`Successful`. A pre-rollout six-minute
+`pioneer` charge proved the qualification and email path but, as expected, could
+not create the then-undeployed snapshot. Natural post-rollout charge acceptance
+in both beta views remains open.
+
+DRV-CHG-001 has a repository-complete extension for the authenticated journey
+view. It shows journey distance and the latest real odometer without synthesizing
+missing values. A qualified unplug or ten-minute charging-stop completion stores
+end SOC, a plausible recent odometer and completion time in the existing charging
+session item. The protected current-journey response exposes only that minimized
+reference. `Seit letzter Ladung` shows observed distance/SOC immediately and
+withholds its zero/reserve projection until at least 5 km and 5 SOC points have
+been consumed. It uses the configured reserve and remains distinct from the
+long-term personal forecast. Repository tests and syntax checks pass. Isolated
+code updates of the existing Vehicle API and Notification Lambdas are deployed;
+both report `Active`/`Successful`, anonymous API access remains `401` and the
+send-free Notification smoke test passed. Portal upload and physical
+charge/drive acceptance remain open.
+
+CHG-COV-001 has started from a read-only review of 48 charging-summary events
+across five vehicles. Of 36 capacity-comparable sessions, 28 were within
+85–120 percent of the SOC-based expectation, five were materially low and none
+was materially high. The outliers are session-specific and align with the
+existing 30-second power-integration gap guard: SOC can resume at its current
+value after connectivity returns while energy inside the missing interval is not
+invented. The repository now tracks covered power time, largest gap and sample
+count, reads the existing declared vehicle-capacity profile and adds both measured
+minimum energy and a separate SOC-based estimate to all four localized charging
+emails. New event attributes are additive; debug History and offline Backfill
+remain isolated. All 106 notification tests and CloudFormation validation pass.
+Two broad Change Sets were deleted unexecuted because existing drift exposed
+unrelated Scheduler/EventBridge/IoT changes. The exact tested ZIP was instead
+deployed through the established isolated Notification-Lambda path, with a
+separate least-privilege profile-table read policy. Lambda read-back is
+`Active`/`Successful`, the send-free smoke test passed and checked error logs are
+empty. Natural continuous/interrupted-session email acceptance remains open.
 
 NTF-I18N-001 is complete with an additive per-user/vehicle notification-language
 preference for German, English, French and Italian. German is the server-side
@@ -610,6 +691,15 @@ subscribe/receive path. At verification time the adapter had published only
 system and connectivity telemetry on firmware `C6-001-REV10-AWS`; no CAN, trip,
 charging or GPS values and no notification preference record were present.
 Adapter-side caching and notification recipients remain user-completed steps.
+Reserved vehicle identity `ml-pilot-029` is pre-authorized for operational
+History and server-side offline cache Backfill before adapter activation and
+claim consumption. Reviewed replacement-free Change Set
+`pregrant-ml-pilot-029-20260912` modified only the two ingest Lambdas and their
+derived IoT rules; stack `mot-aws-3-1` returned to `UPDATE_COMPLETE` and both
+effective allowlists contain the identity. No Thing or telemetry state existed at
+that point. Device activation must still create and verify the exact Backfill-ACK
+policy, while adapter-side caching, ownership and notification destinations remain
+separate later steps.
 The confirmed pilot account `be07@microlino-open-telemetry.ch` owns active vehicle
 `ml-pilot-027`. On 2026-09-01 the reviewed no-replacement Change Set
 `enable-ml-pilot-027-history-20260901` added that vehicle to operational History

@@ -4,7 +4,11 @@
   const $ = id => document.getElementById(id);
   const state = { provider: null, vehicleId: null, values: {}, metadata: {}, preferences: {}, forecast: null, journey: null };
 
-  const number = value => { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : NaN; };
+  const number = value => {
+    if (value === null || value === undefined || value === '') return NaN;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
   const isTrue = value => value === true || Number(value) === 1 || String(value).toLowerCase() === 'true';
   const text = (id, value) => { if ($(id)) $(id).textContent = value; };
   const tr = value => window.MOT_I18N?.translate?.(value) || value;
@@ -49,6 +53,102 @@
     text('drive-range-zero', Number.isFinite(soc) ? `${Math.round(soc * kmPerSoc)} km` : '-- km');
     text('drive-range-reserve', Number.isFinite(soc) ? `${Math.round(Math.max(0, soc - reserve) * kmPerSoc)} km` : '-- km');
     text('drive-reserve-label', `${tr('bis')} ${reserve.toFixed(0)} % ${tr('Reserve')}`);
+  }
+
+  function currentOdometer() {
+    const live = number(state.values['display/odometer_km'] ?? state.values['display/odo']);
+    return Number.isFinite(live) ? live : number(state.journey?.lastOdometer);
+  }
+
+  function renderDistance() {
+    const odometer = currentOdometer();
+    const start = number(state.journey?.startOdometer);
+    const distance = Number.isFinite(odometer) && Number.isFinite(start) && odometer >= start
+      ? odometer - start : NaN;
+    text('drive-distance', Number.isFinite(distance)
+      ? `${distance.toLocaleString(locale(), { maximumFractionDigits: 0 })} km` : '-- km');
+    text('drive-distance-context', tr(state.journey?.active ? 'Aktuelle Fahrt' : 'Letzte Fahrt'));
+    text('drive-odometer', Number.isFinite(odometer)
+      ? `${odometer.toLocaleString(locale(), { maximumFractionDigits: 0 })} km` : '-- km');
+  }
+
+  function renderChargeReference() {
+    const card = document.querySelector('.charge-reference-card');
+    const reference = state.journey?.chargeReference;
+    const lastCharge = state.journey?.lastCharge;
+    const energy = number(lastCharge?.energyKwh);
+    const discharged = number(lastCharge?.dischargedKwh);
+    const net = number(lastCharge?.netKwh);
+    const coverage = number(lastCharge?.coveragePercent);
+    const estimate = number(lastCharge?.socEstimateKwh);
+    const startSoc = number(lastCharge?.startSoc);
+    const peakSoc = number(lastCharge?.peakSoc);
+    const endSoc = number(lastCharge?.endSoc);
+    const sessions = number(lastCharge?.sessionCount);
+    const measuredPrefix = Number.isFinite(coverage) && coverage < 95 ? `${tr('mind.')} ` : '';
+    text('drive-last-charge-energy', Number.isFinite(energy)
+      ? `${measuredPrefix}${energy.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh`
+      : '-- kWh');
+    const energyDetails = [];
+    if (Number.isFinite(net)) energyDetails.push(`${tr('Netto im Akku')} ${net.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh`);
+    if (Number.isFinite(discharged) && discharged > 0.005) energyDetails.push(`${tr('Entladung vor Fahrt')} ${discharged.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh`);
+    if (Number.isFinite(estimate)) energyDetails.push(`${tr('SoC-Schätzung')} ${estimate.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh`);
+    if (Number.isFinite(startSoc) && Number.isFinite(peakSoc) && Number.isFinite(endSoc)) energyDetails.push(`SoC ${startSoc.toFixed(0)} → max. ${peakSoc.toFixed(0)} → ${endSoc.toFixed(0)} %`);
+    if (Number.isFinite(sessions) && sessions > 1) energyDetails.push(`${sessions.toFixed(0)} ${tr('Ladevorgänge')}`);
+    if (Number.isFinite(coverage)) energyDetails.push(`${tr('Datenabdeckung')} ${coverage.toLocaleString(locale(), { maximumFractionDigits: 0 })} %`);
+    if (lastCharge?.finalized === false) energyDetails.push(tr('Ladebilanz offen'));
+    text('drive-last-charge-detail', energyDetails.length ? energyDetails.join(' · ') : tr('Noch keine abgeschlossene Ladung'));
+    if (lastCharge?.finalized === false) {
+      const socGain = endSoc - startSoc;
+      text('drive-charge-heading', tr('Aktueller Ladeblock'));
+      text('drive-charge-summary', Number.isFinite(startSoc) && Number.isFinite(endSoc)
+        ? `${startSoc.toFixed(0)} % → ${endSoc.toFixed(0)} % · ${Number.isFinite(socGain) ? socGain.toFixed(0) : '--'} ${tr('SOC-Punkte geladen')}`
+        : tr('Ladebilanz offen'));
+      text('drive-charge-soc', Number.isFinite(number(lastCharge?.at))
+        ? new Date(number(lastCharge.at)).toLocaleDateString(locale(), { day: '2-digit', month: '2-digit', year: '2-digit' }) : '--');
+      text('drive-since-charge-distance', '-- km');
+      text('drive-since-charge-zero', '-- km');
+      text('drive-since-charge-reserve', '-- km');
+      text('drive-charge-note', tr('Ladebilanz wird mit der nächsten Fahrt abgeschlossen'));
+      card?.setAttribute('data-ready', 'false');
+      return;
+    }
+    text('drive-charge-heading', tr('Seit letzter Ladung'));
+    const odometer = currentOdometer();
+    const soc = number(state.values['display/soc'] ?? state.journey?.lastSoc);
+    const referenceSoc = number(reference?.soc);
+    const referenceOdometer = number(reference?.odometer);
+    const distance = odometer - referenceOdometer;
+    const socUsed = referenceSoc - soc;
+    const valid = reference && Number.isFinite(distance) && distance >= 0
+      && Number.isFinite(socUsed) && socUsed >= 0;
+    const ready = valid && distance >= 5 && socUsed >= 5;
+    card?.setAttribute('data-ready', ready ? 'true' : 'false');
+    if (!valid) {
+      text('drive-charge-summary', tr('Noch keine Ladereferenz'));
+      text('drive-charge-soc', '--');
+      text('drive-since-charge-distance', '-- km');
+      text('drive-since-charge-zero', '-- km');
+      text('drive-since-charge-reserve', '-- km');
+      text('drive-charge-note', tr('Die nächste qualifizierte Ladung setzt die Referenz'));
+      return;
+    }
+    text('drive-charge-summary', `${referenceSoc.toFixed(0)} % → ${soc.toFixed(0)} % · ${socUsed.toFixed(0)} ${tr('SOC-Punkte')}`);
+    text('drive-charge-soc', new Date(reference.at).toLocaleDateString(locale(), {
+      day: '2-digit', month: '2-digit', year: '2-digit'
+    }));
+    text('drive-since-charge-distance', `${distance.toLocaleString(locale(), { maximumFractionDigits: 0 })} km`);
+    if (!ready) {
+      text('drive-since-charge-zero', '-- km');
+      text('drive-since-charge-reserve', '-- km');
+      text('drive-charge-note', tr('Hochrechnung ab 5 km und 5 verbrauchten SOC-Punkten'));
+      return;
+    }
+    const kmPerSoc = distance / socUsed;
+    const reserve = Math.max(0, Math.min(50, number(state.preferences.rangeReserveSoc || 0)));
+    text('drive-since-charge-zero', `${Math.round(kmPerSoc * referenceSoc)} km`);
+    text('drive-since-charge-reserve', `${Math.round(kmPerSoc * Math.max(0, referenceSoc - reserve))} km`);
+    text('drive-charge-note', tr('Hochrechnung aus der Fahrt seit dem letzten Ladeende'));
   }
 
   function appendLivePoint() {
@@ -96,7 +196,7 @@
     points.forEach(p=>{if(!Number.isFinite(number(p.speed)))return;const px=x(p.ts),py=zero-number(p.speed)*speedScale;const gap=previous&&p.ts-previous.ts>150000;if(!previous||gap)ctx.moveTo(px,py);else ctx.lineTo(px,py);previous=p;});ctx.stroke();
   }
 
-  function render() { renderPower(); renderRange(); appendLivePoint(); renderChart(); }
+  function render() { renderPower(); renderRange(); renderDistance(); renderChargeReference(); appendLivePoint(); renderChart(); }
   function onMessage(topic, payload, metadata) {
     const key=topic.split('/').slice(2).join('/'); let value=payload;
     if(payload==='true'||payload==='false')value=payload==='true';else if(payload!==''&&Number.isFinite(Number(payload)))value=Number(payload);else{try{value=JSON.parse(payload);}catch{}}

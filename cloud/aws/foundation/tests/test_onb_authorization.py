@@ -339,6 +339,243 @@ class VehicleApiAuthorizationTests(unittest.TestCase):
         self.assertFalse(body["active"])
         self.assertEqual([], body["points"])
 
+    def test_current_journey_returns_last_qualified_charge_reference(self):
+        self.journeys.items["alpha"] = {"chargingSummary": {
+            "last_charge_soc": 92,
+            "last_charge_odometer": 1200.5,
+            "last_charge_at": 1_700_000_000_000,
+        }}
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual({
+            "soc": 92,
+            "odometer": 1200.5,
+            "at": 1_700_000_000_000,
+        }, body["chargeReference"])
+
+    def test_current_journey_returns_last_charge_energy_quality(self):
+        self.journeys.items["alpha"] = {"chargingSummary": {
+            "last_charge_soc": 91,
+            "last_charge_energy_kwh": 0.4,
+            "last_charge_energy_at": 1_700_000_000_000,
+            "last_charge_coverage_percent": 38,
+            "last_charge_soc_estimate_kwh": 1.05,
+            "last_charge_start_soc": 81,
+            "last_charge_end_soc": 91,
+        }}
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual({
+            "energyKwh": 0.4,
+            "at": 1_700_000_000_000,
+            "coveragePercent": 38,
+            "socEstimateKwh": 1.05,
+            "startSoc": 81,
+            "endSoc": 91,
+        }, body["lastCharge"])
+
+    def test_current_journey_prefers_finalized_display_charge_balance(self):
+        self.journeys.items["alpha"] = {
+            "chargingSummary": {
+                "last_charge_energy_kwh": 0.2,
+                "last_charge_energy_at": 1_700_000_000_000,
+            },
+            "chargingDisplay": {
+                "last_energy_kwh": 3.4,
+                "last_discharged_kwh": 0.2,
+                "last_net_kwh": 3.2,
+                "last_coverage_percent": 92,
+                "last_soc_estimate_kwh": 3.15,
+                "last_start_soc": 45,
+                "last_peak_soc": 77,
+                "last_end_soc": 75,
+                "last_session_count": 2,
+                "last_charge_at": 1_700_000_100_000,
+                "last_finalized_at": 1_700_000_200_000,
+                "last_reference_soc": 75,
+                "last_reference_odometer": 1201.5,
+            },
+        }
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual(3.4, body["lastCharge"]["energyKwh"])
+        self.assertEqual(0.2, body["lastCharge"]["dischargedKwh"])
+        self.assertEqual(3.2, body["lastCharge"]["netKwh"])
+        self.assertEqual(77, body["lastCharge"]["peakSoc"])
+        self.assertEqual(2, body["lastCharge"]["sessionCount"])
+        self.assertTrue(body["lastCharge"]["finalized"])
+        self.assertEqual({
+            "soc": 75,
+            "odometer": 1201.5,
+            "at": 1_700_000_100_000,
+        }, body["chargeReference"])
+
+    def test_current_journey_projects_finalized_driving_since_charge(self):
+        reference_at = 1_699_999_000_000
+        self.journeys.items["alpha"] = {"chargingSummary": {
+            "last_charge_soc": 80,
+            "last_charge_odometer": 1200.0,
+            "last_charge_at": reference_at,
+        }}
+        self.journeys.items["journey#alpha"] = {
+            "driveSinceCharge": {
+                "reference_at": reference_at,
+                "last_journey_id": "journey-2",
+                "journey_count": 2,
+                "duration_minutes": 48,
+                "energy_drawn_kwh": 2.7,
+                "energy_regen_kwh": 0.3,
+                "energy_net_kwh": 2.4,
+            },
+            "journey": {
+                "latest_odometer": 1230.0,
+                "last_completed_journey_id": "journey-2",
+                "last_completion_at": 1_700_000_000_000,
+            },
+        }
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual({
+            "referenceAt": reference_at,
+            "distanceKm": 30.0,
+            "durationMinutes": 48,
+            "energyNetKwh": 2.4,
+            "consumptionKwhPer100Km": 8.0,
+            "journeyCount": 2,
+            "provisional": False,
+        }, body["driveSinceCharge"])
+
+    def test_current_journey_adds_active_values_without_persisting_them(self):
+        reference_at = 1_699_999_000_000
+        self.journeys.items["alpha"] = {"chargingSummary": {
+            "last_charge_soc": 80,
+            "last_charge_odometer": 1200.0,
+            "last_charge_at": reference_at,
+        }}
+        self.journeys.items["journey#alpha"] = {
+            "driveSinceCharge": {
+                "reference_at": reference_at,
+                "last_journey_id": "journey-1",
+                "journey_count": 1,
+                "duration_minutes": 20,
+                "energy_net_kwh": 1.2,
+            },
+            "journey": {
+                "active_id": "journey-2",
+                "started_at": 1_700_000_000_000,
+                "last_moving_at": 1_700_000_060_000,
+                "last_odometer": 1220.0,
+                "estimated_drawn_kwh": 0.4,
+                "estimated_regen_kwh": 0.1,
+            },
+        }
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])["driveSinceCharge"]
+        self.assertEqual(20.0, body["distanceKm"])
+        self.assertEqual(21, body["durationMinutes"])
+        self.assertAlmostEqual(1.5, body["energyNetKwh"])
+        self.assertAlmostEqual(7.5, body["consumptionKwhPer100Km"])
+        self.assertEqual(2, body["journeyCount"])
+        self.assertTrue(body["provisional"])
+
+    def test_current_journey_accepts_reference_finalized_during_first_drive(self):
+        reference_at = 1_700_000_075_000
+        self.journeys.items["alpha"] = {"chargingDisplay": {
+            "last_reference_soc": 80,
+            "last_reference_odometer": 1200.0,
+            "last_charge_at": reference_at,
+            "last_finalized_at": reference_at,
+        }}
+        self.journeys.items["journey#alpha"] = {"journey": {
+            "active_id": "journey-first",
+            "started_at": 1_700_000_000_000,
+            "last_moving_at": 1_700_000_090_000,
+            "last_odometer": 1201.0,
+            "estimated_drawn_kwh": 0.08,
+            "estimated_regen_kwh": 0.01,
+        }}
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])["driveSinceCharge"]
+        self.assertTrue(body["provisional"])
+        self.assertEqual(1, body["journeyCount"])
+        self.assertAlmostEqual(7.0, body["consumptionKwhPer100Km"])
+
+    def test_new_charge_reference_hides_previous_aggregate(self):
+        self.journeys.items["alpha"] = {"chargingSummary": {
+            "last_charge_soc": 90,
+            "last_charge_odometer": 1300.0,
+            "last_charge_at": 1_700_000_000_000,
+        }}
+        self.journeys.items["journey#alpha"] = {
+            "driveSinceCharge": {
+                "reference_at": 1_699_000_000_000,
+                "journey_count": 3,
+                "duration_minutes": 60,
+                "energy_net_kwh": 3.0,
+            },
+            "journey": {"latest_odometer": 1300.0},
+        }
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])["driveSinceCharge"]
+        self.assertEqual(0.0, body["distanceKm"])
+        self.assertEqual(0, body["durationMinutes"])
+        self.assertIsNone(body["consumptionKwhPer100Km"])
+        self.assertEqual(0, body["journeyCount"])
+
+    def test_current_journey_exposes_open_display_charge_balance(self):
+        self.journeys.items["alpha"] = {"chargingDisplay": {
+            "block_open": True,
+            "block_started_at": 1_700_000_000_000,
+            "block_start_soc": 40,
+            "block_peak_soc": 72,
+            "block_gross_kwh": 3.0,
+            "block_discharged_kwh": 0.1,
+            "block_covered_ms": 90_000,
+            "block_session_count": 2,
+            "block_last_charge_at": 1_700_000_100_000,
+            "block_capacity_kwh": 10.5,
+            "last_soc": 70,
+        }}
+        result = self.module.handler(
+            rest_event(
+                "/api/vehicles/alpha/current-journey", "user-a", "alpha"
+            ), None
+        )
+        body = json.loads(result["body"])
+        self.assertEqual(3.0, body["lastCharge"]["energyKwh"])
+        self.assertEqual(2.9, body["lastCharge"]["netKwh"])
+        self.assertEqual(3.15, body["lastCharge"]["socEstimateKwh"])
+        self.assertEqual(2, body["lastCharge"]["sessionCount"])
+        self.assertFalse(body["lastCharge"]["finalized"])
+
     def test_current_journey_uses_canonical_start_and_native_points(self):
         self.journeys.items["journey#alpha"] = {"journey": {
             "active_id": "journey-17",

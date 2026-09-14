@@ -8,9 +8,113 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-11
+**Last reviewed:** 2026-09-14
 
 ## High priority
+
+### Fill the Vehicle trip values since the last charge
+
+**Active portal/backend sprint:** [VEH-TRIP-001 — Tripwerte seit letzter
+Ladung](../project/sprints/VEH-TRIP-001.md)
+
+**Objective:** Show real distance, cumulative net kWh/100 km and driving time for
+one consistent period beginning at the latest qualified charging completion.
+
+**Current status:** Repository implementation is complete. The isolated Journey
+item accumulates each finalized odometer-valid drive once and the protected
+current-journey API adds an active drive provisionally. A changed charge identity
+logically resets stale totals without a cross-item transaction. The existing
+desktop/smartphone fields render the minimized response. No firmware, table,
+route, IAM or preference change is required. The authorized code-only deployment
+updated only the two existing Lambdas; both are healthy, API authorization and
+the send-free Notification probe passed. Hosted accumulation across several
+journeys and the 5 km qualification boundary passed field acceptance. Dashboard
+and notification kilometre values are presented as whole kilometres while the
+underlying aggregation remains unchanged.
+The first productive drive exposed and verified a bounded compatibility case in
+which a legacy charge balance finalized its reference 75 seconds after movement
+began. The deployed two-minute movement-confirmation allowance has regression
+coverage, and that drive's exact recorded totals were conditionally restored.
+
+### Aggregate the dashboard charge balance until the next drive
+
+**Active portal/backend sprint:** [CHG-BAL-001 — Ladebilanz zwischen
+Fahrten](../project/sprints/CHG-BAL-001.md)
+
+**Objective:** Keep individual charging-summary emails unchanged while the
+dashboard separately aggregates every qualified charge, top-up and measurable
+standby discharge until actual vehicle movement.
+
+**Current status:** Repository implementation and the authorized code-only
+backend deployment are complete. A new additive
+`chargingDisplay` map shares the existing session item but has no dependency on
+email delivery state. It retains the pre-qualification SOC, gross input,
+measurable discharge, net energy, peak/final SOC, coverage and session count.
+Odometer movement closes the block, with sustained speed as fallback. The
+protected existing endpoint prefers this balance and retains legacy fallback;
+both dashboards present the same localized record. Only the existing Vehicle API
+and Notification Lambdas were updated; both are `Active`/`Successful`, and the
+send-free rejection probe passed. Portal upload and physical multi-session
+acceptance remain open.
+
+### Show the last completed charge in both dashboards
+
+**Active portal/backend sprint:** [CHG-DASH-001 — Letzte Ladeenergie im
+Dashboard](../project/sprints/CHG-DASH-001.md)
+
+**Objective:** Fill the existing main-dashboard charging-energy field and add the
+same last-charge evidence to the adjusted journey view, including measured
+minimum, SOC estimate and coverage semantics from CHG-COV-001.
+
+**Current status:** Repository implementation is complete and the backend is
+deployed. Qualified unplug and
+ten-minute completion retain an additive last-charge snapshot in the existing
+session item; the protected current-journey route returns it without a new table
+or authorization surface. Main and journey dashboards use the same nullable
+record, clear it on vehicle changes and localize the presentation in all four
+languages. The complete focused notification, Foundation and dashboard suites,
+syntax checks and both AWS template validations pass. The maintainer uploaded the
+frontend to the MOT beta portal; the authorized code-only backend rollout updated
+only the existing Vehicle API and Notification Lambdas, both now
+`Active`/`Successful`. Natural post-deployment acceptance in both beta views
+remains open.
+
+### Add distance and since-charge range to the journey view
+
+**Active portal/backend sprint:** [DRV-CHG-001 — Fahrstrecke und Reichweite seit
+letzter Ladung](../project/sprints/DRV-CHG-001.md)
+
+**Objective:** Show current/last journey distance, the real vehicle odometer and
+a conservative zero/reserve projection based on SOC consumed since the last
+qualified charge ended.
+
+**Current status:** Repository implementation is complete. It reuses the existing
+charging session table and protected current-journey API, persists the same
+reference on unplug and ten-minute charging timeout, and requires 5 km plus 5
+consumed SOC points before projection. No firmware, new table, battery-capacity
+calculation or authorization change is introduced. Isolated code updates of the
+two existing Lambdas are deployed and healthy; authorization and send-free
+smoke tests pass. Portal upload and physical charge/drive acceptance remain open.
+
+### Make charging-summary energy coverage explicit
+
+**Active backend sprint:** [CHG-COV-001 — Transparent Charging Energy and Data
+Coverage](../project/sprints/CHG-COV-001.md)
+
+**Objective:** Preserve directly measured pack energy while showing its power-data
+coverage and a separate SOC-based estimate from the declared vehicle capacity.
+When coverage is below 95 percent, label measured energy as a minimum rather than
+presenting an incomplete value as precise.
+
+**Current status:** Backend deployed. Charging state now
+tracks covered power duration, largest gap and sample count; persisted events and
+localized emails receive additive coverage, capacity and SOC-estimate fields.
+The Notification Lambda gains read-only access to the existing vehicle-profile
+table. All 106 notification tests, Python syntax and CloudFormation validation
+pass. Two broad drift-affected Change Sets were deleted unexecuted; the exact
+tested code was deployed only to the existing Notification Lambda with a separate
+least-privilege profile-table policy. Read-back and the send-free smoke test pass.
+Natural continuous/interrupted-session acceptance remains open.
 
 ### Localize MOT notifications
 

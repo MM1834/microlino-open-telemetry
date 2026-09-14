@@ -10,6 +10,9 @@
 
 ## Active implementation work
 
+- [CHG-BAL-001 — kumulierte Ladebilanz zwischen Fahrten](CHG-BAL-001.md)
+- [CHG-DASH-001 — letzte Ladeenergie im Haupt- und Fahrdashboard](CHG-DASH-001.md)
+- [CHG-COV-001 — transparent charging energy and data coverage](CHG-COV-001.md)
 - [CHG-SUM-001 — email-only charging summary](CHG-SUM-001.md)
 - [WEBFLASH-001 — controlled portal Web Flasher](WEBFLASH-001.md)
 - [RNG-SET-001 — personal range settings](RNG-SET-001.md)
@@ -28,6 +31,15 @@
 
 ## Newly started work
 
+- [VEH-TRIP-001 — Tripwerte seit letzter Ladung](VEH-TRIP-001.md) fills the
+  existing Vehicle-card Trip, consumption and driving-time fields from one
+  consistent post-charge period. Repository implementation, isolated backend
+  deployment and hosted multi-journey acceptance are complete, including the
+  whole-kilometre presentation follow-up.
+- [DRV-CHG-001 — Fahrstrecke und Reichweite seit letzter Ladung](DRV-CHG-001.md)
+  adds journey distance, current odometer and a conservative SOC projection from
+  the last qualified charging completion. The backend code is deployed and
+  healthy; portal upload and physical charge/drive acceptance remain open.
 - [FLEET-EFF-001 - anonymized long-term fleet efficiency](FLEET-EFF-001.md)
   preserves monthly distance and net-energy evidence beyond the 31-day event
   TTL. It adds declared vehicle battery capacity with conservative plausibility

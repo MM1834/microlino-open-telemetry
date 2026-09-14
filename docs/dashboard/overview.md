@@ -32,6 +32,32 @@ result as a comparison. Before valid history exists, the fixed value remains the
 only displayed forecast. Both `/dashboard/` and `/motbeta/` consume this shared
 portal source.
 
+The dedicated journey page additionally shows the current or retained-last
+journey distance and the newest real odometer. Its separate `Seit letzter Ladung`
+card uses the SOC and odometer retained when the last qualified charging session
+ended. The same card now also shows the measured energy of that completed charge,
+its power-data coverage and the separate SOC estimate when available. Coverage
+below 95 percent labels the measured value as a minimum, matching the charging
+email. It displays observed distance and SOC development immediately but only
+projects range to zero and the configured reserve after at least 5 km and 5 SOC
+percentage points. Missing or inconsistent values remain unavailable rather than
+being inferred. This short-window observation is deliberately separate from the
+long-term personal range forecast.
+
+The main dashboard's charging card uses that same protected last-charge record in
+its existing energy field. It shows measured energy, marks incomplete coverage as
+`mind.`, and adds the optional SOC estimate, coverage and completion time as
+secondary text. It refreshes once per minute and clears the previous value before
+a vehicle change. This is completed standard notification telemetry, not live
+energy metering and not diagnostic-history data.
+
+CHG-BAL-001 evolves that record into a dashboard-only balance between drives.
+Individual charging-summary emails remain bounded per qualified session, while
+the display aggregates repeated charges, top-ups and measurable discharge until
+real movement. It shows gross charged energy as the primary value and adds net
+battery input, discharge, SOC progression, session count, coverage and open/final
+state when available. Legacy single-session records retain their previous shape.
+
 The Vehicle card also contains an authenticated previous-month efficiency
 comparison. It shows the selected vehicle's stored net kWh/100 km beside the
 anonymous community value after subtracting that vehicle's contribution. A `+`
@@ -42,6 +68,17 @@ journeys and 100 km remain. SOC and battery capacity are never part of this API
 or card. German, English, French and Italian wording is included. Hosted desktop
 and smartphone acceptance passed on 2026-09-10, including coexistence with the
 separate DRV-001 live-journey page.
+
+The three compact Vehicle-card values use a separate short-term period beginning
+at the latest qualified charging completion. `Trip` is the real odometer delta,
+`Verbrauch` is accumulated net traction energy per 100 km, and `Fahrzeit` sums
+the finalized journey durations. The protected current-journey response adds the
+active journey provisionally without persisting or double-counting it. A newer
+charge reference immediately invalidates older totals; legacy records remain
+unavailable until later charge-and-drive evidence exists. Dashboard kilometre
+values are rounded to whole kilometres because the retained display odometer
+does not provide reliable 100 m resolution; calculations and qualification
+retain their available internal precision.
 
 The authenticated Settings page ends with a read-only `MOT Adapter
 Informationen` block for the selected vehicle. It obtains DeviceId, Board,

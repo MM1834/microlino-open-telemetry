@@ -92,8 +92,31 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("sns.publish", summary)
         self.assertNotIn("sms_delivery", summary)
         self.assertNotIn("debug", summary.lower())
+        self.assertIn("energyCoveragePercent", summary)
+        self.assertIn("socEstimatedEnergyKwh", summary)
+        self.assertIn("VEHICLE_PROFILE_TABLE_NAME: !Ref VehicleProfileTable", TEMPLATE)
+        self.assertIn("Resource: !GetAtt VehicleProfileTable.Arn", TEMPLATE)
         self.assertIn("chargingSummaryEmailEnabled", PREFERENCE_API)
         self.assertIn("CHARGING_SUMMARY_DELAY_SECONDS", HANDLER)
+
+    def test_dashboard_charge_balance_is_separate_from_email_session(self):
+        self.assertIn('item.get("chargingDisplay")', HANDLER)
+        self.assertIn('"chargingDisplay": _ddb(asdict(display_after))', HANDLER)
+        state_update = HANDLER.split("def update_charging_states", 1)[1].split(
+            "def update_session", 1
+        )[0]
+        self.assertNotIn("send_charging_summaries", state_update)
+        self.assertNotIn("sns.publish", state_update)
+        self.assertIn("update_charging_states(", HANDLER)
+
+    def test_drive_since_charge_totals_are_persisted_with_journey_finalization(self):
+        self.assertIn('item.get("driveSinceCharge")', HANDLER)
+        finalizer = HANDLER.split("def finalize_journey", 1)[1].split(
+            "def finalize_due_journeys", 1
+        )[0]
+        self.assertIn("accumulate_drive_since_charge", finalizer)
+        self.assertIn("_charge_reference_at(vehicle_id)", finalizer)
+        self.assertIn("aggregate,", finalizer)
 
     def test_daily_summary_is_email_only_zurich_scheduled_and_idempotent(self):
         self.assertIn("DailySummarySchedule:", TEMPLATE)

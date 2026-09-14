@@ -35,7 +35,9 @@ class EmailTemplateTests(unittest.TestCase):
             messages = [
                 soc_target(preference, "pioneer", "Pioneer", 80, 81),
                 charging_stop(preference, "pioneer", "Pioneer", 70, 80),
-                charging_summary(preference, "pioneer", "Pioneer", state, 60, "unplugged"),
+                charging_summary(preference, "pioneer", "Pioneer", state, 60, "unplugged",
+                                 capacity_kwh=10.5, coverage_percent=88,
+                                 soc_estimate_kwh=2.1),
                 journey_summary(preference, "pioneer", "Pioneer", journey),
                 daily_summary(preference, "2026-09-10", daily, False),
             ]
@@ -43,6 +45,9 @@ class EmailTemplateTests(unittest.TestCase):
                 self.assertTrue(subject.startswith("MOT -"))
                 self.assertTrue(body.startswith("MOT" ) or body.startswith("Résumé") or body.startswith("Riepilogo"))
                 self.assertLessEqual(len(subject), 100)
+            charging_body = messages[2][1]
+            self.assertIn("88", charging_body)
+            self.assertIn("2", charging_body)
             sms_messages = (
                 sms_soc_target(preference, "pioneer", 81, 80),
                 sms_charging_stop(preference, "pioneer", 70, 80),
@@ -50,6 +55,35 @@ class EmailTemplateTests(unittest.TestCase):
             for message in sms_messages:
                 self.assertLessEqual(len(message), 160)
                 self.assertTrue(message.isascii())
+
+    def test_journey_and_daily_distance_use_whole_kilometres(self):
+        journey = types.SimpleNamespace(
+            distance_km=12.3, duration_minutes=20, soc_used=8,
+            energy_drawn_kwh=1.4, energy_regen_kwh=.2,
+            energy_net_kwh=1.2, net_kwh_per_100_km=9.8,
+            completion_trigger="speed_zero", source_flag="Firmware counter",
+        )
+        daily = {
+            "journeyCount": 1, "distanceKm": 12.3,
+            "journeyDurationMinutes": 20, "energyDrawnKwh": 1.4,
+            "energyRegenKwh": .2, "energyNetKwh": 1.2,
+            "netKwhPer100Km": 9.8, "chargingCount": 0,
+            "chargingDurationMinutes": 0, "energyChargedKwh": 0,
+            "chargingSocDelta": 0,
+        }
+        for lang in ("de", "en", "fr", "it"):
+            preference = {"notificationLanguage": lang, "vehicleId": "pioneer"}
+            subject, body = journey_summary(
+                preference, "pioneer", "Pioneer", journey
+            )
+            self.assertIn("12 km", subject)
+            self.assertIn("12 km", body)
+            self.assertNotIn("12.3 km", subject + body)
+            self.assertNotIn("12,3 km", subject + body)
+            _, daily_body = daily_summary(
+                preference, "2026-09-14", daily, False
+            )
+            self.assertIn("12 km", daily_body)
 
 
 if __name__ == "__main__":

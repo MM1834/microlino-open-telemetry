@@ -17,7 +17,7 @@ class DashboardI18nContractTests(unittest.TestCase):
         self.assertIn("<html lang=\"de\">", INDEX)
 
     def test_language_selector_and_catalog_are_loaded(self):
-        self.assertIn('src="js/i18n.js?v=20260910-drv-eff1"', INDEX)
+        self.assertIn('src="js/i18n.js?v=20260913-last-charge1"', INDEX)
         self.assertIn('id="dashboard-language"', INDEX)
         for language in ("de", "en", "fr", "it"):
             self.assertIn(f'<option value="{language}">', INDEX)
