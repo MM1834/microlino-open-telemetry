@@ -106,6 +106,14 @@ accepted that behaviour. A presentation-only follow-up rounds dashboard Trip,
 journey/odometer distances and journey/daily notification distances to whole
 kilometres; thresholds, aggregation and stored evidence remain unchanged.
 
+After explicit maintainer approval on 2026-09-14, the whole-kilometre
+notification presentation was deployed as an isolated code-only update of the
+existing `mot-dev-notifications` Lambda. It finished `Active` with
+`LastUpdateStatus: Successful` and code hash
+`NdEmtaqtFUJDaCIgm/jE+8issLYD4MmUr1ovPzPWNcY=`. A send-free invocation retained
+the expected `invalid_topic` rejection; no infrastructure or stored data was
+changed.
+
 ## Backend deployment — 2026-09-13
 
 After explicit maintainer approval, the established code-only deployment updated

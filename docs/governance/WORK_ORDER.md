@@ -30,7 +30,8 @@ updated only the two existing Lambdas; both are healthy, API authorization and
 the send-free Notification probe passed. Hosted accumulation across several
 journeys and the 5 km qualification boundary passed field acceptance. Dashboard
 and notification kilometre values are presented as whole kilometres while the
-underlying aggregation remains unchanged.
+underlying aggregation remains unchanged. The final isolated Notification code
+update is deployed and healthy; its send-free rejection probe passed.
 The first productive drive exposed and verified a bounded compatibility case in
 which a legacy charge balance finalized its reference 75 seconds after movement
 began. The deployed two-minute movement-confirmation allowance has regression

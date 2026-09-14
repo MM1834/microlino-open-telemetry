@@ -32,7 +32,9 @@ both are `Active`/`Successful`, anonymous API access remains `401` and the
 send-free Notification probe passed. Hosted multi-journey aggregation and the
 5 km qualification boundary passed field acceptance. Kilometre values are now
 rounded to whole kilometres only at dashboard and notification presentation;
-stored evidence, thresholds and calculations retain available precision.
+stored evidence, thresholds and calculations retain available precision. The
+final Notification-Lambda presentation update is deployed `Active`/`Successful`
+and passed the send-free rejection smoke test.
 The first productive drive then identified a legacy charge-reference timestamp
 finalized 75 seconds after movement began. A bounded two-minute compatibility
 window is deployed and regression-tested; the exact already-recorded 5.1 km
