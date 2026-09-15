@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-14
+**Last reviewed:** 2026-09-15
 
 ## Purpose
 
@@ -18,6 +18,25 @@ notes remain useful audit material, but are not by themselves proof of the curre
 revision.
 
 ## Current product direction
+
+GPS-ALT-001 is complete and field-accepted at the firmware transport boundary;
+JNY-ALT-001 remains backend-deployed with its portal/journey acceptance separate.
+C6 N16/XIAO and the maintained LilyGO AWS targets publish raw
+`location/altitude_m`; the backend derives nullable net, ascent and descent with
+30-second sampling, 5 m hysteresis and an implausible-jump guard. Journey and
+daily emails render the values in all four languages only when evidence exists,
+and the journey page adds them as a compact secondary line below distance. All
+129 Notification and 36 Vehicle API tests pass; C6 and LilyGO build gates pass.
+WROOM remains excluded because its current 4 MB AWS image is already 4,516 bytes
+over the existing OTA slot before this optional publisher. Physical C6 testing
+confirmed plausible altitude delivery through both AWS and secure local MQTT on
+2026-09-15. CloudFormation Change
+Set `jny-alt-001-rule-20260915` changed only the existing NotificationRule without
+replacement; both affected Lambdas are `Active`/`Successful`. A bounded
+optimistic-lock retry correction found during rollout passed a clean live-log
+window, send-free invalid-topic probe and retained `401` API authorization.
+MOTbeta upload and the filtered outdoor out-and-back journey plausibility test
+remain open under JNY-ALT-001.
 
 VEH-TRIP-001 is repository-complete. The existing Vehicle-card `Trip`,
 `Verbrauch` and `Fahrzeit` fields now share one period since the latest qualified
@@ -196,10 +215,17 @@ authenticated local owner opt-in; revocation durably schedules retained broker
 topic cleanup. The complete focused C6 suite passes 60 tests.
 `nanoesp32c6-n16` builds at 1,404,108 application bytes (26.8%) with 59,096 bytes
 static RAM; compatibility-only `xiao-esp32c6` builds at 1,389,896 bytes (81.6%,
-below its 85% gate) with 58,356 bytes static RAM. No broker, ioBroker or physical
-N16 acceptance is claimed yet. Home Assistant remains a schema-compatibility
-target, and LilyGO plus mobile-network work is parked pending the hardware
-decision.
+below its 85% gate) with 58,356 bytes static RAM. On 2026-09-15 the maintainer
+confirmed the first real connection to an ioBroker MQTT instance using verified
+TLS with a locally issued trust anchor plus dedicated username/password; vehicle
+telemetry arrived in ioBroker. This closes basic broker connectivity and consumer
+receipt. The maintainer subsequently completed the planned adapter restart,
+broker stop/start, online/retained/freshness inspection and wrong-credential/trust
+negative checks; automatic reconnect also succeeded. Exact namespace denial,
+mTLS, location-consent cleanup, certificate rotation, configuration-preserving
+OTA, extended outage isolation and the 12-hour N16 soak remain open.
+Home Assistant remains a schema-compatibility target, and LilyGO plus
+mobile-network work is parked pending the hardware decision.
 
 ADP-INF-001 adds a read-only `MOT Adapter Informationen` block at the end of the
 authenticated Settings page. It reads DeviceId, Board, firmware version,

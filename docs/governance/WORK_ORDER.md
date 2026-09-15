@@ -8,9 +8,30 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-14
+**Last reviewed:** 2026-09-15
 
 ## High priority
+
+### Publish GNSS altitude and derive journey elevation
+
+**Completed firmware sprint:** [GPS-ALT-001 — GNSS altitude telemetry](../project/sprints/GPS-ALT-001.md)
+
+**Active backend/portal sprint:** [JNY-ALT-001 — Höhenmeter in Fahrten und
+Zusammenfassungen](../project/sprints/JNY-ALT-001.md)
+
+**Objective:** Publish raw `location/altitude_m` for C6/local integrations and
+derive separately filtered ascent/descent for journey email, daily summary and
+the compact journey screen.
+
+**Current status:** GPS-ALT-001 is complete: C6 N16, XIAO and both maintained
+LilyGO AWS builds pass, and physical C6 publication of plausible altitude through
+AWS and secure local MQTT is accepted. The Notification and Vehicle API suites
+plus dashboard syntax checks pass. WROOM is excluded because its existing 4 MB
+AWS image is already over the OTA slot. The exact NotificationRule-only Change
+Set and both Lambda code updates are deployed and healthy; the post-deployment
+concurrency correction passed a clean live-log window, send-free probe and API
+authorization check. Hosted portal upload and filtered road ascent/descent
+plausibility validation remain open for JNY-ALT-001.
 
 ### Fill the Vehicle trip values since the last charge
 
