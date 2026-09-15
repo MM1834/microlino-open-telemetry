@@ -1,0 +1,500 @@
+{
+  "__inputs": [{
+    "name": "DS_MYSQL",
+    "label": "ioBroker MySQL",
+    "description": "MySQL/MariaDB data source with ioBroker SQL history",
+    "type": "datasource",
+    "pluginId": "mysql",
+    "pluginName": "MySQL"
+  }],
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [{
+    "asDropdown": false,
+    "icon": "dashboard",
+    "includeVars": true,
+    "keepTime": true,
+    "tags": ["MOT"],
+    "targetBlank": false,
+    "title": "MOT Dashboards",
+    "tooltip": "Weitere MOT Dashboards",
+    "type": "dashboards"
+  }],
+  "panels": [
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "GPS-Höhe aus location/altitude_m im gewählten Zeitraum. Das Panel verwendet dieselbe Zeitachse wie das Leistungsdiagramm.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "semi-dark-green", "mode": "fixed" },
+        "custom": { "drawStyle": "line", "fillOpacity": 18, "lineInterpolation": "linear", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false },
+        "decimals": 0,
+        "unit": "lengthm"
+      }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "id": 14,
+      "options": {
+        "legend": { "calcs": ["min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "time_series",
+        "rawQuery": true,
+        "rawSql": "SELECT t.ts DIV 1000 AS time, t.val AS 'Höhe' FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.location.altitude_m') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 ORDER BY t.ts",
+        "refId": "A"
+      }],
+      "title": "Höhenprofil",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Differenz aus grösstem und kleinstem Kilometerstand im gewählten Zeitraum.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "blue", "mode": "fixed" },
+        "decimals": 1,
+        "unit": "suffix: km"
+      }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT GREATEST(MAX(t.val)-MIN(t.val),0) AS value FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.odometer_km') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000",
+        "refId": "A"
+      }],
+      "title": "Gefahrene Strecke",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Höchste gespeicherte Display-CAN-Geschwindigkeit im Zeitraum.",
+      "fieldConfig": { "defaults": {
+        "color": { "mode": "thresholds" },
+        "decimals": 1,
+        "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null },
+          { "color": "yellow", "value": 50 },
+          { "color": "red", "value": 80 }
+        ] },
+        "unit": "velocitykmh"
+      }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT MAX(t.val) AS value FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.speed_kmh') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000",
+        "refId": "A"
+      }],
+      "title": "Höchstgeschwindigkeit",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Integrierte positive Fahrzeugleistung; Lücken über 30 Sekunden werden ausgeschlossen.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "orange", "mode": "fixed" },
+        "decimals": 2,
+        "unit": "kwatth"
+      }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 0 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "WITH p AS (SELECT t.ts,t.val,LEAD(t.ts) OVER (ORDER BY t.ts) AS next_ts FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000) SELECT COALESCE(SUM(CASE WHEN val>0 AND next_ts-ts BETWEEN 0 AND 30000 THEN val*(next_ts-ts) ELSE 0 END)/3600000000.0,0) AS value FROM p",
+        "refId": "A"
+      }],
+      "title": "Verbrauch · gemessen",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Integrierte negative Fahrzeugleistung bei gemeldetem Rekuperationszustand; Lücken über 30 Sekunden werden ausgeschlossen.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "green", "mode": "fixed" },
+        "decimals": 2,
+        "unit": "kwatth"
+      }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 0 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "WITH p AS (SELECT t.ts,t.val,LEAD(t.ts) OVER (ORDER BY t.ts) AS next_ts FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000) SELECT COALESCE(SUM(CASE WHEN val<0 AND next_ts-ts BETWEEN 0 AND 30000 AND COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.is_regenerating') AND b.ts<=p.ts ORDER BY b.ts DESC LIMIT 1),0)=1 THEN -val*(next_ts-ts) ELSE 0 END)/3600000000.0,0) AS value FROM p",
+        "refId": "A"
+      }],
+      "title": "Rekuperation · gemessen",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Integrierte negative Fahrzeugleistung bei gemeldetem Ladezustand; Lücken über 30 Sekunden werden ausgeschlossen.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "purple", "mode": "fixed" },
+        "decimals": 2,
+        "unit": "kwatth"
+      }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 0 },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "WITH p AS (SELECT t.ts,t.val,LEAD(t.ts) OVER (ORDER BY t.ts) AS next_ts FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000) SELECT COALESCE(SUM(CASE WHEN val<0 AND next_ts-ts BETWEEN 0 AND 30000 AND (COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.charging.is_charging') AND b.ts<=p.ts ORDER BY b.ts DESC LIMIT 1),0)=1 OR COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.charging.plugged') AND b.ts<=p.ts ORDER BY b.ts DESC LIMIT 1),0)=1 OR COALESCE((SELECT s.val FROM ts_number s JOIN datapoints ds ON ds.id=s.id WHERE ds.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.speed_kmh') AND s.ts<=p.ts ORDER BY s.ts DESC LIMIT 1),0)<=1) THEN -val*(next_ts-ts) ELSE 0 END)/3600000000.0,0) AS value FROM p",
+        "refId": "A"
+      }],
+      "title": "Geladen · gemessen",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Nettoverbrauch aus Verbrauch minus Rekuperation, bezogen auf die Kilometerstanddifferenz. Erst ab 0,1 km.",
+      "fieldConfig": { "defaults": {
+        "color": { "mode": "thresholds" },
+        "decimals": 1,
+        "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null },
+          { "color": "yellow", "value": 8 },
+          { "color": "red", "value": 14 }
+        ] },
+        "unit": "suffix: kWh/100 km"
+      }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 0 },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "WITH p AS (SELECT t.ts,t.val,LEAD(t.ts) OVER (ORDER BY t.ts) AS next_ts FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000), e AS (SELECT SUM(CASE WHEN next_ts-ts BETWEEN 0 AND 30000 THEN val*(next_ts-ts) ELSE 0 END)/3600000000.0 AS net_kwh FROM p), km AS (SELECT MAX(t.val)-MIN(t.val) AS distance_km FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.odometer_km') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000) SELECT CASE WHEN km.distance_km>=0.1 THEN e.net_kwh*100.0/km.distance_km ELSE NULL END AS value FROM e CROSS JOIN km",
+        "refId": "A"
+      }],
+      "title": "Nettoverbrauch",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Kilometerstand relativ zum ersten Messwert des gewählten Zeitraums.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "blue", "mode": "fixed" },
+        "custom": { "drawStyle": "line", "fillOpacity": 12, "lineInterpolation": "stepAfter", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false },
+        "decimals": 1,
+        "unit": "suffix: km"
+      }, "overrides": [] },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 38 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "time_series",
+        "rawQuery": true,
+        "rawSql": "SELECT t.ts DIV 1000 AS time, t.val-MIN(t.val) OVER () AS 'Strecke' FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.odometer_km') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 ORDER BY t.ts",
+        "refId": "A"
+      }],
+      "title": "Gefahrene Strecke im Zeitraum",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Verbrauch wird positiv, Rekuperation und Laden werden negativ dargestellt; Geschwindigkeit liegt auf der rechten Achse. Laden verwendet is_charging, plugged oder Stillstand als Fallback.",
+      "fieldConfig": { "defaults": {
+        "color": { "mode": "palette-classic" },
+        "custom": { "axisCenteredZero": true, "drawStyle": "bars", "fillOpacity": 55, "lineWidth": 1, "pointSize": 2, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" } },
+        "decimals": 2,
+        "unit": "kwatt"
+      }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Verbrauch" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Rekuperation" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Laden" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Geschwindigkeit" }, "properties": [
+          { "id": "color", "value": { "fixedColor": "light-blue", "mode": "fixed" } },
+          { "id": "unit", "value": "velocitykmh" },
+          { "id": "min", "value": 0 },
+          { "id": "custom.axisPlacement", "value": "right" },
+          { "id": "custom.axisLabel", "value": "Geschwindigkeit" },
+          { "id": "custom.axisCenteredZero", "value": false },
+          { "id": "custom.axisSoftMin", "value": 0 },
+          { "id": "custom.drawStyle", "value": "line" },
+          { "id": "custom.fillOpacity", "value": 0 },
+          { "id": "custom.lineWidth", "value": 2 },
+          { "id": "custom.showPoints", "value": "never" }
+        ] }
+      ] },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+      "id": 12,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT t.ts DIV 1000 AS time, CASE WHEN t.val>0 THEN t.val/1000.0 END AS 'Verbrauch' FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 ORDER BY t.ts",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT t.ts DIV 1000 AS time, CASE WHEN t.val<0 AND COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.is_regenerating') AND b.ts<=t.ts ORDER BY b.ts DESC LIMIT 1),0)=1 THEN t.val/1000.0 END AS 'Rekuperation' FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 ORDER BY t.ts",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT t.ts DIV 1000 AS time, CASE WHEN t.val<0 AND (COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.charging.is_charging') AND b.ts<=t.ts ORDER BY b.ts DESC LIMIT 1),0)=1 OR COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.charging.plugged') AND b.ts<=t.ts ORDER BY b.ts DESC LIMIT 1),0)=1 OR COALESCE((SELECT s.val FROM ts_number s JOIN datapoints ds ON ds.id=s.id WHERE ds.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.speed_kmh') AND s.ts<=t.ts ORDER BY s.ts DESC LIMIT 1),0)<=1) THEN t.val/1000.0 END AS 'Laden' FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 ORDER BY t.ts",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT t.ts DIV 1000 AS time, GREATEST(t.val,0) AS 'Geschwindigkeit' FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.speed_kmh') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 ORDER BY t.ts",
+          "refId": "D"
+        }
+      ],
+      "title": "Leistung und Geschwindigkeit",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Aus Ladeleistung integrierte Tageswerte. Zeitlücken über 30 Sekunden werden nicht ergänzt; daher gemessene Mindestenergie.",
+      "fieldConfig": { "defaults": {
+        "color": { "fixedColor": "purple", "mode": "fixed" },
+        "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "pointSize": 2, "showPoints": "never", "spanNulls": false },
+        "decimals": 2,
+        "min": 0,
+        "unit": "kwatth"
+      }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 47 },
+      "id": 13,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [{
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "editorMode": "code",
+        "format": "time_series",
+        "rawQuery": true,
+        "rawSql": "WITH p AS (SELECT t.ts,t.val,LEAD(t.ts) OVER (ORDER BY t.ts) AS next_ts FROM ts_number t JOIN datapoints d ON d.id=t.id WHERE d.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND t.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000), c AS (SELECT p.*,COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.charging.is_charging') AND b.ts<=p.ts ORDER BY b.ts DESC LIMIT 1),0) AS charging,COALESCE((SELECT b.val FROM ts_bool b JOIN datapoints db ON db.id=b.id WHERE db.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.charging.plugged') AND b.ts<=p.ts ORDER BY b.ts DESC LIMIT 1),0) AS plugged,COALESCE((SELECT s.val FROM ts_number s JOIN datapoints ds ON ds.id=s.id WHERE ds.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.speed_kmh') AND s.ts<=p.ts ORDER BY s.ts DESC LIMIT 1),0) AS speed FROM p) SELECT (ts DIV 86400000)*86400 AS time, SUM(CASE WHEN val<0 AND (charging=1 OR plugged=1 OR speed<=1) AND next_ts-ts BETWEEN 0 AND 30000 THEN -val*(next_ts-ts) ELSE 0 END)/3600000000.0 AS 'Geladene Mindestenergie' FROM c GROUP BY ts DIV 86400000 HAVING SUM(CASE WHEN val<0 AND (charging=1 OR plugged=1 OR speed<=1) THEN 1 ELSE 0 END)>0 ORDER BY time",
+        "refId": "A"
+      }],
+      "title": "Ladeenergie pro UTC-Tag",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "description": "Route aus separat freigegebener GPS-Historie. Pfeile folgen der Zeitreihenfolge. Blau zeigt negative Fahrzeugleistung (während der Fahrt typischerweise Rekuperation); Verbrauch wechselt bei 0/3/10 kW von grün über gelb zu rot. Für eine einzelne Fahrt den Zeitraum eng wählen.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null },
+            { "color": "green", "value": 0 },
+            { "color": "yellow", "value": 3 },
+            { "color": "red", "value": 10 }
+          ] },
+          "unit": "kwatt"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 24, "x": 0, "y": 23 },
+      "id": 20,
+      "options": {
+        "basemap": { "config": {}, "name": "OpenStreetMap", "type": "osm-standard" },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": true,
+          "showScale": true,
+          "showZoom": true
+        },
+        "layers": [{
+          "config": {
+            "arrow": 1,
+            "showLegend": true,
+            "style": {
+              "color": { "field": "power_kw", "fixed": "green" },
+              "lineWidth": 5,
+              "opacity": 0.85,
+              "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
+              "size": { "fixed": 5, "max": 15, "min": 2 },
+              "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
+              "textConfig": { "fontSize": 12, "offsetX": 0, "offsetY": 0, "textAlign": "center", "textBaseline": "middle" }
+            }
+          },
+          "filterData": { "id": "byRefId", "options": "A" },
+          "location": { "latitude": "latitude", "longitude": "longitude", "mode": "coords" },
+          "name": "Fahrtroute",
+          "opacity": 1,
+          "tooltip": true,
+          "type": "route"
+        }, {
+          "config": {
+            "showLegend": false,
+            "style": {
+              "color": { "field": "power_kw", "fixed": "green" },
+              "opacity": 0.25,
+              "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
+              "size": { "fixed": 6, "max": 10, "min": 4 },
+              "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
+              "textConfig": { "fontSize": 12, "offsetX": 0, "offsetY": 0, "textAlign": "center", "textBaseline": "middle" }
+            }
+          },
+          "filterData": { "id": "byRefId", "options": "A" },
+          "location": { "latitude": "latitude", "longitude": "longitude", "mode": "coords" },
+          "name": "Messpunkte",
+          "opacity": 1,
+          "tooltip": true,
+          "type": "markers"
+        }, {
+          "config": {
+            "border": 0,
+            "color": "transparent",
+            "crop": false,
+            "kind": "square",
+            "radius": 32,
+            "shadow": false,
+            "src": "image_url"
+          },
+          "filterData": { "id": "byRefId", "options": "B" },
+          "location": { "latitude": "latitude", "longitude": "longitude", "mode": "coords" },
+          "name": "Aktueller Standort",
+          "tooltip": true,
+          "type": "photos"
+        }],
+        "tooltip": { "mode": "details" },
+        "view": { "allLayers": true, "id": "fit", "lat": 47.3769, "lon": 8.5417, "padding": 10, "shared": false, "zoom": 11 }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT lat.ts DIV 1000 AS time, lat.val AS latitude, (SELECT lon.val FROM ts_number lon JOIN datapoints dl ON dl.id=lon.id WHERE dl.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.location.longitude') AND ABS(lon.ts-lat.ts)<=10000 ORDER BY ABS(lon.ts-lat.ts) LIMIT 1) AS longitude, (SELECT p.val/1000.0 FROM ts_number p JOIN datapoints dp ON dp.id=p.id WHERE dp.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.bms.vehicle_power_w') AND ABS(p.ts-lat.ts)<=10000 ORDER BY ABS(p.ts-lat.ts) LIMIT 1) AS power_kw, (SELECT GREATEST(s.val,0) FROM ts_number s JOIN datapoints ds ON ds.id=s.id WHERE ds.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.display.speed_kmh') AND ABS(s.ts-lat.ts)<=10000 ORDER BY ABS(s.ts-lat.ts) LIMIT 1) AS speed_kmh FROM ts_number lat JOIN datapoints dlat ON dlat.id=lat.id WHERE dlat.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.location.latitude') AND lat.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 AND lat.val BETWEEN -90 AND 90 HAVING longitude BETWEEN -180 AND 180 ORDER BY lat.ts",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT lat.ts DIV 1000 AS time, lat.val AS latitude, (SELECT lon.val FROM ts_number lon JOIN datapoints dl ON dl.id=lon.id WHERE dl.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.location.longitude') AND ABS(lon.ts-lat.ts)<=10000 ORDER BY ABS(lon.ts-lat.ts) LIMIT 1) AS longitude, 'https://www.microlino-open-telemetry.ch/images/microlino-outline.svg' AS image_url FROM ts_number lat JOIN datapoints dlat ON dlat.id=lat.id WHERE dlat.name=CONCAT('mqtt.2.mot.', ${vehicle:sqlstring}, '.location.latitude') AND lat.ts BETWEEN $__unixEpochFrom()*1000 AND $__unixEpochTo()*1000 AND lat.val BETWEEN -90 AND 90 HAVING longitude BETWEEN -180 AND 180 ORDER BY lat.ts DESC LIMIT 1",
+          "refId": "B"
+        }
+      ],
+      "title": "Fahrtroute · Leistung und Fahrtrichtung",
+      "type": "geomap"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["MOT", "ioBroker", "MySQL", "TeslaMate-inspired"],
+  "templating": { "list": [{
+    "current": { "selected": true, "text": "pioneer", "value": "pioneer" },
+    "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+    "definition": "SELECT DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(name,'.',4),'.',-1) AS __text, SUBSTRING_INDEX(SUBSTRING_INDEX(name,'.',4),'.',-1) AS __value FROM datapoints WHERE name LIKE 'mqtt.2.mot.%.display.soc' ORDER BY __text",
+    "hide": 0,
+    "includeAll": false,
+    "label": "Fahrzeug",
+    "multi": false,
+    "name": "vehicle",
+    "options": [],
+    "query": "SELECT DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(name,'.',4),'.',-1) AS __text, SUBSTRING_INDEX(SUBSTRING_INDEX(name,'.',4),'.',-1) AS __value FROM datapoints WHERE name LIKE 'mqtt.2.mot.%.display.soc' ORDER BY __text",
+    "refresh": 1,
+    "regex": "",
+    "skipUrlSync": false,
+    "sort": 1,
+    "type": "query"
+  }] },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MOT · Fahrten & Energie",
+  "uid": "mot-trips-energy",
+  "version": 9,
+  "weekStart": "monday"
+}

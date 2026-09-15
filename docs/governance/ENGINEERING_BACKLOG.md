@@ -404,11 +404,26 @@ and record signal confidence.
 
 For every supported model and battery variant, validate SOC, traction,
 regeneration, charging power and range scaling against controlled vehicle
-observations. For the Standard-CAN V2 decoder, treat `charging/plugged` and
-`charging/is_charging` from Standard CAN as an explicit release gate: capture
-unplugged, plugged-idle, active-charging and charge-stop transitions before those
-signals are considered verified or used as authoritative notification and journey
-boundaries.
+observations. Standard-CAN V2 `charging/plugged` and `charging/is_charging` passed
+the required large-battery capture across unplugged, plugged-idle, active 6 A/8 A
+charging, charge stop and unplug transitions and received subsequent V2 field
+confirmation. That bounded decoder portion is closed. A V2 traction/regeneration
+comparison remains a separate decoder follow-up.
+
+### BAT-DEC-001 — additional battery-data decoder
+
+**Status:** Open decoder task. Capture and decode further passive traction-battery
+and BMS signals when verified CAN traces or manufacturer information become
+available. Candidate outputs include a confirmed internal/BMS SOC, pack voltage
+and current, gross charge/discharge direction, usable and total energy counters,
+SOH, battery temperatures, charge limits and cell minimum/maximum/delta values.
+
+Do not promote a candidate PID from diagnostic observations alone. For each signal,
+record CAN channel, arbitration ID, byte/bit layout, scale, offset, unit, update
+rate, signedness, invalid values and confidence, and validate it against controlled
+charging, rest, driving and regeneration traces on more than one compatible
+vehicle where possible. Keep Display-CAN SOC explicitly separate from internal
+BMS SOC and do not silently replace the current standard telemetry contract.
 
 ### Consent-bound remote CAN diagnostic capture
 
@@ -428,9 +443,9 @@ certificates or unrelated device configuration. Encrypt transport and storage,
 apply short retention with automatic deletion, scope download to administrators,
 and audit consent, authorization, start, stop, expiry, access and deletion.
 
-Use the first suitable vehicle to compare V1 and V2 Standard-CAN generations and
-to isolate the missing V2 `charging/plugged` and `charging/is_charging` states
-across unplugged, plugged-idle, charging, charge-stop and unplug transitions.
+Use the next suitable V2 drive to complete the traction/regeneration comparison;
+the implemented `0x60D` plug and `0x610` charging states are confirmed and no
+longer discovery targets.
 Keep battery capacity, production year, BMS supplier/generation, motor generation
 and selected decoder profile as separate evidence fields; do not infer the CAN
 generation from battery size alone. Before enabling this remotely for a pilot,

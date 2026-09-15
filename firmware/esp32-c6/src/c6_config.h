@@ -13,6 +13,15 @@ struct C6Configuration {
     String setupPassword;
     bool motCloudEnabled = true;
     bool abrpEnabled = false;
+    bool localMqttEnabled = false;
+    bool localMqttUseClientCertificate = false;
+    bool localMqttLocationEnabled = false;
+    bool localMqttLocationCleanupPending = false;
+    String localMqttHost;
+    uint16_t localMqttPort = 8883;
+    String localMqttVehicleId;
+    String localMqttTopicPrefix = "mot";
+    String localMqttUsername;
     bool gpsEnabled = true;
     bool offlineCacheEnabled = false;
     String abrpApiKey;
@@ -38,6 +47,12 @@ bool c6ConfigSetAbrpCredentials(const String &apiKey, const String &userToken);
 void c6ConfigClearAbrpCredentials();
 void c6ConfigSetMotCloudEnabled(bool enabled);
 void c6ConfigSetAbrpEnabled(bool enabled);
+void c6ConfigSetLocalMqttEnabled(bool enabled);
+bool c6ConfigSetLocalMqttConnection(const String &host, uint16_t port,
+    const String &vehicleId, const String &topicPrefix, const String &username,
+    bool useClientCertificate);
+void c6ConfigSetLocalMqttLocationEnabled(bool enabled);
+void c6ConfigMarkLocalMqttLocationCleanupComplete();
 void c6ConfigSetOfflineCacheEnabled(bool enabled);
 String c6ConfigRecoverAdminPassword();
 String c6ConfigExportJson(bool includeSecrets = false);

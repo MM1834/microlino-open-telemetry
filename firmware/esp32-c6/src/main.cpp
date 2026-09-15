@@ -10,6 +10,7 @@
 #include "c6_dual_can.h"
 #include "c6_gps.h"
 #include "c6_journey_energy.h"
+#include "c6_local_mqtt.h"
 #include "c6_network.h"
 #include "c6_offline_cache.h"
 #include "c6_web.h"
@@ -89,6 +90,10 @@ void handleSerialCommand(String command)
         c6SocDiscoveryDump();
         return;
     }
+    if (normalized == "soc diff") {
+        c6SocDiscoveryDiff();
+        return;
+    }
     if (normalized == "soc 48d") {
         c6SocDiscovery48dDump();
         return;
@@ -164,6 +169,16 @@ void handleSerialCommand(String command)
         Serial.println("ABRP: " + c6AbrpStatusJson());
         return;
     }
+    if (normalized == "mqtt status") {
+        Serial.println("Local MQTT: " + c6LocalMqttStatusJson());
+        return;
+    }
+    if (normalized == "mqtt enable" || normalized == "mqtt disable") {
+        const bool enabled = normalized == "mqtt enable";
+        c6ConfigSetLocalMqttEnabled(enabled);
+        Serial.printf("Local MQTT: %s (credentials unchanged)\n", enabled ? "enabled" : "disabled");
+        return;
+    }
     if (normalized == "abrp clear") {
         c6ConfigClearAbrpCredentials();
         Serial.println("ABRP: disabled; API key and user token deleted");
@@ -198,7 +213,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc 48d | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
+        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc diff | soc 48d | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
         return;
     }
 
@@ -255,9 +270,10 @@ void setup()
     c6NetworkSetup();
     c6WebSetup();
     c6AwsSetup();
+    c6LocalMqttSetup();
     c6AbrpSetup();
     c6DriveCaptureReset();
-    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
+    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
 }
 
 void loop()
@@ -268,6 +284,7 @@ void loop()
     c6NetworkLoop();
     c6WebLoop();
     c6AwsLoop();
+    c6LocalMqttLoop();
     c6AbrpLoop();
     pollSerialCommands();
 
@@ -287,7 +304,7 @@ void loop()
                       c6GpsDetected() ? "yes" : "no",
                       c6GpsValid() ? "yes" : "no",
                       c6GpsMessage().c_str());
-        Serial.printf("WiFi=%s | AWS=%s\n", c6NetworkStatus().c_str(), c6AwsStatus().c_str());
+        Serial.printf("WiFi=%s | AWS=%s | Local MQTT=%s\n", c6NetworkStatus().c_str(), c6AwsStatus().c_str(), c6LocalMqttStatusJson().c_str());
 
         const uint32_t packAgeMs = millis() - telemetry.bms.packStatusLastUpdateMs;
         const uint32_t cellsAgeMs = millis() - telemetry.bms.cellVoltagesLastUpdateMs;

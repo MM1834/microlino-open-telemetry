@@ -31,6 +31,12 @@ true SOC until its BMS semantics are independently confirmed. `bms/soc_display`
 is diagnostic corroboration only; `display/soc` remains the product SOC source.
 The large-battery V2 capture contained no `0x48D` frames and instead exposes its
 SOC/SOH pair on `0x1B1`, so this decoding is deliberately confined to Pioneer V1.
+This profile name describes the confirmed reference vehicle, not a guaranteed
+badge or battery-size boundary: field evidence also includes non-Pioneer
+medium-battery vehicles with V1 behaviour, while a newer small-battery vehicle
+requires V2. Profile assignment therefore remains manually verified until the
+manufacturer confirms a VIN, type-certificate, model-year, BMS or drivetrain
+identifier.
 
 Pack power is derived as `current_A × voltage_V`. This field uses the battery
 convention: positive current/power flows into the pack during charging or

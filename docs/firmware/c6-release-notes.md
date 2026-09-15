@@ -1,6 +1,34 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current release:** `C6-001-REV18-AWS`
+> **Current accepted release:** `C6-001-REV20-AWS`
+>
+> **Previous field-validation release:** `C6-001-REV19-AWS`
+
+### `C6-001-REV20-AWS`
+
+REV20 publishes raw valid-fix GPS altitude as `location/altitude_m` through MOT
+Cloud/AWS and the optional secure local MQTT service. Physical C6 testing
+confirmed plausible outdoor altitude on both transports. The N16 and XIAO build
+gates remain part of the release validation; WROOM remains outside this release
+boundary because its existing image exceeds its OTA slot.
+
+REV20 includes the now accepted REV19 Standard-CAN V2 plug and charging-state
+decoder described below.
+
+### `C6-001-REV19-AWS`
+
+REV19 separates the newly verified Standard-CAN V2 charging-state decoder from
+the previously accepted REV18 release identity. On the tested newer-generation
+large-battery vehicle, Standard-CAN `0x60D` byte 1 bit 3 identifies a connected
+charge cable, while `0x610` byte 0 distinguishes unplugged (`0x01`), plugged and
+idle (`0x05`) and actively charging (`0x02`). Pack voltage, current and derived
+power remained plausible during controlled 6 A and 8 A charging tests, and both
+CAN channels remained error-free.
+
+The plug and active-charging portion is field-accepted after the original
+large-battery test and a subsequent V2 confirmation. This does not claim that
+traction and regeneration have been validated on every newer-generation
+battery/BMS variant.
 >
 > **Targets:** nanoESP32-C6-N16 and Seeed XIAO ESP32-C6
 

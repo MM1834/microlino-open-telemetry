@@ -13,4 +13,5 @@ String c6GpsMessage();
 double c6GpsLatitude();
 double c6GpsLongitude();
 double c6GpsSpeedKmph();
+double c6GpsAltitudeMeters();
 uint32_t c6GpsSatellites();

@@ -89,6 +89,7 @@ bool publishTelemetry()
         published |= client.publishFloat("location/latitude", static_cast<float>(c6GpsLatitude()), 6);
         published |= client.publishFloat("location/longitude", static_cast<float>(c6GpsLongitude()), 6);
         published |= client.publishFloat("location/speed_kmph", static_cast<float>(c6GpsSpeedKmph()), 2);
+        published |= client.publishFloat("location/altitude_m", static_cast<float>(c6GpsAltitudeMeters()), 1);
         published |= client.publishInt("location/satellites", c6GpsSatellites());
     }
     return published;

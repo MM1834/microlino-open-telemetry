@@ -264,6 +264,11 @@ void publishLilygoTelemetry()
             static_cast<float>(l76kSpeedKmph()),
             1
         );
+        awsClient.publishFloat(
+            "location/altitude_m",
+            static_cast<float>(l76kAltitudeMeters()),
+            1
+        );
         awsClient.publishInt(
             "location/satellites",
             static_cast<long>(l76kSatellites())
@@ -701,6 +706,11 @@ void publishLilygoTelemetry()
         publishLegacyFloat(
             "location/speed_kmph",
             static_cast<float>(l76kSpeedKmph())
+        );
+        publishLegacyFloat(
+            "location/altitude_m",
+            static_cast<float>(l76kAltitudeMeters()),
+            1
         );
         publishLegacyInt(
             "location/satellites",

@@ -6,4 +6,5 @@ void c6SocDiscoveryReset();
 void c6SocDiscoveryObserve(size_t channel, const MotCanFrame &frame);
 void c6SocDiscoveryMark();
 void c6SocDiscoveryDump();
+void c6SocDiscoveryDiff();
 void c6SocDiscovery48dDump();

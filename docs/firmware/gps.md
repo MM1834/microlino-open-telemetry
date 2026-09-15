@@ -64,6 +64,21 @@ Location MQTT topics are emitted only while the current fix is valid. Retained A
 coordinates may remain as last-known values when a fix disappears; consumers use
 receive metadata/freshness rather than presence alone.
 
+The C6 and LilyGO publishers also emit `location/altitude_m` from the same valid
+fix. This is raw GNSS altitude at 0.1 m transport resolution. AWS journey summaries
+derive ascent and descent separately with 30-second sampling, a 5 m hysteresis and
+an implausible vertical-rate guard; consumers must not sum every raw MQTT delta.
+The WROOM parser exposes altitude internally, but its current 4 MB AWS application
+already exceeds its OTA slot and therefore does not take this optional publisher
+until a separate size-reduction decision is made.
+
+The bounded C6 offline cache does not contain coordinates, altitude or other GPS
+values. It stores only moving Speed samples (at most once per minute plus the
+following zero) and SOC samples while moving or charging (at most once per five
+minutes). Its acknowledged replay is an AWS History backfill and is not consumed
+by the secure local-MQTT publisher. Local MQTT therefore reports live GPS values
+only; a local broker outage creates no later GPS replay.
+
 ## Validation needs
 
 - no-receiver detection timeout/state;

@@ -10,6 +10,7 @@
 #include "c6_config.h"
 #include "c6_dual_can.h"
 #include "c6_gps.h"
+#include "c6_local_mqtt.h"
 #include "c6_network.h"
 #include "c6_offline_cache.h"
 #include "decoders/decoder_profile.h"
@@ -158,6 +159,7 @@ String diagnosticsJson()
     out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
     out += ",\"gps\":{\"state\":\"" + jsonEscape(c6GpsState()) + "\",\"detected\":" + String(c6GpsDetected() ? "true" : "false") + ",\"fix\":" + String(c6GpsValid() ? "true" : "false") + ",\"chars\":" + String(static_cast<unsigned long long>(c6GpsChars())) + ",\"satellites\":" + String(c6GpsSatellites()) + "}";
     out += ",\"aws\":\"" + jsonEscape(c6AwsStatus()) + "\"";
+    out += ",\"localMqtt\":" + c6LocalMqttStatusJson();
     out += ",\"offlineCache\":" + c6OfflineCacheStatusJson();
     out += ",\"abrp\":" + c6AbrpStatusJson() + "}";
     return out;
@@ -187,6 +189,8 @@ void configPage()
         out += "<div class='card'><h2>GPS</h2><input type='hidden' name='gpsControlPresent' value='1'><label><input style='width:auto' type='checkbox' name='gpsEnabled'" + String(c6Config.gpsEnabled ? " checked" : "") + "> Enable detected GPS module</label><p class='muted'>Default: enabled. Disabling stops GPS initialization, decoding and telemetry after reboot.</p></div>";
     }
     out += "<div class='card'><h2>Telemetry services</h2><h3>MOT Cloud (AWS IoT)</h3><label><input style='width:auto' type='checkbox' name='motCloudEnabled'" + String(c6Config.motCloudEnabled ? " checked" : "") + "> Enable MOT Cloud</label><p class='muted'>The adapter remains AWS ready. Disabling stops cloud connections but retains its provisioned certificates and vehicle assignment.</p><hr><h3>ABRP</h3><label><input style='width:auto' type='checkbox' name='abrpEnabled'" + String(c6Config.abrpEnabled ? " checked" : "") + "> Enable ABRP</label> <label>API key</label><input type='password' name='abrpApiKey' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><label>User token</label><input type='password' name='abrpUserToken' maxlength='192' autocomplete='new-password' placeholder='Leave blank to keep current'><p class='muted'>ABRP uses WiFi independently and can run with or without MOT Cloud. Credentials are never included in normal backups or diagnostics. Empty fields retain stored values.</p><input type='hidden' name='returnTo' value='/config'><button class='secondary-small' type='submit' formaction='/api/abrp/clear' formmethod='post' onclick=\"return confirm('Delete the stored ABRP API key and user token and disable ABRP?')\">Delete ABRP credentials</button></div>";
+    out += "<div class='card'><h2>Secure local MQTT</h2><label><input style='width:auto' type='checkbox' name='localMqttEnabled'" + String(c6Config.localMqttEnabled ? " checked" : "") + "> Enable local MQTT over verified TLS</label><label>Broker hostname</label><input name='localMqttHost' maxlength='253' value='" + htmlEscape(c6Config.localMqttHost) + "' placeholder='mqtt.example.local'><label>TLS port</label><input type='number' min='1' max='65535' name='localMqttPort' value='" + String(c6Config.localMqttPort) + "'><label>Vehicle ID</label><input name='localMqttVehicleId' maxlength='64' value='" + htmlEscape(c6Config.localMqttVehicleId) + "'><label>Topic prefix</label><input name='localMqttTopicPrefix' maxlength='32' value='" + htmlEscape(c6Config.localMqttTopicPrefix) + "'><label>Authentication</label><select name='localMqttAuth'><option value='password'" + String(c6Config.localMqttUseClientCertificate ? "" : " selected") + ">Dedicated username and password</option><option value='mtls'" + String(c6Config.localMqttUseClientCertificate ? " selected" : "") + ">Dedicated client certificate (mTLS)</option></select><label>Broker username</label><input name='localMqttUsername' maxlength='128' autocomplete='off' value='" + htmlEscape(c6Config.localMqttUsername) + "'><label>Broker password</label><input type='password' name='localMqttPassword' maxlength='512' autocomplete='new-password' placeholder='Leave blank to keep stored value'><label>Broker CA / trust anchor (PEM)</label><textarea name='localMqttRootCa' rows='5' maxlength='12288' placeholder='Leave blank to keep stored CA'></textarea><label>Client certificate (PEM, mTLS only)</label><textarea name='localMqttClientCertificate' rows='5' maxlength='12288' placeholder='Leave blank to keep stored certificate'></textarea><label>Client private key (PEM, mTLS only)</label><textarea name='localMqttClientPrivateKey' rows='5' maxlength='8192' placeholder='Leave blank to keep stored private key'></textarea><p class='muted'>TLS server and hostname verification are mandatory. Anonymous and plaintext MQTT are unavailable. Secrets are excluded from diagnostics and backups; blank secret fields retain stored values.</p><pre>" + htmlEscape(c6LocalMqttStatusJson()) + "</pre><input type='hidden' name='returnTo' value='/config'><button class='secondary-small' type='submit' formaction='/api/local-mqtt/clear' formmethod='post' onclick=\"return confirm('Delete all local MQTT credentials and disable local MQTT?')\">Delete local MQTT credentials</button></div>";
+    out += "<div class='card'><h2>Local MQTT location sharing</h2><p><b>Current state: " + String(c6Config.localMqttLocationEnabled ? "enabled" : "disabled") + "</b></p><p class='muted'>This is separate from MQTT activation. Opting in publishes retained coordinates to the configured broker. Opting out stops new location data and schedules deletion of retained location topics, but cannot erase copies already stored by broker consumers.</p><input type='hidden' name='locationEnabled' value='" + String(c6Config.localMqttLocationEnabled ? "0" : "1") + "'><button class='secondary-small' type='submit' formaction='/api/local-mqtt/location' formmethod='post' onclick=\"return confirm('" + String(c6Config.localMqttLocationEnabled ? "Disable MQTT location sharing and clear retained location topics?" : "Enable retained MQTT location sharing for this adapter?") + "')\">" + String(c6Config.localMqttLocationEnabled ? "Disable location sharing" : "Enable location sharing") + "</button></div>";
     out += "<div class='card'><h2>Offline History cache</h2><label><input style='width:auto' type='checkbox' name='offlineCacheEnabled'" + String(c6Config.offlineCacheEnabled ? " checked" : "") + "> Cache SOC and active Speed during Internet loss</label><p class='muted'>Default: disabled. Sampling and replay pause while MOT Cloud is disabled; queued samples are retained. Samples require trustworthy UTC. No GPS/location is stored. Explicitly disabling the cache or factory reset deletes queued samples; physical flash access may still expose unencrypted remnants.</p><pre>" + htmlEscape(c6OfflineCacheStatusJson()) + "</pre></div>";
     out += "<div class='card'><h2>Runtime</h2><label>Telemetry interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button class='primary'>Save &amp; reboot</button></form>";
     out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
@@ -215,6 +219,32 @@ void saveConfig()
     if (server.hasArg("gpsControlPresent")) c6Config.gpsEnabled = server.hasArg("gpsEnabled");
     c6Config.motCloudEnabled = server.hasArg("motCloudEnabled");
     c6Config.abrpEnabled = server.hasArg("abrpEnabled");
+    const C6Configuration beforeLocalMqtt = c6Config;
+    const bool localMqttEnabled = server.hasArg("localMqttEnabled");
+    const uint32_t localMqttPort = server.arg("localMqttPort").toInt();
+    const bool hasLocalMqttConfiguration = !server.arg("localMqttHost").isEmpty() ||
+        !server.arg("localMqttVehicleId").isEmpty();
+    if ((localMqttEnabled || hasLocalMqttConfiguration) &&
+        (localMqttPort == 0 || localMqttPort > 65535 ||
+         !c6ConfigSetLocalMqttConnection(server.arg("localMqttHost"),
+             static_cast<uint16_t>(localMqttPort), server.arg("localMqttVehicleId"),
+             server.arg("localMqttTopicPrefix"), server.arg("localMqttUsername"),
+             server.arg("localMqttAuth") == "mtls"))) {
+        c6Config = beforeLocalMqtt;
+        server.send(400, "text/plain", "Invalid secure local MQTT configuration"); return;
+    }
+    String mqttCredentialError;
+    if (!c6LocalMqttStoreCredentials(server.arg("localMqttRootCa"),
+            server.arg("localMqttPassword"), server.arg("localMqttClientCertificate"),
+            server.arg("localMqttClientPrivateKey"), mqttCredentialError)) {
+        c6Config = beforeLocalMqtt;
+        server.send(400, "text/plain", "Local MQTT credentials rejected: " + mqttCredentialError); return;
+    }
+    if (localMqttEnabled && !c6LocalMqttCredentialsReady()) {
+        c6Config = beforeLocalMqtt;
+        server.send(400, "text/plain", "Local MQTT needs a trust anchor and complete authentication credentials"); return;
+    }
+    c6Config.localMqttEnabled = localMqttEnabled;
     const bool offlineCacheEnabled = server.hasArg("offlineCacheEnabled");
     String abrpKey = c6Config.abrpApiKey;
     String abrpToken = c6Config.abrpUserToken;
@@ -247,6 +277,7 @@ void importConfig()
 void factoryReset()
 {
     if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6LocalMqttClearCredentials();
     c6ConfigFactoryReset();
     server.send(200, "text/html", header("Reset") + "<h1>Factory reset complete</h1><p>Rebooting into protected setup mode.</p></body></html>");
     scheduleReboot();
@@ -457,6 +488,22 @@ void abrpClear()
     server.sendHeader("Location", returnTo);
     server.send(303);
 }
+
+void localMqttClear()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6LocalMqttClearCredentials();
+    server.sendHeader("Location", "/config");
+    server.send(303);
+}
+
+void localMqttLocation()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6ConfigSetLocalMqttLocationEnabled(server.arg("locationEnabled") == "1");
+    server.sendHeader("Location", "/config");
+    server.send(303);
+}
 }
 
 void c6WebSetup()
@@ -481,6 +528,9 @@ void c6WebSetup()
     server.on("/api/abrp/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6AbrpStatusJson()); });
     server.on("/api/abrp/test", HTTP_POST, abrpTest);
     server.on("/api/abrp/clear", HTTP_POST, abrpClear);
+    server.on("/api/local-mqtt/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6LocalMqttStatusJson()); });
+    server.on("/api/local-mqtt/clear", HTTP_POST, localMqttClear);
+    server.on("/api/local-mqtt/location", HTTP_POST, localMqttLocation);
     server.on("/config", HTTP_GET, configPage);
     server.on("/save", HTTP_POST, saveConfig);
     server.on("/api/config/export", HTTP_GET, exportConfig);

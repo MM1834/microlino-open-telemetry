@@ -29,8 +29,20 @@
 - [LG-CAN2-001 — LilyGO mobile dual-CAN pilot](LG-CAN2-001.md)
 - [LG-S3-001 — T-SIM7670G-S3 firmware pilot](LG-S3-001.md)
 
-## Newly started work
+## Current work
 
+- [GPS-ALT-001 — GNSS altitude telemetry](GPS-ALT-001.md) adds the raw
+  `location/altitude_m` topic to the C6 and maintained LilyGO publishers. Builds
+  and physical C6 publication through AWS and secure local MQTT pass; the
+  firmware telemetry sprint is complete. WROOM is excluded by its already
+  exceeded 4 MB OTA-slot budget.
+- [JNY-ALT-001 — Höhenmeter in Fahrten und Zusammenfassungen](JNY-ALT-001.md)
+  derives noise-bounded ascent/descent for journey and daily emails and adds one
+  compact line to the current/last-journey screen. Backend deployment and smoke
+  checks pass; MOTbeta upload and road acceptance remain open.
+- [CHG-MAIL-001 — Ruhige Ladezusammenfassung bei oberen Nachladungen](CHG-MAIL-001.md)
+  suppresses only the individual email for minimal high-SOC top-ups while
+  retaining the event for daily summaries and dashboard charge accounting.
 - [VEH-TRIP-001 — Tripwerte seit letzter Ladung](VEH-TRIP-001.md) fills the
   existing Vehicle-card Trip, consumption and driving-time fields from one
   consistent post-charge period. Repository implementation, isolated backend

@@ -21,6 +21,17 @@ bool validAdminPassword(const String &password)
     return true;
 }
 
+bool validMqttIdentifier(const String &value, size_t maximumLength)
+{
+    if (value.isEmpty() || value.length() > maximumLength) return false;
+    for (size_t i = 0; i < value.length(); ++i) {
+        const char c = value[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '-' || c == '_')) return false;
+    }
+    return true;
+}
+
 }
 
 C6Configuration c6Config;
@@ -42,6 +53,15 @@ void c6ConfigLoad()
     c6Config.setupPassword = preferences.getString("setupPass", "");
     c6Config.motCloudEnabled = preferences.getBool("cloudEn", true);
     c6Config.abrpEnabled = preferences.getBool("abrpEn", false);
+    c6Config.localMqttEnabled = preferences.getBool("mqttEn", false);
+    c6Config.localMqttUseClientCertificate = preferences.getBool("mqttMtls", false);
+    c6Config.localMqttLocationEnabled = preferences.getBool("mqttLoc", false);
+    c6Config.localMqttLocationCleanupPending = preferences.getBool("mqttLocClr", false);
+    c6Config.localMqttHost = preferences.getString("mqttHost", "");
+    c6Config.localMqttPort = preferences.getUShort("mqttPort", 8883);
+    c6Config.localMqttVehicleId = preferences.getString("mqttVehicle", "");
+    c6Config.localMqttTopicPrefix = preferences.getString("mqttPrefix", "mot");
+    c6Config.localMqttUsername = preferences.getString("mqttUser", "");
     c6Config.gpsEnabled = preferences.getBool("gpsEn", true);
     c6Config.offlineCacheEnabled = preferences.getBool("cacheEn", false);
     c6Config.abrpApiKey = preferences.getString("abrpKey", "");
@@ -134,6 +154,15 @@ void c6ConfigSave()
     preferences.putString("setupPass", c6Config.setupPassword);
     preferences.putBool("cloudEn", c6Config.motCloudEnabled);
     preferences.putBool("abrpEn", c6Config.abrpEnabled);
+    preferences.putBool("mqttEn", c6Config.localMqttEnabled);
+    preferences.putBool("mqttMtls", c6Config.localMqttUseClientCertificate);
+    preferences.putBool("mqttLoc", c6Config.localMqttLocationEnabled);
+    preferences.putBool("mqttLocClr", c6Config.localMqttLocationCleanupPending);
+    preferences.putString("mqttHost", c6Config.localMqttHost);
+    preferences.putUShort("mqttPort", c6Config.localMqttPort);
+    preferences.putString("mqttVehicle", c6Config.localMqttVehicleId);
+    preferences.putString("mqttPrefix", c6Config.localMqttTopicPrefix);
+    preferences.putString("mqttUser", c6Config.localMqttUsername);
     preferences.putBool("gpsEn", c6Config.gpsEnabled);
     preferences.putBool("cacheEn", c6Config.offlineCacheEnabled);
     preferences.putString("abrpKey", c6Config.abrpApiKey);
@@ -198,6 +227,56 @@ void c6ConfigSetMotCloudEnabled(bool enabled)
     preferences.end();
 }
 
+void c6ConfigSetLocalMqttEnabled(bool enabled)
+{
+    c6Config.localMqttEnabled = enabled;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("mqttEn", enabled);
+    preferences.end();
+}
+
+bool c6ConfigSetLocalMqttConnection(const String &hostValue, uint16_t port,
+    const String &vehicleIdValue, const String &topicPrefixValue,
+    const String &usernameValue, bool useClientCertificate)
+{
+    String host = hostValue; host.trim();
+    String vehicleId = vehicleIdValue; vehicleId.trim();
+    String topicPrefix = topicPrefixValue; topicPrefix.trim();
+    String username = usernameValue; username.trim();
+    if (host.isEmpty() || host.length() > 253 || port == 0 ||
+        !validMqttIdentifier(vehicleId, 64) ||
+        !validMqttIdentifier(topicPrefix, 32) || username.length() > 128 ||
+        (!useClientCertificate && username.isEmpty())) return false;
+    if (host.indexOf("://") >= 0 || host.indexOf('/') >= 0 ||
+        host.indexOf(' ') >= 0) return false;
+    c6Config.localMqttHost = host;
+    c6Config.localMqttPort = port;
+    c6Config.localMqttVehicleId = vehicleId;
+    c6Config.localMqttTopicPrefix = topicPrefix;
+    c6Config.localMqttUsername = username;
+    c6Config.localMqttUseClientCertificate = useClientCertificate;
+    return true;
+}
+
+void c6ConfigSetLocalMqttLocationEnabled(bool enabled)
+{
+    const bool wasEnabled = c6Config.localMqttLocationEnabled;
+    c6Config.localMqttLocationEnabled = enabled;
+    if (wasEnabled && !enabled) c6Config.localMqttLocationCleanupPending = true;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("mqttLoc", enabled);
+    preferences.putBool("mqttLocClr", c6Config.localMqttLocationCleanupPending);
+    preferences.end();
+}
+
+void c6ConfigMarkLocalMqttLocationCleanupComplete()
+{
+    c6Config.localMqttLocationCleanupPending = false;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("mqttLocClr", false);
+    preferences.end();
+}
+
 void c6ConfigSetOfflineCacheEnabled(bool enabled)
 {
     const bool wasEnabled = c6Config.offlineCacheEnabled;
@@ -232,6 +311,15 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["otaEnabled"] = c6Config.otaEnabled;
     doc["motCloudEnabled"] = c6Config.motCloudEnabled;
     doc["abrpEnabled"] = c6Config.abrpEnabled;
+    doc["localMqttEnabled"] = false;
+    doc["localMqttLocationEnabled"] = false;
+    doc["localMqttRequiresLocalReconfiguration"] = true;
+    doc["localMqttHost"] = c6Config.localMqttHost;
+    doc["localMqttPort"] = c6Config.localMqttPort;
+    doc["localMqttVehicleId"] = c6Config.localMqttVehicleId;
+    doc["localMqttTopicPrefix"] = c6Config.localMqttTopicPrefix;
+    doc["localMqttUsername"] = c6Config.localMqttUsername;
+    doc["localMqttUseClientCertificate"] = c6Config.localMqttUseClientCertificate;
     doc["gpsEnabled"] = c6Config.gpsEnabled;
     doc["offlineCacheEnabled"] = c6Config.offlineCacheEnabled;
     doc["onboardingComplete"] = c6Config.onboardingComplete;
@@ -266,6 +354,15 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
     if (!doc["motCloudEnabled"].isNull()) candidate.motCloudEnabled = doc["motCloudEnabled"].as<bool>();
     if (!doc["abrpEnabled"].isNull()) candidate.abrpEnabled = doc["abrpEnabled"].as<bool>();
+    // Local MQTT and location consent never transfer through backup restore.
+    candidate.localMqttEnabled = false;
+    candidate.localMqttLocationEnabled = false;
+    if (!doc["localMqttHost"].isNull()) candidate.localMqttHost = doc["localMqttHost"].as<String>();
+    if (!doc["localMqttPort"].isNull()) candidate.localMqttPort = doc["localMqttPort"].as<uint16_t>();
+    if (!doc["localMqttVehicleId"].isNull()) candidate.localMqttVehicleId = doc["localMqttVehicleId"].as<String>();
+    if (!doc["localMqttTopicPrefix"].isNull()) candidate.localMqttTopicPrefix = doc["localMqttTopicPrefix"].as<String>();
+    if (!doc["localMqttUsername"].isNull()) candidate.localMqttUsername = doc["localMqttUsername"].as<String>();
+    if (!doc["localMqttUseClientCertificate"].isNull()) candidate.localMqttUseClientCertificate = doc["localMqttUseClientCertificate"].as<bool>();
     if (!doc["gpsEnabled"].isNull()) candidate.gpsEnabled = doc["gpsEnabled"].as<bool>();
     if (!doc["offlineCacheEnabled"].isNull()) candidate.offlineCacheEnabled = doc["offlineCacheEnabled"].as<bool>();
     if (!doc["abrpApiKey"].isNull()) candidate.abrpApiKey = doc["abrpApiKey"].as<String>();
@@ -275,9 +372,17 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["adminPassword"].isNull()) candidate.adminPassword = doc["adminPassword"].as<String>();
     candidate.wifiSsid.trim();
     candidate.wifi2Ssid.trim();
+    candidate.localMqttHost.trim();
+    candidate.localMqttVehicleId.trim();
+    candidate.localMqttTopicPrefix.trim();
+    candidate.localMqttUsername.trim();
     if (candidate.wifiSsid.length() > 32 || candidate.wifiPassword.length() > 63 ||
         candidate.wifi2Ssid.length() > 32 || candidate.wifi2Password.length() > 63 ||
         candidate.abrpApiKey.length() > 192 || candidate.abrpUserToken.length() > 192 ||
+        (!candidate.localMqttHost.isEmpty() && candidate.localMqttHost.length() > 253) ||
+        (!candidate.localMqttVehicleId.isEmpty() && !validMqttIdentifier(candidate.localMqttVehicleId, 64)) ||
+        (!candidate.localMqttTopicPrefix.isEmpty() && !validMqttIdentifier(candidate.localMqttTopicPrefix, 32)) ||
+        candidate.localMqttUsername.length() > 128 || candidate.localMqttPort == 0 ||
         candidate.publishIntervalMs < 1000 || candidate.publishIntervalMs > 3600000 ||
         candidate.onboardingStep < 1 || candidate.onboardingStep > 7) {
         error = "invalid WiFi, ABRP credentials, or publish interval";

@@ -134,15 +134,19 @@ battery. It does not reuse the Pioneer `0x18D` or `0x4AD` layout.
 | `0x1B0` | bytes 2–3 pack mV, 4–5 minimum cell mV, 6–7 maximum cell mV; all big-endian | Source workbook plus plausible 47.317–47.326 V and 3,635–3,643 mV live values |
 | `0x1B1` | bytes 0–1 SOC ×100 and 2–3 SOH ×100; big-endian | Source workbook plus 83 identical captured frames at 32.15% SOC and 97.01% SOH |
 | `0x2BA` | bytes 0–1 signed big-endian battery current ×10 | Flespi source explicitly uses signed 16-bit big-endian; stationary sample -1.9 to -2.1 A supports `/10` |
+| `0x60D` | byte 1 bit 3 (`0x08`) indicates physical cable presence | Confirmed by repeated unplugged and plugged-idle transitions with EVSE power both off and on |
+| `0x610` | byte 0: `0x01` unplugged, `0x05` plugged-idle, `0x02` actively charging | Confirmed across plug, 6 A/8 A charging, charge stop and unplug transitions |
 | `0x18D` | retained as raw discovery data only | Large-battery payload is incompatible with Pioneer scaling |
 | `0x4AD` | not decoded | Absent from both available large-battery captures |
 
 Pack power is derived from `0x2BA` current and fresh `0x1B0` voltage. Negative
 current in the stationary capture is consistent with pack discharge, so vehicle
-power retains the MOT convention `vehiclePower = -packPower`. The current sign
-still requires a controlled traction/regeneration/charging comparison. No V2
-plugged or active-charging state is inferred yet. Display-CAN `0x602` remains the
-AWS `display/soc` source; the separately decoded BMS SOC never overwrites it.
+power retains the MOT convention `vehiclePower = -packPower`. Controlled 6 A and
+8 A charging confirmed the positive pack-current direction and plausible derived
+DC power; traction and regeneration still require a dedicated V2 road comparison.
+The V2 decoder takes physical plug presence from `0x60D` and active charging from
+the discrete `0x610` state, never from Display-CAN. Display-CAN `0x602` remains
+the AWS `display/soc` source; the separately decoded BMS SOC never overwrites it.
 
 The full measurement table, plausibility boundary and AWS topic contract are in
 [Pioneer Standard-CAN decoder](pioneer-standard-can.md).

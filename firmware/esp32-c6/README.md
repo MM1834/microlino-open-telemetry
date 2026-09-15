@@ -90,6 +90,10 @@ run `soc dump`. The comparison lists byte and 16-bit little-/big-endian fields
 whose delta exactly matches 1, 2, 10 or 100 raw units per percentage point.
 Repeating the process across several SOC transitions eliminates rolling counters
 and other coincidental matches. State is lost on restart.
+`soc diff` compares the latest payload of every observed 11-bit CAN1 identifier
+with the last `soc mark`, even when Display-CAN SOC has not changed. It is intended
+for controlled plugged and charging state transitions; repeat transitions to
+separate state bits from rolling counters.
 
 ## WiFi and AWS qualification
 

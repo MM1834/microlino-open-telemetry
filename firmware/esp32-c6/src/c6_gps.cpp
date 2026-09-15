@@ -78,4 +78,5 @@ String c6GpsMessage()
 double c6GpsLatitude() { return gps.latitude(); }
 double c6GpsLongitude() { return gps.longitude(); }
 double c6GpsSpeedKmph() { return gps.speedKmph(); }
+double c6GpsAltitudeMeters() { return gps.altitudeMeters(); }
 uint32_t c6GpsSatellites() { return gps.satellites(); }

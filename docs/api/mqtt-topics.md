@@ -62,17 +62,25 @@ provisioned or connected to AWS. See the
 
 Published only while the board reports a valid GPS fix:
 
-| Suffix | ESP32 legacy/AWS | LilyGO legacy | LilyGO AWS |
-|---|---:|---:|---:|
-| `location/latitude` | Yes | Yes | Yes |
-| `location/longitude` | Yes | Yes | Yes |
-| `location/speed_kmph` | Yes | Yes | Yes |
-| `location/satellites` | Yes | Yes | Yes |
-| `location/hdop` | Yes | No | Yes when numeric |
-| `location/age_ms` | Yes | No | Yes |
+| Suffix | C6 AWS/local | WROOM legacy/AWS | LilyGO legacy | LilyGO AWS |
+|---|---:|---:|---:|---:|
+| `location/latitude` | Yes | Yes | Yes | Yes |
+| `location/longitude` | Yes | Yes | Yes | Yes |
+| `location/speed_kmph` | Yes | Yes | Yes | Yes |
+| `location/altitude_m` | Yes | No | Yes | Yes |
+| `location/satellites` | Yes | Yes | Yes | Yes |
+| `location/hdop` | No | Yes | No | Yes when numeric |
+| `location/age_ms` | No | Yes | No | Yes |
 
 The spelling `speed_kmph` is part of the current contract even though
 `speed_kmh` would be more conventional. Renaming requires a versioned migration.
+
+`location/altitude_m` is the receiver's raw GNSS altitude in metres, rounded only
+for transport. It is suitable for visualization and later processing but is not
+itself a filtered ascent/descent counter. C6 N16, XIAO and both maintained LilyGO
+AWS targets build with this topic. WROOM remains excluded because its current
+4 MB AWS image already exceeds the OTA application slot before this optional
+addition; its partition layout is not enlarged implicitly.
 
 AWS location topics are retained. When no current fix exists, firmware does not
 overwrite retained coordinates; backend metadata/receive time must distinguish
@@ -143,6 +151,10 @@ future skew, numeric ranges, payload size and at most 60 samples. Firmware emits
 at most eight samples per replay batch and deletes them only after the matching
 authenticated acknowledgement. Duplicate batches are harmless. Backfill writes
 History only and has no State or WebSocket route.
+
+This cache is not a general MQTT store-and-forward queue. It never contains GPS
+coordinates or altitude, and the local MQTT transport neither reads nor clears
+it. GPS topics on a local broker are current live telemetry only.
 
 ## Decoder limitation
 

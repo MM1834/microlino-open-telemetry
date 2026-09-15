@@ -9,7 +9,7 @@
 \
 > **Status:** Working evidence matrix\
 >\
-> **Last updated:** 2026-08-29\
+> **Last updated:** 2026-09-14\
 >\
 > **Audience:** Firmware developer, decoder reviewer and hardware tester\
 \
@@ -26,7 +26,7 @@ must not be read as proof that similarly named values are interchangeable.\
 | **Externally indicated** | Present in supplied notes/screenshots, but byte order, scale, signedness or exact semantics remain incomplete |\
 | **Not observed** | Targeted ID did not appear during the stationary Pioneer capture |\
 | **Observed on large-battery vehicle** | Seen by MOT on a newer Microlino with the 200-240 km battery; interpretation still requires controlled state changes |\
-| **Confirmed for large-battery decoder** | Original PID/Flespi material agrees with physically plausible values in a 16,675-frame capture from the newer large-battery vehicle |\
+| **Confirmed for large-battery decoder** | Original PID/Flespi material and controlled live tests agree with physically plausible values and repeatable vehicle-state transitions |\
 \
 All MOT captures used two ESP32-C6 TWAI controllers at 500 kbit/s in listen-only\
 mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
@@ -40,10 +40,10 @@ mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
 | Speed | `0x602 data[1] / 2` | Not found | No supplied mapping | Display-CAN decoder field. |\
 | Odometer | `0x602 data[4..7]` with current packed scaling | Not found | No supplied mapping | Display-CAN decoder field. |\
 | HV pack voltage | Not currently decoded | `0x18D data[3..4]`, unsigned little-endian mV | External source: same mapping; large-battery frame decodes to impossible 792 mV | Confirmed only on Pioneer. The supplied mapping is unusable on the tested large-battery vehicle. |\
-| Battery current | Not currently decoded | `0x18D data[1..2]`, signed little-endian; `raw x 0.3 A` | External material lists `0x2BA`; old layout yields impossible 1,306.2 A on the large-battery frame | Scale and sign confirmed only on Pioneer. `0x2BA` is a discovery target for the newer vehicle. |\
-| DC charging power | Dashboard power byte is unscaled and bidirectional | Derived as pack voltage \'d7 battery current | Not derivable until voltage and current mappings are verified | Pioneer result is confirmed; the current V2 decoder must not publish the same calculation as valid for the large-battery vehicle. |\
-| Plugged | Existing candidate `0x604 data[4] & 0x10` | `0x18D data[6]`: stable `0x10` unplugged and `0x20` plugged | External source calls byte 6 charge/status; large-battery live value `0x03` | Pioneer Standard-CAN state confirmed. The stable plugged value or bit for the newer vehicle is unknown. |\
-| Active charging | Current `0x603` power-threshold inference is not reliable | Positive signed `0x18D data[1..2]`; idle offset about -3/-4 | Unknown on the large-battery vehicle | Confirmed only on Pioneer across start, stable charge, AC removal and natural completion. |\
+| Battery current | Not currently decoded | `0x18D data[1..2]`, signed little-endian; `raw x 0.3 A` | `0x2BA data[0..1]`, signed big-endian; raw / 10 A | V1 scale/sign confirmed for charge, traction and regeneration. V2 scale and charge direction confirmed at 6 A and 8 A; traction/regeneration validation remains open. |\
+| DC charging power | Dashboard power byte is unscaled and bidirectional | Derived as pack voltage \'d7 battery current | Derived from `0x1B0` voltage and `0x2BA` current | V2 produced approximately 1.18-1.30 kW DC at 1.34 kW AC and 1.36-1.53 kW DC at 1.55 kW AC; conversion loss and vehicle load explain the difference. |\
+| Plugged | Existing candidate `0x604 data[4] & 0x10` | `0x18D data[6]`: stable `0x10` unplugged and `0x20` plugged | `0x60D data[1] & 0x08`; corroborated by `0x610 data[0]`: `0x01` unplugged, `0x05` plugged-idle, `0x02` charging | V1 and V2 Standard-CAN states confirmed by repeated powered and unpowered plug transitions. Display-CAN is ignored when either Standard-CAN profile is active. |\
+| Active charging | Current `0x603` power-threshold inference is not reliable | Positive signed `0x18D data[1..2]`; idle offset about -3/-4 | `0x610 data[0] == 0x02`; `0x05` is plugged-idle and `0x01` unplugged | V2 confirmed across unplugged, plugged-idle, active 6 A/8 A charging, charge stop and unplug. |\
 | Cell values A/B | Not decoded | `0x4AD data[0..1]` and `[2..3]`, unsigned little-endian mV | External source: same mapping; `0x4AD` absent on tested large-battery vehicle | Plausible on Pioneer. External vehicle assignment is unresolved and the mapping is unusable on the tested vehicle. |\
 | Cell min/max/delta | Not decoded | Derived from the two `0x4AD` values | External source: same derivation; unavailable without `0x4AD` on large-battery vehicle | Plausible only for the observed Pioneer payload. |\
 | SOH | Not decoded | Not found | `0x1B1 data[2..3] / 100` candidate | 83 identical large-battery frames decode to plausible 97.01%; external validation still pending. |\
@@ -115,8 +115,9 @@ errors. `0x18D` was present continuously, while `0x4AD` was absent. One stable\
 Applying the Pioneer layout would produce 1,306.2 A, 792 mV pack voltage, status\
 `0x03` and an SOC candidate of 5%. The current and voltage results are physically\
 impossible, proving that the Pioneer byte layout cannot be used for this vehicle.\
-The frame must remain raw discovery data until controlled unplugged, plugged,\
-charging, traction and regeneration captures identify the actual signals.\
+The frame remains raw discovery data; controlled tests found the V2 plug and\
+charging states on separate IDs `0x60D` and `0x610`. Traction and regeneration\
+validation of the V2 current signal remains open.\
 \
 The earlier source may have been recorded from a Pioneer/V1 vehicle, or from a\
 newer Microlino whose medium battery and BMS retain the Pioneer layout. This is a\
@@ -134,12 +135,15 @@ all three IDs with matching physically plausible values:\
 |---:|---|---|---|\
 | `0x1B0` | bytes 2-3 pack mV, 4-5 minimum cell mV, 6-7 maximum cell mV; big-endian | 47,317-47,326 mV pack and 3,635-3,643 mV cells | Implemented |\
 | `0x1B1` | bytes 0-1 SOC x100, bytes 2-3 SOH x100; big-endian | 32.15% SOC and 97.01% SOH | Implemented as BMS-specific values |\
-| `0x2BA` | bytes 0-1 signed big-endian current x10 | stationary -1.9 to -2.1 A | Implemented; sign still needs drive/charge confirmation |\
+| `0x2BA` | bytes 0-1 signed big-endian current x10 | stationary -1.9 to -2.1 A and +21.9 to +28.8 A while charging | Implemented; charging sign confirmed, traction/regeneration pending |\
+| `0x60D` | byte 1 bit 3 (`0x08`) set while cable connected | repeated unplugged/plugged transitions with EVSE energized and de-energized | Implemented and confirmed |\
+| `0x610` | byte 0 state: `0x01` unplugged, `0x05` plugged-idle, `0x02` actively charging | repeated plug, 6 A/8 A charge, stop and unplug transitions | Implemented and confirmed |\
 \
 The direct CAN order must be used by MOT. The Flespi `manual.can.hex.*` conversion\
 reverses groups of 16-bit words internally and must not be copied as bus byte\
 order. Pack power is derived only when fresh `0x1B0` voltage and plausible\
-`0x2BA` current are available. Plugged and active charging remain unknown. AWS\
+`0x2BA` current are available. Plugged and active charging come from the\
+confirmed `0x60D`/`0x610` states above. AWS\
 continues to publish Display-CAN `0x602` as `display/soc`; BMS SOC is kept\
 separate and never overwrites the confirmed display value.\
 \
@@ -151,7 +155,9 @@ separate and never overwrites the confirmed display value.\
 | `0x107` | Not observed | Separate ESPHome source watched bytes 0\'963 without a decoding rule |\
 | `0x1B0` | Not observed | Confirmed big-endian pack/min/max layout on the large-battery vehicle |\
 | `0x1B1` | Not observed | Confirmed big-endian SOC/SOH x100 layout on the large-battery vehicle |\
-| `0x2BA` | Not observed | Signed big-endian current /10 implemented; dynamic sign validation pending |\
+| `0x2BA` | Not observed | Signed big-endian current /10; charging sign confirmed, traction/regeneration pending |\
+| `0x60D` | Not observed | Byte 1 bit 3 is the confirmed physical plug-presence signal |\
+| `0x610` | Not observed | Byte 0 is confirmed as `0x01` unplugged, `0x05` plugged-idle, `0x02` charging |\
 | `0x37F` | Observed and constant while stationary | Bytes 2\'963 pedal/power-request candidate |\
 \
 ## Display-CAN signal map\
@@ -208,8 +214,8 @@ CAN current/plug signals or another independently verified source.\
 \
 - Stationary/drive comparison of `0x37F` to test the pedal hypothesis.\
 - Direct Display-CAN `0x604` plug-state comparison.\
-- Compare `0x2BA` during unplugged, plugged-idle, charging, traction and\
-  regeneration states and identify the large-battery plug/charge signal.\
+- Compare `0x2BA` during traction and regeneration; its charging direction and\
+  the separate large-battery plug/charge states are now confirmed.\
 - Identify the exact vehicle, battery and BMS generation behind the externally\
   supplied `0x18D`/`0x4AD` material.\
 - Controlled cross-channel injection and extended dual-CAN soak.\

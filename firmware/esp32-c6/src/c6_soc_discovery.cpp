@@ -81,6 +81,13 @@ void print48d(const char *prefix, uint32_t timestampMs, uint8_t dlc,
     }
     Serial.println();
 }
+
+void printPayload(const uint8_t *data, uint8_t dlc)
+{
+    for (uint8_t index = 0; index < dlc; ++index) {
+        Serial.printf("%02X%s", data[index], index + 1 < dlc ? " " : "");
+    }
+}
 }
 #endif
 
@@ -237,6 +244,44 @@ void c6SocDiscoveryDump()
     Serial.printf("SOC_COMPARE candidates=%u\n", static_cast<unsigned>(candidates));
 #else
     Serial.println("SOC dump is available only in the dedicated diagnostic build");
+#endif
+}
+
+void c6SocDiscoveryDiff()
+{
+#ifdef MOT_SOC_DISCOVERY
+    if (!markValid) {
+        Serial.println("SOC diff failed: run 'soc mark' first");
+        return;
+    }
+    size_t changedIds = 0;
+    Serial.println("SOC_DIFF CAN1 last payloads changed since mark");
+    for (uint16_t id = 0; id < STANDARD_ID_COUNT; ++id) {
+        const FrameState &state = states[id];
+        if (!state.frames) continue;
+        const uint8_t beforeDlc = markedDlcs[id];
+        const uint8_t afterDlc = state.dlc;
+        uint8_t changedMask = beforeDlc == afterDlc ? 0 : 0xFF;
+        const uint8_t common = min(beforeDlc, afterDlc);
+        for (uint8_t offset = 0; offset < common; ++offset) {
+            if (markedPayloads[id][offset] != state.last[offset]) {
+                changedMask |= static_cast<uint8_t>(1U << offset);
+            }
+        }
+        if (beforeDlc && changedMask == 0) continue;
+        Serial.printf("SOC_DIFF id=0x%03X age=%lu ms changed=0x%02X before=",
+                      id, static_cast<unsigned long>(millis() - state.lastFrameMs),
+                      changedMask);
+        if (beforeDlc) printPayload(markedPayloads[id], beforeDlc);
+        else Serial.print("not-seen");
+        Serial.print(" after=");
+        printPayload(state.last, afterDlc);
+        Serial.println();
+        changedIds++;
+    }
+    Serial.printf("SOC_DIFF changed_ids=%u\n", static_cast<unsigned>(changedIds));
+#else
+    Serial.println("SOC diff is available only in the dedicated diagnostic build");
 #endif
 }
 

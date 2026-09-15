@@ -76,9 +76,37 @@ void decode2ba(const uint8_t *data)
     telemetry.bms.packCurrentA = currentA;
     telemetry.bms.packPowerW = powerW;
     telemetry.bms.vehiclePowerW = -powerW;
-    telemetry.bms.isRegenerating = currentA > 2.0f;
+    telemetry.bms.isRegenerating = !telemetry.bms.plugged && currentA > 2.0f;
     telemetry.bms.isDischarging = currentA < -2.0f;
     telemetry.bms.packCurrentLastUpdateMs = millis();
+    telemetry.charging.powerSigned =
+        static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f));
+}
+
+void decode60d(const uint8_t *data)
+{
+    // Verified 2026-09-14 on a large-battery V2 vehicle:
+    // byte 1 bit 3 is set while the charge cable is connected, independent
+    // of whether energy is currently flowing.
+    telemetry.bms.plugged = (data[1] & 0x08) != 0;
+    telemetry.bms.statusLastUpdateMs = millis();
+    telemetry.charging.plugged = telemetry.bms.plugged;
+}
+
+void decode610(const uint8_t *data)
+{
+    // Verified state values on the same vehicle:
+    // 0x01 = unplugged, 0x05 = plugged/idle, 0x02 = actively charging.
+    const uint8_t state = data[0];
+    if (state != 0x01 && state != 0x02 && state != 0x05) return;
+
+    telemetry.bms.statusByte = state;
+    telemetry.bms.plugged = state != 0x01;
+    telemetry.bms.statusLastUpdateMs = millis();
+    telemetry.charging.valid = true;
+    telemetry.charging.plugged = telemetry.bms.plugged;
+    telemetry.charging.isCharging = state == 0x02;
+    telemetry.charging.lastUpdateMs = millis();
 }
 
 } // namespace
@@ -89,4 +117,6 @@ void decoderStandardCanV2HandleFrame(const MotCanFrame &frame)
     if (frame.id == 0x1B0) decode1b0(frame.data);
     else if (frame.id == 0x1B1) decode1b1(frame.data);
     else if (frame.id == 0x2BA) decode2ba(frame.data);
+    else if (frame.id == 0x60D) decode60d(frame.data);
+    else if (frame.id == 0x610) decode610(frame.data);
 }

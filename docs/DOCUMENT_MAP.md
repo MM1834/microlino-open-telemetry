@@ -12,6 +12,7 @@ task. Follow links from that owner page instead of scanning adjacent directories
 | Current state or priorities | `governance/CURRENT_STATUS.md`, `governance/WORK_ORDER.md` | `governance/ENGINEERING_BACKLOG.md` |
 | Firmware behaviour | `firmware/README.md` | Relevant subsystem page and source files |
 | Local WebUI | `webui/overview.md` | Relevant feature page and firmware route |
+| Private MQTT/SQL collection and Grafana | `tools/mqtt-mariadb-collector.md`, `tools/grafana-iobroker-mysql.md` | `api/mqtt-topics.md`, `firmware/mqtt.md`, `project/sprints/MQTT-001.md` |
 | Portal/dashboard | `dashboard/overview.md` | `architecture/authentication.md`, relevant portal source |
 | Optional-service entitlements or subscriptions | `architecture/service-entitlements.md` | `governance/ENGINEERING_BACKLOG.md`, notification and administrator owner pages |
 | AWS/backend | `architecture/aws-iot.md` | `api/`, `administrator/aws/`, relevant template or handler |

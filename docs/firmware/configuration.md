@@ -20,6 +20,8 @@ targets retain Display-CAN as the default for their available input.
 | `mqttUser` / `mqttPass` | MQTT credentials |
 | `otaEnabled` / `otaPassword` | OTA configuration |
 | `motCloudEnabled` | C6-only runtime switch for provisioned MOT Cloud / AWS IoT |
+| secure local MQTT settings | C6 TLS broker endpoint, namespace, authentication mode and default-off enable state |
+| local MQTT location consent | Separate C6 owner opt-in; never restored or inferred from MQTT/GPS enablement |
 | `abrpEnabled` | Enables optional ABRP integration |
 | `offlineCacheEnabled` | C6-only, default-off SOC/active-Speed outage cache |
 | ABRP API key/token | ABRP credentials |
@@ -69,6 +71,22 @@ The API key and user token are stored in NVS, accepted only through authenticate
 same-origin configuration routes and omitted from normal backup exports and
 diagnostics. The local onboarding wizard records only its progress and completion
 state; it is not portal/account onboarding.
+
+C6 secure local MQTT is independently default-off. Its non-secret broker and
+namespace settings are stored in NVS; CA, password, client certificate and private
+key are kept in the separate `/mqtt` LittleFS namespace and never included in a
+normal backup. Restore carries non-secret connection hints but always forces the
+service and its separate location consent off. The authenticated configuration
+page accepts either dedicated broker username/password authentication or a
+matching client-certificate/private-key pair, always with a user-supplied trust
+anchor and broker-hostname verification. Blank secret fields retain stored
+values; the confirmed delete action disables the service and removes all of its
+credentials.
+
+Location publication requires a second explicit action in the authenticated
+local adapter UI. Revocation stops new coordinates and retains a cleanup request
+until all retained broker location topics can be deleted after reconnect. The
+adapter cannot delete copies already persisted by ioBroker or another consumer.
 
 On C6 the wizard also stores its current step so required reboots resume the local
 setup journey. Its WiFi, CAN and service forms use the same persisted configuration

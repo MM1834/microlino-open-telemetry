@@ -1,6 +1,40 @@
 # MQTT
 
-MOT uses plain MQTT over TCP for the current firmware-to-broker connection. The browser dashboard may use MQTT over WebSocket, but that is a separate connection path and port.
+The historical WROOM/LilyGO legacy-broker client uses plain MQTT over TCP and is
+not an acceptable security baseline for a new deployment. MQTT-001 now has a
+repository-build-qualified C6 path using MQTT over verified TLS only. It remains
+default-off and physically unvalidated; do not treat it as released until the
+Sprint's broker, ioBroker and N16 acceptance gates pass. The browser dashboard may
+use MQTT over WebSocket, but that is a separate connection path and port.
+
+## Secure C6 local MQTT boundary
+
+The C6 implementation requires a configured broker hostname, TLS port, CA/trust
+anchor, vehicle ID and one complete dedicated authentication mode:
+
+- broker username plus password; or
+- client certificate plus matching private key.
+
+It does not provide plaintext, anonymous or certificate-verification bypass
+modes. Credentials are stored separately from AWS IoT files under `/mqtt`, are
+omitted from diagnostics and backup exports, and can be deleted only through the
+authenticated same-origin configuration action. UTC must be plausible before a
+TLS connection is attempted.
+
+Local MQTT, MOT Cloud and ABRP are independent services. The local client only
+publishes retained telemetry under the configured
+`<prefix>/<vehicleId>/#` namespace, uses a retained `status/online` birth/Last
+Will state and does not subscribe to command topics.
+
+A private consumer may persist this state independently of MOT Cloud. The
+[MQTT-to-MariaDB collector guide](../tools/mqtt-mariadb-collector.md) defines the
+recommended subscribe-only identity, typed append-only storage, retained-message
+handling and privacy boundary. Database access remains outside the firmware.
+
+Location uses the same canonical suffixes but has a separate default-off consent
+state. Only the authenticated local adapter UI can opt in. Opt-out stops new
+location publishes and deletes retained location topics immediately or after the
+next broker reconnect. It cannot erase copies already stored by a consumer.
 
 ## Topic pattern
 
@@ -41,9 +75,14 @@ mot/<vehicle>/<category>/<field>
 | `location/latitude` | number | degrees |
 | `location/longitude` | number | degrees |
 | `location/speed_kmph` | number | km/h |
+| `location/altitude_m` | number | m, raw GNSS altitude |
 | `location/satellites` | integer | — |
 | `location/hdop` | number | — |
 | `location/age_ms` | integer | ms |
+
+Location, including `location/altitude_m`, is live-only. The C6 offline cache is
+limited to SOC and Speed and replays exclusively through the acknowledged AWS
+History backfill; enabling local MQTT does not redirect or drain that cache.
 
 ### System
 
