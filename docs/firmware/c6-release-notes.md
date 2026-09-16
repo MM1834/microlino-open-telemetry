@@ -19,6 +19,15 @@ WiFi, AWS IoT and local MQTT states. Its red Dual-CAN startup-error indication i
 covered by source/build contracts but was not destructively provoked during the
 field test.
 
+The exact N16 application from commit `b427650` was activated in the controlled
+WebFlash catalog through replacement-free Change Set
+`webflash-rev26-20260916`. The private AES256-encrypted, versioned object is
+1,476,224 bytes with SHA-256
+`597c00565204d0531ec8b46d676071f3dc4dab1b4949a6ebe98fdcfaed0882d0`.
+All three previously active N16 pilot grants were explicitly and atomically
+renewed for the REV26 identity while retaining their existing expirations; each
+renewal has a successful audit record. The XIAO catalog entry remains on REV21.
+
 ### `C6-001-REV25-AWS`
 
 REV25 addresses the remaining height drop while rolling into the garage. It

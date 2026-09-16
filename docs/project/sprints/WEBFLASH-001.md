@@ -243,6 +243,20 @@ browser/device compatibility guard behaves as designed. The confirmed but still
 first-login-pending account `christian@reding.com` received a separate audited
 48-hour N16 grant; deployed Lambda read-back returned the exact 16 MB N16 release.
 
+On 2026-09-16 the controlled N16 catalog entry advanced from REV21 to the exact
+`C6-001-REV26-AWS` image built from commit `b427650`. The 1,476,224-byte private
+artifact has SHA-256
+`597c00565204d0531ec8b46d676071f3dc4dab1b4949a6ebe98fdcfaed0882d0` and S3
+version `xEew5m0C70jSHcd8KQJu_B25t25ngr3b`; upload read-back reproduced the hash
+and confirmed AES256 encryption. Reviewed Change Set
+`webflash-rev26-20260916` modified only the existing Lambda, integration and IAM
+role without replacement or deletion. The stack returned to `UPDATE_COMPLETE`,
+Lambda read-back is `Active`/`Successful`, IAM permits only the exact XIAO REV21
+and N16 REV26 objects, and anonymous API access remains `401`. The three active
+N16 grants for Maya Eisele, Christian Reding and Elisabeth Hascouet were renewed
+atomically for the REV26 version/hash with their existing expirations and three
+successful audit events.
+
 ## Password-recovery extension
 
 The repository now contains a separate administrator-approved local-password
