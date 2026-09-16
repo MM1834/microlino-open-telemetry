@@ -64,8 +64,23 @@ Location MQTT topics are emitted only while the current fix is valid. Retained A
 coordinates may remain as last-known values when a fix disappears; consumers use
 receive metadata/freshness rather than presence alone.
 
-The C6 and LilyGO publishers also emit `location/altitude_m` from the same valid
-fix. This is raw GNSS altitude at 0.1 m transport resolution. AWS journey summaries
+The C6 and LilyGO publishers emit `location/altitude_m` only through a stricter
+altitude-quality gate: position and altitude must both be no older than five
+seconds, at least six satellites must be reported and HDOP must be at most 5.0.
+The publishers additionally require fresh Display-CAN speed above 1 km/h. After
+the first accepted moving sample, another height is emitted only after at least
+10 m horizontal displacement and when its absolute change does not exceed 10 m
+plus 50 percent of that displacement. A rejected sample never advances the
+reference point. No height is emitted while the vehicle is stationary; consumers
+retain the last journey-valid value. A checksum-valid NMEA stream or a fresh 2D
+position alone is not enough.
+
+After boot, the first moving height is provisional and is never published. A
+second point at least 10 m away must pass the same distance-relative height check
+before it becomes the accepted anchor. If qualification fails, the newer point
+becomes the next provisional candidate without being published. This prevents a
+degraded first fix while leaving a garage from trapping or poisoning the filter.
+The accepted value is raw GNSS altitude at 0.1 m transport resolution. AWS journey summaries
 derive ascent and descent separately with 30-second sampling, a 5 m hysteresis and
 an implausible vertical-rate guard; consumers must not sum every raw MQTT delta.
 The WROOM parser exposes altitude internally, but its current 4 MB AWS application

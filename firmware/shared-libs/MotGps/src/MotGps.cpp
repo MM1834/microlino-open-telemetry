@@ -5,6 +5,30 @@
 #include <time.h>
 
 namespace {
+constexpr double EARTH_RADIUS_M = 6371000.0;
+constexpr double ALTITUDE_MIN_HORIZONTAL_DISTANCE_M = 10.0;
+constexpr double ALTITUDE_BASE_TOLERANCE_M = 10.0;
+constexpr double ALTITUDE_MAX_GRADE = 0.5;
+
+double degreesToRadians(double degrees)
+{
+    return degrees * PI / 180.0;
+}
+
+double horizontalDistanceMeters(
+    double latitudeA,
+    double longitudeA,
+    double latitudeB,
+    double longitudeB)
+{
+    const double latitudeDelta = degreesToRadians(latitudeB - latitudeA);
+    const double longitudeDelta = degreesToRadians(longitudeB - longitudeA);
+    const double a = sin(latitudeDelta / 2.0) * sin(latitudeDelta / 2.0) +
+        cos(degreesToRadians(latitudeA)) * cos(degreesToRadians(latitudeB)) *
+        sin(longitudeDelta / 2.0) * sin(longitudeDelta / 2.0);
+    return EARTH_RADIUS_M * 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+}
+
 bool validDateTime(TinyGPSPlus& gps)
 {
     if (!gps.date.isValid() || !gps.time.isValid()) return false;
@@ -63,6 +87,10 @@ bool MotGps::begin(const MotGpsConfig& config)
     config_ = config;
     status_ = MotGpsStatus();
     systemTimeSet_ = false;
+    altitudeAnchorValid_ = false;
+    altitudeProvisionalValid_ = false;
+    altitudeCandidateValid_ = false;
+    altitudeRejectedSamples_ = 0;
 
     if (config_.rxPin < 0) {
         status_.message = "GNSS RX pin is not configured";
@@ -131,7 +159,23 @@ void MotGps::refreshStatus()
         gps_.location.isValid() &&
         status_.ageMs <= config_.validFixMaxAgeMs;
     status_.satellites = satellites();
+    status_.satellitesAgeMs = gps_.satellites.isValid()
+        ? gps_.satellites.age()
+        : 0;
     status_.hdop = hdop();
+    status_.hdopAgeMs = gps_.hdop.isValid()
+        ? gps_.hdop.age()
+        : 0;
+    status_.altitudeAgeMs = gps_.altitude.isValid()
+        ? gps_.altitude.age()
+        : 0;
+    status_.altitudeValid =
+        status_.valid &&
+        gps_.altitude.isValid() &&
+        status_.altitudeAgeMs <= config_.validFixMaxAgeMs &&
+        status_.satellites >= config_.minAltitudeSatellites &&
+        !isnan(status_.hdop) &&
+        status_.hdop <= config_.maxAltitudeHdop;
 
     if (!status_.started) {
         status_.state = MotGpsState::GPS_DISABLED;
@@ -226,9 +270,97 @@ double MotGps::speedKmph()
     return gps_.speed.isValid() ? gps_.speed.kmph() : NAN;
 }
 
+bool MotGps::altitudeValid()
+{
+    refreshStatus();
+    return status_.altitudeValid;
+}
+
+bool MotGps::altitudePublishable(bool moving)
+{
+    refreshStatus();
+    if (!moving || !status_.altitudeValid) return false;
+
+    const double latitude = gps_.location.lat();
+    const double longitude = gps_.location.lng();
+    const double altitude = gps_.altitude.meters();
+    if (!isfinite(latitude) || !isfinite(longitude) || !isfinite(altitude)) return false;
+
+    if (altitudeCandidateValid_ &&
+        fabs(latitude - altitudeCandidateLatitude_) < 0.0000001 &&
+        fabs(longitude - altitudeCandidateLongitude_) < 0.0000001 &&
+        fabs(altitude - altitudeCandidateMeters_) < 0.01) {
+        return altitudeCandidateAccepted_;
+    }
+
+    altitudeCandidateValid_ = true;
+    altitudeCandidateLatitude_ = latitude;
+    altitudeCandidateLongitude_ = longitude;
+    altitudeCandidateMeters_ = altitude;
+    altitudeCandidateAccepted_ = false;
+
+    if (!altitudeAnchorValid_) {
+        if (!altitudeProvisionalValid_) {
+            altitudeProvisionalValid_ = true;
+            altitudeProvisionalLatitude_ = latitude;
+            altitudeProvisionalLongitude_ = longitude;
+            altitudeProvisionalMeters_ = altitude;
+            return false;
+        }
+
+        const double provisionalDistance = horizontalDistanceMeters(
+            altitudeProvisionalLatitude_, altitudeProvisionalLongitude_, latitude, longitude);
+        if (!isfinite(provisionalDistance) ||
+            provisionalDistance < ALTITUDE_MIN_HORIZONTAL_DISTANCE_M) {
+            return false;
+        }
+
+        const double provisionalAllowedDelta =
+            ALTITUDE_BASE_TOLERANCE_M + ALTITUDE_MAX_GRADE * provisionalDistance;
+        if (fabs(altitude - altitudeProvisionalMeters_) > provisionalAllowedDelta) {
+            altitudeRejectedSamples_++;
+            // The first moving fix was not trustworthy. Start qualification
+            // again from the newer point, but do not publish or establish an
+            // accepted anchor yet.
+            altitudeProvisionalLatitude_ = latitude;
+            altitudeProvisionalLongitude_ = longitude;
+            altitudeProvisionalMeters_ = altitude;
+            return false;
+        }
+
+        altitudeAnchorValid_ = true;
+        altitudeAnchorLatitude_ = latitude;
+        altitudeAnchorLongitude_ = longitude;
+        altitudeAnchorMeters_ = altitude;
+        altitudeProvisionalValid_ = false;
+        altitudeCandidateAccepted_ = true;
+        return true;
+    }
+
+    const double horizontalDistance = horizontalDistanceMeters(
+        altitudeAnchorLatitude_, altitudeAnchorLongitude_, latitude, longitude);
+    if (!isfinite(horizontalDistance) ||
+        horizontalDistance < ALTITUDE_MIN_HORIZONTAL_DISTANCE_M) {
+        return false;
+    }
+
+    const double allowedAltitudeDelta =
+        ALTITUDE_BASE_TOLERANCE_M + ALTITUDE_MAX_GRADE * horizontalDistance;
+    if (fabs(altitude - altitudeAnchorMeters_) > allowedAltitudeDelta) {
+        altitudeRejectedSamples_++;
+        return false;
+    }
+
+    altitudeAnchorLatitude_ = latitude;
+    altitudeAnchorLongitude_ = longitude;
+    altitudeAnchorMeters_ = altitude;
+    altitudeCandidateAccepted_ = true;
+    return true;
+}
+
 double MotGps::altitudeMeters()
 {
-    return gps_.altitude.isValid() ? gps_.altitude.meters() : NAN;
+    return altitudeValid() ? gps_.altitude.meters() : NAN;
 }
 
 double MotGps::courseDegrees()
@@ -297,6 +429,13 @@ String MotGps::statusJson()
     doc["lastCharMs"] = status_.lastCharMs;
     doc["ageMs"] = status_.ageMs;
     doc["satellites"] = status_.satellites;
+    doc["satellitesAgeMs"] = status_.satellitesAgeMs;
+    doc["altitudeValid"] = status_.altitudeValid;
+    doc["altitudeAgeMs"] = status_.altitudeAgeMs;
+    doc["hdopAgeMs"] = status_.hdopAgeMs;
+    doc["altitudeFilterAnchored"] = altitudeAnchorValid_;
+    doc["altitudeFilterProvisional"] = altitudeProvisionalValid_;
+    doc["altitudeRejectedSamples"] = altitudeRejectedSamples_;
     doc["message"] = status_.message;
 
     if (isnan(status_.hdop)) {
@@ -319,7 +458,7 @@ String MotGps::statusJson()
         doc["speedKmph"] = nullptr;
     }
 
-    if (gps_.altitude.isValid()) {
+    if (status_.altitudeValid) {
         doc["altitudeMeters"] = gps_.altitude.meters();
     } else {
         doc["altitudeMeters"] = nullptr;

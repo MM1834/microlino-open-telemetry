@@ -25,6 +25,18 @@ constexpr char CLIENT_PRIVATE_KEY_PATH[] = "/mqtt/client-private-key.pem";
 constexpr time_t MIN_VALID_UTC = 1704067200;  // 2024-01-01 UTC
 constexpr uint32_t MIN_RECONNECT_MS = 5000;
 constexpr uint32_t MAX_RECONNECT_MS = 300000;
+constexpr uint32_t ALTITUDE_DISPLAY_MAX_AGE_MS = 3000;
+constexpr float ALTITUDE_MIN_MOVING_SPEED_KMH = 1.0f;
+
+bool altitudePublishable()
+{
+    const bool displayFresh = telemetry.display.valid &&
+        static_cast<uint32_t>(millis() - telemetry.display.lastUpdateMs) <=
+            ALTITUDE_DISPLAY_MAX_AGE_MS;
+    const bool moving = displayFresh && isfinite(telemetry.display.speedKmh) &&
+        telemetry.display.speedKmh > ALTITUDE_MIN_MOVING_SPEED_KMH;
+    return c6GpsAltitudePublishable(moving);
+}
 
 WiFiClientSecure secureClient;
 PubSubClient mqttClient(secureClient);
@@ -266,7 +278,9 @@ void publishTelemetry()
         publishFloat("location/latitude", static_cast<float>(c6GpsLatitude()), 6);
         publishFloat("location/longitude", static_cast<float>(c6GpsLongitude()), 6);
         publishFloat("location/speed_kmph", static_cast<float>(c6GpsSpeedKmph()), 2);
-        publishFloat("location/altitude_m", static_cast<float>(c6GpsAltitudeMeters()), 1);
+        if (altitudePublishable()) {
+            publishFloat("location/altitude_m", static_cast<float>(c6GpsAltitudeMeters()), 1);
+        }
         publishInt("location/satellites", c6GpsSatellites());
     }
     publishInt("system/uptime_sec", millis() / 1000UL);
@@ -349,6 +363,8 @@ void c6LocalMqttLoop()
         publishTelemetry();
     }
 }
+
+bool c6LocalMqttConnected() { return mqttClient.connected(); }
 
 String c6LocalMqttStatusJson()
 {

@@ -4,6 +4,7 @@
 
 void c6LocalMqttSetup();
 void c6LocalMqttLoop();
+bool c6LocalMqttConnected();
 String c6LocalMqttStatusJson();
 bool c6LocalMqttCredentialsReady();
 bool c6LocalMqttStoreCredentials(

@@ -1,8 +1,77 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current accepted release:** `C6-001-REV20-AWS`
+> **Current repository release:** `C6-001-REV26-AWS`
 >
-> **Previous field-validation release:** `C6-001-REV19-AWS`
+> **Current field-accepted release:** `C6-001-REV26-AWS`
+
+### `C6-001-REV26-AWS`
+
+REV26 closes the cold-start exception found when leaving the garage on REV25.
+The first moving altitude after boot is now provisional and never published. A
+second point at least 10 m away must pass the same distance-relative height check
+before becoming the accepted anchor. Failed qualification restarts from the
+newer provisional point without sending it, so a degraded initial fix cannot
+poison the filter. The parallel C6 status-LED work remains intact.
+Physical N16 acceptance passed on 2026-09-16: a short drive established valid
+height, and subsequent waiting inside the garage produced no drifting replacement
+value. The onboard GPIO8 RGB LED was also accepted on the physical N16 for boot,
+WiFi, AWS IoT and local MQTT states. Its red Dual-CAN startup-error indication is
+covered by source/build contracts but was not destructively provoked during the
+field test.
+
+### `C6-001-REV25-AWS`
+
+REV25 addresses the remaining height drop while rolling into the garage. It
+requires at least six satellites and retains REV24's CAN-motion gate. After the
+first moving anchor, height is published only after at least 10 m horizontal
+movement and when the height change remains within 10 m plus 50 percent of that
+distance. Rejected measurements do not advance the anchor, preventing degraded
+indoor fixes from ratcheting the accepted height downward.
+
+### `C6-001-REV24-AWS`
+
+REV24 increases the socket inactivity timeout only for an authenticated,
+same-origin local OTA upload from the ESP32 framework default of 5 seconds to
+30 seconds. This tolerates transient packet loss and retransmission on weak WiFi
+without changing Home/Mobile/AP selection, ordinary WebUI timeouts or image
+validation. An actual connection loss still requires restarting the upload.
+
+### `C6-001-REV23-AWS`
+
+REV23 corrects an over-restrictive REV22 altitude gate. The first REV22 road test
+recorded Display-CAN speeds up to 38 km/h and later 12 satellites but published
+no height. REV23 keeps the decisive fresh CAN-motion requirement that suppresses
+stationary garage drift, while restoring REV21's proven four-satellite and HDOP
+5.0 GNSS thresholds. Invalid or stationary height remains omitted without a
+separate validity topic.
+
+### `C6-001-REV22-AWS`
+
+REV22 closes the remaining indoor-altitude path observed with REV21. Satellite
+count and HDOP must now be fresh as well as position and altitude, the height
+gate requires at least six satellites and HDOP no greater than 2.5, and C6 plus
+LilyGO publish height only with fresh Display-CAN motion above 1 km/h. Invalid or
+stationary height is omitted; no separate validity topic is introduced.
+The focused altitude contract and the N16, XIAO, T-A7670X and
+T-SIM7670G-S3 AWS build gates pass. Physical road-to-garage acceptance remains
+open.
+
+### `C6-001-REV21-AWS`
+
+REV21 hardens the REV20 altitude publisher after an indoor field observation.
+A general fresh location fix is no longer sufficient for height: location and
+altitude must both be at most five seconds old, at least four satellites must be
+reported and HDOP must be no greater than 5.0. When that separate quality gate
+fails, C6 and LilyGO omit `location/altitude_m` instead of publishing a drifting
+indoor value. GPS diagnostics expose `altitudeValid` and `altitudeAgeMs`.
+
+The immutable N16 and XIAO application images are active in the controlled
+WebFlash catalog. Change Set `webflash-rev21-20260915` updated only the existing
+Lambda environment, its exact S3 object permissions and the dependent API
+integration, all without replacement. The stack returned to `UPDATE_COMPLETE`;
+the Lambda is `Active`/`Successful` and both private artifacts are AES256
+encrypted and versioned. Existing user grants remain release-bound and therefore
+must be explicitly issued or renewed for REV21.
 
 ### `C6-001-REV20-AWS`
 

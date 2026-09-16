@@ -13,6 +13,7 @@
 #include "c6_local_mqtt.h"
 #include "c6_network.h"
 #include "c6_offline_cache.h"
+#include "c6_status_led.h"
 #include "c6_web.h"
 #include "telemetry/telemetry.h"
 
@@ -258,6 +259,7 @@ void setup()
     Serial.println();
     Serial.println("MOT ESP32-C6 dual-CAN qualification firmware");
     c6BoardSetup();
+    c6StatusLedSetup();
     telemetryInit();
     c6ConfigLoad();
     c6OfflineCacheSetup();
@@ -265,6 +267,7 @@ void setup()
 
     if (!c6DualCanSetup()) {
         Serial.println("Dual-CAN startup incomplete");
+        c6StatusLedSetError(true);
     }
     c6GpsSetup();
     c6NetworkSetup();
@@ -286,6 +289,7 @@ void loop()
     c6AwsLoop();
     c6LocalMqttLoop();
     c6AbrpLoop();
+    c6StatusLedLoop();
     pollSerialCommands();
 
     if (millis() - lastStatusMs >= 5000) {

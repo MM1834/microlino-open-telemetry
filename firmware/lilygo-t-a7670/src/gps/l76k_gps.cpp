@@ -107,6 +107,16 @@ double l76kSpeedKmph()
     return gps.speedKmph();
 }
 
+bool l76kAltitudeValid()
+{
+    return gps.altitudeValid();
+}
+
+bool l76kAltitudePublishable(bool moving)
+{
+    return gps.altitudePublishable(moving);
+}
+
 double l76kAltitudeMeters()
 {
     return gps.altitudeMeters();

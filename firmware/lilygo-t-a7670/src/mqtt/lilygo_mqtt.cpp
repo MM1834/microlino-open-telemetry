@@ -14,6 +14,18 @@
 
 static const unsigned long MQTT_PUBLISH_INTERVAL_MS = 5000;
 static unsigned long lastPublishMs = 0;
+static const unsigned long ALTITUDE_DISPLAY_MAX_AGE_MS = 3000;
+static const float ALTITUDE_MIN_MOVING_SPEED_KMH = 1.0f;
+
+static bool altitudePublishable()
+{
+    const bool displayFresh = telemetry.display.valid &&
+        static_cast<uint32_t>(millis() - telemetry.display.lastUpdateMs) <=
+            ALTITUDE_DISPLAY_MAX_AGE_MS;
+    const bool moving = displayFresh && isfinite(telemetry.display.speedKmh) &&
+        telemetry.display.speedKmh > ALTITUDE_MIN_MOVING_SPEED_KMH;
+    return l76kAltitudePublishable(moving);
+}
 
 static String esc(String value)
 {
@@ -264,11 +276,13 @@ void publishLilygoTelemetry()
             static_cast<float>(l76kSpeedKmph()),
             1
         );
-        awsClient.publishFloat(
-            "location/altitude_m",
-            static_cast<float>(l76kAltitudeMeters()),
-            1
-        );
+        if (altitudePublishable()) {
+            awsClient.publishFloat(
+                "location/altitude_m",
+                static_cast<float>(l76kAltitudeMeters()),
+                1
+            );
+        }
         awsClient.publishInt(
             "location/satellites",
             static_cast<long>(l76kSatellites())
@@ -707,11 +721,13 @@ void publishLilygoTelemetry()
             "location/speed_kmph",
             static_cast<float>(l76kSpeedKmph())
         );
-        publishLegacyFloat(
-            "location/altitude_m",
-            static_cast<float>(l76kAltitudeMeters()),
-            1
-        );
+        if (altitudePublishable()) {
+            publishLegacyFloat(
+                "location/altitude_m",
+                static_cast<float>(l76kAltitudeMeters()),
+                1
+            );
+        }
         publishLegacyInt(
             "location/satellites",
             l76kSatellites()

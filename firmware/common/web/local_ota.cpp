@@ -12,6 +12,7 @@ bool updateStarted = false;
 String validationError;
 bool rebootPending = false;
 uint32_t rebootAtMs = 0;
+constexpr uint32_t OTA_UPLOAD_SOCKET_TIMEOUT_MS = 30000;
 
 bool authorize()
 {
@@ -47,6 +48,13 @@ void upload()
         uploadAllowed = authorize() && LocalWebSecurity::requireSameOrigin(*web);
         updateStarted = false;
         validationError = "";
+        if (uploadAllowed) {
+            // The framework default permits only a five-second gap between
+            // upload bytes. Give this authenticated OTA connection enough time
+            // to survive loss/retransmission on a weak WiFi link without
+            // changing timeouts for normal WebUI requests.
+            web->client().setTimeout(OTA_UPLOAD_SOCKET_TIMEOUT_MS);
+        }
     } else if (item.status == UPLOAD_FILE_WRITE && uploadAllowed) {
         if (!updateStarted) {
             const OtaImageGuardResult result = otaValidateImageHeader(item.buf, item.currentSize);

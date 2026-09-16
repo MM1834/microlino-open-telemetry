@@ -12,6 +12,8 @@ bool l76kGpsValid();
 double l76kLatitude();
 double l76kLongitude();
 double l76kSpeedKmph();
+bool l76kAltitudeValid();
+bool l76kAltitudePublishable(bool moving);
 double l76kAltitudeMeters();
 double l76kCourseDegrees();
 uint32_t l76kSatellites();

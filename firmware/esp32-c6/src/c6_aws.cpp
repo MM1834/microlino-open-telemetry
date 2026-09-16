@@ -17,6 +17,18 @@ MotAwsCredentials credentials;
 MotAwsIotClient client;
 uint32_t lastPublishMs = 0;
 bool freshLivePublished = false;
+constexpr uint32_t ALTITUDE_DISPLAY_MAX_AGE_MS = 3000;
+constexpr float ALTITUDE_MIN_MOVING_SPEED_KMH = 1.0f;
+
+bool altitudePublishable()
+{
+    const bool displayFresh = telemetry.display.valid &&
+        static_cast<uint32_t>(millis() - telemetry.display.lastUpdateMs) <=
+            ALTITUDE_DISPLAY_MAX_AGE_MS;
+    const bool moving = displayFresh && isfinite(telemetry.display.speedKmh) &&
+        telemetry.display.speedKmh > ALTITUDE_MIN_MOVING_SPEED_KMH;
+    return c6GpsAltitudePublishable(moving);
+}
 
 MotAwsRuntime runtime()
 {
@@ -89,7 +101,9 @@ bool publishTelemetry()
         published |= client.publishFloat("location/latitude", static_cast<float>(c6GpsLatitude()), 6);
         published |= client.publishFloat("location/longitude", static_cast<float>(c6GpsLongitude()), 6);
         published |= client.publishFloat("location/speed_kmph", static_cast<float>(c6GpsSpeedKmph()), 2);
-        published |= client.publishFloat("location/altitude_m", static_cast<float>(c6GpsAltitudeMeters()), 1);
+        if (altitudePublishable()) {
+            published |= client.publishFloat("location/altitude_m", static_cast<float>(c6GpsAltitudeMeters()), 1);
+        }
         published |= client.publishInt("location/satellites", c6GpsSatellites());
     }
     return published;

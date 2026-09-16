@@ -77,6 +77,14 @@ class C6ProductionHardeningTests(unittest.TestCase):
         self.assertIn("Update.abort()", SHARED_OTA)
         self.assertIn("The running firmware remains active", SHARED_OTA)
 
+    def test_ota_uses_a_scoped_weak_link_timeout(self) -> None:
+        self.assertIn("OTA_UPLOAD_SOCKET_TIMEOUT_MS = 30000", SHARED_OTA)
+        self.assertIn("if (uploadAllowed)", SHARED_OTA)
+        self.assertIn(
+            "web->client().setTimeout(OTA_UPLOAD_SOCKET_TIMEOUT_MS)",
+            SHARED_OTA,
+        )
+
     def test_runtime_services_remain_cooperative(self) -> None:
         loop = MAIN.split("void loop()", 1)[1]
         for call in ("c6DualCanLoop();", "c6GpsLoop();", "c6NetworkLoop();", "c6WebLoop();", "c6AwsLoop();"):
@@ -84,6 +92,21 @@ class C6ProductionHardeningTests(unittest.TestCase):
         self.assertNotIn("while (WiFi.status()", NETWORK)
         self.assertIn("WiFi.setAutoReconnect(false)", NETWORK)
         self.assertNotIn("WiFi.reconnect();", NETWORK)
+
+    def test_n16_status_led_is_non_blocking_and_xiao_safe(self) -> None:
+        status_led = (ROOT / "firmware/esp32-c6/src/c6_status_led.cpp").read_text()
+        self.assertIn("STATUS_LED_PIN = 8", status_led)
+        self.assertIn("#ifndef MOT_XIAO_BOARD", status_led)
+        self.assertIn("rgbLedWrite", status_led)
+        self.assertNotIn("delay(", status_led)
+        self.assertIn("c6StatusLedLoop();", MAIN)
+
+    def test_status_led_uses_runtime_connection_states(self) -> None:
+        status_led = (ROOT / "firmware/esp32-c6/src/c6_status_led.cpp").read_text()
+        self.assertIn("c6NetworkOnline()", status_led)
+        self.assertIn("c6AwsConnected()", status_led)
+        self.assertIn("c6LocalMqttConnected()", status_led)
+        self.assertIn("c6StatusLedSetError(true);", MAIN)
 
 
 if __name__ == "__main__":
