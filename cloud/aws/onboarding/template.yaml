@@ -421,6 +421,46 @@ Resources:
       AuthorizationType: JWT
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub "integrations/${OnboardingIntegration}"
+  UsbDiagnosticsGrantRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/usb-diagnostics/grants"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  UsbDiagnosticsRevokeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/usb-diagnostics/grants/revoke"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  UsbDiagnosticsAccessRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "GET /api/usb-diagnostics/access"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  UsbDiagnosticsStartRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/usb-diagnostics/start"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
+  UsbDiagnosticsResultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OnboardingApi
+      RouteKey: "POST /api/usb-diagnostics/result"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub "integrations/${OnboardingIntegration}"
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:

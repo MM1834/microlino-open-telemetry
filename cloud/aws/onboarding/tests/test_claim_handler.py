@@ -470,6 +470,37 @@ class ClaimHandlerTests(unittest.TestCase):
         self.assertEqual({"S": "PASSWORD_RECOVERY_SUCCEEDED"}, audit["eventType"])
         self.assertNotIn("password", audit)
 
+    def test_usb_diagnostics_requires_its_own_grant_and_never_audits_output(self):
+        granted = self.module.handler(event(
+            "POST /api/usb-diagnostics/grants",
+            {"username": "pilot@example.com", "expiresInHours": 24},
+            subject="admin-sub", groups=["mot-beta-admins"],
+        ), None)
+        self.assertEqual(200, granted["statusCode"])
+        stored = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "usb-diagnostics"}, stored["target"])
+        self.assertEqual({"S": "usb-diagnostics"}, stored["action"])
+        self.assertNotIn("sha256", stored)
+
+        self.module.dynamodb = Resource({"firmware-grants": {
+            ("user-a", "usb-diagnostics"): {
+                "status": "ACTIVE", "action": "usb-diagnostics",
+                "expiresAt": int(self.module.time.time()) + 100,
+            },
+        }})
+        access = self.module.handler(event("GET /api/usb-diagnostics/access", {}), None)
+        self.assertTrue(json.loads(access["body"])["authorized"])
+        started = self.module.handler(event("POST /api/usb-diagnostics/start", {}), None)
+        operation_id = json.loads(started["body"])["operationId"]
+        result = self.module.handler(event(
+            "POST /api/usb-diagnostics/result",
+            {"operationId": operation_id, "result": "SUCCEEDED", "output": "SECRET"},
+        ), None)
+        self.assertEqual(200, result["statusCode"])
+        audit = self.client.transactions[-1][0]["Put"]["Item"]
+        self.assertEqual({"S": "USB_DIAGNOSTICS_SUCCEEDED"}, audit["eventType"])
+        self.assertNotIn("output", audit)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -277,7 +277,8 @@
   #cells{order:54}
   #history{order:60}
   #firmware-flasher{order:71;width:100%}
-  #password-recovery{order:72;width:100%}
+  #usb-diagnostics{order:72;width:100%}
+  #password-recovery{order:73;width:100%}
   #vehicle .speedo strong{position:absolute;top:48px;left:0;right:0;transform:none;text-align:center;line-height:1}
   #vehicle .speedo span{bottom:30px;left:0;right:0;text-align:center}
   .hero-image-wrap{order:90;width:100%;min-height:180px;border:1px solid var(--line);box-shadow:var(--shadow)}

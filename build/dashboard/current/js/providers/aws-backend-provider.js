@@ -336,6 +336,18 @@
         return firmwareRequest('/api/password-recovery/result', 'POST', { operationId, result });
       },
 
+      async getUsbDiagnosticsAccess() {
+        return firmwareRequest('/api/usb-diagnostics/access');
+      },
+
+      async authorizeUsbDiagnostics() {
+        return firmwareRequest('/api/usb-diagnostics/start', 'POST', {});
+      },
+
+      async reportUsbDiagnosticsResult(operationId, result) {
+        return firmwareRequest('/api/usb-diagnostics/result', 'POST', { operationId, result });
+      },
+
       async getNotificationPreferences() {
         if (!activeVehicleId) throw new Error('Kein Fahrzeug ausgewählt');
         return notificationRequest(`/api/vehicles/${encodeURIComponent(activeVehicleId)}/notifications`);

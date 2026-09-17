@@ -68,6 +68,9 @@
 
 ## Completed predecessors
 
+- [USB-DIAG-001](USB-DIAG-001.md) provides an independent expiring grant and a
+  strictly filtered, read-only USB status log; AWS deployment and hosted
+  acceptance with two users passed on 2026-09-17.
 - [NTF-I18N-001](NTF-I18N-001.md) adds an independent per-user/vehicle
   DE/EN/FR/IT preference for MOT email and SMS; German compatibility fallback,
   isolated AWS deployment, hosted persistence and productive account updates

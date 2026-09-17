@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260910-drv-eff1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260917-usbdiag1" />
   <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
   <link rel="stylesheet" href="css/location-map.css?v=20260904-touch-interaction1">
   <link rel="stylesheet" href="css/location-map-cleanup.css">
-  <script src="js/i18n.js?v=20260913-last-charge1"></script>
+  <script src="js/i18n.js?v=20260917-usbdiag1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -311,6 +311,37 @@
   </details>
 </section>
 
+<section id="usb-diagnostics" class="card firmware-card" hidden>
+  <div class="card-header">
+    <div>
+      <h2>USB-Diagnose</h2>
+      <span class="muted">Zeitlich freigegebene, schreibgeschützte Statusabfrage</span>
+    </div>
+  </div>
+  <div id="usb-diagnostics-browser-warning" class="firmware-warning" hidden>
+    Dieser Browser unterstützt Web Serial nicht. Bitte Chrome oder Edge über HTTPS auf macOS, Windows oder Android verwenden.
+  </div>
+  <ol class="firmware-steps">
+    <li>Adapter normal starten und über ein USB-C-Datenkabel verbinden. Nicht in den Bootloader wechseln.</li>
+    <li>USB-Gerät auswählen. Ausgelesen werden nur Profile, WiFi-, AWS- und Offline-Cache-Status.</li>
+    <li>Die gefilterte Ausgabe bleibt ausschließlich in diesem Browser und kann für den Support kopiert werden.</li>
+  </ol>
+  <dl class="firmware-meta">
+    <div><dt>Zugriff</dt><dd>Nur lesen · keine Konfigurationsänderung</dd></div>
+    <div><dt>Freigabe gültig bis</dt><dd id="usb-diagnostics-expiry">--</dd></div>
+    <div><dt>AWS-Protokoll</dt><dd>Nur Start und Erfolg/Fehler · keine Diagnoseinhalte</dd></div>
+  </dl>
+  <div class="firmware-actions">
+    <button id="usb-diagnostics-start" class="auth-button" type="button">USB-Diagnose starten</button>
+    <button id="usb-diagnostics-copy" class="auth-button secondary" type="button" disabled>Diagnose kopieren</button>
+  </div>
+  <p id="usb-diagnostics-status" class="connection-detail" aria-live="polite">Bereit für die USB-Diagnose.</p>
+  <details class="firmware-log-wrap" open>
+    <summary>Technische Details</summary>
+    <pre id="usb-diagnostics-log" class="firmware-log"></pre>
+  </details>
+</section>
+
 <section id="password-recovery" class="card firmware-card" hidden>
   <div class="card-header">
     <div>
@@ -357,8 +388,8 @@
   <script src="js/auth/auth-manager.js?v=20260814-persist1"></script>
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
-  <script src="js/providers/aws-backend-provider.js?v=20260910-drv-eff1"></script>
-  <script src="js/app.js?v=20260914-whole-km1"></script>
+  <script src="js/providers/aws-backend-provider.js?v=20260917-usbdiag1"></script>
+  <script src="js/app.js?v=20260917-usbdiag1"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260904-history-split1"></script>

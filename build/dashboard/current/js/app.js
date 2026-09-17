@@ -31,6 +31,9 @@
     passwordRecoveryAccess: null,
     passwordRecovery: null,
     passwordRecoveryBusy: false,
+    usbDiagnosticsAccess: null,
+    usbDiagnostics: null,
+    usbDiagnosticsBusy: false,
     notificationBusy: false,
     notificationVehicleId: null,
     notificationReadOnly: false,
@@ -282,6 +285,83 @@
     $('password-recovery-result').hidden = true;
     $('password-recovery-clear').disabled = true;
     setPasswordRecoveryStatus('Passwortanzeige wurde geleert.');
+  }
+
+  function setUsbDiagnosticsStatus(message, level = 'info') {
+    const status = $('usb-diagnostics-status');
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.level = level;
+  }
+
+  function renderUsbDiagnosticsAccess(message = '') {
+    const panel = $('usb-diagnostics');
+    const authorized = state.usbDiagnosticsAccess?.authorized === true;
+    if (!panel) return;
+    panel.hidden = !authorized;
+    if (!authorized) return;
+    $('usb-diagnostics-expiry').textContent = new Date(
+      state.usbDiagnosticsAccess.expiresAt * 1000
+    ).toLocaleString(activeLocale());
+    const supported = Boolean(state.usbDiagnostics?.supported());
+    $('usb-diagnostics-browser-warning').hidden = supported;
+    $('usb-diagnostics-start').disabled = state.usbDiagnosticsBusy || !supported;
+    $('usb-diagnostics-copy').disabled = state.usbDiagnosticsBusy
+      || !$('usb-diagnostics-log').textContent.trim();
+    if (message) setUsbDiagnosticsStatus(message);
+  }
+
+  async function loadUsbDiagnosticsAccess() {
+    if (!state.dataProvider?.getUsbDiagnosticsAccess) return;
+    try {
+      state.usbDiagnosticsAccess = await state.dataProvider.getUsbDiagnosticsAccess();
+      if (!state.usbDiagnosticsAccess?.authorized) {
+        renderUsbDiagnosticsAccess();
+        return;
+      }
+      const module = await import('./firmware/usb-diagnostics.js?v=20260917-usbdiag1');
+      state.usbDiagnostics = module.createUsbDiagnostics({
+        onStatus: setUsbDiagnosticsStatus,
+        onLog: line => {
+          const output = $('usb-diagnostics-log');
+          output.textContent += `${line}\n`;
+        }
+      });
+      renderUsbDiagnosticsAccess();
+    } catch (error) {
+      console.error('USB diagnostics access failed:', error);
+      state.usbDiagnosticsAccess = null;
+      renderUsbDiagnosticsAccess();
+    }
+  }
+
+  async function runUsbDiagnostics() {
+    if (state.usbDiagnosticsBusy || !state.usbDiagnostics) return;
+    state.usbDiagnosticsBusy = true;
+    $('usb-diagnostics-log').textContent = '';
+    renderUsbDiagnosticsAccess();
+    try {
+      await state.usbDiagnostics.run({
+        authorize: () => state.dataProvider.authorizeUsbDiagnostics(),
+        reportResult: (operationId, result) => state.dataProvider.reportUsbDiagnosticsResult(operationId, result)
+      });
+    } catch (error) {
+      console.error('USB diagnostics failed:', error?.message || error);
+    } finally {
+      state.usbDiagnosticsBusy = false;
+      renderUsbDiagnosticsAccess();
+    }
+  }
+
+  async function copyUsbDiagnostics() {
+    const text = $('usb-diagnostics-log')?.textContent.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setUsbDiagnosticsStatus('Diagnose wurde kopiert.', 'success');
+    } catch (_) {
+      setUsbDiagnosticsStatus('Diagnose konnte nicht kopiert werden.', 'error');
+    }
   }
 
   async function connectFirmwareAdapter() {
@@ -1638,6 +1718,8 @@ function startDataProvider() {
   $('password-recovery-confirm')?.addEventListener('change', () => renderPasswordRecoveryAccess());
   $('password-recovery-start')?.addEventListener('click', recoverLocalPassword);
   $('password-recovery-clear')?.addEventListener('click', clearRecoveredPassword);
+  $('usb-diagnostics-start')?.addEventListener('click', runUsbDiagnostics);
+  $('usb-diagnostics-copy')?.addEventListener('click', copyUsbDiagnostics);
   $('notification-form')?.addEventListener('submit', saveNotificationPreferences);
   $('notification-email')?.addEventListener('input', updateEmailConfirmationHelp);
   $('notification-sms-request')?.addEventListener('click', requestSmsVerification);
@@ -1672,7 +1754,7 @@ function startDataProvider() {
     setLiveStatus({ state: 'connecting', detail: 'WebSocket wird initialisiert' });
     startDataProvider();
     window.setInterval(() => loadLastCharge().catch(error => console.warn('Last charge refresh failed:', error)), 60000);
-    await Promise.all([loadFirmwareAccess(), loadPasswordRecoveryAccess()]);
+    await Promise.all([loadFirmwareAccess(), loadPasswordRecoveryAccess(), loadUsbDiagnosticsAccess()]);
   }
 
   bootstrap().catch(error => {

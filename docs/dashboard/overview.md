@@ -186,6 +186,13 @@ independently checked the same claim. Signed-out and non-administrator users see
 no privileged controls. The onboarding and firmware APIs remain the authoritative
 server-side authorization boundary.
 
+USB-DIAG-001 extends the same Administration surface with a third, independent
+active-grant inventory and grant/revoke form. An authorized user receives a
+read-only USB diagnosis card near the WebFlasher. It issues only existing status
+commands and renders an explicit allowlist of WiFi, AWS, profile and offline-cache
+lines. The serial content never leaves the browser; the backend audits only the
+grant lifecycle and operation outcome.
+
 ## Settings
 
 Personal, vehicle-specific range and notification controls live on the dedicated

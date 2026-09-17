@@ -20,6 +20,16 @@ proxies the binary.
 The deployed password-recovery extension uses a separate reserved grant target,
 five JWT-protected grant/access/start/result routes and the adapter's existing
 local USB console command. It never sends the generated password to AWS.
+
+USB-DIAG-001 adds another independent reserved target and five JWT-protected
+grant/access/start/result routes. Its browser module sends only existing
+read-only `profiles`, `wifi status`, `aws status` and `cache status` commands and
+shows only allowlisted status-line prefixes. Diagnostic output remains local;
+AWS receives only bounded grant and operation outcomes. Repository implementation
+is complete. Change Set `usb-diag-001-20260917` added the five JWT routes and
+updated the existing Lambda without deletion or replacement; stack, Lambda,
+anonymous-denial and ungranted-subject smoke checks pass. Hosted portal and
+physical USB acceptance passed with two users on 2026-09-17.
 ADM-GRANT-001 adds an administrator-only inventory route over the same encrypted
 grant table. It evaluates status, expiry and current WebFlash release identity on
 the server and returns only the fields required by the Administration page. The

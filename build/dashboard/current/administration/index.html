@@ -56,9 +56,19 @@
           <div class="admin-grants-header">
             <div>
               <h1>Aktive Berechtigungen</h1>
-              <p>Nur aktuell gültige WebFlash- und Passwort-Recovery-Freigaben.</p>
+              <p>Nur aktuell gültige WebFlash-, USB-Diagnose- und Passwort-Recovery-Freigaben.</p>
             </div>
             <button id="admin-grants-refresh" class="auth-button secondary" type="button">Aktualisieren</button>
+          </div>
+          <div class="admin-grants-section">
+            <h2>USB-Diagnose</h2>
+            <div id="admin-usb-diagnostics-grants-table" class="admin-grants-table-wrap">
+              <table class="admin-grants-table">
+                <thead><tr><th>Benutzer</th><th>Erteilt am</th><th>Gültig bis</th></tr></thead>
+                <tbody id="admin-usb-diagnostics-grants"></tbody>
+              </table>
+            </div>
+            <p id="admin-usb-diagnostics-grants-empty" class="muted" hidden>Keine aktive USB-Diagnose-Freigabe.</p>
           </div>
           <span id="admin-grants-status" class="connection-detail" aria-live="polite"></span>
           <div class="admin-grants-section">
@@ -125,6 +135,24 @@
 
         <section class="card onboarding-card admin-function-card">
           <div>
+            <h1>USB-Diagnose freigeben</h1>
+            <p>Erlaubt einem Portal-Benutzer zeitlich begrenzt eine schreibgeschützte lokale Statusabfrage. Diagnoseinhalte werden nicht an AWS übertragen.</p>
+          </div>
+          <form id="admin-usb-diagnostics-form" class="onboarding-form" autocomplete="off">
+            <label for="admin-usb-diagnostics-user">Benutzer-E-Mail</label>
+            <input id="admin-usb-diagnostics-user" name="username" type="email" required autocomplete="off" />
+            <label for="admin-usb-diagnostics-hours">Gültigkeit (Stunden)</label>
+            <input id="admin-usb-diagnostics-hours" name="expiresInHours" type="number" min="1" max="168" value="24" required />
+            <div class="settings-actions">
+              <button class="auth-button" type="submit">USB-Diagnose freigeben</button>
+              <button id="admin-usb-diagnostics-revoke" class="auth-button secondary" type="button">Freigabe entziehen</button>
+            </div>
+            <span id="admin-usb-diagnostics-status" class="connection-detail" aria-live="polite"></span>
+          </form>
+        </section>
+
+        <section class="card onboarding-card admin-function-card">
+          <div>
             <h1>Lokales Passwort zurücksetzen</h1>
             <p>Erlaubt einem Portal-Benutzer zeitlich begrenzt, über eine lokale USB-Verbindung ein neues Adapterpasswort zu erzeugen. Die übrige Konfiguration bleibt erhalten.</p>
           </div>
@@ -147,6 +175,6 @@
   <script src="../js/auth/pkce.js"></script>
   <script src="../js/auth/token-store.js?v=20260814-persist1"></script>
   <script src="../js/auth/auth-manager.js?v=20260814-persist1"></script>
-  <script src="../js/administration.js?v=20260909-grant-list1"></script>
+  <script src="../js/administration.js?v=20260917-usbdiag1"></script>
 </body>
 </html>

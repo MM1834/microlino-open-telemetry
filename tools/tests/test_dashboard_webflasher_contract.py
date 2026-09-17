@@ -79,8 +79,9 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertNotIn('id="settings"', html)
         self.assertIn('href="settings/"', html)
         self.assertIn("#firmware-flasher{order:71;width:100%}", css)
-        self.assertIn("#password-recovery{order:72;width:100%}", css)
-        self.assertIn("dashboard.css?v=20260910-drv-eff1", html)
+        self.assertIn("#usb-diagnostics{order:72;width:100%}", css)
+        self.assertIn("#password-recovery{order:73;width:100%}", css)
+        self.assertIn("dashboard.css?v=20260917-usbdiag1", html)
 
     def test_esptool_is_vendored_with_license(self) -> None:
         bundle = DASHBOARD / "vendor/esptool-js/bundle-0.6.0.js"
@@ -112,6 +113,28 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertLess(html.index('id="password-recovery-output"'), html.index('id="password-recovery-clear"'))
         self.assertIn("output.textContent = password", (DASHBOARD / "js/app.js").read_text(encoding="utf-8"))
         self.assertIn("$('password-recovery-result').hidden = true", (DASHBOARD / "js/app.js").read_text(encoding="utf-8"))
+
+    def test_usb_diagnostics_has_separate_grant_and_allowlisted_local_output(self) -> None:
+        html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        admin_html = (DASHBOARD / "administration/index.html").read_text(encoding="utf-8")
+        admin_js = (DASHBOARD / "js/administration.js").read_text(encoding="utf-8")
+        provider = (DASHBOARD / "js/providers/aws-backend-provider.js").read_text(encoding="utf-8")
+        diagnostics = (DASHBOARD / "js/firmware/usb-diagnostics.js").read_text(encoding="utf-8")
+        self.assertIn('id="usb-diagnostics"', html)
+        self.assertIn('id="admin-usb-diagnostics-form"', admin_html)
+        self.assertIn("'/api/usb-diagnostics/grants'", admin_js)
+        self.assertIn("'/api/usb-diagnostics/grants/revoke'", admin_js)
+        for path in (
+            "/api/usb-diagnostics/access", "/api/usb-diagnostics/start",
+            "/api/usb-diagnostics/result",
+        ):
+            self.assertIn(path, provider)
+        for prefix in ("Profiles:", "WiFi:", "AWS IoT:", "Offline cache:"):
+            self.assertIn(prefix, diagnostics)
+        self.assertIn("safeDiagnosticLines(raw)", diagnostics)
+        self.assertIn("reportResult(operationId, result)", diagnostics)
+        self.assertNotIn("reportResult(operationId, result, raw)", diagnostics)
+        self.assertNotIn("console.log", diagnostics)
 
 
 if __name__ == "__main__":

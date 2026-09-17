@@ -59,10 +59,13 @@
   function renderActiveGrants(result = {}) {
     const firmware = Array.isArray(result.firmware) ? result.firmware : [];
     const recovery = Array.isArray(result.passwordRecovery) ? result.passwordRecovery : [];
+    const diagnostics = Array.isArray(result.usbDiagnostics) ? result.usbDiagnostics : [];
     const firmwareBody = $('admin-firmware-grants');
     const recoveryBody = $('admin-password-recovery-grants');
+    const diagnosticsBody = $('admin-usb-diagnostics-grants');
     firmwareBody.replaceChildren();
     recoveryBody.replaceChildren();
+    diagnosticsBody.replaceChildren();
     firmware.forEach(grant => {
       const row = document.createElement('tr');
       appendCells(row, [grant.email, grant.target, grant.version, dateTime(grant.expiresAt)]);
@@ -73,10 +76,17 @@
       appendCells(row, [grant.email, dateTime(grant.grantedAt), dateTime(grant.expiresAt)]);
       recoveryBody.appendChild(row);
     });
+    diagnostics.forEach(grant => {
+      const row = document.createElement('tr');
+      appendCells(row, [grant.email, dateTime(grant.grantedAt), dateTime(grant.expiresAt)]);
+      diagnosticsBody.appendChild(row);
+    });
     $('admin-firmware-grants-empty').hidden = firmware.length > 0;
     $('admin-password-recovery-grants-empty').hidden = recovery.length > 0;
+    $('admin-usb-diagnostics-grants-empty').hidden = diagnostics.length > 0;
     $('admin-firmware-grants-table').hidden = firmware.length === 0;
     $('admin-password-recovery-grants-table').hidden = recovery.length === 0;
+    $('admin-usb-diagnostics-grants-table').hidden = diagnostics.length === 0;
   }
 
   async function loadActiveGrants() {
@@ -162,6 +172,29 @@
     } finally { setBusy(false); }
   }
 
+  async function changeUsbDiagnosticsAccess(revoke = false) {
+    if (busy) return;
+    const username = String($('admin-usb-diagnostics-user').value || '').trim();
+    const expiresInHours = Number($('admin-usb-diagnostics-hours').value || 24);
+    if (!username) {
+      $('admin-usb-diagnostics-status').textContent = 'Bitte Benutzer-E-Mail eingeben.';
+      return;
+    }
+    $('admin-usb-diagnostics-status').textContent = revoke ? 'Freigabe wird entzogen…' : 'Freigabe wird erstellt…';
+    setBusy(true);
+    try {
+      const path = revoke ? '/api/usb-diagnostics/grants/revoke' : '/api/usb-diagnostics/grants';
+      const body = revoke ? { username } : { username, expiresInHours };
+      const result = await request(path, body);
+      $('admin-usb-diagnostics-status').textContent = revoke
+        ? `USB-Diagnose-Freigabe für ${username} entzogen.`
+        : `USB-Diagnose für ${username} bis ${new Date(result.expiresAt * 1000).toLocaleString(activeLocale())} freigegeben.`;
+      await loadActiveGrants();
+    } catch (error) {
+      $('admin-usb-diagnostics-status').textContent = error.message || (revoke ? 'Freigabe konnte nicht entzogen werden.' : 'Freigabe fehlgeschlagen.');
+    } finally { setBusy(false); }
+  }
+
   async function bootstrap() {
     if (!auth?.isConfigured()) {
       showAccess('signed-out', 'Cognito ist nicht vollständig konfiguriert.');
@@ -199,6 +232,11 @@
     changePasswordRecoveryAccess(false);
   });
   $('admin-password-recovery-revoke')?.addEventListener('click', () => changePasswordRecoveryAccess(true));
+  $('admin-usb-diagnostics-form')?.addEventListener('submit', event => {
+    event.preventDefault();
+    changeUsbDiagnosticsAccess(false);
+  });
+  $('admin-usb-diagnostics-revoke')?.addEventListener('click', () => changeUsbDiagnosticsAccess(true));
   $('admin-grants-refresh')?.addEventListener('click', loadActiveGrants);
   bootstrap().catch(error => showAccess('denied', error.message || 'Administration konnte nicht geladen werden.'));
 })();

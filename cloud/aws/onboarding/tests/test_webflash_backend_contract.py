@@ -59,6 +59,20 @@ class WebflashBackendContractTests(unittest.TestCase):
         self.assertIn('"PASSWORD_RECOVERY_AUTHORIZED"', HANDLER)
         self.assertNotIn('body.get("password"', HANDLER)
 
+    def test_usb_diagnostics_routes_are_jwt_protected_and_output_is_not_audited(self):
+        for route in (
+            "POST /api/usb-diagnostics/grants",
+            "POST /api/usb-diagnostics/grants/revoke",
+            "GET /api/usb-diagnostics/access",
+            "POST /api/usb-diagnostics/start",
+            "POST /api/usb-diagnostics/result",
+        ):
+            self.assertIn(f'RouteKey: "{route}"', TEMPLATE)
+        self.assertGreaterEqual(TEMPLATE.count("AuthorizationType: JWT"), 17)
+        self.assertIn('USB_DIAGNOSTICS_TARGET = "usb-diagnostics"', HANDLER)
+        self.assertIn('"USB_DIAGNOSTICS_AUTHORIZED"', HANDLER)
+        self.assertNotIn('body.get("output"', HANDLER)
+
     def test_download_is_short_lived_and_release_is_supported_c6_application_only(self):
         self.assertIn("MaxValue: 300", TEMPLATE)
         self.assertIn('AllowedValues: [nanoesp32c6-n16, xiao-esp32c6]', TEMPLATE)
