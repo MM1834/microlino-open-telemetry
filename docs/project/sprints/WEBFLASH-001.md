@@ -6,6 +6,9 @@
 >
 > **Targets:** nanoESP32-C6-N16 and Seeed XIAO ESP32-C6
 
+> **Safety hold lifted 2026-09-17:** Two physical runs accepted the explicit
+> reset pulse. The previously valid N16 users now have exact REV29 grants.
+
 ## Objective
 
 Let an authenticated pilot install an administrator-approved MOT firmware image
@@ -256,6 +259,78 @@ and N16 REV26 objects, and anonymous API access remains `401`. The three active
 N16 grants for Maya Eisele, Christian Reding and Elisabeth Hascouet were renewed
 atomically for the REV26 version/hash with their existing expirations and three
 successful audit events.
+
+On 2026-09-16 the accepted ACCESS-001 release advanced the N16 catalog to
+`C6-001-REV27-AWS`. The 1,477,344-byte artifact has SHA-256
+`993b32c65904db00eda65166c58cea9577355baebde693db89ef9e5dde0bee4c` and private
+AES256-encrypted S3 version `TBtGb9yKfGEiNncJIfPETi4O9ibPsQ.w`; download
+read-back reproduced the exact hash. Reviewed Change Set
+`webflash-rev27-20260916` again modified only the existing Lambda, integration
+and IAM role without replacement. Stack read-back is `UPDATE_COMPLETE`, Lambda
+is `Active`/`Successful`, and anonymous firmware access remains `401`. The same
+three active N16 grants were renewed atomically for REV27 with unchanged
+expirations and three successful audit events. XIAO remains unchanged on REV21.
+
+### Web Serial reset/recovery follow-up
+
+A macOS Chrome/Edge field report showed that starting WebFlash immediately takes
+the running adapter offline. Entering the ESP32 ROM loader is required for chip
+and flash identification and is therefore expected. The defect was that a failed
+preflight, explicit disconnect or failure before a completed write only closed
+the serial transport and could leave the adapter in the ROM loader or flasher
+stub. The portal now tracks every bootloader session and resets back to the
+application before closing the transport on all exit paths. The bundled
+esptool-js 0.6.0 `hard_reset` only deasserts RTS and therefore produces no reset
+edge when RTS is already inactive. The corrected path releases the boot strap,
+asserts RTS/EN for 120 ms, deasserts it and allows 800 ms for boot before closing
+USB. Error, disconnect and successful-write behavior then required physical
+validation before the held pilot grants could be restored.
+
+Physical retesting on 2026-09-17 passed for the corrected diagnostic path and the
+complete WebFlash write. The first recovery attempt did not restart the
+application: the LED remained green, but the adapter stayed off-network. The
+success message now states that the restart was triggered and instructs the user
+to power the adapter off and on if it has not returned to the network after 60
+seconds. Two subsequent physical runs accepted the explicit DTR/RTS reset pulse and the
+adapter returned to normal operation after WebFlash. The safety hold was lifted.
+The newly built `C6-001-REV28-AWS` N16 application is 1,479,584 bytes with
+SHA-256 `1f7e1432ba154cbccf0f0ddfab110034ddb72169395886d1247979e20c933dd4`.
+Upload read-back reproduced the exact hash and confirmed AES256 encryption on S3
+version `1fsXBRMpBZCqLif4PY6TIc_5M3mLMfCV`. Reviewed Change Set
+`webflash-rev28-20260917` modified only the existing Lambda, integration and IAM
+role with `Replacement: False`; the stack returned to `UPDATE_COMPLETE` and the
+Lambda is `Active`/`Successful`. The maintainer, Maya Eisele, Christian Reding
+and Elisabeth Hascouet received audited 48-hour grants for the exact REV28
+version/hash. An older, independently revoked N16 grant was not reactivated.
+Anonymous firmware access remains HTTP 401.
+
+On 2026-09-17 the remotely distinguishable LED refinement advanced the N16
+catalog to `C6-001-REV29-AWS`. The 1,479,632-byte application has SHA-256
+`3879d337c88eb18c6b958ede018ebdf4894bc40045ee901e3e1a5a2d505b98a4`.
+Upload read-back reproduced the exact hash and confirmed AES256 encryption on S3
+version `q4WkhrOFo22Br9lsIaNOmNTzOXnZSdNa`. Reviewed Change Set
+`webflash-rev29-20260917` modified only the existing Lambda, integration and IAM
+role without replacement; stack and Lambda read-back are healthy. The maintainer,
+Maya Eisele, Christian Reding and Elisabeth Hascouet received audited 48-hour
+REV29 grants. The older independently revoked N16 grant remains revoked and
+anonymous firmware access remains HTTP 401.
+
+### Deferred bootloader entry
+
+A subsequent production run showed that the former **connect and check** action
+already called `detectChip()`. That necessarily reset the C6 into its ROM loader
+and removed WiFi/AWS before the user pressed the separate firmware-update button.
+Leaving the page at that point could therefore strand the adapter even though no
+write had started. The portal now treats the first action as USB selection only:
+it validates the browser-reported VID/PID but does not open the serial port,
+toggle DTR/RTS or interrupt the running firmware. Download and SHA-256 validation
+also occur while the adapter remains online. Only the explicit confirmed
+**Firmware aktualisieren** action opens the transport and executes bootloader
+entry, chip/flash preflight, write and the accepted reset pulse as one bounded
+operation. The UI states this transition explicitly. Physical hosted acceptance
+passed on 2026-09-17: diagnosis remained stable, USB selection left the adapter
+reachable, it went offline only after the explicit flash start, and the completed
+write returned it to normal network operation through the automatic reset pulse.
 
 ## Password-recovery extension
 

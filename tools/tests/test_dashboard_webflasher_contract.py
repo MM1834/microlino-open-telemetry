@@ -34,13 +34,23 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertIn("const spiAttachPacket = new Uint8Array(8)", source)
         self.assertIn("await loader.runStub()", source)
         self.assertIn("if (stubFlashId !== flashId)", source)
+        self.assertIn("let bootloaderSession = false", source)
+        self.assertIn("if (resetToApplication && bootloaderSession && currentTransport)", source)
+        self.assertIn("await resetToApplicationFirmware(currentTransport)", source)
+        self.assertIn("await activeTransport.setDTR(false)", source)
+        self.assertIn("await activeTransport.setRTS(true)", source)
+        self.assertIn("await activeTransport.setRTS(false)", source)
+        self.assertIn("bootloaderSession = true;\n        await loader.detectChip()", source)
         self.assertIn("factoryErase !== false", source)
         self.assertIn("address: APPLICATION_OFFSET", source)
         self.assertIn("eraseAll: false", source)
         self.assertIn("flashSize: profile.flashSizeLabel", source)
+        self.assertIn("Falls der Adapter nach 60 Sekunden nicht wieder im Netzwerk ist", source)
 
     def test_preflight_and_artifact_integrity_fail_before_write(self) -> None:
         source = (DASHBOARD / "js/firmware/web-flasher.js").read_text(encoding="utf-8")
+        connect_source = source.split("async connect(release)", 1)[1].split("async flash(", 1)[0]
+        flash_source = source.split("async flash(", 1)[1]
         write_at = source.index("await loader.writeFlash")
         self.assertLess(source.index("navigator.serial.requestPort"), write_at)
         self.assertLess(source.index("loader.readFlashId()"), write_at)
@@ -51,6 +61,20 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertLess(source.index("loader.DETECTED_FLASH_SIZES"), write_at)
         self.assertLess(source.index("crypto.subtle.digest('SHA-256'"), write_at)
         self.assertLess(source.index("actualSha256 !== release.sha256"), write_at)
+        self.assertNotIn("new Transport", connect_source)
+        self.assertNotIn("loader.detectChip", connect_source)
+        self.assertNotIn("port.open", connect_source)
+        self.assertIn("selectedPort = port", connect_source)
+        self.assertLess(flash_source.index("actualSha256 !== release.sha256"), flash_source.index("new Transport"))
+        self.assertLess(flash_source.index("new Transport"), flash_source.index("loader.detectChip"))
+
+    def test_usb_selection_keeps_adapter_online_until_confirmed_update(self) -> None:
+        html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        source = (DASHBOARD / "js/firmware/web-flasher.js").read_text(encoding="utf-8")
+        self.assertIn("USB-Gerät auswählen", html)
+        self.assertIn("Der Adapter bleibt dabei normal im Netzwerk", html)
+        self.assertIn("Erst dann wird der Adapter", html)
+        self.assertIn("remains online until the", source)
 
     def test_backend_authorization_controls_visibility_and_download(self) -> None:
         app = (DASHBOARD / "js/app.js").read_text(encoding="utf-8")
@@ -129,8 +153,14 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
             "/api/usb-diagnostics/result",
         ):
             self.assertIn(path, provider)
-        for prefix in ("Profiles:", "WiFi:", "AWS IoT:", "Offline cache:"):
+        for prefix in (
+            "Profiles:", "WiFi:", "WiFi profiles:", "AWS IoT:", "Offline cache:",
+            "Support system:", "Support network:", "Support AWS:", "Support cache:",
+            "Support time:", "Support CAN1:", "Support CAN2:",
+        ):
             self.assertIn(prefix, diagnostics)
+        self.assertIn("support status\\r\\nprofiles\\r\\nwifi status\\r\\naws status\\r\\ncache status", diagnostics)
+        self.assertNotIn("setSignals", diagnostics)
         self.assertIn("safeDiagnosticLines(raw)", diagnostics)
         self.assertIn("reportResult(operationId, result)", diagnostics)
         self.assertNotIn("reportResult(operationId, result, raw)", diagnostics)

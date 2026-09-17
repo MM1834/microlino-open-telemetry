@@ -1,8 +1,72 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV26-AWS`
+> **Current repository release:** `C6-001-REV29-AWS`
 >
-> **Current field-accepted release:** `C6-001-REV26-AWS`
+> **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV29-AWS`
+
+REV29 makes the N16 onboard status LED unambiguous for remote support. An
+incomplete onboarding state breathes white; configured WiFi that is currently
+offline breathes magenta instead of the former yellow that multiple observers
+perceived as green. Solid blue continues to mean WiFi without a connected cloud
+service, solid green means AWS IoT connected, cyan means local MQTT only, green
+with a blue component means AWS plus local MQTT, and breathing red remains the
+Dual-CAN startup-error indication. XIAO remains excluded from the GPIO8 LED path.
+Focused contracts pass, and N16 plus XIAO builds pass; XIAO uses 82.5 percent of
+its application slot. The exact N16 WebFlash candidate is 1,479,632 bytes with
+SHA-256 `3879d337c88eb18c6b958ede018ebdf4894bc40045ee901e3e1a5a2d505b98a4`.
+Its private AES256-encrypted S3 object version is
+`q4WkhrOFo22Br9lsIaNOmNTzOXnZSdNa`.
+Reviewed Change Set `webflash-rev29-20260917` modified only the existing Lambda,
+API integration and IAM role with `Replacement: False`; the stack returned to
+`UPDATE_COMPLETE` and the Lambda is `Active`/`Successful`. The four previously
+valid N16 users have audited 48-hour grants for the exact REV29 version/hash; the
+older independently revoked grant remains revoked. Anonymous access remains HTTP
+401. Physical REV29 acceptance passed on 2026-09-17: USB diagnosis left the
+adapter stable, USB selection kept it online until the explicit flash start, the
+complete write restarted it into normal network operation, and the white
+incomplete-onboarding plus magenta WiFi-offline LED indications were confirmed.
+
+### `C6-001-REV28-AWS`
+
+REV28 adds backward-compatible, read-only USB support diagnostics. The new
+`support status` command reports firmware/device identity, uptime and reset
+reason, heap watermarks, WiFi link and disconnect state, AWS/TLS status,
+offline-cache counters, clock validity and CAN1/CAN2 frame health without
+exposing credentials. `wifi status` additionally identifies the configured home
+and mobile SSIDs after serial-safe normalization. The portal continues to issue
+the established `profiles`, `wifi status`, `aws status` and `cache status`
+commands after the new command, so adapters still running older firmware remain
+diagnosable during rollout. Repository builds and automated contracts pass.
+Physical diagnosis acceptance passed without resetting the adapter. Two complete
+WebFlash recovery runs passed with the explicit DTR/RTS reset pulse returning the
+adapter to normal operation. The exact 1,479,584-byte N16 application with
+SHA-256 `1f7e1432ba154cbccf0f0ddfab110034ddb72169395886d1247979e20c933dd4`
+is active in the controlled WebFlash catalog through replacement-free Change Set
+`webflash-rev28-20260917`. Its private AES256-encrypted S3 object version is
+`1fsXBRMpBZCqLif4PY6TIc_5M3mLMfCV`. The four previously valid N16 users were
+granted the exact REV28 release for 48 hours; an older independently revoked
+grant remains revoked.
+
+### `C6-001-REV27-AWS`
+
+REV27 adds the field-derived Display-CAN `0x601` access decoder. Byte 3 reports
+the electronic central-lock state (`0x01` locked, `0x02` unlocked), while bit 7
+of byte 0 reports the observed door-open state. Because tests showed that the
+lock byte can remain stale during charging and after unplugging, firmware emits
+a separate validity topic and requires a later electronic transition before the
+lock state becomes valid again. Mechanical key operation remains outside the
+confirmed signal boundary. C6 N16 and both maintained LilyGO AWS builds pass;
+Physical firmware, AWS publication, the charging-uncertain presentation and live
+language switching are field-accepted. The exact 1,477,344-byte N16 application
+with SHA-256
+`993b32c65904db00eda65166c58cea9577355baebde693db89ef9e5dde0bee4c` is active
+in the controlled WebFlash catalog through replacement-free Change Set
+`webflash-rev27-20260916`. Its private AES256-encrypted S3 object version is
+`TBtGb9yKfGEiNncJIfPETi4O9ibPsQ.w`. The three existing N16 pilot grants were
+atomically renewed for REV27 with unchanged expirations and successful audit
+events. ACCESS-001 is complete.
 
 ### `C6-001-REV26-AWS`
 

@@ -108,6 +108,15 @@ class C6ProductionHardeningTests(unittest.TestCase):
         self.assertIn("c6LocalMqttConnected()", status_led)
         self.assertIn("c6StatusLedSetError(true);", MAIN)
 
+    def test_status_led_distinguishes_onboarding_and_wifi_outage(self) -> None:
+        status_led = (ROOT / "firmware/esp32-c6/src/c6_status_led.cpp").read_text()
+        onboarding = status_led.index("if (!c6Config.onboardingComplete)")
+        wifi_outage = status_led.index("if (!c6NetworkOnline())")
+        self.assertLess(onboarding, wifi_outage)
+        self.assertIn("return {brightness, brightness, brightness};", status_led)
+        self.assertIn("return {brightness, 0, brightness};", status_led)
+        self.assertNotIn("return {brightness, brightness, 0};", status_led)
+
 
 if __name__ == "__main__":
     unittest.main()

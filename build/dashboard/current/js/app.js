@@ -9,6 +9,7 @@
     : null;
   const $ = (id) => document.getElementById(id);
   const activeLocale = () => window.MOT_I18N?.locale || dashboardCfg.locale || 'de-CH';
+  const translate = text => window.MOT_I18N?.translate?.(text) || text;
   const state = {
     lastMessage: 0,
     values: {},
@@ -185,7 +186,7 @@
         renderFirmwareAccess();
         return;
       }
-      const module = await import('./firmware/web-flasher.js?v=20260901-webflash10');
+      const module = await import('./firmware/web-flasher.js?v=20260917-webflash14');
       state.firmwareFlasher = module.createWebFlasher({
         onStatus: setFirmwareStatus,
         onProgress: percent => {
@@ -319,7 +320,7 @@
         renderUsbDiagnosticsAccess();
         return;
       }
-      const module = await import('./firmware/usb-diagnostics.js?v=20260917-usbdiag1');
+      const module = await import('./firmware/usb-diagnostics.js?v=20260917-usbdiag4');
       state.usbDiagnostics = module.createUsbDiagnostics({
         onStatus: setUsbDiagnosticsStatus,
         onLog: line => {
@@ -373,10 +374,10 @@
     renderFirmwareAccess();
     try {
       const device = await state.firmwareFlasher.connect(state.firmwareAccess.release);
-      $('firmware-device').textContent = `${device.chipName} · ${device.flashSize}`;
+      $('firmware-device').textContent = `${translate('USB ausgewählt')} · ${device.target}`;
     } catch (error) {
-      console.error('Firmware preflight failed:', error);
-      $('firmware-device').textContent = 'Prüfung fehlgeschlagen';
+      console.error('Firmware USB selection failed:', error);
+      $('firmware-device').textContent = translate('USB-Auswahl fehlgeschlagen');
     } finally {
       state.firmwareBusy = false;
       renderFirmwareAccess();

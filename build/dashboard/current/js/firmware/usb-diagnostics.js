@@ -9,8 +9,16 @@ const SAFE_PREFIXES = [
   'Profiles:',
   'Profiles configured:',
   'WiFi:',
+  'WiFi profiles:',
   'AWS IoT:',
-  'Offline cache:'
+  'Offline cache:',
+  'Support system:',
+  'Support network:',
+  'Support AWS:',
+  'Support cache:',
+  'Support time:',
+  'Support CAN1:',
+  'Support CAN2:'
 ];
 
 export function safeDiagnosticLines(text) {
@@ -45,14 +53,16 @@ export function createUsbDiagnostics({ onStatus = () => {}, onLog = () => {} } =
       onStatus('USB-Gerät auswählen…');
       port = await navigator.serial.requestPort({ filters: USB_FILTERS });
       await port.open({ baudRate: BAUD_RATE });
-      await port.setSignals?.({ dataTerminalReady: false, requestToSend: false });
+      // Do not touch DTR/RTS in the read-only console path. Web Serial applies
+      // these lines independently; even a final false/false state can briefly
+      // trigger the ESP32-C6 auto-reset/boot circuit on CH343-backed adapters.
       await new Promise(resolve => setTimeout(resolve, 900));
 
       writer = port.writable.getWriter();
       reader = port.readable.getReader();
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();
-      await writer.write(encoder.encode('\r\nprofiles\r\nwifi status\r\naws status\r\ncache status\r\n'));
+      await writer.write(encoder.encode('\r\nsupport status\r\nprofiles\r\nwifi status\r\naws status\r\ncache status\r\n'));
       onStatus('Adapterstatus wird ausgelesen…');
 
       let raw = '';

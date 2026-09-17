@@ -4,6 +4,8 @@ const CHIP_FAMILY = 'ESP32-C6';
 const APPLICATION_OFFSET = 0x10000;
 const SAFE_BAUDRATE = 115200;
 const ESP32_C6_SPI_REG_BASE = 0x60003000;
+const RESET_ASSERT_MS = 120;
+const RESET_BOOT_WAIT_MS = 800;
 const TARGETS = {
   'nanoesp32c6-n16': {
     flashSizeBytes: 16 * 1024 * 1024,
@@ -85,6 +87,17 @@ async function sha256Hex(bytes) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+async function resetToApplicationFirmware(activeTransport) {
+  // esptool-js 0.6.0's hard reset only deasserts RTS. If RTS is already
+  // inactive, the CH343-backed N16 receives no reset edge and can remain in the
+  // flasher stub. Keep the boot strap released and pulse EN through RTS.
+  await activeTransport.setDTR(false);
+  await activeTransport.setRTS(true);
+  await new Promise(resolve => setTimeout(resolve, RESET_ASSERT_MS));
+  await activeTransport.setRTS(false);
+  await new Promise(resolve => setTimeout(resolve, RESET_BOOT_WAIT_MS));
+}
+
 function connectionErrorMessage(error) {
   const detail = String(error?.message || error || '');
   if (/open|busy|claim|access denied|in use/i.test(detail)) {
@@ -99,9 +112,11 @@ function connectionErrorMessage(error) {
 export function createWebFlasher({ onStatus, onProgress, onLog } = {}) {
   let transport = null;
   let loader = null;
+  let selectedPort = null;
   let approvedRelease = null;
   let deviceInfo = null;
   let busy = false;
+  let bootloaderSession = false;
 
   const status = (message, level = 'info') => onStatus?.(message, level);
   const log = message => onLog?.(String(message));
@@ -111,11 +126,20 @@ export function createWebFlasher({ onStatus, onProgress, onLog } = {}) {
     write(data) { log(data); }
   };
 
-  async function disconnect() {
+  async function disconnect({ resetToApplication = true } = {}) {
     const currentTransport = transport;
     loader = null;
     transport = null;
+    selectedPort = null;
     deviceInfo = null;
+    if (resetToApplication && bootloaderSession && currentTransport) {
+      try {
+        await resetToApplicationFirmware(currentTransport);
+      } catch (error) {
+        console.warn('Adapter could not be reset to application firmware:', error);
+      }
+    }
+    bootloaderSession = false;
     if (currentTransport) {
       try { await currentTransport.disconnect(); } catch (error) { console.debug('Serial disconnect:', error); }
     }
@@ -145,50 +169,16 @@ export function createWebFlasher({ onStatus, onProgress, onLog } = {}) {
         if (!usbMatchesTarget) {
           throw new Error('Nicht unterstützter USB-Adapter ausgewählt.');
         }
-        transport = new Transport(port, false);
-        // CH343-backed nanoESP32-C6 units returned Flash ID 0 from the bundled
-        // C6 stub. Stay in the ROM loader and keep all traffic at 115200.
-        loader = new ESPLoader({ transport, baudrate: SAFE_BAUDRATE, terminal });
-        await loader.detectChip();
-        const chipName = String(await loader.chip.getChipDescription(loader));
-        loader.info(`Chip is ${chipName}`);
-        loader.info(`Features: ${(await loader.chip.getChipFeatures(loader)).join(',')}`);
-        loader.info(`Crystal is ${await loader.chip.getCrystalFreq(loader)}MHz`);
-        loader.info(`MAC: ${await loader.chip.readMac(loader)}`);
-        if (!chipName.toUpperCase().includes(CHIP_FAMILY)) {
-          throw new Error(`Falscher Chip erkannt (${chipName || 'unbekannt'} statt ESP32-C6).`);
-        }
-        // esptool-js 0.6.0 still uses the older C3 register base and a four-byte
-        // SPI_ATTACH request for C6. Match current official Python esptool:
-        // C6 SPI2 base 0x60003000 and the ROM's additional four reserved bytes.
-        loader.chip.SPI_REG_BASE = ESP32_C6_SPI_REG_BASE;
-        installEsp32C6RomCompatibility(loader);
-        const spiAttachPacket = new Uint8Array(8);
-        await loader.checkCommand('configure SPI flash pins', loader.ESP_SPI_ATTACH, spiAttachPacket);
-        loader.info('SPI flash attached (ESP32-C6 ROM)');
-        const flashId = await loader.readFlashId();
-        if (flashId === 0 || flashId === 0xffffff) {
-          throw new Error('Flash-Speicher konnte nicht ausgelesen werden. Die Verbindung ist nicht stabil; es wurde nichts geschrieben.');
-        }
-        const flashSize = loader.DETECTED_FLASH_SIZES[(flashId >>> 16) & 0xff];
-        if (!flashSize) {
-          throw new Error(`Unbekannter Flash-Speicher erkannt (ID 0x${flashId.toString(16)}).`);
-        }
-        const flashSizeBytes = loader.flashSizeBytes(flashSize);
-        if (flashSizeBytes !== profile.flashSizeBytes) {
-          throw new Error(`Falsche Flash-Größe erkannt (${flashSize || 'unbekannt'} statt ${profile.flashSizeLabel}).`);
-        }
-        // ESP32-C6 ROM can identify the flash but does not implement compressed
-        // application writes. Start the bundled stub only after the fail-closed
-        // ROM preflight, retain 115200 baud and re-check the same JEDEC flash.
-        await loader.runStub();
-        const stubFlashId = await loader.readFlashId();
-        if (stubFlashId !== flashId) {
-          throw new Error('Flash-Speicher ist nach dem Start des Schreibprogramms nicht stabil erreichbar; es wurde nichts geschrieben.');
-        }
-        loader.info('ESP32-C6 flasher ready at 115200 baud');
-        deviceInfo = { chipName, flashSize, usbVendorId: usb.usbVendorId, usbProductId: usb.usbProductId };
-        status(`Adapter geprüft: ${chipName}, ${flashSize}.`, 'success');
+        // Selecting the Web Serial device must not open the port or toggle the
+        // ESP32 boot/reset lines. The adapter therefore remains online until the
+        // user explicitly confirms and starts the firmware update.
+        selectedPort = port;
+        deviceInfo = {
+          target: approvedRelease.target,
+          usbVendorId: usb.usbVendorId,
+          usbProductId: usb.usbProductId
+        };
+        status('USB-Gerät ausgewählt. Der Adapter bleibt bis zum Start des Updates im Normalbetrieb.', 'success');
         return deviceInfo;
       } catch (error) {
         await disconnect();
@@ -202,8 +192,8 @@ export function createWebFlasher({ onStatus, onProgress, onLog } = {}) {
 
     async flash({ authorizeDownload, reportResult }) {
       if (busy) return;
-      if (!loader || !deviceInfo || !approvedRelease) {
-        throw new Error('Bitte zuerst den Adapter verbinden und prüfen.');
+      if (!selectedPort || !deviceInfo || !approvedRelease) {
+        throw new Error('Bitte zuerst das USB-Gerät auswählen.');
       }
       busy = true;
       let operationId = '';
@@ -226,7 +216,51 @@ export function createWebFlasher({ onStatus, onProgress, onLog } = {}) {
         if (actualSha256 !== release.sha256) {
           throw new Error('Die Firmware-Prüfsumme stimmt nicht. Es wurde nichts geschrieben.');
         }
-        status('Firmware geprüft. Update wird geschrieben – USB nicht trennen.');
+        status('Firmware geprüft. Adapter wird jetzt in den Update-Modus versetzt – USB nicht trennen.');
+        transport = new Transport(selectedPort, false);
+        // From detectChip() onward the adapter is intentionally offline. Keep
+        // identification, flash checks and writing inside this one confirmed
+        // operation so abandoning the earlier selection cannot strand it.
+        loader = new ESPLoader({ transport, baudrate: SAFE_BAUDRATE, terminal });
+        bootloaderSession = true;
+        await loader.detectChip();
+        const chipName = String(await loader.chip.getChipDescription(loader));
+        loader.info(`Chip is ${chipName}`);
+        loader.info(`Features: ${(await loader.chip.getChipFeatures(loader)).join(',')}`);
+        loader.info(`Crystal is ${await loader.chip.getCrystalFreq(loader)}MHz`);
+        loader.info(`MAC: ${await loader.chip.readMac(loader)}`);
+        if (!chipName.toUpperCase().includes(CHIP_FAMILY)) {
+          throw new Error(`Falscher Chip erkannt (${chipName || 'unbekannt'} statt ESP32-C6).`);
+        }
+        loader.chip.SPI_REG_BASE = ESP32_C6_SPI_REG_BASE;
+        installEsp32C6RomCompatibility(loader);
+        const spiAttachPacket = new Uint8Array(8);
+        await loader.checkCommand('configure SPI flash pins', loader.ESP_SPI_ATTACH, spiAttachPacket);
+        loader.info('SPI flash attached (ESP32-C6 ROM)');
+        const flashId = await loader.readFlashId();
+        if (flashId === 0 || flashId === 0xffffff) {
+          throw new Error('Flash-Speicher konnte nicht ausgelesen werden. Die Verbindung ist nicht stabil; es wurde nichts geschrieben.');
+        }
+        const flashSize = loader.DETECTED_FLASH_SIZES[(flashId >>> 16) & 0xff];
+        if (!flashSize) {
+          throw new Error(`Unbekannter Flash-Speicher erkannt (ID 0x${flashId.toString(16)}).`);
+        }
+        const flashSizeBytes = loader.flashSizeBytes(flashSize);
+        if (flashSizeBytes !== profile.flashSizeBytes) {
+          throw new Error(`Falsche Flash-Größe erkannt (${flashSize || 'unbekannt'} statt ${profile.flashSizeLabel}).`);
+        }
+        await loader.runStub();
+        const stubFlashId = await loader.readFlashId();
+        if (stubFlashId !== flashId) {
+          throw new Error('Flash-Speicher ist nach dem Start des Schreibprogramms nicht stabil erreichbar; es wurde nichts geschrieben.');
+        }
+        loader.info('ESP32-C6 flasher ready at 115200 baud');
+        deviceInfo = {
+          chipName, flashSize,
+          usbVendorId: deviceInfo.usbVendorId,
+          usbProductId: deviceInfo.usbProductId
+        };
+        status(`Adapter geprüft: ${chipName}, ${flashSize}. Update wird geschrieben – USB nicht trennen.`);
         await loader.writeFlash({
           fileArray: [{ data: image, address: APPLICATION_OFFSET }],
           flashMode: 'keep',
@@ -239,9 +273,10 @@ export function createWebFlasher({ onStatus, onProgress, onLog } = {}) {
           }
         });
         onProgress?.(100);
-        await loader.after('hard_reset');
+        await resetToApplicationFirmware(transport);
+        bootloaderSession = false;
         await reportResult(operationId, 'SUCCEEDED', approvedRelease.target);
-        status('Update erfolgreich. Der Adapter wurde neu gestartet.', 'success');
+        status('Update erfolgreich und WebFlash beendet. Der Neustart wurde ausgelöst. Falls der Adapter nach 60 Sekunden nicht wieder im Netzwerk ist, bitte die Stromversorgung kurz aus- und wieder einschalten.', 'success');
       } catch (error) {
         if (operationId) {
           try { await reportResult(operationId, 'FAILED', approvedRelease.target); } catch (reportError) {

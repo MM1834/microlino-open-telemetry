@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="css/history-soc-speed.css">
   <link rel="stylesheet" href="css/location-map.css?v=20260904-touch-interaction1">
   <link rel="stylesheet" href="css/location-map-cleanup.css">
-  <script src="js/i18n.js?v=20260917-usbdiag1"></script>
+  <script src="js/i18n.js?v=20260917-usbdiag4"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -285,8 +285,8 @@
   </div>
   <ol class="firmware-steps">
     <li>Adapter vom Fahrzeug trennen und nur über ein USB-C-Datenkabel mit dem Computer verbinden.</li>
-    <li><strong>Adapter verbinden und prüfen</strong> wählen und im Browser das USB-Gerät auswählen.</li>
-    <li>Nach erfolgreicher Prüfung die Sicherheitsbestätigung aktivieren und das Update starten.</li>
+    <li><strong>USB-Gerät auswählen</strong> wählen. Der Adapter bleibt dabei normal im Netzwerk.</li>
+    <li>Danach bestätigen und <strong>Firmware aktualisieren</strong> starten. Erst dann wird der Adapter für Prüfung und Schreiben vorübergehend offline genommen.</li>
   </ol>
   <dl class="firmware-meta">
     <div><dt>Ziel</dt><dd id="firmware-release-target">--</dd></div>
@@ -296,7 +296,7 @@
     <div><dt>Erkanntes Gerät</dt><dd id="firmware-device">Noch nicht geprüft</dd></div>
   </dl>
   <div class="firmware-actions">
-    <button id="firmware-connect" class="auth-button secondary" type="button">Adapter verbinden und prüfen</button>
+    <button id="firmware-connect" class="auth-button secondary" type="button">USB-Gerät auswählen</button>
     <label class="firmware-confirmation">
       <input id="firmware-confirm" type="checkbox" disabled />
       <span>Der Adapter ist vom Fahrzeug getrennt und bleibt während des Updates per USB verbunden.</span>
@@ -389,7 +389,7 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260917-usbdiag1"></script>
-  <script src="js/app.js?v=20260917-usbdiag1"></script>
+  <script src="js/app.js?v=20260917-usbdiag7"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260904-history-split1"></script>

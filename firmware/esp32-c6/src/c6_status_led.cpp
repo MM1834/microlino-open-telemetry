@@ -49,9 +49,13 @@ Color desiredColor(uint32_t now)
         const uint8_t brightness = pulseBrightness(now, 2, 16);
         return {brightness, 0, 0};
     }
+    if (!c6Config.onboardingComplete) {
+        const uint8_t brightness = pulseBrightness(now, 2, 10);
+        return {brightness, brightness, brightness};
+    }
     if (!c6NetworkOnline()) {
         const uint8_t brightness = pulseBrightness(now, 2, 12);
-        return {brightness, brightness, 0};
+        return {brightness, 0, brightness};
     }
 
     const bool awsConnected = c6AwsConnected();
@@ -77,7 +81,7 @@ void c6StatusLedSetup()
 #ifndef MOT_XIAO_BOARD
     // GPIO8 drives the nanoESP32-C6-N16 onboard WS2812. The XIAO build leaves
     // its board-specific LED and GPIO mapping untouched.
-    writeColor({8, 8, 0});
+    writeColor({8, 8, 8});
 #endif
 }
 

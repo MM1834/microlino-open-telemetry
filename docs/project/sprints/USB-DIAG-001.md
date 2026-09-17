@@ -1,6 +1,6 @@
 # USB-DIAG-001 — Freigegebene lokale Adapterdiagnose
 
-**Status:** Complete — deployed and accepted with two users
+**Status:** Complete — Web Serial reset correction physically accepted
 
 **Prepared:** 2026-09-17
 
@@ -19,7 +19,9 @@ expected AWS telemetry.
 - Open the normally running adapter through Web Serial at 115200 baud; never
   enter the bootloader and never write configuration.
 - Execute only the existing read-only console commands `profiles`, `wifi status`,
-  `aws status` and `cache status`.
+  `aws status` and `cache status`. New firmware additionally accepts the read-only
+  `support status` command; the original commands remain in the request for older
+  adapters.
 - Display only complete lines beginning with the explicit safe prefixes
   `Profiles:`, `Profiles configured:`, `WiFi:`, `AWS IoT:` or `Offline cache:`.
   All startup and unrelated console output is discarded.
@@ -67,3 +69,48 @@ The portal was uploaded and productive acceptance passed with two different
 users on 2026-09-17. Administrator grant, user-specific visibility, physical USB
 read-out, filtered technical details, local copy action and subsequent access
 handling all behaved as designed. USB-DIAG-001 is complete.
+
+## Local WiFi identification extension
+
+Support follow-up after acceptance showed that a loose connection can leave an
+adapter in an ambiguous network state. The diagnosis therefore also accepts the
+local-only `WiFi profiles:` line. A firmware follow-up prints the configured home
+and mobile SSID plus the already available active-profile IP address, but never
+prints either password. Control characters in SSIDs are replaced before serial
+output so one name cannot create a second apparent diagnostic line. Existing
+firmware continues to provide IP and configured/not-configured flags; SSID names
+appear after installation of a firmware version containing this extension.
+
+## Backward-compatible support status
+
+The firmware follow-up adds one compact `support status` command without removing
+or changing any existing console command. It reports firmware, device and board,
+uptime and reset reason, heap watermarks, detailed WiFi connection and disconnect
+state, AWS/TLS status, offline-cache counters, clock validity and CAN1/CAN2 frame
+health. This makes power interruptions, weak or switching WiFi, invalid time,
+cloud handshake failures and a missing vehicle bus distinguishable during one
+authorized session. Passwords, certificates, private keys and tokens remain
+excluded.
+
+The portal sends `support status` first and then still sends `profiles`,
+`wifi status`, `aws status` and `cache status`. Older firmware ignores the unknown
+new command and answers the established commands; updated firmware supplies both
+the richer support report and the established fallback lines.
+
+## Web Serial reset follow-up
+
+A later macOS Chrome/Edge retest reproduced an immediate ESP32-C6 reset when the
+portal opened USB diagnosis. The captured serial log contains a new ROM boot with
+`rst:0x1 (POWERON)` but no panic, watchdog or brownout. PlatformIO Device Monitor,
+direct `support status` input and the Spacehuhn Web Serial terminal remain stable
+on the same adapters. Code comparison showed that the stable terminal opens the
+port without changing DTR/RTS, while the portal additionally requested a
+`false`/`false` signal state after opening. Because Web Serial applies the two
+control signals independently, that request can transiently activate the C6
+auto-reset circuit. The portal correction therefore leaves DTR/RTS untouched in
+the read-only diagnostic path. Physical no-reset acceptance on the affected
+Mac/CH343 combinations was required before this sprint could return to complete.
+
+Physical retesting on 2026-09-17 passed: opening the authorized diagnosis left
+the adapter stable and returned the requested filtered support data. This closes
+the reset follow-up and returns USB-DIAG-001 to complete.

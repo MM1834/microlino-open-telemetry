@@ -1,4 +1,7 @@
 #include <Arduino.h>
+#include <esp_heap_caps.h>
+#include <esp_system.h>
+#include <time.h>
 
 #include "c6_board.h"
 #include "c6_abrp.h"
@@ -14,6 +17,8 @@
 #include "c6_network.h"
 #include "c6_offline_cache.h"
 #include "c6_status_led.h"
+#include "system/device_id.h"
+#include "system/version.h"
 #include "c6_web.h"
 #include "telemetry/telemetry.h"
 
@@ -50,6 +55,71 @@ void printProfiles()
                   decoderProfileKey(c6CanStatus(1).profile));
 }
 
+String serialSafeWifiName(const String &value)
+{
+    if (value.isEmpty()) return "not-configured";
+    String safe;
+    safe.reserve(value.length());
+    for (size_t i = 0; i < value.length(); ++i) {
+        const char c = value.charAt(i);
+        safe += (c >= 32 && c != 127 && c != '"') ? c : ' ';
+    }
+    return safe;
+}
+
+const char *supportResetReason()
+{
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON: return "power_on";
+        case ESP_RST_EXT: return "external";
+        case ESP_RST_SW: return "software";
+        case ESP_RST_PANIC: return "panic";
+        case ESP_RST_INT_WDT: return "interrupt_watchdog";
+        case ESP_RST_TASK_WDT: return "task_watchdog";
+        case ESP_RST_WDT: return "watchdog";
+        case ESP_RST_DEEPSLEEP: return "deep_sleep";
+        case ESP_RST_BROWNOUT: return "brownout";
+        case ESP_RST_SDIO: return "sdio";
+        default: return "unknown";
+    }
+}
+
+void printSupportCanStatus(size_t channel)
+{
+    const C6CanChannelStatus &status = c6CanStatus(channel);
+    Serial.printf("Support CAN%u: started=%s profile=%s frames=%lu errors=%lu lastFrameAgeMs=",
+                  static_cast<unsigned>(channel + 1), status.started ? "yes" : "no",
+                  decoderProfileKey(status.profile), static_cast<unsigned long>(status.frames),
+                  static_cast<unsigned long>(status.receiveErrors));
+    if (status.frames) Serial.println(static_cast<unsigned long>(millis() - status.lastFrameMs));
+    else Serial.println("never");
+}
+
+void printSupportStatus()
+{
+    const time_t now = time(nullptr);
+    Serial.printf("Support system: firmware=%s device=%s board=%s uptimeSec=%lu reset=%s freeHeap=%u minFreeHeap=%u largestBlock=%u\n",
+                  MOT_VERSION, motDeviceId().c_str(), MOT_BOARD,
+                  static_cast<unsigned long>(millis() / 1000UL), supportResetReason(),
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap(),
+                  heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    Serial.printf("Support network: state=%s profile=%s transportReady=%s ip=%s rssi=%d channel=%d weak=%s transitions=%lu disconnects=%lu lastDisconnect=%s lastDisconnectAgeMs=%lu managerInitiated=%s\n",
+                  c6NetworkStateName().c_str(), c6NetworkProfileName().c_str(),
+                  c6NetworkTransportReady() ? "yes" : "no", c6NetworkIp().c_str(),
+                  c6NetworkRssi(), c6NetworkChannel(), c6NetworkLinkWeak() ? "yes" : "no",
+                  static_cast<unsigned long>(c6NetworkTransitionCount()),
+                  static_cast<unsigned long>(c6NetworkDisconnectCount()),
+                  c6NetworkLastDisconnectReasonName().c_str(),
+                  static_cast<unsigned long>(c6NetworkLastDisconnectAgeMs()),
+                  c6NetworkLastDisconnectWasManagerInitiated() ? "yes" : "no");
+    Serial.println("Support AWS: " + c6AwsStatus());
+    Serial.println("Support cache: " + c6OfflineCacheStatusJson());
+    Serial.printf("Support time: valid=%s epoch=%lld\n",
+                  now >= 1700000000 ? "yes" : "no", static_cast<long long>(now));
+    printSupportCanStatus(0);
+    printSupportCanStatus(1);
+}
+
 void handleSerialCommand(String command)
 {
     command.trim();
@@ -57,6 +127,10 @@ void handleSerialCommand(String command)
     normalized.toLowerCase();
     if (normalized == "profiles") {
         printProfiles();
+        return;
+    }
+    if (normalized == "support status") {
+        printSupportStatus();
         return;
     }
     if (normalized == "scan reset") {
@@ -105,6 +179,9 @@ void handleSerialCommand(String command)
         Serial.printf("Profiles configured: home=%s mobile=%s\n",
                       c6NetworkHomeConfigured() ? "yes" : "no",
                       c6NetworkMobileConfigured() ? "yes" : "no");
+        Serial.printf("WiFi profiles: home=\"%s\" mobile=\"%s\"\n",
+                      serialSafeWifiName(c6Config.wifiSsid).c_str(),
+                      serialSafeWifiName(c6Config.wifi2Ssid).c_str());
         return;
     }
     if (normalized == "wifi clear") {

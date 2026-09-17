@@ -8,7 +8,7 @@
 
 **Governance Version:** 1.0
 
-**Last reviewed:** 2026-09-15
+**Last reviewed:** 2026-09-17
 
 ## Purpose
 
@@ -19,10 +19,94 @@ revision.
 
 ## Current product direction
 
+USB-DIAG-001 is complete, including its Web Serial reset correction. It adds a separate expiring `usb-diagnostics` grant,
+administrator
+grant/revoke and inventory controls, and a read-only Web Serial view over the
+existing `profiles`, WiFi, AWS and offline-cache status commands. Browser output
+is restricted to an explicit safe-prefix allowlist; no diagnostic content is
+sent to AWS, whose audit records contain only grant and operation outcomes.
+Reviewed Change Set `usb-diag-001-20260917` added exactly five JWT routes and
+updated the existing Lambda/integration without deletion or replacement. Stack,
+Lambda, anonymous `401` and ungranted-subject checks pass. Initial hosted physical
+USB acceptance passed with two users. A subsequent macOS Chrome/Edge retest found
+that the portal's post-open DTR/RTS request can reset CH343-backed C6 adapters,
+while PlatformIO and a Web Serial terminal that leaves those signals untouched
+remain stable. The portal now follows that no-signal-change behavior. Physical
+retesting passed with a stable adapter and the requested filtered support data.
+The first WebFlash recovery test showed that the bundled esptool-js `hard_reset`
+did not produce a reset edge: the LED remained green while the adapter stayed
+off-network. The portal now holds the boot strap in its normal state and
+explicitly pulses RTS/EN before closing USB, with power-off/on after 60 seconds
+as the communicated fallback. Two subsequent physical runs returned the adapter
+to normal operation. Exact encrypted REV28 was activated through replacement-free
+Change Set `webflash-rev28-20260917`; stack and Lambda are healthy, anonymous
+access remains HTTP 401. The successor REV29 replaces the ambiguous yellow/green
+offline indication with a magenta WiFi-outage pulse and adds a separate white
+incomplete-onboarding pulse. Its exact encrypted N16 artifact is active through
+replacement-free Change Set `webflash-rev29-20260917`; stack and Lambda are
+healthy, and the four previously valid N16 users now have audited 48-hour REV29
+grants. The older independently revoked grant remains revoked. Physical REV29
+testing accepted both the white incomplete-onboarding and magenta configured-
+WiFi-offline indications.
+One later production run confirmed that the former WebFlash preflight entered the
+ROM loader before the separate write confirmation, explaining how abandoning the
+screen could leave a device offline. The revised first stage now only selects and
+checks the browser USB identity without opening the port; download/hash validation
+also remains online. Bootloader entry, full chip/flash preflight, write and reset
+start only after the explicit firmware-update confirmation. Focused contracts
+and JavaScript syntax pass. Hosted physical acceptance confirmed that diagnosis
+remains stable, USB selection leaves the adapter reachable until explicit flash
+start, and a completed write automatically restarts normal network operation.
+
+DRV-WAKE-001 is repository-complete. The authenticated journey screen requests
+the standard Screen Wake Lock when it becomes visible, exposes a compact
+localized toggle/retry state, reacquires after a visible-tab return and releases
+on page exit. Unsupported or policy-rejected browsers retain the complete
+journey UI. The behavior is isolated from the main dashboard and introduces no
+backend, firmware or native-app dependency. JavaScript syntax and 18 focused
+portal tests pass. Hosted iPhone Safari acceptance passed, including automatic
+release on a tab change; Android acceptance remains open. The selected vehicle
+ID now prefixes the adjacent vehicle-lock status so it cannot be confused with
+the screen-lock control.
+
+ACCESS-001 and REV27 are complete and field-accepted for electronically reported
+vehicle-access state. Display-CAN `0x601` now supplies a validity-gated central-lock report and
+door-open bit to local telemetry, MQTT and AWS. The main dashboard places it in
+a compact access row below the primary metrics; the journey view uses a small
+header chip. Unlocked standstill is amber, while plugged/charging deliberately
+shows an unconfirmed state because field testing demonstrated a stale lock byte
+during and after charging. Mechanical key operation is not presented as a
+confirmed lock transition. C6 N16 and both maintained LilyGO AWS builds pass;
+physical firmware, AWS state, dashboard presentation and live language switching
+are accepted. Replacement-free Change Set `webflash-rev27-20260916` activated
+the exact encrypted REV27 N16 artifact; the stack and Lambda are healthy,
+anonymous access remains `401`, and all three existing N16 grants now reference
+REV27 with unchanged expirations and successful audit records.
+
+The dashboard now separates adapter reachability from fresh vehicle telemetry in
+the Microlino/OBD2 indicator. A fresh `system/heartbeat` or `status/online`
+message without current CAN-backed display data is amber and labelled as an
+attached adapter; fresh SOC, speed or odometer data is green and labelled as
+sending data; a stale adapter heartbeat is red/offline. The same semantics apply
+to desktop and smartphone mirrors in German, English, French and Italian. Asset
+cache-busting, JavaScript syntax and 40 focused dashboard contracts pass; hosted
+upload and visual acceptance remain open.
+
 GPS-ALT-001 is complete and field-accepted at the firmware transport boundary;
 JNY-ALT-001 remains backend-deployed with its portal/journey acceptance separate.
 C6 N16/XIAO and the maintained LilyGO AWS targets publish raw
-`location/altitude_m`; the backend derives nullable net, ascent and descent with
+`location/altitude_m`. REV21's first indoor-drift gate proved insufficient when
+a receiver retained a five-satellite multipath fix. REV22's additional GNSS
+thresholds then suppressed all height on a road test despite CAN speeds up to
+38 km/h and a later 12-satellite fix. REV24 restored moving height, but a garage
+entry still stored 107.1 m 25 seconds before the first zero-speed sample. The
+REV25 repository candidate requires six satellites plus fresh Display-CAN motion,
+at least 10 m horizontal movement between accepted points and a bounded
+distance-relative height change. REV25's first test then exposed an unconditional
+cold-start anchor; REV26 keeps the first moving point provisional until a second
+point at least 10 m away passes the same check. Invalid, implausible or stationary
+height is omitted rather than accompanied by a validity topic; retained portal values are labelled as last rather than current after the
+freshness limit. The backend derives nullable net, ascent and descent with
 30-second sampling, 5 m hysteresis and an implausible-jump guard. Journey and
 daily emails render the values in all four languages only when evidence exists,
 and the journey page adds them as a compact secondary line below distance. All
@@ -30,13 +114,30 @@ and the journey page adds them as a compact secondary line below distance. All
 WROOM remains excluded because its current 4 MB AWS image is already 4,516 bytes
 over the existing OTA slot before this optional publisher. Physical C6 testing
 confirmed plausible altitude delivery through both AWS and secure local MQTT on
-2026-09-15. CloudFormation Change
+2026-09-15. REV26 subsequently passed the complete short-drive and stationary-
+garage acceptance on 2026-09-16 without replacing the valid moving height with
+indoor drift. CloudFormation Change
 Set `jny-alt-001-rule-20260915` changed only the existing NotificationRule without
 replacement; both affected Lambdas are `Active`/`Successful`. A bounded
 optimistic-lock retry correction found during rollout passed a clean live-log
 window, send-free invalid-topic probe and retained `401` API authorization.
 MOTbeta upload and the filtered outdoor out-and-back journey plausibility test
 remain open under JNY-ALT-001.
+
+REV21 is also active in the controlled WebFlash catalog for both N16 and XIAO.
+The reviewed `webflash-rev21-20260915` Change Set modified three existing
+resources without replacement; the stack is `UPDATE_COMPLETE`, the Lambda is
+`Active`/`Successful`, and both private versioned artifacts are AES256 encrypted.
+WebFlash access remains an explicit, exact-release user grant.
+
+CHG-MAIL-001 is repository-complete. Charging-summary emails are suppressed for
+minimal high-SOC top-ups that start at 98 percent or higher, or start above 96
+percent and add less than 2 SOC points. The underlying event remains recorded
+for daily summaries and dashboard charge accounting and carries an explicit
+`MINIMAL_TOP_UP` audit reason. Missing or contradictory SOC does not suppress a
+message. All 127 Notification tests pass. The isolated Notification-Lambda
+deployment is `Active`/`Successful` and its send-free rejection probe passed;
+natural plugged-in field acceptance remains open.
 
 VEH-TRIP-001 is repository-complete. The existing Vehicle-card `Trip`,
 `Verbrauch` and `Fahrzeit` fields now share one period since the latest qualified
@@ -206,8 +307,8 @@ returns `200`. The maintainer accepted the portal and AWS backend on 2026-09-09.
 Subsequent diverse WebFlash and password-recovery grant/revoke tests also passed,
 providing final productive acceptance.
 
-MQTT-001 has started with a first repository-build-qualified C6 secure local MQTT
-slice. It is default-off and uses verified TLS with a user-supplied trust anchor,
+MQTT-001 is complete for the accepted C6/ioBroker private-pilot scope. It is
+default-off and uses verified TLS with a user-supplied trust anchor,
 dedicated username/password or checked mTLS credentials, a publish-only canonical
 vehicle namespace and retained online/freshness state. Credentials remain separate
 from AWS IoT and absent from backup/diagnostics. Location requires an independent
@@ -221,11 +322,13 @@ TLS with a locally issued trust anchor plus dedicated username/password; vehicle
 telemetry arrived in ioBroker. This closes basic broker connectivity and consumer
 receipt. The maintainer subsequently completed the planned adapter restart,
 broker stop/start, online/retained/freshness inspection and wrong-credential/trust
-negative checks; automatic reconnect also succeeded. Exact namespace denial,
-mTLS, location-consent cleanup, certificate rotation, configuration-preserving
-OTA, extended outage isolation and the 12-hour N16 soak remain open.
-Home Assistant remains a schema-compatibility target, and LilyGO plus
-mobile-network work is parked pending the hardware decision.
+negative checks; automatic reconnect also succeeded. On 2026-09-16 the
+maintainer accepted the private Grafana layouts backed directly by ioBroker
+MySQL history, including signed energy flow, altitude and an interactive route.
+Exact namespace denial, mTLS, location-consent cleanup, certificate rotation,
+configuration-preserving OTA, extended outage isolation, Home Assistant mapping
+and the 12-hour N16 soak are explicitly deferred rather than claimed complete.
+LilyGO plus mobile-network work remains parked pending the hardware decision.
 
 ADP-INF-001 adds a read-only `MOT Adapter Informationen` block at the end of the
 authenticated Settings page. It reads DeviceId, Board, firmware version,
@@ -710,6 +813,15 @@ allowlists include `ml-pilot-030`, and the device policy already contains the ex
 Backfill-ACK subscribe/receive path. The adapter-side cache remains a separate
 local setting. No notification preference or verified SMS destination existed at
 the time of this server-side enablement, so email/SMS remain user-completed steps.
+The confirmed pilot account for B028 now owns active vehicle `ml-pilot-028` after
+successful claim consumption. Reviewed replacement-free Change Set
+`services-ml-pilot-028-20260915` added only that vehicle to operational History
+and offline cache Backfill; the two existing Lambda functions and their derived
+IoT rules were modified in place, stack `mot-aws-3-1` returned to
+`UPDATE_COMPLETE`, and both Lambdas read back `Active`/`Successful` with the
+effective allowlists containing `ml-pilot-028`. No notification preference or
+SMS destination record existed at activation time. Adapter-side cache collection
+and notification destination configuration therefore remain user-completed steps.
 The active `ml-pilot-026` owner assignment is likewise enabled for operational
 History and offline cache Backfill. Reviewed replacement-free Change Set
 `services-ml-pilot-026-20260905` changed only the same two Lambda functions and
