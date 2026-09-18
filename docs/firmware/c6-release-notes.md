@@ -1,8 +1,34 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV29-AWS`
+> **Current repository release:** `C6-001-REV31-AWS`
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV31-AWS` — repository candidate
+
+REV31 adds local altitude-filter diagnostics without publishing rejected data.
+Runtime Diagnostics and serial output now show raw GNSS height/validity, the
+current acceptance decision and reason, filter state, rejection count and last
+accepted moving height. MQTT/AWS qualification remains unchanged. The exact N16
+WebFlash application is 1,484,336 bytes with SHA-256
+`3df6a9148bde70a7d1088e4fe44d3e35b501042319b95b44edd9d7585ad4a77a`.
+S3 read-back reproduced that hash and confirmed AES256 encryption on object
+version `u0YCc22.0cFUJZqxtVrpxPMRWPQHK0z8`. Reviewed Change Set
+`webflash-rev31-20260918` updated only the existing Lambda, integration and IAM
+role with `Replacement: False`; the stack is `UPDATE_COMPLETE` and Lambda is
+`Active`/`Successful`. The four still-active N16 grants were atomically updated
+to the exact REV31 identity with four audit events; the separately revoked grant
+remains untouched. Anonymous firmware access returns HTTP 401. Local OTA and
+diagnostic-field acceptance passed; physical WebFlash installation remains open.
+
+### `C6-001-REV30-AWS` — repository candidate
+
+REV30 discards Display-CAN `0x604 data[4] bit 4` as a plugged-state source on
+every board. An unplugged B.031 live test reported the bit as set, disproving the
+former interpretation. Standard-CAN V1/V2 remain the only authoritative plugged
+sources. C6 drive diagnostics retain the raw bit solely as a clearly labelled
+discarded candidate. C6 N16, XIAO and LilyGO A7670 AWS builds pass; physical
+installation and release publication remain open.
 
 ### `C6-001-REV29-AWS`
 

@@ -75,6 +75,26 @@ class BmsTelemetryContractTests(unittest.TestCase):
         lilygo = configurations[0].read_text()
         self.assertIn("suppressedDisplayCharging", lilygo)
 
+    def test_display_can_604_plugged_candidate_is_discarded(self) -> None:
+        source = (ROOT / "firmware/common/decoders/decoder_display_can.cpp").read_text()
+        case = source.split("case 0x604:", 1)[1].split("default:", 1)[0]
+        self.assertIn("break;", case)
+        self.assertNotIn("telemetry.charging.plugged", case)
+        self.assertNotIn("decode604", source)
+
+        publishers = (
+            ROOT / "firmware/esp32-wroom/src/mqtt/mqtt_client.cpp",
+            ROOT / "firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp",
+            ROOT / "firmware/esp32-c6/src/c6_aws.cpp",
+            ROOT / "firmware/esp32-c6/src/c6_local_mqtt.cpp",
+        )
+        for path in publishers:
+            with self.subTest(path=path):
+                self.assertNotIn(
+                    '"charging/plugged", telemetry.charging.plugged',
+                    path.read_text(),
+                )
+
     def test_all_device_publishers_use_the_same_bms_topics(self) -> None:
         publishers = (
             ROOT / "firmware/esp32-wroom/src/mqtt/mqtt_client.cpp",

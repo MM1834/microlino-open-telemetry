@@ -82,3 +82,8 @@ bool c6GpsAltitudeValid() { return gps.altitudeValid(); }
 bool c6GpsAltitudePublishable(bool moving) { return gps.altitudePublishable(moving); }
 double c6GpsAltitudeMeters() { return gps.altitudeMeters(); }
 uint32_t c6GpsSatellites() { return gps.satellites(); }
+String c6GpsStatusJson(bool moving)
+{
+    gps.altitudePublishable(moving);
+    return gps.statusJson();
+}

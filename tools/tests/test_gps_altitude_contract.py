@@ -70,6 +70,21 @@ class GpsAltitudeContractTests(unittest.TestCase):
         self.assertIn("altitudeProvisionalMeters_ = altitude", implementation)
         self.assertIn("altitudeFilterProvisional", implementation)
 
+    def test_runtime_diagnostics_separate_raw_and_accepted_altitude(self):
+        implementation = self.source("firmware/shared-libs/MotGps/src/MotGps.cpp")
+        web = self.source("firmware/esp32-c6/src/c6_web.cpp")
+        console = self.source("firmware/esp32-c6/src/main.cpp")
+        for field in (
+            "rawAltitudeValid",
+            "rawAltitudeMeters",
+            "altitudeAccepted",
+            "altitudeDecision",
+            "lastAcceptedAltitudeMeters",
+        ):
+            self.assertIn(field, implementation)
+        self.assertIn("c6GpsStatusJson(gpsMoving)", web)
+        self.assertIn("GPS altitude:", console)
+
 
 if __name__ == "__main__":
     unittest.main()

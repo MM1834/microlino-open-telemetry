@@ -51,7 +51,7 @@ Only standard frames with DLC at least 8 are decoded.
 |---:|---|
 | `0x602` | SOC, speed, odometer and derived estimated range |
 | `0x603` | charging power, signed power and derived charging state |
-| `0x604` | plugged state |
+| `0x604` | no production telemetry; former plugged candidate is disproven and discarded |
 
 Scaling and the charging threshold are present in code but must not be generalized
 to other Microlino models without verified traces.
@@ -79,12 +79,13 @@ value, not by itself proof of active charging. The current threshold-derived
 behaviour and must be replaced or confirmed using controlled traces and an
 independent plugged/charging signal.
 
-Display-CAN `0x603`/`0x604` may provide compatibility charging power/state and
-`charging.plugged` only on a display-only installation. If either configured
-input uses Standard-CAN V1 Pioneer or V2, the dual-CAN input layer suppresses
-both frames for charging telemetry. Standard-CAN then exclusively supplies the
-canonical plug, charge and compatibility-power values; CAN input processing
-order and stale Display-CAN fallback cannot overwrite them.
+Display-CAN `0x603` may provide provisional compatibility charging power/state
+only on a display-only installation. Display-CAN `0x604 data[4] bit 4` is a
+disproven plugged candidate: an unplugged vehicle can report it as set. The
+production decoder therefore discards `0x604` and never maps it to
+`charging.plugged`. If either configured input uses Standard-CAN V1 Pioneer or
+V2, the dual-CAN input layer additionally suppresses `0x603`; Standard-CAN then
+exclusively supplies canonical plug, charge and compatibility-power values.
 
 ## Standard-CAN profiles
 

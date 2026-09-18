@@ -91,6 +91,9 @@ bool MotGps::begin(const MotGpsConfig& config)
     altitudeProvisionalValid_ = false;
     altitudeCandidateValid_ = false;
     altitudeRejectedSamples_ = 0;
+    altitudeDecision_ = "not_evaluated";
+    altitudeLastAcceptedValid_ = false;
+    altitudeLastAcceptedMeters_ = NAN;
 
     if (config_.rxPin < 0) {
         status_.message = "GNSS RX pin is not configured";
@@ -279,12 +282,49 @@ bool MotGps::altitudeValid()
 bool MotGps::altitudePublishable(bool moving)
 {
     refreshStatus();
-    if (!moving || !status_.altitudeValid) return false;
+    if (!moving) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "waiting_for_motion";
+        return false;
+    }
+    if (!gps_.altitude.isValid()) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "raw_altitude_invalid";
+        return false;
+    }
+    if (!status_.valid) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "position_invalid_or_stale";
+        return false;
+    }
+    if (status_.altitudeAgeMs > config_.validFixMaxAgeMs) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "altitude_stale";
+        return false;
+    }
+    if (status_.satellites < config_.minAltitudeSatellites) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "insufficient_satellites";
+        return false;
+    }
+    if (isnan(status_.hdop) || status_.hdop > config_.maxAltitudeHdop) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "hdop_too_high";
+        return false;
+    }
+    if (!status_.altitudeValid) {
+        altitudeCandidateAccepted_ = false;
+        altitudeDecision_ = "quality_gate_failed";
+        return false;
+    }
 
     const double latitude = gps_.location.lat();
     const double longitude = gps_.location.lng();
     const double altitude = gps_.altitude.meters();
-    if (!isfinite(latitude) || !isfinite(longitude) || !isfinite(altitude)) return false;
+    if (!isfinite(latitude) || !isfinite(longitude) || !isfinite(altitude)) {
+        altitudeDecision_ = "non_finite_value";
+        return false;
+    }
 
     if (altitudeCandidateValid_ &&
         fabs(latitude - altitudeCandidateLatitude_) < 0.0000001 &&
@@ -305,6 +345,7 @@ bool MotGps::altitudePublishable(bool moving)
             altitudeProvisionalLatitude_ = latitude;
             altitudeProvisionalLongitude_ = longitude;
             altitudeProvisionalMeters_ = altitude;
+            altitudeDecision_ = "waiting_for_second_moving_point";
             return false;
         }
 
@@ -312,6 +353,7 @@ bool MotGps::altitudePublishable(bool moving)
             altitudeProvisionalLatitude_, altitudeProvisionalLongitude_, latitude, longitude);
         if (!isfinite(provisionalDistance) ||
             provisionalDistance < ALTITUDE_MIN_HORIZONTAL_DISTANCE_M) {
+            altitudeDecision_ = "waiting_for_minimum_distance";
             return false;
         }
 
@@ -325,6 +367,7 @@ bool MotGps::altitudePublishable(bool moving)
             altitudeProvisionalLatitude_ = latitude;
             altitudeProvisionalLongitude_ = longitude;
             altitudeProvisionalMeters_ = altitude;
+            altitudeDecision_ = "implausible_provisional_delta";
             return false;
         }
 
@@ -334,6 +377,9 @@ bool MotGps::altitudePublishable(bool moving)
         altitudeAnchorMeters_ = altitude;
         altitudeProvisionalValid_ = false;
         altitudeCandidateAccepted_ = true;
+        altitudeLastAcceptedValid_ = true;
+        altitudeLastAcceptedMeters_ = altitude;
+        altitudeDecision_ = "accepted";
         return true;
     }
 
@@ -341,6 +387,7 @@ bool MotGps::altitudePublishable(bool moving)
         altitudeAnchorLatitude_, altitudeAnchorLongitude_, latitude, longitude);
     if (!isfinite(horizontalDistance) ||
         horizontalDistance < ALTITUDE_MIN_HORIZONTAL_DISTANCE_M) {
+        altitudeDecision_ = "waiting_for_minimum_distance";
         return false;
     }
 
@@ -348,6 +395,7 @@ bool MotGps::altitudePublishable(bool moving)
         ALTITUDE_BASE_TOLERANCE_M + ALTITUDE_MAX_GRADE * horizontalDistance;
     if (fabs(altitude - altitudeAnchorMeters_) > allowedAltitudeDelta) {
         altitudeRejectedSamples_++;
+        altitudeDecision_ = "implausible_altitude_delta";
         return false;
     }
 
@@ -355,7 +403,15 @@ bool MotGps::altitudePublishable(bool moving)
     altitudeAnchorLongitude_ = longitude;
     altitudeAnchorMeters_ = altitude;
     altitudeCandidateAccepted_ = true;
+    altitudeLastAcceptedValid_ = true;
+    altitudeLastAcceptedMeters_ = altitude;
+    altitudeDecision_ = "accepted";
     return true;
+}
+
+const char* MotGps::altitudeDecision()
+{
+    return altitudeDecision_.c_str();
 }
 
 double MotGps::altitudeMeters()
@@ -436,6 +492,8 @@ String MotGps::statusJson()
     doc["altitudeFilterAnchored"] = altitudeAnchorValid_;
     doc["altitudeFilterProvisional"] = altitudeProvisionalValid_;
     doc["altitudeRejectedSamples"] = altitudeRejectedSamples_;
+    doc["altitudeAccepted"] = altitudeCandidateAccepted_;
+    doc["altitudeDecision"] = altitudeDecision_;
     doc["message"] = status_.message;
 
     if (isnan(status_.hdop)) {
@@ -458,10 +516,22 @@ String MotGps::statusJson()
         doc["speedKmph"] = nullptr;
     }
 
+    const bool rawAltitudeValid = gps_.altitude.isValid() && isfinite(gps_.altitude.meters());
+    doc["rawAltitudeValid"] = rawAltitudeValid;
+    if (rawAltitudeValid) {
+        doc["rawAltitudeMeters"] = gps_.altitude.meters();
+    } else {
+        doc["rawAltitudeMeters"] = nullptr;
+    }
     if (status_.altitudeValid) {
         doc["altitudeMeters"] = gps_.altitude.meters();
     } else {
         doc["altitudeMeters"] = nullptr;
+    }
+    if (altitudeLastAcceptedValid_) {
+        doc["lastAcceptedAltitudeMeters"] = altitudeLastAcceptedMeters_;
+    } else {
+        doc["lastAcceptedAltitudeMeters"] = nullptr;
     }
 
     char utc[32];

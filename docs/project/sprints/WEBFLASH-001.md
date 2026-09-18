@@ -315,6 +315,21 @@ Maya Eisele, Christian Reding and Elisabeth Hascouet received audited 48-hour
 REV29 grants. The older independently revoked N16 grant remains revoked and
 anonymous firmware access remains HTTP 401.
 
+### REV31 altitude-diagnostics release
+
+On 2026-09-18 the N16 catalog advanced to `C6-001-REV31-AWS`. The exact
+1,484,336-byte application has SHA-256
+`3df6a9148bde70a7d1088e4fe44d3e35b501042319b95b44edd9d7585ad4a77a`.
+S3 read-back matched the source artifact and reported AES256 plus version ID
+`u0YCc22.0cFUJZqxtVrpxPMRWPQHK0z8`. Change Set
+`webflash-rev31-20260918` modified the existing Onboarding Lambda, API
+integration and IAM role with `Replacement: False`; effective Lambda environment
+read-back matches REV31 and the stack is `UPDATE_COMPLETE`. Exactly four
+still-active REV29 N16 grants were atomically updated to REV31 while retaining
+their prior expiry, with one audit event per grant. The independent revoked grant
+remains REV27/REVOKED. Anonymous firmware access still returns HTTP 401. Local
+OTA validation passed; a physical WebFlash REV31 installation remains open.
+
 ### Deferred bootloader entry
 
 A subsequent production run showed that the former **connect and check** action

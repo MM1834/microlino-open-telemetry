@@ -71,6 +71,7 @@ public:
 
     const MotGpsStatus& status();
     String statusJson();
+    const char* altitudeDecision();
 
 private:
     HardwareSerial* serial_ = nullptr;
@@ -92,6 +93,9 @@ private:
     double altitudeCandidateMeters_ = NAN;
     bool altitudeCandidateAccepted_ = false;
     uint32_t altitudeRejectedSamples_ = 0;
+    String altitudeDecision_ = "not_evaluated";
+    bool altitudeLastAcceptedValid_ = false;
+    double altitudeLastAcceptedMeters_ = NAN;
 
     void refreshStatus();
     void updateSystemTime();

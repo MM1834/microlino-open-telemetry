@@ -37,11 +37,6 @@ static void decode603(const uint8_t *b)
     telemetry.charging.isCharging = b[4] >= CHARGING_POWER_THRESHOLD;
 }
 
-static void decode604(const uint8_t *b)
-{
-    telemetry.charging.plugged = b[4] & 0x10;
-}
-
 void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
 {
     if (frame.extended || frame.dlc < 8) {
@@ -51,7 +46,11 @@ void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
     switch (frame.id) {
         case 0x602: decode602(frame.data); break;
         case 0x603: decode603(frame.data); break;
-        case 0x604: decode604(frame.data); break;
+        // 0x604 data[4] bit 4 was previously treated as a plugged flag.
+        // Controlled unplugged testing disproved that interpretation. Keep the
+        // frame out of canonical telemetry; raw capture remains available in
+        // the C6 drive diagnostic only.
+        case 0x604: break;
         default: break;
     }
 }

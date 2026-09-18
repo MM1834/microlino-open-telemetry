@@ -273,7 +273,7 @@ void c6DriveCaptureDump()
         Serial.println("DRIVE 0x603 not seen");
     }
     if (capture.display604Seen) {
-        Serial.printf("DRIVE 0x604 pluggedFirst=%s pluggedLast=%s\n",
+        Serial.printf("DRIVE 0x604 discardedBit4First=%s discardedBit4Last=%s (invalid plugged candidate)\n",
                       capture.displayPluggedFirst ? "yes" : "no",
                       capture.displayPluggedLast ? "yes" : "no");
     } else {

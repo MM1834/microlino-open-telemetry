@@ -259,7 +259,6 @@ void publishTelemetry()
                    static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f)));
     } else if (telemetry.charging.valid) {
         publishBool("charging/is_charging", telemetryIsCharging());
-        publishBool("charging/plugged", telemetry.charging.plugged);
         publishInt("charging/power_display", telemetry.charging.powerDisplay);
         publishInt("charging/power_signed", telemetry.charging.powerSigned);
     }

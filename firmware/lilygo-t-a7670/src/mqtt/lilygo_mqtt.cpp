@@ -221,10 +221,8 @@ void publishLilygoTelemetry()
             ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f
             : telemetry.charging.isCharging
     );
-    awsClient.publishBool(
-        "charging/plugged",
-        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged
-    );
+    if (freshBmsStatus)
+        awsClient.publishBool("charging/plugged", telemetry.bms.plugged);
     awsClient.publishInt(
         "charging/power_display",
         telemetry.charging.powerDisplay
@@ -667,10 +665,8 @@ void publishLilygoTelemetry()
             ? telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f
             : telemetry.charging.isCharging
     );
-    publishLegacyBool(
-        "charging/plugged",
-        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged
-    );
+    if (freshBmsStatus)
+        publishLegacyBool("charging/plugged", telemetry.bms.plugged);
     publishLegacyInt(
         "charging/power_display",
         telemetry.charging.powerDisplay

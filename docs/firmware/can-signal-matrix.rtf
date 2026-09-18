@@ -42,7 +42,7 @@ mode. CAN1 was connected to Standard CAN and CAN2 to Display CAN.\
 | HV pack voltage | Not currently decoded | `0x18D data[3..4]`, unsigned little-endian mV | External source: same mapping; large-battery frame decodes to impossible 792 mV | Confirmed only on Pioneer. The supplied mapping is unusable on the tested large-battery vehicle. |\
 | Battery current | Not currently decoded | `0x18D data[1..2]`, signed little-endian; `raw x 0.3 A` | `0x2BA data[0..1]`, signed big-endian; raw / 10 A | V1 scale/sign confirmed for charge, traction and regeneration. V2 scale and charge direction confirmed at 6 A and 8 A; traction/regeneration validation remains open. |\
 | DC charging power | Dashboard power byte is unscaled and bidirectional | Derived as pack voltage \'d7 battery current | Derived from `0x1B0` voltage and `0x2BA` current | V2 produced approximately 1.18-1.30 kW DC at 1.34 kW AC and 1.36-1.53 kW DC at 1.55 kW AC; conversion loss and vehicle load explain the difference. |\
-| Plugged | Existing candidate `0x604 data[4] & 0x10` | `0x18D data[6]`: stable `0x10` unplugged and `0x20` plugged | `0x60D data[1] & 0x08`; corroborated by `0x610 data[0]`: `0x01` unplugged, `0x05` plugged-idle, `0x02` charging | V1 and V2 Standard-CAN states confirmed by repeated powered and unpowered plug transitions. Display-CAN is ignored when either Standard-CAN profile is active. |\
+| Plugged | No valid signal; former `0x604 data[4] & 0x10` candidate is disproven and discarded | `0x18D data[6]`: stable `0x10` unplugged and `0x20` plugged | `0x60D data[1] & 0x08`; corroborated by `0x610 data[0]`: `0x01` unplugged, `0x05` plugged-idle, `0x02` charging | V1 and V2 Standard-CAN states confirmed by repeated powered and unpowered plug transitions. Display-CAN must not supply plugged state. |\
 | Active charging | Current `0x603` power-threshold inference is not reliable | Positive signed `0x18D data[1..2]`; idle offset about -3/-4 | `0x610 data[0] == 0x02`; `0x05` is plugged-idle and `0x01` unplugged | V2 confirmed across unplugged, plugged-idle, active 6 A/8 A charging, charge stop and unplug. |\
 | Cell values A/B | Not decoded | `0x4AD data[0..1]` and `[2..3]`, unsigned little-endian mV | External source: same mapping; `0x4AD` absent on tested large-battery vehicle | Plausible on Pioneer. External vehicle assignment is unresolved and the mapping is unusable on the tested vehicle. |\
 | Cell min/max/delta | Not decoded | Derived from the two `0x4AD` values | External source: same derivation; unavailable without `0x4AD` on large-battery vehicle | Plausible only for the observed Pioneer payload. |\
@@ -198,7 +198,7 @@ CAN current/plug signals or another independently verified source.\
 \
 | Firmware position | Mask | Meaning | Status |\
 |---|---:|---|---|\
-| `data[4]` | `0x10` | plugged candidate | Implemented, but not yet directly compared with the controlled plug sequence |\
+| `data[4]` | `0x10` | former plugged candidate | Disproven by an unplugged live vehicle reporting the bit; discarded and never published |\
 \
 ## Decoder policy\
 \
@@ -213,7 +213,7 @@ CAN current/plug signals or another independently verified source.\
 ## Remaining validation\
 \
 - Stationary/drive comparison of `0x37F` to test the pedal hypothesis.\
-- Direct Display-CAN `0x604` plug-state comparison.\
+- Preserve `0x604 data[4] bit 4` only as raw diagnostic evidence; do not reinterpret it as plugged without new controlled evidence.\
 - Compare `0x2BA` during traction and regeneration; its charging direction and\
   the separate large-battery plug/charge states are now confirmed.\
 - Identify the exact vehicle, battery and BMS generation behind the externally\

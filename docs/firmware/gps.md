@@ -87,6 +87,15 @@ The WROOM parser exposes altitude internally, but its current 4 MB AWS applicati
 already exceeds its OTA slot and therefore does not take this optional publisher
 until a separate size-reduction decision is made.
 
+REV31 makes the filter state observable without weakening it. C6 Runtime
+Diagnostics and the periodic serial output distinguish the receiver's raw
+altitude and validity from the current acceptance decision, its reason and the
+last accepted moving altitude. Typical reasons include `waiting_for_motion`,
+`insufficient_satellites`, `hdop_too_high`,
+`waiting_for_second_moving_point`, `waiting_for_minimum_distance` and
+`implausible_altitude_delta`. Raw or rejected values remain local diagnostics;
+only accepted values reach MQTT/AWS.
+
 The bounded C6 offline cache does not contain coordinates, altitude or other GPS
 values. It stores only moving Speed samples (at most once per minute plus the
 following zero) and SOC samples while moving or charging (at most once per five

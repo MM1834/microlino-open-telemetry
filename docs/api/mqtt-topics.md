@@ -24,7 +24,7 @@ provide `vehicleId` and `topicPrefix`, also defaulting to `mot`.
 | `display/odometer_km` | number | Yes | Yes | km |
 | `display/estimated_range_km` | integer | Yes | Yes | derived from SOC/current fixed full range |
 | `charging/is_charging` | boolean-like | Yes | Yes | derived threshold; calibration noted in code |
-| `charging/plugged` | boolean-like | Yes | Yes | Display-CAN flag |
+| `charging/plugged` | boolean-like | Yes | Yes | Published only with valid Standard-CAN status; omitted for Display-only input and never sourced from discarded `0x604` |
 | `charging/power_display` | integer | Yes | Yes | raw/display value |
 | `charging/power_signed` | integer (0.1 kW) | Yes | Yes | vehicle convention: consumption positive, charge/regen negative; Display-only fallback remains decoder-derived |
 

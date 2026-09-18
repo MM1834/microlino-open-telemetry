@@ -385,6 +385,10 @@ void loop()
                       c6GpsDetected() ? "yes" : "no",
                       c6GpsValid() ? "yes" : "no",
                       c6GpsMessage().c_str());
+        const bool gpsMoving = telemetry.display.valid &&
+            millis() - telemetry.display.lastUpdateMs <= 5000 &&
+            telemetry.display.speedKmh > 1.0f;
+        Serial.printf("GPS altitude: %s\n", c6GpsStatusJson(gpsMoving).c_str());
         Serial.printf("WiFi=%s | AWS=%s | Local MQTT=%s\n", c6NetworkStatus().c_str(), c6AwsStatus().c_str(), c6LocalMqttStatusJson().c_str());
 
         const uint32_t packAgeMs = millis() - telemetry.bms.packStatusLastUpdateMs;

@@ -146,8 +146,8 @@ void publishTelemetry()
     );
 
     awsClient.publishBool("charging/is_charging", telemetryIsCharging());
-    awsClient.publishBool("charging/plugged",
-        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged);
+    if (freshBmsStatus)
+        awsClient.publishBool("charging/plugged", telemetry.bms.plugged);
     awsClient.publishInt(
         "charging/power_display",
         telemetry.charging.powerDisplay
@@ -264,8 +264,8 @@ void publishTelemetry()
         telemetry.display.estimatedRangeKm
     );
     publishBool("charging/is_charging", telemetryIsCharging());
-    publishBool("charging/plugged",
-        freshBmsStatus ? telemetry.bms.plugged : telemetry.charging.plugged);
+    if (freshBmsStatus)
+        publishBool("charging/plugged", telemetry.bms.plugged);
     publishInt(
         "charging/power_display",
         telemetry.charging.powerDisplay

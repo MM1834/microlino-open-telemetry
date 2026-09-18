@@ -70,7 +70,6 @@ bool publishTelemetry()
                           static_cast<int>(lroundf(telemetry.bms.vehiclePowerW / 100.0f)));
     } else if (telemetry.charging.valid) {
         published |= client.publishBool("charging/is_charging", telemetryIsCharging());
-        published |= client.publishBool("charging/plugged", telemetry.charging.plugged);
         published |= client.publishInt("charging/power_signed", telemetry.charging.powerSigned);
     }
     if (telemetry.bms.packStatusValid) {

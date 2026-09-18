@@ -10,6 +10,27 @@
 
 **Last reviewed:** 2026-09-17
 
+REV31 is a repository candidate adding local altitude-filter observability. C6
+Runtime Diagnostics and periodic serial output now separate raw GNSS altitude
+from accepted altitude, report the decision/rejection reason and retain the last
+accepted value. The existing movement, satellite, HDOP, distance and plausibility
+gates remain unchanged; rejected values are never sent to MQTT/AWS. Local OTA
+acceptance passed. The exact encrypted N16 artifact is active in the controlled
+WebFlash catalog through replacement-free Change Set
+`webflash-rev31-20260918`; stack/Lambda health, artifact read-back, four audited
+active-grant migrations, unchanged revoked grant and anonymous HTTP 401 all pass.
+Physical WebFlash installation remains open.
+
+REV30 explicitly rejects Display-CAN `0x604 data[4] bit 4` as a plugged-state
+source. A live unplugged Pioneer reported the bit as set during the B.031 dual-CAN
+acceptance test. The shared production decoder discards the frame instead of
+updating `charging.plugged`; Standard-CAN V1/V2 remain the only authoritative
+plug-state sources. The C6 raw drive capture labels the bit as a discarded,
+invalid candidate so diagnostics cannot be mistaken for telemetry semantics.
+C6 N16, XIAO and LilyGO A7670 AWS builds pass. The legacy 4 MB WROOM AWS target
+remains 5,900 bytes above its existing OTA slot; this change removes decoder code
+and does not cause that pre-existing capacity failure.
+
 ## Purpose
 
 This document records the current repository state. A capability is only called

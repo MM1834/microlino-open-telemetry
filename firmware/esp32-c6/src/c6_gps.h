@@ -17,3 +17,4 @@ bool c6GpsAltitudeValid();
 bool c6GpsAltitudePublishable(bool moving);
 double c6GpsAltitudeMeters();
 uint32_t c6GpsSatellites();
+String c6GpsStatusJson(bool moving);
