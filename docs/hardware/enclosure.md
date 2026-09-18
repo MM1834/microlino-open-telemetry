@@ -13,6 +13,12 @@ The final hardware should be installed in an enclosure that protects the electro
 - Provide strain relief for OBD/CAN wiring.
 - Keep USB accessible for recovery flashing.
 - Keep LTE and GPS antennas away from shielding.
+- For DA37+DA10 and any similar receiver with a u.FL connector immediately beside
+  an exposed backup battery, provide a physical separator and a defined,
+  strain-relieved cable route. The cable-side u.FL shield must not be able to
+  touch either the top or side edge of the battery in any installed position.
+  Pilot builds require Kapton/polyimide insulation over the exposed battery edge
+  plus heat-shrink insulation on the cable-side connector transition.
 - Mount a ceramic GNSS patch horizontally with its free patch/ceramic face toward
   the sky and its ground-plane/PCB/cable or intended adhesive face toward the
   mounting surface. Do not infer the active face from colour alone; confirm every

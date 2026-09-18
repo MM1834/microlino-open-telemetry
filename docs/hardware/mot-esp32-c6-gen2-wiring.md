@@ -72,6 +72,44 @@ DA37+DA10 ist das bevorzugte C6-Pilot-GPS. Die getrennte Antenne kann außerhalb
 des Gehäuses mit geeigneter Himmelsicht platziert werden, während Empfänger und
 Backup-Batterie geschützt im Gehäuse bleiben. PPS wird von MOT nicht benötigt.
 
+### Sicherheitsauflage für DA37+DA10-Antennenanschluss
+
+Bei der eingesetzten DA37+DA10-Breakout-Ausführung wurde ein reproduzierbares
+mechanisches Kurzschlussrisiko festgestellt: Der kabelseitige Metallschirm des
+u.FL-Steckers ist im Übergang zum Koaxialkabel nicht vollständig isoliert. Wird
+das Kabel im engen Gehäuse zur Zugentlastung gedreht, kann dieser Schirm die
+Metallkante der unmittelbar benachbarten Backup-Batterie berühren. Das führte
+bei Pilotaufbauten zu starker Erwärmung des GNSS-Moduls. Dies ist ein
+Hardware-/Montagefehler und kann nicht durch Firmware erkannt oder behoben
+werden.
+
+Für alle Adapter mit dieser Modulausführung gilt deshalb verbindlich:
+
+- Batterieoberseite **und die zum u.FL-Anschluss gerichtete Metallkante** mit
+  mindestens zwei sauber anliegenden Lagen elektrisch isolierendem
+  Polyimid-/Kaptonband abdecken;
+- den freiliegenden metallischen Kabelabgang des u.FL-Steckers zusätzlich mit
+  dünnem Schrumpfschlauch isolieren, ohne den Steckmechanismus zu behindern;
+- das Koaxialkabel spannungsfrei und mit Zugentlastung fixieren, sodass sich der
+  Stecker weder zur Batterie drehen noch von der Buchse abheben kann;
+- bei ausgeschaltetem Adapter durch Sichtprüfung und vorsichtige Bewegung des
+  Kabels sicherstellen, dass in keiner zulässigen Lage Metallkontakt möglich ist;
+- den fertigen, geschlossenen Aufbau mindestens 30 Minuten betreiben und auf
+  ungewöhnliche Erwärmung kontrollieren.
+
+Ein bereits stark erhitztes GNSS-Modul oder eine thermisch belastete
+Backup-Batterie wird nicht in einem Pilotgerät weiterverwendet. Kaptonband allein
+auf der Batterieoberseite genügt nicht, weil der kritische Kontakt an der
+seitlichen Metallkante entstehen kann. Schrumpfschlauch allein ersetzt keine
+Zugentlastung.
+
+Diese Sicherheitsauflage muss in jede zukünftige MOT-Verkabelungsanleitung und
+jedes Wiring-Diagramm übernommen werden, solange das verwendete GNSS-Modul eine
+ungeschützte Backup-Batterie neben dem u.FL-Anschluss besitzt. Eine spätere
+Hardware-Revision soll stattdessen konstruktiven Abstand, eine definierte
+Kabelabgangsrichtung und Berührungsschutz vorsehen oder ein anderes GNSS-Modul
+verwenden.
+
 ### GNSS-Antenne ausrichten
 
 Keramische GNSS-Patchantennen sind gerichtet. Im normalen Fahrzeugeinbau liegt
@@ -147,12 +185,16 @@ automotive-tauglich.
 Alle Prüfungen zunächst ohne Verbindung zu CAN1, CAN2 oder Fahrzeug-12-V:
 
 1. Sichtprüfung auf Lötbrücken, lose Litzen, falsche Polarität und fehlende
-   Zugentlastung durchführen.
+   Zugentlastung durchführen. Beim DA37+DA10 zusätzlich die Isolation zwischen
+   u.FL-Kabelabgang und Oberseite/Seitenkante der Backup-Batterie in allen
+   möglichen Kabellagen prüfen.
 2. Im spannungslosen Adapter zwischen 3V3 und GND auf Kurzschluss prüfen. Ein
    kurzer Ladeeffekt der Kondensatoren ist möglich; ein dauerhaft annähernd
    null Ohm messender Pfad ist nicht zulässig.
 3. Den Adapter nur über USB einschalten. Prüfen, dass N16, beide CAN-Module und
-   optional GPS versorgt werden und nichts ungewöhnlich warm wird.
+   optional GPS versorgt werden und nichts ungewöhnlich warm wird. Einen
+   DA37+DA10-Aufbau nach geschlossenem Gehäuse mindestens 30 Minuten beobachten;
+   bei Erwärmung sofort spannungslos machen.
 4. 3V3 gegen GND messen. Erwartet werden ungefähr 3,3 V; bei deutlich
    abweichendem Wert sofort trennen.
 5. Fahrzeug vollständig ausschalten. Jeden vorgesehenen CAN-Bus getrennt

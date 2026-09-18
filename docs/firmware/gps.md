@@ -19,6 +19,12 @@ are published only with a valid location fix.
 DA37+DA10 is the preferred optional receiver for new C6 pilot assemblies. It uses
 the existing 3.3 V, 9600-baud NMEA UART contract and requires no firmware variant.
 Its separate antenna improves enclosure placement; PPS remains unconnected.
+The currently used breakout is only conditionally suitable: its exposed
+cable-side u.FL shield can contact the adjacent backup-battery edge and cause
+severe module heating. The mandatory insulation, strain relief and thermal test
+are hardware requirements in the
+[C6 Gen.2 assembly guide](../hardware/mot-esp32-c6-gen2-wiring.md); firmware cannot
+detect or mitigate this short circuit.
 
 The nanoESP32-C6-N16 UART wiring was physically checked on 2026-08-06: receiver
 TX to GPIO20 and receiver RX to GPIO21 produced continuously increasing UART-byte

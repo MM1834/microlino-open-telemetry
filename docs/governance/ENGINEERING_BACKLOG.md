@@ -549,6 +549,18 @@ in the intended enclosure and vehicle location. Mark the enclosure drawing with
 `GNSS SKY SIDE` and keep metal, metallized coatings, batteries, PCBs and cable
 bundles outside the required clearance volume.
 
+The next enclosure/carrier revision must also remove the reproduced
+DA37+DA10 short-circuit geometry: the cable-side u.FL shield can rotate onto the
+adjacent exposed backup-battery edge and severely heat the receiver. Prefer a
+receiver with a protected or differently placed antenna connector; otherwise
+provide a rigid separator, defined connector orientation, cable strain relief
+and clearance in every assembly tolerance. Until that revision is qualified,
+pilot builds require Kapton/polyimide protection over the battery top and side
+edge, heat-shrink insulation over the cable-side connector transition and a
+closed-enclosure thermal soak. Every future MOT wiring instruction and diagram
+that includes an affected GNSS module must depict or explicitly call out this
+isolation; omission is a documentation release blocker.
+
 ## Vehicle adapter power supply
 
 Turn the existing pilot wiring guidance into a qualified unattended power-input
