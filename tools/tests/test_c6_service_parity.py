@@ -180,10 +180,10 @@ class C6ServiceParityTests(unittest.TestCase):
 
     def test_gps_control_is_compact_and_can2_is_fixed_in_wizard(self) -> None:
         self.assertIn("class='compact-control'", WEB)
-        self.assertIn(".compact-control button{display:block;margin-top:10px}", WEB)
+        self.assertIn("<div class='compact-control'><label>", WEB)
         self.assertIn("> Enable GPS</label>", WEB)
         self.assertIn("action='/wizard/hardware'", WEB)
-        self.assertIn("class='secondary-small'>Save hardware &amp; continue", WEB)
+        self.assertIn("class='primary wizard-action'>Save hardware &amp; continue", WEB)
         vehicle_page = WEB.split("case OnboardingStep::Vehicle:", 1)[1].split(
             "case OnboardingStep::Services:", 1
         )[0]
@@ -196,6 +196,18 @@ class C6ServiceParityTests(unittest.TestCase):
         )[0]
         self.assertIn("const DecoderProfile can2 = DECODER_PROFILE_DISPLAY_CAN", vehicle_handler)
 
+    def test_can1_only_offers_and_accepts_standard_can_profiles(self) -> None:
+        self.assertIn("String can1ProfileOptions", WEB)
+        self.assertIn("c6ConfigCan1ProfileAllowed(profile.id)", WEB)
+        self.assertIn("can1ProfileOptions(c6Config.can1Profile)", WEB)
+        self.assertIn("if (!c6ConfigCan1ProfileAllowed(can1))", WEB)
+        self.assertIn("CAN1 profile must be Standard-CAN V1 or V2", WEB)
+        self.assertIn("bool c6ConfigCan1ProfileAllowed", CONFIG)
+        self.assertIn("profile == DECODER_PROFILE_STANDARD_CAN_V1_PIONEER", CONFIG)
+        self.assertIn("profile == DECODER_PROFILE_STANDARD_CAN_V2", CONFIG)
+        self.assertIn("channel == 0 && !c6ConfigCan1ProfileAllowed(profile)", CONFIG)
+        self.assertIn("!c6ConfigCan1ProfileAllowed(candidate.can1Profile)", CONFIG)
+
     def test_settings_steps_have_one_unambiguous_continue_action(self) -> None:
         self.assertIn("const bool settingsStep", WEB)
         self.assertIn("step == onboardingStepNumber(OnboardingStep::Hardware)", WEB)
@@ -206,6 +218,21 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn("Save WiFi &amp; continue", WEB)
         self.assertIn("Save CAN &amp; continue", WEB)
         self.assertNotIn("Save, reboot &amp; continue", WEB)
+
+    def test_wizard_forward_actions_share_layout_and_cache_defaults_on(self) -> None:
+        self.assertIn(".wizard-action{display:block;width:240px;max-width:100%", WEB)
+        self.assertIn("class='primary wizard-action' name='step'", WEB)
+        self.assertIn(">Next</button>", WEB)
+        self.assertIn("class='primary wizard-action'>Save hardware &amp; continue", WEB)
+        self.assertIn("class='primary wizard-action'>Save WiFi &amp; continue", WEB)
+        self.assertIn("class='primary wizard-action'>Save CAN &amp; continue", WEB)
+        self.assertIn("class='primary wizard-action'>Save &amp; continue", WEB)
+        self.assertIn("class='primary wizard-action'>Apply settings &amp; restart", WEB)
+        self.assertIn("class='primary wizard-action'>Complete onboarding", WEB)
+        config_h = (C6 / "c6_config.h").read_text(encoding="utf-8")
+        self.assertIn("bool offlineCacheEnabled = true", config_h)
+        self.assertIn('preferences.getBool("cacheEn", true)', CONFIG)
+        self.assertIn("Default: enabled. Temporarily stores supported telemetry", WEB)
 
     def test_wizard_configuration_steps_never_reboot_individually(self) -> None:
         hardware_handler = WEB.split("void wizardHardwareSave()", 1)[1].split("void onboardingStep()", 1)[0]

@@ -23,7 +23,7 @@ struct C6Configuration {
     String localMqttTopicPrefix = "mot";
     String localMqttUsername;
     bool gpsEnabled = true;
-    bool offlineCacheEnabled = false;
+    bool offlineCacheEnabled = true;
     String abrpApiKey;
     String abrpUserToken;
     bool onboardingComplete = false;
@@ -36,6 +36,7 @@ extern C6Configuration c6Config;
 
 void c6ConfigLoad();
 void c6ConfigSave();
+bool c6ConfigCan1ProfileAllowed(DecoderProfile profile);
 bool c6ConfigSetCanProfile(size_t channel, DecoderProfile profile);
 bool c6ConfigSetWifi(const String &ssid, const String &password);
 void c6ConfigClearWifi();

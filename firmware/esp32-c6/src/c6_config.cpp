@@ -36,12 +36,21 @@ bool validMqttIdentifier(const String &value, size_t maximumLength)
 
 C6Configuration c6Config;
 
+bool c6ConfigCan1ProfileAllowed(DecoderProfile profile)
+{
+    return profile == DECODER_PROFILE_STANDARD_CAN_V1_PIONEER ||
+           profile == DECODER_PROFILE_STANDARD_CAN_V2;
+}
+
 void c6ConfigLoad()
 {
     preferences.begin(PREFERENCES_NAMESPACE, true);
     c6Config.can1Profile = decoderProfileNormalize(
         preferences.getUChar("can1", DECODER_PROFILE_STANDARD_CAN_V1_PIONEER),
         DECODER_PROFILE_STANDARD_CAN_V1_PIONEER);
+    if (!c6ConfigCan1ProfileAllowed(c6Config.can1Profile)) {
+        c6Config.can1Profile = DECODER_PROFILE_STANDARD_CAN_V1_PIONEER;
+    }
     c6Config.can2Profile = decoderProfileNormalize(
         preferences.getUChar("can2", DECODER_PROFILE_DISPLAY_CAN),
         DECODER_PROFILE_DISPLAY_CAN);
@@ -63,7 +72,7 @@ void c6ConfigLoad()
     c6Config.localMqttTopicPrefix = preferences.getString("mqttPrefix", "mot");
     c6Config.localMqttUsername = preferences.getString("mqttUser", "");
     c6Config.gpsEnabled = preferences.getBool("gpsEn", true);
-    c6Config.offlineCacheEnabled = preferences.getBool("cacheEn", false);
+    c6Config.offlineCacheEnabled = preferences.getBool("cacheEn", true);
     c6Config.abrpApiKey = preferences.getString("abrpKey", "");
     c6Config.abrpUserToken = preferences.getString("abrpToken", "");
     c6Config.onboardingComplete = preferences.isKey("onboarded")
@@ -348,7 +357,14 @@ bool c6ConfigImportJson(const String &json, String &error)
     if (!doc["wifiPassword"].isNull()) candidate.wifiPassword = doc["wifiPassword"].as<String>();
     if (!doc["wifi2Ssid"].isNull()) candidate.wifi2Ssid = doc["wifi2Ssid"].as<String>();
     if (!doc["wifi2Pass"].isNull()) candidate.wifi2Password = doc["wifi2Pass"].as<String>();
-    if (!doc["can1Profile"].isNull()) candidate.can1Profile = decoderProfileNormalize(doc["can1Profile"].as<int>());
+    if (!doc["can1Profile"].isNull()) {
+        candidate.can1Profile = decoderProfileNormalize(
+            doc["can1Profile"].as<int>(), DECODER_PROFILE_DISABLED);
+        if (!c6ConfigCan1ProfileAllowed(candidate.can1Profile)) {
+            error = "CAN1 profile must be Standard-CAN V1 or V2";
+            return false;
+        }
+    }
     if (!doc["can2Profile"].isNull()) candidate.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
     if (!doc["publishIntervalMs"].isNull()) candidate.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
@@ -412,6 +428,9 @@ void c6ConfigFactoryReset()
 bool c6ConfigSetCanProfile(size_t channel, DecoderProfile profile)
 {
     if (channel >= 2 || decoderProfileFind(profile) == nullptr) {
+        return false;
+    }
+    if (channel == 0 && !c6ConfigCan1ProfileAllowed(profile)) {
         return false;
     }
 

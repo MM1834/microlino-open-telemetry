@@ -2,9 +2,10 @@
 
 Configuration is stored in ESP32 Preferences/NVS and can be edited through the local WebUI.
 
-Decoder assignment is a logical runtime setting, not a decoder restriction tied
-to one controller. Multi-CAN targets store both `can1` and `can2`; single-CAN
-targets retain Display-CAN as the default for their available input.
+Multi-CAN targets store both `can1` and `can2`; single-CAN targets retain
+Display-CAN as the default for their available input. The dual-CAN C6 wiring is
+also enforced as configuration policy: CAN1 accepts Standard-CAN V1 or V2, while
+Display-CAN cannot be assigned to CAN1.
 
 ## Main settings
 
@@ -23,7 +24,7 @@ targets retain Display-CAN as the default for their available input.
 | secure local MQTT settings | C6 TLS broker endpoint, namespace, authentication mode and default-off enable state |
 | local MQTT location consent | Separate C6 owner opt-in; never restored or inferred from MQTT/GPS enablement |
 | `abrpEnabled` | Enables optional ABRP integration |
-| `offlineCacheEnabled` | C6-only, default-off SOC/active-Speed outage cache |
+| `offlineCacheEnabled` | C6-only, default-on SOC/active-Speed outage cache |
 | ABRP API key/token | ABRP credentials |
 | `can1Profile` / `can2Profile` | Independent decoder assignment for each physical CAN input |
 
@@ -98,7 +99,8 @@ Cloud state reboots before validation so credentials are loaded or the active AW
 client is stopped consistently; the final completion itself applies immediately.
 
 Both C6 targets expose an authenticated `Offline History cache` option. It is
-off by default and records only SOC plus active one-minute Speed/terminal zero
+on by default for new or factory-reset configurations, remains visible as a
+checkbox and records only SOC plus active one-minute Speed/terminal zero
 while AWS IoT is disconnected and trustworthy UTC has previously been obtained.
 It never stores GPS/location. XIAO is capped at 128 KiB and N16 at 256 KiB;
 reaching the cap stops new writes instead of rotating flash. Disabling the option

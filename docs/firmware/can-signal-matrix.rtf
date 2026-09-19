@@ -204,8 +204,8 @@ CAN current/plug signals or another independently verified source.\
 \
 - Preserve Display-CAN and Standard-CAN values as source-specific telemetry.\
 - Do not overwrite Display-CAN SOC with `0x18D data[7]` on Pioneer.\
-- Permit every registered decoder profile on every physical CAN controller; board\
-  defaults are configuration policy, not decoder-engine restrictions.\
+- Restrict dual-CAN C6 CAN1 to Standard-CAN V1 or V2; Display-CAN is assigned to\
+  CAN2 and cannot be selected or restored for CAN1.\
 - Keep CAN operation listen-only during discovery and pilot operation.\
 - Promote plausible or externally indicated fields to confirmed only after a\
   repeatable state change or independent physical reference.\

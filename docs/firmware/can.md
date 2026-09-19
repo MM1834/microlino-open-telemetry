@@ -30,6 +30,12 @@ Standard-CAN and MCP2515 CAN2 is Display-CAN. Each has an independent decoder pr
 [LG-CAN2-001](../project/sprints/LG-CAN2-001.md).
 Standalone wiring must also tie the FeatherWing `RST` pad to 3.3 V.
 
+On the dual-CAN C6 adapter, the local configuration and onboarding interfaces
+restrict CAN1 to the Standard-CAN V1 and V2 decoders. Display-CAN is not a valid
+CAN1 assignment; CAN2 remains fixed to Display-CAN during onboarding. The same
+CAN1 constraint is enforced for submitted forms, restored backups and the
+internal runtime profile setter.
+
 Previous documentation incorrectly assigned GPIO32/13 to ESP32-WROOM. Physical
 beta wiring must be checked against the actual board/transceiver before power-up.
 

@@ -8,7 +8,7 @@ Current implemented slice:
 - board-specific PlatformIO environments and flash partitions;
 - two concurrent ESP32-C6 TWAI controllers at 500 kbit/s;
 - listen-only operation with independent counters and decoder profiles;
-- persistent independent CAN1/CAN2 profile selection in Preferences/NVS;
+- persistent channel-specific CAN profile selection in Preferences/NVS;
 - Display-CAN, Standard-CAN V1 - Pioneer / Gen1 Mid-Range and Standard-CAN V2 shared decoders;
 - board, flash, CAN and GPS pin diagnostics;
 - shared optional-GPS detection and NMEA fix-state handling;
@@ -50,8 +50,9 @@ AWS credentials remains the C6-ENV-001 rollout gate. Physical USB is the support
 recovery path and signed-image rollback is not claimed.
 
 Default decoder assignment is Standard-CAN V1 - Pioneer / Gen1 Mid-Range on CAN1 and Display-CAN
-on CAN2. Both channels accept any registered decoder profile at runtime; these are
-safe defaults for the intended dual-CAN adapter, not decoder-engine restrictions.
+on CAN2. The C6 configuration restricts CAN1 to Standard-CAN V1 or V2; Display-CAN
+cannot be selected or restored for that physical input. CAN2 retains its separate
+profile assignment and is fixed to Display-CAN during onboarding.
 
 ## Mobile test capture
 
