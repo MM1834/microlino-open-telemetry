@@ -795,10 +795,14 @@
       : Number(forecast?.effectiveKmPerSoc);
     const hasForecast = Number.isFinite(learned) && Number(forecast?.tripCount) > 0;
     const displayedRange = hasForecast ? Math.round(usableSoc * learned) : standardRange;
+    const rangeToZero = hasForecast ? Math.round(soc * learned) : Math.round(maxRange * soc / 100);
     const reserveLabel = reserveSoc > 0 ? ` · bis ${reserveSoc}%` : '';
     setText('range-main', `${displayedRange} km`);
+    setText('range-reserve-label', `bis ${reserveSoc} %`);
+    setText('range-zero-main', `${rangeToZero} km`);
     setText('range-forecast-main', `${displayedRange} km`);
-    setText('range-method', hasForecast ? `Persönliche Prognose${reserveLabel}` : `Nach SoC · Basis ${maxRange} km${reserveLabel}`);
+    setText('range-method-main', hasForecast ? 'Persönliche Prognose' : `Nach SoC · Basis ${maxRange} km`);
+    setText('range-method-reserve', reserveLabel);
     setText('range-soc-comparison', `Nach SoC: ${standardRange} km · Basis ${maxRange} km${reserveLabel}`);
     setText('range-forecast-basis', hasForecast
       ? `Basierend auf ${fmtNum(forecast.distanceKm, 0)} km · ${forecast.tripCount} ${Number(forecast.tripCount) === 1 ? 'Fahrt' : 'Fahrten'}`
@@ -1308,7 +1312,10 @@ function resetDashboardForVehicle(vehicleId) {
   setText('speed-card', '--');
   setText('odo-main', '-- km');
   setText('range-main', '-- km');
-  setText('range-method', `Nach SoC · Basis ${Number(vehicleCfg.defaultRangeKmAt100 || 140)} km`);
+  setText('range-reserve-label', 'bis 0 %');
+  setText('range-zero-main', '-- km');
+  setText('range-method-main', `Nach SoC · Basis ${Number(vehicleCfg.defaultRangeKmAt100 || 140)} km`);
+  setText('range-method-reserve', '');
   setText('range-forecast-main', '-- km');
   setText('range-forecast-basis', 'Noch keine ausreichende Fahrhistorie');
   setText('range-soc-comparison', 'Nach SoC: -- km');

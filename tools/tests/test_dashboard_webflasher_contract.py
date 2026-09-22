@@ -105,7 +105,7 @@ class DashboardWebFlasherContractTests(unittest.TestCase):
         self.assertIn("#firmware-flasher{order:71;width:100%}", css)
         self.assertIn("#usb-diagnostics{order:72;width:100%}", css)
         self.assertIn("#password-recovery{order:73;width:100%}", css)
-        self.assertIn("dashboard.css?v=20260917-usbdiag1", html)
+        self.assertIn("dashboard.css?v=20260922-dual-range2", html)
 
     def test_esptool_is_vendored_with_license(self) -> None:
         bundle = DASHBOARD / "vendor/esptool-js/bundle-0.6.0.js"

@@ -17,7 +17,7 @@ class DashboardI18nContractTests(unittest.TestCase):
         self.assertIn("<html lang=\"de\">", INDEX)
 
     def test_language_selector_and_catalog_are_loaded(self):
-        self.assertIn('src="js/i18n.js?v=20260913-last-charge1"', INDEX)
+        self.assertIn('src="js/i18n.js?v=20260922-dual-range1"', INDEX)
         self.assertIn('id="dashboard-language"', INDEX)
         for language in ("de", "en", "fr", "it"):
             self.assertIn(f'<option value="{language}">', INDEX)
@@ -51,6 +51,9 @@ class DashboardI18nContractTests(unittest.TestCase):
             ".replace(/ · bis (\\d+)%/g, ' · to $1%')",
             ".replace(/ · bis (\\d+)%/g, ' · jusqu’à $1 %')",
             ".replace(/ · bis (\\d+)%/g, ' · fino al $1%')",
+            ".replace(/\\bbis (\\d+) %/g, 'to $1%')",
+            ".replace(/\\bbis (\\d+) %/g, 'jusqu’à $1 %')",
+            ".replace(/\\bbis (\\d+) %/g, 'fino al $1%')",
         ):
             self.assertIn(marker, I18N)
 

@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <title>MOT Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=20260917-usbdiag1" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260922-dual-range2" />
   <link rel="stylesheet" href="css/history.css?v=20260821-history-resilience1">
   <link rel="stylesheet" href="css/history-controls.css">
   <link rel="stylesheet" href="css/history-soc-speed.css">
   <link rel="stylesheet" href="css/location-map.css?v=20260904-touch-interaction1">
   <link rel="stylesheet" href="css/location-map-cleanup.css">
-  <script src="js/i18n.js?v=20260917-usbdiag4"></script>
+  <script src="js/i18n.js?v=20260922-dual-range1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -133,7 +133,7 @@
           <a class="history-link" href="#history">History ansehen →</a>
         </div>
         <div class="hero-metrics">
-          <div class="metric-card soc-card overview-soc"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><strong id="range-main">-- km</strong><small id="range-method" class="range-method">Nach SoC · Basis 140 km</small><small id="soc-updated" class="muted">Stand: --</small></div>
+          <div class="metric-card soc-card overview-soc"><div class="ring" id="soc-ring"><span id="soc-main">--%</span><small>SoC</small></div><p>Reichweite</p><div class="overview-range-values"><span><strong id="range-main">-- km</strong><small id="range-reserve-label">bis 0 %</small></span><i aria-hidden="true">/</i><span><strong id="range-zero-main">-- km</strong><small>bis 0 %</small></span></div><small id="range-method" class="range-method"><span id="range-method-main">Nach SoC · Basis 140 km</span><span id="range-method-reserve"></span></small><small id="soc-updated" class="muted">Stand: --</small></div>
           <div class="metric-card overview-speed"><span class="metric-icon">◷</span><strong id="speed-main">--</strong><small>km/h</small><p>Geschwindigkeit</p></div>
           <div class="metric-card overview-charging">
             <div class="overview-charging-stationary"><span class="metric-icon green">⌁</span><strong id="charging-main">--</strong><small id="charging-power-main" hidden>-- kW</small><span class="overview-power-meter" data-power-meter hidden role="progressbar" aria-label="Leistung" aria-valuemin="0" aria-valuemax="20"><span data-power-meter-fill></span></span><p>Ladestatus</p></div>
@@ -389,7 +389,7 @@
   <script src="js/providers/provider-registry.js"></script>
   <script src="js/live/websocket-client.js"></script>
   <script src="js/providers/aws-backend-provider.js?v=20260917-usbdiag1"></script>
-  <script src="js/app.js?v=20260917-usbdiag7"></script>
+  <script src="js/app.js?v=20260922-dual-range2"></script>
   <script src="js/history/history-db.js"></script>
   <script src="js/history/history-recorder.js"></script>
   <script src="js/history/history-chart.js?v=20260904-history-split1"></script>

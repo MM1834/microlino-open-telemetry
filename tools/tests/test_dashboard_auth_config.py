@@ -68,7 +68,7 @@ class DashboardRevocationTests(unittest.TestCase):
     def test_dashboard_cache_busts_revocation_aware_provider(self) -> None:
         source = (ROOT / "build/dashboard/current/index.html").read_text(encoding="utf-8")
         self.assertIn("aws-backend-provider.js?v=20260917-usbdiag1", source)
-        self.assertIn("app.js?v=20260917-usbdiag1", source)
+        self.assertIn("app.js?v=20260922-dual-range2", source)
 
 
 class DashboardTouchMapInteractionTests(unittest.TestCase):
@@ -326,11 +326,17 @@ class DashboardRangeForecastTests(unittest.TestCase):
         html = (ROOT / "build/dashboard/current/index.html").read_text()
         history = (ROOT / "build/dashboard/current/js/history/history-chart.js").read_text()
         self.assertIn('id="range-method"', html)
+        self.assertIn('id="range-method-reserve"', html)
+        self.assertIn('id="range-reserve-label"', html)
+        self.assertIn('id="range-zero-main"', html)
         self.assertIn('id="range-forecast-main"', html)
         self.assertIn('id="range-forecast-basis"', html)
         self.assertIn('id="range-soc-comparison"', html)
         self.assertIn("function renderRangeForecast()", app)
         self.assertIn("Persönliche Prognose", app)
+        self.assertIn("const rangeToZero", app)
+        self.assertIn("setText('range-reserve-label', `bis ${reserveSoc} %`)", app)
+        self.assertIn("setText('range-method-reserve', reserveLabel)", app)
         self.assertIn("Basierend auf ${fmtNum(forecast.distanceKm, 0)} km", app)
         provider = (ROOT / "build/dashboard/current/js/providers/aws-backend-provider.js").read_text()
         self.assertIn("async function loadRangeForecast", app)

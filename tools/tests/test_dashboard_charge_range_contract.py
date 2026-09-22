@@ -24,7 +24,7 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
             self.assertIn(field, renderer)
         self.assertIn("result?.driveSinceCharge", MAIN_JS)
         self.assertIn("fmtNum(distance, 0)", renderer)
-        self.assertIn("20260917-usbdiag7", MAIN_HTML)
+        self.assertIn("20260922-dual-range2", MAIN_HTML)
 
     def test_drive_view_displays_all_odometer_distances_as_whole_kilometres(self):
         self.assertGreaterEqual(JS.count("maximumFractionDigits: 0"), 3)

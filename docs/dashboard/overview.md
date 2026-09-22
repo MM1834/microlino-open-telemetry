@@ -29,8 +29,14 @@ The overview range card uses an automatic personal forecast when the backend has
 enough valid distance/SOC evidence. The vehicle card explains the basis as driven
 kilometres and journey count and retains the fixed `SOC × configured 100% range`
 result as a comparison. Before valid history exists, the fixed value remains the
-only displayed forecast. Both `/dashboard/` and `/motbeta/` consume this shared
-portal source.
+only displayed forecast. The leading overview card presents that same forecast
+as two compact remaining-distance values: first to the configured SOC reserve,
+then to zero SOC. Both values share the same learned or fixed calculation basis,
+so a configured 15-percent reserve is shown unambiguously as, for example,
+`18 km / 33 km` with `bis 15 % / bis 0 %` labels. On smartphone layouts the
+method line omits its duplicate reserve suffix because both direct value labels
+remain visible. Both `/dashboard/` and `/motbeta/` consume this shared portal
+source.
 
 The dedicated journey page additionally shows the current or retained-last
 journey distance and the newest real odometer. Its separate `Seit letzter Ladung`

@@ -214,6 +214,7 @@
 /* Mobile charging-first information architecture. */
 .mobile-connection-card{display:none}
 .range-method{display:block;margin-top:2px;color:var(--green);font-size:.72rem}
+.overview-range-values{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:start;gap:7px;width:100%;margin-top:3px}.overview-range-values>span{display:flex;min-width:0;flex-direction:column;align-items:center}.overview-range-values strong{font-size:clamp(1.25rem,2.25vw,1.9rem);line-height:1.1;white-space:nowrap}.overview-range-values small{margin-top:3px;color:var(--muted);font-size:.68rem;white-space:nowrap}.overview-range-values i{align-self:start;color:var(--muted);font-size:1.25rem;font-style:normal;line-height:1.35}
 .range-forecast{display:flex;flex-direction:column;align-items:center;gap:4px;margin:12px 0;padding:10px;border:1px solid rgba(158,176,199,.14);border-radius:12px;background:rgba(255,255,255,.025);text-align:center}
 .range-forecast label{color:var(--muted);font-size:.75rem}
 .range-forecast strong{font-size:1.55rem}
@@ -229,6 +230,7 @@
 .overview-charging.is-data-stale .mobile-driving-flow{opacity:.46;filter:saturate(.25)}
 .overview-charging.is-data-stale .metric-freshness{color:var(--amber);opacity:1;filter:none}
 @media (max-width:900px){
+  #range-method-reserve{display:none}
   .sidebar{display:none}
   .main{display:flex;gap:14px}
   .topbar{position:static;order:10;padding:12px;display:flex;align-items:center;gap:10px}

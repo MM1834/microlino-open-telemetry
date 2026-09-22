@@ -682,6 +682,7 @@
         .replace(/\bvor (\d+) min\b/g, '$1 min ago')
         .replace(/\bvor (\d+) h\b/g, '$1 h ago')
         .replace(/\bvor (\d+) Tagen\b/g, '$1 days ago')
+        .replace(/\bbis (\d+) %/g, 'to $1%')
         .replace(/ · bis (\d+)%/g, ' · to $1%');
     } else if (target === 'fr') {
       result = result
@@ -689,6 +690,7 @@
         .replace(/\bvor (\d+) min\b/g, 'il y a $1 min')
         .replace(/\bvor (\d+) h\b/g, 'il y a $1 h')
         .replace(/\bvor (\d+) Tagen\b/g, 'il y a $1 jours')
+        .replace(/\bbis (\d+) %/g, 'jusqu’à $1 %')
         .replace(/ · bis (\d+)%/g, ' · jusqu’à $1 %');
     } else if (target === 'it') {
       result = result
@@ -696,6 +698,7 @@
         .replace(/\bvor (\d+) min\b/g, '$1 min fa')
         .replace(/\bvor (\d+) h\b/g, '$1 h fa')
         .replace(/\bvor (\d+) Tagen\b/g, '$1 giorni fa')
+        .replace(/\bbis (\d+) %/g, 'fino al $1%')
         .replace(/ · bis (\d+)%/g, ' · fino al $1%');
     }
     Object.keys(dictionary).sort((a, b) => b.length - a.length).forEach(key => {
