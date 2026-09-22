@@ -1,6 +1,6 @@
 # DRV-CHG-001 — Fahrstrecke und Reichweite seit letzter Ladung
 
-**Status:** Active — backend deployed; portal upload and road acceptance pending
+**Status:** Complete — backend deployed and hosted road acceptance passed
 
 **Started:** 2026-09-13
 
@@ -21,6 +21,9 @@ from driving observed since the last qualified charging session ended.
   reference. The odometer sample may precede charge start by at most 30 minutes.
 - The portal shows distance and SOC development immediately, but calculates a
   projection only after at least 5 km and 5 consumed SOC percentage points.
+- The same card shows the backend-derived net consumption since the charging
+  reference between distance and the two SOC-based total-distance projections.
+  Missing or implausible consumption remains unavailable.
 - Projection to zero is `distance / SOC used * charge-end SOC`; projection to
   reserve uses the vehicle's configured SOC reserve.
 - Missing, negative or inconsistent SOC/odometer differences fail closed and
@@ -45,6 +48,8 @@ three reference values together with its existing journey odometer endpoints.
 The DRV page adds journey distance, total odometer and a separate `Seit letzter
 Ladung` card. German, English, French and Italian runtime wording is included.
 The card explicitly withholds projection until its minimum evidence is reached.
+It also renders `driveSinceCharge.consumptionKwhPer100Km` as a two-decimal
+average without recalculating energy in the browser.
 
 ## Deployment evidence — 2026-09-13
 
@@ -61,7 +66,18 @@ Lambda's send-free invalid-topic probe returns the expected controlled rejection
 - [x] endpoint contract returns no reference for legacy data and a minimized
   reference when present;
 - [x] portal contract enforces 5 km / 5 SOC-point thresholds and configured reserve;
+- [x] portal shows backend net consumption in the requested position with a
+  fail-closed unavailable state;
 - [x] JavaScript and Python syntax checks;
 - [x] isolated no-replacement AWS Lambda code deployment and smoke tests;
-- [ ] hosted desktop and smartphone presentation;
-- [ ] one qualified charge followed by sufficient driving validates the values.
+- [x] hosted desktop and smartphone presentation;
+- [x] one qualified charge followed by sufficient driving validates the values.
+
+## Completion evidence — 2026-09-22
+
+The hosted dashboard and journey screen passed acceptance after a qualified
+charge and sufficient driving. For `ml-pilot-027`, the protected backend value
+used 74 km and 5.512 kWh net energy to report 7.45 kWh/100 km. The journey card
+showed that value between distance and the two projected total distances, with
+the expected language and unavailable-data fallbacks. The maintainer uploaded
+the accepted assets to production. DRV-CHG-001 is complete.

@@ -24,12 +24,12 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
             self.assertIn(field, renderer)
         self.assertIn("result?.driveSinceCharge", MAIN_JS)
         self.assertIn("fmtNum(distance, 0)", renderer)
-        self.assertIn("20260914-whole-km1", MAIN_HTML)
+        self.assertIn("20260917-usbdiag7", MAIN_HTML)
 
     def test_drive_view_displays_all_odometer_distances_as_whole_kilometres(self):
         self.assertGreaterEqual(JS.count("maximumFractionDigits: 0"), 3)
         self.assertNotIn("minimumFractionDigits: 1, maximumFractionDigits: 1 })} km", JS)
-        self.assertIn("20260914-whole-km1", HTML)
+        self.assertIn("20260922-consumption1", HTML)
 
     def test_main_dashboard_shows_last_charge_with_quality(self):
         self.assertIn('id="charge-energy"', MAIN_HTML)
@@ -50,7 +50,7 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
         for element_id in (
             "drive-distance", "drive-odometer", "drive-charge-summary",
             "drive-charge-heading",
-            "drive-since-charge-distance", "drive-since-charge-zero",
+            "drive-since-charge-distance", "drive-since-charge-consumption", "drive-since-charge-zero",
             "drive-since-charge-reserve", "drive-last-charge-energy",
             "drive-last-charge-detail",
         ):
@@ -59,6 +59,14 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
         self.assertIn("Erwartete Gesamtstrecke bis 0 %", HTML)
         self.assertIn("Erwartete Gesamtstrecke bis Reserve", HTML)
         self.assertLess(
+            HTML.index('id="drive-since-charge-distance"'),
+            HTML.index('id="drive-since-charge-consumption"'),
+        )
+        self.assertLess(
+            HTML.index('id="drive-since-charge-consumption"'),
+            HTML.index('id="drive-since-charge-zero"'),
+        )
+        self.assertLess(
             HTML.index('id="drive-chart"'),
             HTML.index('id="drive-distance"'),
         )
@@ -66,7 +74,7 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
             HTML.index('id="drive-chart"'),
             HTML.index('id="drive-charge-summary"'),
         )
-        self.assertIn("20260914-whole-km1", HTML)
+        self.assertIn("20260922-consumption1", HTML)
 
     def test_projection_has_conservative_minimum_evidence(self):
         renderer = JS.split("function renderChargeReference()", 1)[1].split(
@@ -81,6 +89,8 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
         self.assertIn("value === null || value === undefined || value === ''", JS)
         self.assertIn("year: '2-digit'", renderer)
         self.assertIn("lastCharge?.finalized === false", renderer)
+        self.assertIn("driveSinceCharge?.consumptionKwhPer100Km", renderer)
+        self.assertIn("drive-since-charge-consumption", renderer)
         self.assertIn("drive-charge-heading", renderer)
         self.assertIn("Aktueller Ladeblock", renderer)
         self.assertIn("Ladebilanz wird mit der nächsten Fahrt abgeschlossen", renderer)
@@ -102,6 +112,7 @@ class DashboardChargeRangeContractTests(unittest.TestCase):
             "Aktueller Ladeblock",
             "SOC-Punkte geladen",
             "Ladebilanz wird mit der nächsten Fahrt abgeschlossen",
+            "Ø Verbrauch",
         ):
             self.assertGreaterEqual(I18N.count(wording), 3)
 

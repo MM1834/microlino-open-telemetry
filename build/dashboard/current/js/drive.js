@@ -85,6 +85,10 @@
     const peakSoc = number(lastCharge?.peakSoc);
     const endSoc = number(lastCharge?.endSoc);
     const sessions = number(lastCharge?.sessionCount);
+    const consumption = number(state.journey?.driveSinceCharge?.consumptionKwhPer100Km);
+    text('drive-since-charge-consumption', Number.isFinite(consumption)
+      ? `${consumption.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh/100 km`
+      : '-- kWh/100 km');
     const measuredPrefix = Number.isFinite(coverage) && coverage < 95 ? `${tr('mind.')} ` : '';
     text('drive-last-charge-energy', Number.isFinite(energy)
       ? `${measuredPrefix}${energy.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh`
@@ -107,6 +111,7 @@
       text('drive-charge-soc', Number.isFinite(number(lastCharge?.at))
         ? new Date(number(lastCharge.at)).toLocaleDateString(locale(), { day: '2-digit', month: '2-digit', year: '2-digit' }) : '--');
       text('drive-since-charge-distance', '-- km');
+      text('drive-since-charge-consumption', '-- kWh/100 km');
       text('drive-since-charge-zero', '-- km');
       text('drive-since-charge-reserve', '-- km');
       text('drive-charge-note', tr('Ladebilanz wird mit der nächsten Fahrt abgeschlossen'));
@@ -128,6 +133,7 @@
       text('drive-charge-summary', tr('Noch keine Ladereferenz'));
       text('drive-charge-soc', '--');
       text('drive-since-charge-distance', '-- km');
+      text('drive-since-charge-consumption', '-- kWh/100 km');
       text('drive-since-charge-zero', '-- km');
       text('drive-since-charge-reserve', '-- km');
       text('drive-charge-note', tr('Die nächste qualifizierte Ladung setzt die Referenz'));

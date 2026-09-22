@@ -219,11 +219,14 @@ session item. The protected current-journey response exposes only that minimized
 reference. `Seit letzter Ladung` shows observed distance/SOC immediately and
 withholds its zero/reserve projection until at least 5 km and 5 SOC points have
 been consumed. It uses the configured reserve and remains distinct from the
-long-term personal forecast. Repository tests and syntax checks pass. Isolated
+long-term personal forecast. The same card now displays the backend-derived
+average net consumption between distance and the projections, with a fail-closed
+unavailable state. Repository tests and syntax checks pass. Isolated
 code updates of the existing Vehicle API and Notification Lambdas are deployed;
 both report `Active`/`Successful`, anonymous API access remains `401` and the
-send-free Notification smoke test passed. Portal upload and physical
-charge/drive acceptance remain open.
+send-free Notification smoke test passed. Hosted production acceptance passed
+on 2026-09-22 after a qualified charge and 74 km of driving; the observed
+reference value was 7.45 kWh/100 km. DRV-CHG-001 is complete.
 
 CHG-COV-001 has started from a read-only review of 48 charging-summary events
 across five vehicles. Of 36 capacity-comparable sessions, 28 were within

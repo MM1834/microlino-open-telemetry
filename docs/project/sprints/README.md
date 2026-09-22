@@ -48,10 +48,6 @@
   consistent post-charge period. Repository implementation, isolated backend
   deployment and hosted multi-journey acceptance are complete, including the
   whole-kilometre presentation follow-up.
-- [DRV-CHG-001 — Fahrstrecke und Reichweite seit letzter Ladung](DRV-CHG-001.md)
-  adds journey distance, current odometer and a conservative SOC projection from
-  the last qualified charging completion. The backend code is deployed and
-  healthy; portal upload and physical charge/drive acceptance remain open.
 - [FLEET-EFF-001 - anonymized long-term fleet efficiency](FLEET-EFF-001.md)
   preserves monthly distance and net-energy evidence beyond the 31-day event
   TTL. It adds declared vehicle battery capacity with conservative plausibility
@@ -68,6 +64,10 @@
 
 ## Completed predecessors
 
+- [DRV-CHG-001](DRV-CHG-001.md) adds journey distance, current odometer,
+  backend-derived average consumption and conservative SOC projections from the
+  latest qualified charging completion; hosted production road acceptance
+  passed on 2026-09-22.
 - [USB-DIAG-001](USB-DIAG-001.md) provides an independent expiring grant and a
   strictly filtered, read-only USB status log; AWS deployment and hosted
   acceptance with two users passed on 2026-09-17.

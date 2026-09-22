@@ -35,7 +35,9 @@ portal source.
 The dedicated journey page additionally shows the current or retained-last
 journey distance and the newest real odometer. Its separate `Seit letzter Ladung`
 card uses the SOC and odometer retained when the last qualified charging session
-ended. The same card now also shows the measured energy of that completed charge,
+ended. Between the observed distance and the SOC-based projections it shows the
+backend-derived average net consumption in kWh/100 km; missing or implausible
+evidence stays unavailable. The same card now also shows the measured energy of that completed charge,
 its power-data coverage and the separate SOC estimate when available. Coverage
 below 95 percent labels the measured value as a minimum, matching the charging
 email. It displays observed distance and SOC development immediately but only

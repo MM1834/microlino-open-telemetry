@@ -103,7 +103,7 @@ remains open.
 
 ### Add distance and since-charge range to the journey view
 
-**Active portal/backend sprint:** [DRV-CHG-001 — Fahrstrecke und Reichweite seit
+**Completed portal/backend sprint:** [DRV-CHG-001 — Fahrstrecke und Reichweite seit
 letzter Ladung](../project/sprints/DRV-CHG-001.md)
 
 **Objective:** Show current/last journey distance, the real vehicle odometer and
@@ -116,7 +116,10 @@ reference on unplug and ten-minute charging timeout, and requires 5 km plus 5
 consumed SOC points before projection. No firmware, new table, battery-capacity
 calculation or authorization change is introduced. Isolated code updates of the
 two existing Lambdas are deployed and healthy; authorization and send-free
-smoke tests pass. Portal upload and physical charge/drive acceptance remain open.
+smoke tests pass. Hosted production acceptance passed after a qualified charge
+and 74 km of driving; the journey card also displays the backend-derived
+7.45 kWh/100 km net average between distance and the two projections. The sprint
+is complete.
 
 ### Make charging-summary energy coverage explicit
 
