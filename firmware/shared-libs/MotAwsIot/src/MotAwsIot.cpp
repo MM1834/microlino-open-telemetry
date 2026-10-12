@@ -160,11 +160,28 @@ bool MotAwsIotClient::begin(const MotAwsCredentials& credentials) {
     secureClient_.setCACert(credentials.rootCa.c_str());
     secureClient_.setCertificate(credentials.certificate.c_str());
     secureClient_.setPrivateKey(credentials.privateKey.c_str());
+    secureClient_.configureServerIdentity(credentials.endpoint, credentials.rootCa,
+                                          credentials.certificate, credentials.privateKey);
     // A weak but still associated WiFi link must not stall the firmware's
     // cooperative network/CAN/GPS loop for tens of seconds.
+#ifdef MOT_DISPLAY_BLE
+    // A local instrument must not disappear behind a long failing WAN
+    // handshake. The normal builds retain their established network bounds.
+    secureClient_.setHandshakeTimeout(3);
+    secureClient_.setTimeout(2000);
+#else
     secureClient_.setHandshakeTimeout(7);
     secureClient_.setTimeout(5000);
+#endif
     return configure(credentials, secureClient_);
+}
+
+bool MotAwsIotClient::resolveEndpointOnLoopTask() {
+    return secureClient_.resolveOnLoopTask();
+}
+
+bool MotAwsIotClient::endpointResolutionReady() const {
+    return secureClient_.resolutionReady();
 }
 
 bool MotAwsIotClient::begin(
@@ -191,9 +208,16 @@ bool MotAwsIotClient::configure(
         credentials_.endpoint.c_str(),
         credentials_.port
     );
-    mqtt_.setBufferSize(1024);
+    // telemetry/state/v1 is deliberately bounded below 4 KiB. Leave room for
+    // the MQTT topic and framing without fragmenting the state back into scalar
+    // publishes.
+    mqtt_.setBufferSize(5120);
     mqtt_.setKeepAlive(45);
+#ifdef MOT_DISPLAY_BLE
+    mqtt_.setSocketTimeout(2);
+#else
     mqtt_.setSocketTimeout(5);
+#endif
 
     status_.message = "AWS IoT configured";
     return true;
@@ -283,7 +307,6 @@ bool MotAwsIotClient::connect() {
 
     status_.reconnectCount++;
     status_.consecutiveConnectFailures = 0;
-    reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
     status_.reconnectDelayMs = reconnectDelayMs_;
     status_.tlsErrorCode = 0;
     status_.tlsError = "";
@@ -294,7 +317,17 @@ bool MotAwsIotClient::connect() {
         willTopic.c_str()
     );
 
-    publishBirth();
+    if (!birthPublished_) {
+        publishBirth();
+        birthPublished_ = true;
+    } else {
+        // Retained identity/profile topics survive a short reconnect. Repeating
+        // the complete multi-topic birth sequence on a weak link can block the
+        // cooperative firmware loop for tens of seconds.
+        publish("status/online", "true", true);
+        publishHeartbeat(true);
+    }
+    connectedSinceMs_ = millis();
     return true;
 }
 
@@ -304,6 +337,7 @@ void MotAwsIotClient::loop(
 ) {
     runtime_ = runtime;
     status_.timeValid = timeValid();
+    const uint32_t now = millis();
 
     if (!enabled()) return;
 
@@ -312,14 +346,11 @@ void MotAwsIotClient::loop(
         status_.connected = false;
         status_.message = "AWS IoT waiting for network";
         previousConnected_ = false;
-        lastReconnectAttemptMs_ = 0;
-        reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
         status_.reconnectDelayMs = reconnectDelayMs_;
         return;
     }
 
     if (!mqtt_.connected()) {
-        const uint32_t now = millis();
         if (!lastReconnectAttemptMs_ ||
             now - lastReconnectAttemptMs_ >= reconnectDelayMs_) {
             lastReconnectAttemptMs_ = now;
@@ -331,12 +362,34 @@ void MotAwsIotClient::loop(
     const bool connectedNow = mqtt_.connected();
 
     if (previousConnected_ && !connectedNow) {
+        status_.disconnectCount++;
+        const uint32_t connectedDurationMs = connectedSinceMs_
+            ? now - connectedSinceMs_ : 0;
+        if (connectedDurationMs < STABLE_CONNECTION_MS) {
+            reconnectDelayMs_ = min(MAX_RECONNECT_INTERVAL_MS,
+                                    reconnectDelayMs_ > MAX_RECONNECT_INTERVAL_MS / 2
+                                        ? MAX_RECONNECT_INTERVAL_MS
+                                        : reconnectDelayMs_ * 2);
+            lastReconnectAttemptMs_ = now;
+        } else {
+            reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
+        }
+        status_.reconnectDelayMs = reconnectDelayMs_;
         Serial.printf(
-            "AWS IoT: connection lost state=%d loopOk=%s freeHeap=%u\n",
+            "AWS IoT: connection lost state=%d loopOk=%s freeHeap=%u connectedMs=%lu retryMs=%lu\n",
             mqtt_.state(),
             loopOk ? "true" : "false",
-            ESP.getFreeHeap()
+            ESP.getFreeHeap(),
+            static_cast<unsigned long>(connectedDurationMs),
+            static_cast<unsigned long>(reconnectDelayMs_)
         );
+    }
+
+    if (connectedNow && connectedSinceMs_ &&
+        now - connectedSinceMs_ >= STABLE_CONNECTION_MS &&
+        reconnectDelayMs_ != RECONNECT_INTERVAL_MS) {
+        reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
+        status_.reconnectDelayMs = reconnectDelayMs_;
     }
 
     previousConnected_ = connectedNow;
@@ -348,7 +401,22 @@ void MotAwsIotClient::loop(
 
 void MotAwsIotClient::disconnect() {
     if (mqtt_.connected()) mqtt_.disconnect();
+    // Release the owned TLS transport before a bounded independent HTTPS use.
+    secureClient_.stop();
+    // This is a scheduler-requested handoff, not an unstable connection.  Do
+    // not let the next loop count it as a loss or exponentially back off the
+    // reconnect that follows the independent TLS window.
+    previousConnected_ = false;
+    connectedSinceMs_ = 0;
+    reconnectDelayMs_ = RECONNECT_INTERVAL_MS;
+    lastReconnectAttemptMs_ = millis();
     status_.connected = false;
+    status_.mqttState = mqtt_.state();
+    status_.reconnectDelayMs = reconnectDelayMs_;
+}
+
+void MotAwsIotClient::setMinimalBirth(bool minimal) {
+    minimalBirth_ = minimal;
 }
 
 bool MotAwsIotClient::publish(
@@ -358,12 +426,23 @@ bool MotAwsIotClient::publish(
 ) {
     if (!mqtt_.connected()) return false;
 
+    const String fullTopic = topic(suffix);
     const bool ok = mqtt_.publish(
-        topic(suffix).c_str(),
+        fullTopic.c_str(),
         payload.c_str(),
         retained
     );
-    if (ok) status_.publishCount++;
+    if (ok) {
+        status_.publishCount++;
+        status_.payloadBytes += payload.length();
+        const size_t remainingLength = 2 + fullTopic.length() + payload.length();
+        size_t remainingLengthBytes = 1;
+        for (size_t value = remainingLength; value >= 128; value /= 128) {
+            remainingLengthBytes++;
+        }
+        status_.mqttPublishBytes +=
+            1 + remainingLengthBytes + remainingLength;
+    }
     return ok;
 }
 
@@ -437,16 +516,27 @@ const char* MotAwsIotClient::resetReasonText() {
 
 void MotAwsIotClient::publishBirth() {
     publish("status/online", "true", true);
+    if (minimalBirth_) {
+        publish("system/device_id", runtime_.deviceId, true);
+        publish("system/board", runtime_.board, true);
+        publish("system/firmware_version", runtime_.firmwareVersion, true);
+        publish("system/can1_profile", runtime_.can1Profile, true);
+        publish("system/can2_profile", runtime_.can2Profile, true);
+        publish("system/ip_address", runtime_.ipAddress, true);
+        publishHeartbeat(true);
+        status_.birthCount++;
+        return;
+    }
     publish("system/device_id", runtime_.deviceId, true);
-    publish("system/device_name", runtime_.deviceName, true);
-    publish("system/mqtt_client_id", credentials_.thingName, true);
     publish("system/board", runtime_.board, true);
     publish("system/firmware_version", runtime_.firmwareVersion, true);
     publish("system/can1_profile", runtime_.can1Profile, true);
     publish("system/can2_profile", runtime_.can2Profile, true);
+    publish("system/ip_address", runtime_.ipAddress, true);
+    publish("system/device_name", runtime_.deviceName, true);
+    publish("system/mqtt_client_id", credentials_.thingName, true);
     publish("system/network_mode", runtime_.networkMode, true);
     publish("system/mqtt_transport", runtime_.transport, true);
-    publish("system/ip_address", runtime_.ipAddress, true);
     publish("system/boot_reason", resetReasonText(), true);
     publishLastSeenUtc();
     publishHeartbeat(true);

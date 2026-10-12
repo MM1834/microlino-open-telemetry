@@ -6,6 +6,8 @@
 #include <time.h>
 
 #include "c6_config.h"
+#include "c6_journey_energy.h"
+#include "c6_charge_journal.h"
 #include "telemetry/telemetry.h"
 
 #ifndef MOT_OFFLINE_CACHE_MAX_BYTES
@@ -378,6 +380,8 @@ void c6OfflineCachePurge()
     state.pendingBatchCount = 0;
     state.pendingBatchId = "";
     state.lastReplayResult = "purged";
+    c6JourneyBackfillPurge();
+    c6ChargeJournalPurge();
 }
 
 String c6OfflineCacheStatusJson()

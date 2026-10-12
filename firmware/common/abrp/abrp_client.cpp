@@ -7,9 +7,11 @@
 #include <time.h>
 
 #include "telemetry/telemetry.h"
+#include "network/resolved_network_client_secure.h"
 
 namespace {
 constexpr char ABRP_URL[] = "https://api.iternio.com/1/tlm/send";
+constexpr char ABRP_HOST[] = "api.iternio.com";
 constexpr uint32_t MIN_INTERVAL_MS = 15000;
 constexpr uint32_t DEFAULT_INTERVAL_MS = 60000;
 constexpr uint32_t HTTP_TIMEOUT_MS = 7000;
@@ -25,6 +27,7 @@ struct AbrpTaskInput {
 AbrpStatus currentStatus;
 SemaphoreHandle_t statusMutex = nullptr;
 uint32_t lastQueuedMs = 0;
+ResolvedNetworkClientSecure abrpTlsClient;
 
 bool validUnixTime(time_t value) { return value > 1700000000; }
 
@@ -121,7 +124,7 @@ void performSend(const AbrpTaskInput &input)
     HTTPClient http;
     http.setConnectTimeout(5000);
     http.setTimeout(HTTP_TIMEOUT_MS);
-    if (!http.begin(url)) {
+    if (!http.begin(abrpTlsClient, url)) {
         finishAttempt(false, 0, "http.begin failed");
         return;
     }
@@ -200,7 +203,26 @@ void setupAbrp(const AbrpSettings &settings)
 {
     if (statusMutex == nullptr) statusMutex = xSemaphoreCreateMutex();
     lockStatus(); currentStatus.enabled = abrpEnabled(settings); unlockStatus();
+    abrpTlsClient.configureServerIdentity(ABRP_HOST, "");
+    abrpTlsClient.setInsecure();
     Serial.println(abrpEnabled(settings) ? "ABRP: enabled" : "ABRP: disabled");
+}
+
+bool abrpPrepareNetwork() { return abrpTlsClient.resolveOnLoopTask(); }
+
+bool abrpTelemetryDue(const AbrpSettings &settings)
+{
+    const uint32_t interval = settings.intervalMs < MIN_INTERVAL_MS
+        ? DEFAULT_INTERVAL_MS : settings.intervalMs;
+    return millis() - lastQueuedMs >= interval;
+}
+
+bool abrpInFlight()
+{
+    lockStatus();
+    const bool value = currentStatus.inFlight;
+    unlockStatus();
+    return value;
 }
 
 bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locationProvider)
@@ -273,7 +295,6 @@ bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locat
 void abrpLoop(const AbrpSettings &settings, AbrpLocationProvider locationProvider)
 {
     if (!abrpEnabled(settings)) return;
-    const uint32_t interval = settings.intervalMs < MIN_INTERVAL_MS ? DEFAULT_INTERVAL_MS : settings.intervalMs;
-    if (millis() - lastQueuedMs < interval) return;
+    if (!abrpTelemetryDue(settings)) return;
     queueAbrpTelemetry(settings, locationProvider);
 }

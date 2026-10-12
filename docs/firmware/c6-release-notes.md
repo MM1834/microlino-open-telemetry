@@ -1,8 +1,219 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV31-AWS`
+> **Current repository release:** `C6-001-REV39-AWS`
+
+> **Separate analysis build:** `C6-001-REV36-BM2-BM6-DIAG` is an N16-only,
+> BLE battery-monitor qualification image for separate BM2 and BM6 protocols. It does not change the production REV36
+> release or its WebFlash artifacts.
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV39-AWS` — repository production candidate
+
+REV39 promotes the physically validated PRE7 N16 service-coexistence work into
+the canonical production build. `nanoesp32c6-n16` now includes the bonded,
+read-only MOT Display BLE service and the bounded TLS ownership handoff between
+AWS IoT, secure local MQTT and ABRP. Endpoint resolution remains on the Arduino
+loop task; blocking cloud work remains on the dedicated worker. AWS yields only
+after a stable, recently productive connection, reconnects after ABRP or local
+MQTT releases TLS, and disabled ABRP cannot request a pause.
+
+The exact N16 application is 1,924,800 bytes with SHA-256
+`25de26cfff41fd0de3cb8e98a9163d4cc2513cca771aef5420727f3ccbd5c9f0`.
+The XIAO compatibility application remains without Display BLE and is 1,493,488
+bytes with SHA-256
+`d41f76b3bc6eecad41d4eb79a675fac68239b4cef81717901d4f804f93bcb5ac`.
+Both builds and 112 focused firmware/service/policy/backfill tests pass. Physical
+PRE7 evidence covers the N16 implementation: ABRP returned HTTP 200, the local
+MQTT burst completed and AWS reconnected stably after its policy correction.
+REV38 remains the active controlled WebFlash release and rollback point; no
+catalog object, grant or deployed firmware was changed by this promotion.
+
+### `C6-001-REV38-AWS-DISPLAY-BLE-PRE7` — physically validated recovery candidate
+
+PRE7 completes the display-build TLS ownership work started in PRE5/PRE6. AWS
+now yields deliberately to bounded ABRP and secure-local-MQTT TLS windows and
+reconnects after their TLS objects are released. On the physical Pioneer N16,
+ABRP returned HTTP 200, the local-MQTT burst completed, AWS reconnected with
+zero current failures, and free heap recovered to 118,364 bytes with an 88,052-
+byte largest block. The connected MOT Display was previously measured at only
+about 2.4 KiB additional heap and is not the cause of the original ABRP deferral.
+
+The remaining AWS MQTT state `-3` was independently traced with an adapter-only
+AWS IoT debug target to a missing authorization for
+`mot/pioneer/charge/backfill/ack/v1`. Policy version 4 adds only
+`iot:Subscribe` on that exact topic filter and `iot:Receive` on that exact topic.
+After propagation, AWS IoT recorded successful subscriptions for charge,
+journey and history acknowledgements, followed by successful heartbeat,
+telemetry and MQTT ping traffic. The provisioning script and its contract test
+now include all three acknowledgement paths so future device policies retain the
+fix. Temporary adapter-specific debug logging and its IAM role were removed;
+the diagnostic log group expires under its 30-day retention setting.
+
+The exact PRE7 application is 1,924,848 bytes with SHA-256
+`fc750606b085227691aa60ef7d4c43077efef713cd9c03ff03304db1b49b5d1f`.
+It is installed on the Pioneer qualification adapter. Forty-seven focused AWS
+policy/service-parity/local-MQTT tests pass. PRE7 remains a local candidate; no
+controlled WebFlash release was changed. A follow-up account-wide audit then
+added the same vehicle-bound Charge-ACK Subscribe/Receive pair to the other 25
+regular bidirectional MOT device policies. Read-back confirms the exact pair on
+all 26 such policies. The publish-only Node-RED and WiCAN Lite identities plus
+the generic historical test policy remain unchanged.
+
+### `C6-001-REV38-AWS-DISPLAY-BLE-PRE6` — local recovery candidate
+
+PRE6 fixes the ABRP pause-state regression isolated during the 2026-10-12 PRE5
+physical soak. In the display build, an elapsed ABRP cadence could request and
+immediately release the cloud-worker TLS pause even while ABRP was disabled.
+That repeatedly closed an otherwise successful AWS MQTT connection after about
+100–300 ms (`MQTT_CONNECTION_LOST`, state `-3`). AWS-only testing reproduced
+the failure with local MQTT disabled and ABRP configured off, while the serial
+log exposed the repeated ABRP pause/release cycle.
+
+The C6 ABRP adapter now exits before network preparation or pause arbitration
+when ABRP is disabled or its credentials are incomplete. It also cancels a
+pending display-build request exactly once if ABRP is disabled during a send.
+The regression test asserts that this enabled check precedes every pause
+request. The PRE6 display application builds at 1,923,760 bytes with SHA-256
+`bc310e06643881a10503edbae0ce23d6ef64d4651ec8b7eec197bdd72d4c0768`;
+all 68 focused display/service/MQTT/cadence tests pass. Physical AWS-only and
+combined-service acceptance remain required before promotion.
+
+### `C6-001-REV38-AWS-DISPLAY-BLE-PRE5` — local recovery candidate
+
+PRE5 corrects the cloud-task and ABRP regression found during the 2026-10-12
+Pioneer USB diagnosis. The failing PRE4 build invoked Arduino's hostname
+resolver from the separate cloud worker; the decoded panic ended in lwIP
+`udp_new_ip_type` with `Required to lock TCPIP core functionality`. PRE5 resolves
+AWS, secure local MQTT and ABRP endpoints on the Arduino loop task, then gives
+the worker a resolved-address TLS client that retains the original hostname for
+SNI and certificate verification.
+
+The display build also treats AWS, secure local MQTT and ABRP as serialized TLS
+owners. Before an ABRP HTTPS task starts, the cloud worker closes both persistent
+MQTT transports and acknowledges the pause. It reconnects them only after the
+ABRP task has destroyed its HTTP/TLS objects. This retains the independent
+service settings and credentials while preventing the measured overlapping-heap
+condition. The canonical non-display N16 path keeps its established scheduling.
+
+Live evidence preceding the correction showed that the connected display itself
+cost only about 2.4 KiB. With local MQTT removed, ABRP immediately returned HTTP
+200 with zero low-memory skips; the separate worker DNS call then reproduced a
+panic reset. The PRE5 repository candidate builds at 1,923,696 bytes with SHA-256
+`701b4dfa2991373d65bef4e22554021046578d138321898e5fd253bf00c608fd`.
+The canonical N16 regression build also passes at 1,526,496 bytes. Sixty-eight
+focused display/service/MQTT/cadence tests pass. Physical installation and a
+combined AWS/local-MQTT/ABRP soak remain open; PRE5 is not a WebFlash release.
+
+### `C6-001-REV38-AWS` — active N16 WebFlash release
+
+REV38 adds the bounded N16 offline-charge journal from OFFLINE-ACT-001. A
+completed charging session that experienced a connectivity gap is retained in
+LittleFS and replayed as `charge/backfill/v1`; it is removed only after the
+matching AWS acknowledgement. The journal holds at most 16 compact records and
+is covered by the existing offline-cache setting and purge operation. AWS also
+reconciles fully offline charging from reconnect SOC and odometer snapshots.
+
+The initial release scope is `nanoesp32c6-n16`. XIAO and all other hardware
+remain outside this REV38 release until separately approved. Physical smoke and
+offline-charge replay acceptance remain open. The exact configuration-preserving
+N16 application is 1,523,824 bytes with SHA-256
+`c40a77ba5fc34c2425326dc500f6c3202104fd9bd90b0cfa117929afecb9eacf`.
+Private AES256/versioned S3 read-back matched on object version
+`f7wSa87gZALHAWwCPXJuNI3ezAsY6.8d`. Replacement-free Change Set
+`webflash-rev38-20261004` updated only the existing Onboarding Lambda and its
+exact-object IAM policy; the stack returned to `UPDATE_COMPLETE`. XIAO remains
+on REV36. Existing REV37 grants were deliberately not migrated and therefore
+fail closed until REV38 access is separately approved.
+
+### `C6-001-REV37-AWS` — repository candidate
+
+REV37 adds the N16 local journey recuperation peak from JNY-REGEN-PEAK-001. It
+updates the peak only from fresh valid Standard-CAN vehicle power while movement
+is confirmed and no plug/charging boundary is active. The non-decreasing whole-
+watt value joins the existing journey checkpoint and bounded offline journal;
+AWS prefers it over the lower-resolution observed telemetry peak for the same
+journey. No high-frequency history is added. XIAO retains the shared firmware
+line but its N16-only journey counter remains disabled.
+
+The exact configuration-preserving N16 WebFlash application is 1,516,064 bytes
+with SHA-256
+`53e50d2aabf4c6c93467e73814641ec0be3e313a856a3f2b1dd59737da7eca0d`.
+Private AES256/versioned S3 read-back matched on object version
+`EankjqU6MxPeo.DkSM93fePAFqBzz0yM`. Reviewed replacement-free Change Set
+`webflash-rev37-20261001` updated only the existing Lambda, its exact-object IAM
+policy and dynamically referenced API integration; the stack returned to
+`UPDATE_COMPLETE`. XIAO remains on REV36. Exactly four previously active N16
+grants were atomically migrated from the REV36 identity to REV37 with their
+existing expiries preserved and four audit events. All four read-only access
+checks return the exact REV37 release, anonymous HTTP remains 401 and the recent
+Lambda error log is clean. Physical installation remains open.
+
+### `C6-001-REV36-AWS` — repository candidate
+
+REV36 connects direct ABRP to the same adaptive scheduler introduced for AWS
+and local MQTT. ABRP keeps its independent HTTPS/JSON protocol and 60-second
+active base interval, but uses the 5-/10-minute parked steps and immediately
+queues on scheduler events. The controlled Nano test of REV35 remains valid as
+the MQTT-envelope/cadence baseline; REV36 adds only this ABRP scheduling slice.
+
+The exact REV36 application artifacts are active in the controlled WebFlash
+catalog for both `nanoesp32c6-n16` and `xiao-esp32c6` through replacement-free
+Change Set `webflash-rev36-20260928`. N16 is 1,506,752 bytes with SHA-256
+`b067438d46a8e4502065f22be25733bb57fbb90911f1876a4e8fb65f04bab71a`;
+XIAO is 1,481,264 bytes with SHA-256
+`aa8718e33763972c16282dfd401e26e28e7d1525237c89a9d636e638c0234ca3`.
+Both S3 read-backs matched, the objects are AES256 encrypted and versioned, the
+stack and Lambda are healthy, and anonymous firmware access remains HTTP 401.
+Physical WebFlash installation of this exact release remains open.
+
+### `C6-001-REV35-AWS` — repository candidate
+
+REV35 extends `telemetry/state/v1` to secure local MQTT with no local scalar or
+dual-publish mode. AWS and local MQTT now use independent configurable active
+intervals (defaults 5 s and 60 s) plus one shared adaptive cadence: 30 s minimum
+while charging, 5 minutes after 10 minutes parked and 10 minutes after 30
+minutes parked. Motion, charge, plug, door, electronic-lock and entry into the
+provisional absolute 12 kW peak band publish immediately; reconnect also sends
+immediately. The first local connection removes retained telemetry scalars left
+by older firmware and records completion. An envelope-aware ioBroker consumer
+and physical cadence/migration testing remain release gates.
+
+### `C6-001-REV34-AWS` — controlled AWS-envelope milestone
+
+REV34 replaces the periodic C6 AWS scalar burst with one retained, versioned,
+sub-4096-byte `telemetry/state/v1` envelope. AWS accepts both the new exact topic
+and legacy scalar topics automatically and normalizes them behind the unchanged
+State, History, WebSocket, notification and Vehicle API contracts. REV34 does
+not dual-publish periodic telemetry; rollback uses the previous firmware. N16
+and XIAO builds pass at 27.4%/18.2% and 83.0%/17.9% Flash/RAM respectively.
+Backend deployment and synthetic productive-IoT coexistence acceptance passed
+on 2026-09-26 with encrypted rollback artifacts. Controlled physical REV34
+publication, reconnect and roaming measurement remain open.
+
+### `C6-001-REV33-AWS` — repository candidate
+
+REV33 starts JNY-OFFLINE-001. On N16, the existing offline-cache setting now
+controls both the unchanged SOC/Speed History journal and a separate checksummed,
+bounded completed-journey journal. A journey that experienced an Internet gap is
+checkpointed, survives restart and is replayed on its own versioned MQTT path;
+local deletion follows only a matching AWS acknowledgement. The compact record
+contains UTC, odometer/SOC endpoints and energy totals but no GPS, route, WiFi or
+IP data. The AWS repository path is fail-closed behind a global default-off
+switch and has no vehicle allowlist. N16 builds at 27.4% flash and 18.1% RAM;
+automated backend, isolation and firmware-contract tests pass. Physical outage,
+reconnect and restart acceptance remains open.
+
+### `C6-001-REV32-AWS` — repository candidate
+
+REV32 adds the decoder-valid BMS SOC and cell-voltage values to C6 secure local
+MQTT, matching the existing AWS topic contract. This includes the Pioneer V1
+internal and display-correlated SOC candidates, V2 Standard-CAN SOC, pack
+voltage and the provisional cell-voltage extrema and delta. Seventeen focused
+BMS/local-MQTT tests pass. C6 N16 builds at 27.2% flash and 18.1% RAM; XIAO
+compatibility builds at 82.8% flash and 17.9% RAM. The functionality was
+physically accepted from the preceding build on 2026-09-21; installation and
+confirmation of the correctly identified REV32 artifact remain open.
 
 ### `C6-001-REV31-AWS` — repository candidate
 

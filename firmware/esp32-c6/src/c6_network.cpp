@@ -329,4 +329,5 @@ String c6NetworkStatus()
 
 bool c6NetworkApActive() { return apActive; }
 String c6NetworkApSsid() { return motFallbackApSsid(); }
+String c6NetworkApIp() { return apActive ? WiFi.softAPIP().toString() : String(); }
 String c6NetworkApPassword() { return activeApPassword(); }

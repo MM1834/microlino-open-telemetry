@@ -28,6 +28,10 @@ class EnvironmentValidationTests(unittest.TestCase):
             select_environment("esp32-c6", None),
             "nanoesp32c6-n16",
         )
+        self.assertEqual(
+            select_environment("wican-lite", None),
+            "wican-lite-esp32c3",
+        )
 
     def test_accepts_both_unified_c6_board_environments(self) -> None:
         self.assertEqual(

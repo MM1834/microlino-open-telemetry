@@ -22,6 +22,14 @@ String telemetryToJson(const MotTelemetry &state)
     doc["charging"]["power_signed"] = state.charging.powerSigned;
     doc["charging"]["last_update_ms"] = state.charging.lastUpdateMs;
 
+    doc["access"]["central_lock_valid"] = state.access.centralLockValid;
+    if (state.access.centralLockValid)
+        doc["access"]["central_locked"] = state.access.centralLocked;
+    doc["access"]["door_open_valid"] = state.access.doorOpenValid;
+    if (state.access.doorOpenValid)
+        doc["access"]["door_open"] = state.access.doorOpen;
+    doc["access"]["last_update_ms"] = state.access.lastUpdateMs;
+
     doc["bms"]["pack_status_valid"] = state.bms.packStatusValid;
     doc["bms"]["pack_current_valid"] = state.bms.packCurrentValid;
     doc["bms"]["cell_voltages_valid"] = state.bms.cellVoltagesValid;

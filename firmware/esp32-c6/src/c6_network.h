@@ -27,5 +27,6 @@ String c6NetworkLastDisconnectReasonName();
 uint32_t c6NetworkLastDisconnectAgeMs();
 bool c6NetworkLastDisconnectWasManagerInitiated();
 String c6NetworkApSsid();
+String c6NetworkApIp();
 String c6NetworkApPassword();
 void c6NetworkEnsureOnboardingAp();

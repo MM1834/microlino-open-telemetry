@@ -6,17 +6,23 @@
 #include "c6_board.h"
 #include "c6_abrp.h"
 #include "c6_aws.h"
+#include "c6_charge_journal.h"
+#include "c6_cloud_worker.h"
+#include "c6_bm2_diag.h"
 #include "c6_can_scan.h"
 #include "c6_drive_capture.h"
 #include "c6_soc_discovery.h"
 #include "c6_config.h"
 #include "c6_dual_can.h"
+#include "c6_display_ble.h"
 #include "c6_gps.h"
 #include "c6_journey_energy.h"
+#include "c6_lock_discovery.h"
 #include "c6_local_mqtt.h"
 #include "c6_network.h"
 #include "c6_offline_cache.h"
 #include "c6_status_led.h"
+#include "c6_telemetry_cadence.h"
 #include "system/device_id.h"
 #include "system/version.h"
 #include "c6_web.h"
@@ -133,6 +139,38 @@ void handleSerialCommand(String command)
         printSupportStatus();
         return;
     }
+    if (normalized == "bm2 scan") {
+        if (!c6Bm2DiagStartScan()) Serial.println("BM2 scan not started (not available or already running)");
+        return;
+    }
+    if (normalized == "bm2 stop") {
+        c6Bm2DiagStopScan();
+        return;
+    }
+    if (normalized == "bm2 status") {
+        c6Bm2DiagPrintStatus();
+        return;
+    }
+    if (normalized == "bm2 connect") {
+        if (!c6Bm2DiagConnect()) Serial.println("BM2 GATT connection was not established");
+        return;
+    }
+    if (normalized == "bm6 connect") {
+        if (!c6Bm6DiagConnect()) Serial.println("BM6 GATT connection was not established");
+        return;
+    }
+    if (normalized == "bm2 disconnect") {
+        c6Bm2DiagDisconnect();
+        return;
+    }
+    if (normalized == "bm2 history") {
+        if (!c6Bm2DiagRequestHistory()) Serial.println("BM2 history request was not started");
+        return;
+    }
+    if (normalized == "bm2 history dump") {
+        c6Bm2DiagDumpHistory();
+        return;
+    }
     if (normalized == "scan reset") {
         c6CanScanReset();
         return;
@@ -171,6 +209,26 @@ void handleSerialCommand(String command)
     }
     if (normalized == "soc 48d") {
         c6SocDiscovery48dDump();
+        return;
+    }
+    if (normalized == "lock reset") {
+        c6LockDiscoveryReset();
+        return;
+    }
+    if (normalized == "lock start") {
+        c6LockDiscoveryStart();
+        return;
+    }
+    if (normalized == "lock stop") {
+        c6LockDiscoveryStop();
+        return;
+    }
+    if (normalized == "lock dump") {
+        c6LockDiscoveryDump();
+        return;
+    }
+    if (normalized == "lock diff") {
+        c6LockDiscoveryDiff();
         return;
     }
 
@@ -291,7 +349,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: profiles | profile <1|2> <display|v1|v2|disabled> | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc diff | soc 48d | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
+        Serial.println("Commands: support status | profiles | profile <1|2> <display|v1|v2|disabled> | bm2 scan | bm2 stop | bm2 status | bm2 connect | bm6 connect | bm2 disconnect | bm2 history | bm2 history dump | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc diff | soc 48d | lock reset | lock start | lock stop | lock dump | lock diff | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
         return;
     }
 
@@ -341,6 +399,8 @@ void setup()
     c6ConfigLoad();
     c6OfflineCacheSetup();
     c6JourneyEnergySetup();
+    c6ChargeJournalSetup();
+    c6TelemetryCadenceSetup();
 
     if (!c6DualCanSetup()) {
         Serial.println("Dual-CAN startup incomplete");
@@ -352,20 +412,56 @@ void setup()
     c6AwsSetup();
     c6LocalMqttSetup();
     c6AbrpSetup();
+    c6DisplayBleSetup();
+#ifdef MOT_DISPLAY_BLE
+    c6CloudWorkerSetup();
+#endif
+    c6Bm2DiagSetup();
     c6DriveCaptureReset();
-    Serial.println("Console: profiles | profile <1|2> <display|v1|v2|disabled> | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
+    c6LockDiscoveryReset();
+    Serial.println("Console: support status | profiles | profile <1|2> <display|v1|v2|disabled> | bm2 scan | bm2 stop | bm2 status | bm2 connect | bm6 connect | bm2 disconnect | bm2 history | bm2 history dump | wifi status | wifi/wifi2 set <ssid>|<password> | wifi/wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
 }
 
 void loop()
 {
     c6DualCanLoop();
     c6JourneyEnergyLoop();
+    c6ChargeJournalLoop();
     c6GpsLoop();
+    c6TelemetryCadenceUpdate();
     c6NetworkLoop();
+    c6AwsPrepareNetwork();
+    c6LocalMqttPrepareNetwork();
     c6WebLoop();
+    c6DisplayBleLoop();
+    uint32_t serviceStartedMs = 0;
+    uint32_t serviceElapsedMs = 0;
+#ifdef MOT_DISPLAY_BLE
+    c6CloudWorkerLoop();
+#else
+    serviceStartedMs = millis();
     c6AwsLoop();
+    serviceElapsedMs = millis() - serviceStartedMs;
+    if (serviceElapsedMs >= 250U)
+        Serial.printf("Loop stall: service=aws durationMs=%lu\n",
+                      static_cast<unsigned long>(serviceElapsedMs));
+    c6DisplayBleLoop();
+    serviceStartedMs = millis();
     c6LocalMqttLoop();
+    serviceElapsedMs = millis() - serviceStartedMs;
+    if (serviceElapsedMs >= 250U)
+        Serial.printf("Loop stall: service=local-mqtt durationMs=%lu\n",
+                      static_cast<unsigned long>(serviceElapsedMs));
+#endif
+    c6DisplayBleLoop();
+    serviceStartedMs = millis();
     c6AbrpLoop();
+    serviceElapsedMs = millis() - serviceStartedMs;
+    if (serviceElapsedMs >= 250U)
+        Serial.printf("Loop stall: service=abrp durationMs=%lu\n",
+                      static_cast<unsigned long>(serviceElapsedMs));
+    c6DisplayBleLoop();
+    c6Bm2DiagLoop();
     c6StatusLedLoop();
     pollSerialCommands();
 
@@ -390,6 +486,10 @@ void loop()
             telemetry.display.speedKmh > 1.0f;
         Serial.printf("GPS altitude: %s\n", c6GpsStatusJson(gpsMoving).c_str());
         Serial.printf("WiFi=%s | AWS=%s | Local MQTT=%s\n", c6NetworkStatus().c_str(), c6AwsStatus().c_str(), c6LocalMqttStatusJson().c_str());
+#ifdef MOT_DISPLAY_BLE
+        Serial.println("Cloud worker=" + c6CloudWorkerStatusJson());
+#endif
+        Serial.println("Display BLE=" + c6DisplayBleStatusJson());
 
         const uint32_t packAgeMs = millis() - telemetry.bms.packStatusLastUpdateMs;
         const uint32_t cellsAgeMs = millis() - telemetry.bms.cellVoltagesLastUpdateMs;

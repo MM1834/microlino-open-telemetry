@@ -41,6 +41,10 @@ inline void decode18d(const uint8_t *data, const DecoderRules &rules)
     // Standard-CAN is authoritative for V1/V2 plugged state. Keep the
     // canonical charging field synchronized even if current is implausible.
     telemetry.charging.plugged = telemetry.bms.plugged;
+    if (telemetry.bms.plugged) {
+        telemetry.access.centralLockValid = false;
+        telemetry.access.lockSuppressedByCharging = true;
+    }
 
     if (voltagePlausible) {
         telemetry.bms.packStatusValid = true;

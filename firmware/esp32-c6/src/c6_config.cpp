@@ -66,6 +66,7 @@ void c6ConfigLoad()
     c6Config.localMqttUseClientCertificate = preferences.getBool("mqttMtls", false);
     c6Config.localMqttLocationEnabled = preferences.getBool("mqttLoc", false);
     c6Config.localMqttLocationCleanupPending = preferences.getBool("mqttLocClr", false);
+    c6Config.localMqttLegacyCleanupPending = !preferences.getBool("mqttEnv1", false);
     c6Config.localMqttHost = preferences.getString("mqttHost", "");
     c6Config.localMqttPort = preferences.getUShort("mqttPort", 8883);
     c6Config.localMqttVehicleId = preferences.getString("mqttVehicle", "");
@@ -86,6 +87,11 @@ void c6ConfigLoad()
     c6Config.otaEnabled = preferences.getBool("otaEn", false);
     c6Config.publishIntervalMs = preferences.getUInt("pubMs", 5000);
     if (c6Config.publishIntervalMs < 1000) c6Config.publishIntervalMs = 1000;
+    c6Config.localMqttPublishIntervalMs = preferences.getUInt("mqttPubMs", 60000);
+    if (c6Config.localMqttPublishIntervalMs < 5000)
+        c6Config.localMqttPublishIntervalMs = 5000;
+    if (c6Config.localMqttPublishIntervalMs > 3600000)
+        c6Config.localMqttPublishIntervalMs = 3600000;
     preferences.end();
 
     if (c6Config.setupPassword.length() < 12) {
@@ -167,6 +173,7 @@ void c6ConfigSave()
     preferences.putBool("mqttMtls", c6Config.localMqttUseClientCertificate);
     preferences.putBool("mqttLoc", c6Config.localMqttLocationEnabled);
     preferences.putBool("mqttLocClr", c6Config.localMqttLocationCleanupPending);
+    preferences.putBool("mqttEnv1", !c6Config.localMqttLegacyCleanupPending);
     preferences.putString("mqttHost", c6Config.localMqttHost);
     preferences.putUShort("mqttPort", c6Config.localMqttPort);
     preferences.putString("mqttVehicle", c6Config.localMqttVehicleId);
@@ -180,6 +187,7 @@ void c6ConfigSave()
     preferences.putUChar("onboardStep", c6Config.onboardingStep);
     preferences.putBool("otaEn", c6Config.otaEnabled);
     preferences.putUInt("pubMs", c6Config.publishIntervalMs);
+    preferences.putUInt("mqttPubMs", c6Config.localMqttPublishIntervalMs);
     preferences.end();
 }
 
@@ -286,6 +294,14 @@ void c6ConfigMarkLocalMqttLocationCleanupComplete()
     preferences.end();
 }
 
+void c6ConfigMarkLocalMqttEnvelopeMigrationComplete()
+{
+    c6Config.localMqttLegacyCleanupPending = false;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBool("mqttEnv1", true);
+    preferences.end();
+}
+
 void c6ConfigSetOfflineCacheEnabled(bool enabled)
 {
     const bool wasEnabled = c6Config.offlineCacheEnabled;
@@ -317,6 +333,7 @@ String c6ConfigExportJson(bool includeSecrets)
     doc["can1Profile"] = static_cast<int>(c6Config.can1Profile);
     doc["can2Profile"] = static_cast<int>(c6Config.can2Profile);
     doc["publishIntervalMs"] = c6Config.publishIntervalMs;
+    doc["localMqttPublishIntervalMs"] = c6Config.localMqttPublishIntervalMs;
     doc["otaEnabled"] = c6Config.otaEnabled;
     doc["motCloudEnabled"] = c6Config.motCloudEnabled;
     doc["abrpEnabled"] = c6Config.abrpEnabled;
@@ -367,6 +384,8 @@ bool c6ConfigImportJson(const String &json, String &error)
     }
     if (!doc["can2Profile"].isNull()) candidate.can2Profile = decoderProfileNormalize(doc["can2Profile"].as<int>(), DECODER_PROFILE_DISABLED);
     if (!doc["publishIntervalMs"].isNull()) candidate.publishIntervalMs = doc["publishIntervalMs"].as<uint32_t>();
+    if (!doc["localMqttPublishIntervalMs"].isNull())
+        candidate.localMqttPublishIntervalMs = doc["localMqttPublishIntervalMs"].as<uint32_t>();
     if (!doc["otaEnabled"].isNull()) candidate.otaEnabled = doc["otaEnabled"].as<bool>();
     if (!doc["motCloudEnabled"].isNull()) candidate.motCloudEnabled = doc["motCloudEnabled"].as<bool>();
     if (!doc["abrpEnabled"].isNull()) candidate.abrpEnabled = doc["abrpEnabled"].as<bool>();
@@ -400,6 +419,8 @@ bool c6ConfigImportJson(const String &json, String &error)
         (!candidate.localMqttTopicPrefix.isEmpty() && !validMqttIdentifier(candidate.localMqttTopicPrefix, 32)) ||
         candidate.localMqttUsername.length() > 128 || candidate.localMqttPort == 0 ||
         candidate.publishIntervalMs < 1000 || candidate.publishIntervalMs > 3600000 ||
+        candidate.localMqttPublishIntervalMs < 5000 ||
+        candidate.localMqttPublishIntervalMs > 3600000 ||
         candidate.onboardingStep < 1 || candidate.onboardingStep > 7) {
         error = "invalid WiFi, ABRP credentials, or publish interval";
         return false;

@@ -20,14 +20,15 @@ class C6JourneyEnergyCounterTests(unittest.TestCase):
         self.assertNotIn("MOT_JOURNEY_ENERGY_COUNTER=1", xiao)
         self.assertIn("#ifdef MOT_JOURNEY_ENERGY_COUNTER", COUNTER)
 
-    def test_counter_uses_ram_only_and_bounds_integration_gaps(self) -> None:
+    def test_counter_bounds_integration_gaps_and_persists_only_checkpoints(self) -> None:
         self.assertIn("double drawnWattMs", COUNTER)
         self.assertIn("double regenWattMs", COUNTER)
         self.assertIn("MAX_INTEGRATION_STEP_MS = 2000", COUNTER)
         self.assertIn("stepMs <= MAX_INTEGRATION_STEP_MS", COUNTER)
         self.assertNotIn("Preferences", COUNTER)
-        self.assertNotIn("LittleFS", COUNTER)
-        self.assertNotIn("File ", COUNTER)
+        self.assertIn("CHECKPOINT_MS = 60000", COUNTER)
+        self.assertIn("checkpointActive()", COUNTER)
+        self.assertIn("JOURNEY_MAX_RECORDS = 32", COUNTER)
 
     def test_counter_integrates_consumption_and_regeneration_separately(self) -> None:
         self.assertIn("telemetry.bms.vehiclePowerW", COUNTER)
@@ -54,12 +55,20 @@ class C6JourneyEnergyCounterTests(unittest.TestCase):
         self.assertIn("telemetry.bms.plugged || telemetryIsCharging()", COUNTER)
         self.assertIn("restartAfterPublish", COUNTER)
 
-    def test_checkpoint_is_bounded_and_non_retained(self) -> None:
+    def test_checkpoint_is_bounded_and_embedded_in_state_envelope(self) -> None:
         self.assertIn("CHECKPOINT_MS = 60000", COUNTER)
-        self.assertIn("counterIdJson += '\"';", COUNTER)
-        self.assertIn('"journey/energy_counter_id", counterIdJson, false', COUNTER)
-        self.assertIn('"journey/energy_drawn_wh", drawnWh(), false', COUNTER)
-        self.assertIn('"journey/energy_regen_wh", regenWh(), false', COUNTER)
+        self.assertIn('values["journey/energy_counter_id"] = state.counterId', COUNTER)
+        self.assertIn('values["journey/energy_drawn_wh"] = drawnWh()', COUNTER)
+        self.assertIn('values["journey/energy_regen_wh"] = regenWh()', COUNTER)
+        self.assertIn('values["journey/regen_peak_w"] = state.regenPeakW', COUNTER)
+        self.assertIn("c6JourneyEnergyEnvelopePublished", COUNTER)
+
+    def test_regen_peak_is_moving_only_and_survives_offline_backfill(self) -> None:
+        self.assertIn("telemetry.bms.isRegenerating", COUNTER)
+        self.assertIn("state.active && !state.sealed && movingNow && freshPower", COUNTER)
+        self.assertIn("record.regenPeakW = state.regenPeakW", COUNTER)
+        self.assertIn('item["regenPeakW"] = record.regenPeakW', COUNTER)
+        self.assertIn("uint16_t regenPeakW", COUNTER)
 
     def test_counter_updates_before_aws_publish_and_precedes_charge_boundary(self) -> None:
         loop = MAIN.split("void loop()", 1)[1]
@@ -67,8 +76,8 @@ class C6JourneyEnergyCounterTests(unittest.TestCase):
         self.assertLess(loop.index("c6JourneyEnergyLoop();"), loop.index("c6AwsLoop();"))
         publish = AWS.split("bool publishTelemetry()", 1)[1].split("return published;", 1)[0]
         self.assertLess(
-            publish.index("c6JourneyEnergyPublish(client)"),
-            publish.index('publishBool("charging/is_charging"'),
+            publish.index("c6JourneyEnergyAddToEnvelope(values)"),
+            publish.index('values["charging/is_charging"]'),
         )
 
 

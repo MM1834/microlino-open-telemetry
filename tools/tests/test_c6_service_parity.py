@@ -14,6 +14,13 @@ AWS_CLIENT = (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.cpp").read_te
 
 
 class C6ServiceParityTests(unittest.TestCase):
+    def test_canonical_n16_build_includes_display_ble(self) -> None:
+        platformio = (ROOT / "firmware/esp32-c6/platformio.ini").read_text()
+        n16 = platformio.split("[env:nanoesp32c6-n16]", 1)[1].split(
+            "[env:nanoesp32c6-n16-display-ble]", 1
+        )[0]
+        self.assertIn("-D MOT_DISPLAY_BLE=1", n16)
+
     def test_common_abrp_has_no_board_specific_dependencies(self) -> None:
         self.assertNotIn("app_config.h", ABRP)
         self.assertNotIn("wroom_gps.h", ABRP)
@@ -46,11 +53,22 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn("telemetry.bms.plugged && telemetry.bms.packCurrentA > 2.0f", telemetry)
         self.assertIn(": telemetry.charging.isCharging", telemetry)
 
-    def test_c6_abrp_yields_only_while_enabled_aws_is_reconnecting(self) -> None:
+    def test_c6_abrp_serializes_tls_with_display_cloud_worker(self) -> None:
         c6_abrp = (C6 / "c6_abrp.cpp").read_text(encoding="utf-8")
-        self.assertIn("c6AwsAllowsAbrp()", c6_abrp)
+        loop = c6_abrp.split("void c6AbrpLoop()", 1)[1].split(
+            "bool c6AbrpQueueTelemetry()", 1)[0]
+        self.assertIn("if (!abrpEnabled(current))", loop)
+        self.assertLess(
+            loop.index("if (!abrpEnabled(current))"),
+            loop.index("c6CloudWorkerRequestAbrpPause()"),
+        )
+        self.assertIn("c6CloudWorkerRequestAbrpPause()", c6_abrp)
+        self.assertIn("c6CloudWorkerAbrpPauseReady()", c6_abrp)
+        self.assertIn("c6CloudWorkerReleaseAbrpPause()", c6_abrp)
+        self.assertIn("abrpPrepareNetwork()", c6_abrp)
         self.assertIn("c6NetworkTransportReady()", c6_abrp)
-        self.assertIn("!c6Config.motCloudEnabled || !client.enabled() || client.connected()", AWS)
+        self.assertIn("c6AwsReadyForTlsPause()", c6_abrp)
+        self.assertIn("resolveEndpointOnLoopTask()", AWS)
 
     def test_mot_cloud_can_be_disabled_without_deleting_credentials(self) -> None:
         config_h = (C6 / "c6_config.h").read_text(encoding="utf-8")
@@ -102,11 +120,15 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn('normalized == "abrp clear"', MAIN)
 
     def test_aws_connect_failure_is_bounded_and_backed_off(self) -> None:
-        self.assertIn("secureClient_.setHandshakeTimeout(7)", AWS_CLIENT)
-        self.assertIn("mqtt_.setSocketTimeout(5)", AWS_CLIENT)
+        self.assertIn("secureClient_.setHandshakeTimeout(3)", AWS_CLIENT)
+        self.assertIn("mqtt_.setSocketTimeout(2)", AWS_CLIENT)
         self.assertIn("MAX_RECONNECT_INTERVAL_MS", (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.h").read_text())
+        self.assertIn("STABLE_CONNECTION_MS", AWS_CLIENT)
+        self.assertIn("connectedDurationMs", AWS_CLIENT)
+        self.assertIn("birthPublished_", AWS_CLIENT)
         self.assertIn("consecutiveConnectFailures", AWS_CLIENT)
         self.assertIn("totalConnectFailures", AWS_CLIENT)
+        self.assertIn("if (minimalBirth_)", AWS_CLIENT)
 
     def test_c6_persists_service_state_but_redacts_secrets(self) -> None:
         self.assertIn('preferences.putBool("abrpEn"', CONFIG)
@@ -232,7 +254,11 @@ class C6ServiceParityTests(unittest.TestCase):
         config_h = (C6 / "c6_config.h").read_text(encoding="utf-8")
         self.assertIn("bool offlineCacheEnabled = true", config_h)
         self.assertIn('preferences.getBool("cacheEn", true)', CONFIG)
-        self.assertIn("Default: enabled. Temporarily stores supported telemetry", WEB)
+        self.assertIn(
+            "Default: enabled. Temporarily stores supported History samples "
+            "and compact completed journeys",
+            WEB,
+        )
 
     def test_wizard_configuration_steps_never_reboot_individually(self) -> None:
         hardware_handler = WEB.split("void wizardHardwareSave()", 1)[1].split("void onboardingStep()", 1)[0]
@@ -268,10 +294,18 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn('" tlsCode="', AWS)
         self.assertIn('" tls="', AWS)
 
+    def test_aws_status_exposes_mqtt_volume_and_disconnect_counters(self) -> None:
+        aws_header = (ROOT / "firmware/shared-libs/MotAwsIot/src/MotAwsIot.h").read_text(encoding="utf-8")
+        for field in ("payloadBytes", "mqttPublishBytes", "disconnectCount"):
+            self.assertIn(field, aws_header)
+        self.assertIn("remainingLengthBytes", AWS_CLIENT)
+        self.assertIn('" mqttPublishBytes="', AWS)
+        self.assertIn('" disconnects="', AWS)
+
     def test_wizard_explains_connectivity_services_validation_and_ip_handoff(self) -> None:
         self.assertIn("Use a 2.4 GHz WiFi network", WEB)
         self.assertIn("Maximize Compatibility", WEB)
-        self.assertLess(WEB.index("<h3>History cache</h3>"), WEB.index("<h3>ABRP (optional)</h3>"))
+        self.assertLess(WEB.index("<h3>Offline cache</h3>"), WEB.index("<h3>ABRP (optional)</h3>"))
         self.assertIn("<hr><h3>ABRP (optional)</h3>", WEB)
         self.assertIn("Device and telemetry validation", WEB)
         self.assertIn("Start validation", WEB)

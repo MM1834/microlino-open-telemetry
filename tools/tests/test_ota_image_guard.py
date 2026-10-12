@@ -17,6 +17,8 @@ class OtaImageGuardTests(unittest.TestCase):
 
     def test_guard_compares_chip_and_physical_flash(self):
         self.assertIn("defined(CONFIG_IDF_TARGET_ESP32C6)", GUARD)
+        self.assertIn("defined(CONFIG_IDF_TARGET_ESP32C3)", GUARD)
+        self.assertIn("return 5;", GUARD)
         self.assertNotIn("CONFIG_IDF_TARGET_ESP32_C6", GUARD)
         self.assertIn('#error "Unsupported ESP target for OTA image guard"', GUARD)
         self.assertIn("imageChipId != runningChipId", GUARD)

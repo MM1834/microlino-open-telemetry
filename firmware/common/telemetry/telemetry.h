@@ -20,6 +20,17 @@ struct MotChargingTelemetry {
     uint32_t lastUpdateMs = 0;
 };
 
+struct MotAccessTelemetry {
+    bool centralLockValid = false;
+    bool centralLocked = false;
+    bool doorOpenValid = false;
+    bool doorOpen = false;
+    bool lockSuppressedByCharging = false;
+    bool lockRawSeen = false;
+    uint8_t lockRaw = 0;
+    uint32_t lastUpdateMs = 0;
+};
+
 struct MotBmsTelemetry {
     bool packStatusValid = false;
     bool packCurrentValid = false;
@@ -67,6 +78,7 @@ struct MotSystemTelemetry {
 struct MotTelemetry {
     MotDisplayTelemetry display;
     MotChargingTelemetry charging;
+    MotAccessTelemetry access;
     MotBmsTelemetry bms;
     MotSystemTelemetry system;
 };

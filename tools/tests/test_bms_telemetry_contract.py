@@ -57,8 +57,8 @@ class BmsTelemetryContractTests(unittest.TestCase):
 
     def test_aws_soc_remains_display_can_soc(self) -> None:
         source = (ROOT / "firmware/esp32-c6/src/c6_aws.cpp").read_text()
-        self.assertIn('publishFloat("display/soc", telemetry.display.soc, 1)', source)
-        self.assertNotIn('publishFloat("display/soc", telemetry.bms.socPercent', source)
+        self.assertIn('values["display/soc"] = roundf(telemetry.display.soc', source)
+        self.assertNotIn('values["display/soc"] = telemetry.bms.socPercent', source)
         self.assertIn("telemetry.bms.statusLastUpdateMs != 0", source)
 
     def test_standard_can_prevents_all_display_charging_overrides(self) -> None:
@@ -100,6 +100,7 @@ class BmsTelemetryContractTests(unittest.TestCase):
             ROOT / "firmware/esp32-wroom/src/mqtt/mqtt_client.cpp",
             ROOT / "firmware/lilygo-t-a7670/src/mqtt/lilygo_mqtt.cpp",
             ROOT / "firmware/esp32-c6/src/c6_aws.cpp",
+            ROOT / "firmware/esp32-c6/src/c6_local_mqtt.cpp",
         )
         for path in publishers:
             source = path.read_text()
@@ -145,6 +146,24 @@ class BmsTelemetryContractTests(unittest.TestCase):
         self.assertIn('id="bms-soc-display-row" hidden', html)
         self.assertIn('id="bms-standard-soc-row" hidden', html)
         self.assertIn('id="bms-soh-row" hidden', html)
+
+    def test_portal_resolves_all_soc_sources_without_breaking_display_can(self) -> None:
+        source = (ROOT / "build/dashboard/current/js/app.js").read_text()
+        history = (ROOT / "build/dashboard/current/js/history/history-recorder.js").read_text()
+        html = (ROOT / "build/dashboard/current/index.html").read_text()
+        self.assertIn(
+            "['display/soc', 'bms/soc_display', 'bms/standard_soc']",
+            source,
+        )
+        self.assertIn("function resolvedSoc()", source)
+        self.assertIn("return candidates[0];", source)
+        self.assertNotIn("candidate.receivedAt > selected.receivedAt", source)
+        self.assertEqual(source.count("renderResolvedSoc();"), 3)
+        self.assertIn(
+            '["display/soc","display.soc","bms/soc_display","bms.soc_display","bms/standard_soc","bms.standard_soc","soc"]',
+            history,
+        )
+        self.assertIn("history-recorder.js?v=20260924-mot-lite-soc1", html)
 
     def test_compatibility_power_uses_vehicle_sign_convention(self) -> None:
         for path in (

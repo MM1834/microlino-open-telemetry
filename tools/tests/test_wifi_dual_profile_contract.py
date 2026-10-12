@@ -95,6 +95,31 @@ class WifiDualProfileContractTests(unittest.TestCase):
         self.assertIn('\\"lastDisconnectName\\"', WEB)
         self.assertIn("ARDUINO_EVENT_WIFI_STA_DISCONNECTED", NETWORK)
 
+    def test_serial_diagnostics_show_wifi_names_and_ip_without_passwords(self) -> None:
+        status = MAIN.split('if (normalized == "wifi status")', 1)[1].split("return;", 1)[0]
+        self.assertIn('"WiFi: " + c6NetworkStatus()', status)
+        self.assertIn('"WiFi profiles: home=', status)
+        self.assertIn("c6Config.wifiSsid", status)
+        self.assertIn("c6Config.wifi2Ssid", status)
+        self.assertNotIn("wifiPassword", status)
+        self.assertNotIn("wifi2Password", status)
+        self.assertIn("c != '\"'", MAIN)
+
+    def test_support_status_is_read_only_and_keeps_legacy_diagnostics(self) -> None:
+        status = MAIN.split('if (normalized == "support status")', 1)[1].split("return;", 1)[0]
+        self.assertIn("printSupportStatus()", status)
+        for prefix in (
+            "Support system:", "Support network:", "Support AWS:", "Support cache:",
+            "Support time:", "Support CAN%u:",
+        ):
+            self.assertIn(prefix, MAIN)
+        for legacy in ('normalized == "wifi status"', 'normalized == "aws status"',
+                       'normalized == "cache status"', 'normalized == "profiles"'):
+            self.assertIn(legacy, MAIN)
+        support = MAIN.split("void printSupportStatus()", 1)[1].split("void handleSerialCommand", 1)[0]
+        self.assertNotIn("wifiPassword", support)
+        self.assertNotIn("wifi2Password", support)
+
 
 if __name__ == "__main__":
     unittest.main()

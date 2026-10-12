@@ -17,6 +17,7 @@ struct C6Configuration {
     bool localMqttUseClientCertificate = false;
     bool localMqttLocationEnabled = false;
     bool localMqttLocationCleanupPending = false;
+    bool localMqttLegacyCleanupPending = true;
     String localMqttHost;
     uint16_t localMqttPort = 8883;
     String localMqttVehicleId;
@@ -30,6 +31,7 @@ struct C6Configuration {
     uint8_t onboardingStep = 1;
     bool otaEnabled = false;
     uint32_t publishIntervalMs = 5000;
+    uint32_t localMqttPublishIntervalMs = 60000;
 };
 
 extern C6Configuration c6Config;
@@ -54,6 +56,7 @@ bool c6ConfigSetLocalMqttConnection(const String &host, uint16_t port,
     bool useClientCertificate);
 void c6ConfigSetLocalMqttLocationEnabled(bool enabled);
 void c6ConfigMarkLocalMqttLocationCleanupComplete();
+void c6ConfigMarkLocalMqttEnvelopeMigrationComplete();
 void c6ConfigSetOfflineCacheEnabled(bool enabled);
 String c6ConfigRecoverAdminPassword();
 String c6ConfigExportJson(bool includeSecrets = false);

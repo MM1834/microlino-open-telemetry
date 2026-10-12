@@ -25,4 +25,11 @@ void decoderStandardCanV1PioneerHandleFrame(const MotCanFrame &frame)
         return;
     }
     MotStandardCanBms::handleFrame(frame, PIONEER_RULES);
+    if (!frame.extended && frame.id == 0x18D && frame.dlc == 8) {
+        // Pioneer V1's display-correlated SOC is carried by 0x48D byte 7.
+        // 0x18D byte 7 has been observed fixed at 100 while the cockpit and
+        // 0x48D report a lower SOC, so it must not become canonical SOC.
+        telemetry.bms.standardSocValid = false;
+        telemetry.bms.socPercent = NAN;
+    }
 }

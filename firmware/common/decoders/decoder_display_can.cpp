@@ -6,6 +6,42 @@
 static constexpr float RANGE_FULL_KM = 140.0f;
 static constexpr uint8_t CHARGING_POWER_THRESHOLD = 32;
 
+static bool chargingContext()
+{
+    return telemetry.charging.plugged || telemetry.charging.isCharging ||
+           telemetry.bms.plugged || telemetryIsCharging();
+}
+
+static void decode601(const uint8_t *b)
+{
+    telemetry.access.doorOpenValid = true;
+    telemetry.access.doorOpen = (b[0] & 0x80) != 0;
+    telemetry.access.lastUpdateMs = millis();
+
+    const uint8_t raw = b[3];
+    const bool recognized = raw == 0x01 || raw == 0x02;
+    if (chargingContext()) {
+        telemetry.access.centralLockValid = false;
+        telemetry.access.lockSuppressedByCharging = true;
+    } else if (recognized) {
+        // During charging 0x601 can remain at 0x01 independent of the real
+        // electronic lock state. After unplugging, require a new electronic
+        // state transition before trusting it again.
+        if (!telemetry.access.lockSuppressedByCharging ||
+            !telemetry.access.lockRawSeen || raw != telemetry.access.lockRaw) {
+            telemetry.access.centralLocked = raw == 0x01;
+            telemetry.access.centralLockValid = true;
+            telemetry.access.lockSuppressedByCharging = false;
+        } else {
+            telemetry.access.centralLockValid = false;
+        }
+    } else {
+        telemetry.access.centralLockValid = false;
+    }
+    telemetry.access.lockRaw = raw;
+    telemetry.access.lockRawSeen = true;
+}
+
 static void decode602(const uint8_t *b)
 {
     telemetry.display.valid = true;
@@ -44,6 +80,7 @@ void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
     }
 
     switch (frame.id) {
+        case 0x601: decode601(frame.data); break;
         case 0x602: decode602(frame.data); break;
         case 0x603: decode603(frame.data); break;
         // 0x604 data[4] bit 4 was previously treated as a plugged flag.

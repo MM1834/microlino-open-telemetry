@@ -33,6 +33,9 @@ struct AbrpStatus {
 };
 
 void setupAbrp(const AbrpSettings &settings);
+bool abrpPrepareNetwork();
+bool abrpTelemetryDue(const AbrpSettings &settings);
+bool abrpInFlight();
 void abrpLoop(const AbrpSettings &settings, AbrpLocationProvider locationProvider = nullptr);
 bool abrpEnabled(const AbrpSettings &settings);
 bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locationProvider = nullptr);

@@ -10,6 +10,7 @@ Example:
   ./tools/bootstrap_aws_iot_thing.sh eu-central-1 mot-esp32-f924f0 pioneer esp32-wroom
   ./tools/bootstrap_aws_iot_thing.sh eu-north-1 mot-lilygo-fe8ce0 pioneer lilygo-t-a7670
   ./tools/bootstrap_aws_iot_thing.sh eu-north-1 mot-esp32c6-daa280 pioneer esp32-c6
+  ./tools/bootstrap_aws_iot_thing.sh eu-north-1 mot-esp32c3-d629c4 mot-lite-c429d6 wican-lite
 
 Requirements:
   - AWS CLI v2 configured with an IAM identity allowed to manage AWS IoT
@@ -56,7 +57,8 @@ fi
 
 if [[ "$BOARD_TYPE" != "esp32-wroom" &&
       "$BOARD_TYPE" != "lilygo-t-a7670" &&
-      "$BOARD_TYPE" != "esp32-c6" ]]; then
+      "$BOARD_TYPE" != "esp32-c6" &&
+      "$BOARD_TYPE" != "wican-lite" ]]; then
   echo "Invalid board type: $BOARD_TYPE"
   exit 1
 fi
@@ -105,6 +107,30 @@ chmod 644 "$OUT_DIR/device-certificate.pem.crt" "$OUT_DIR/device-public-key.pem.
 CERT_ARN="$(jq -r '.certificateArn' "$CERT_JSON")"
 CERT_ID="$(jq -r '.certificateId' "$CERT_JSON")"
 
+if [[ "$BOARD_TYPE" == "wican-lite" ]]; then
+cat > "$OUT_DIR/policy.json" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "iot:Connect",
+      "Resource": "arn:aws:iot:${REGION}:${ACCOUNT_ID}:client/${THING_NAME}"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Publish",
+        "iot:RetainPublish"
+      ],
+      "Resource": [
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/*"
+      ]
+    }
+  ]
+}
+EOF
+else
 cat > "$OUT_DIR/policy.json" <<EOF
 {
   "Version": "2012-10-17",
@@ -130,7 +156,9 @@ cat > "$OUT_DIR/policy.json" <<EOF
       "Resource": [
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/commands/*",
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/configuration/*",
-        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/history/backfill/ack/v1"
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/history/backfill/ack/v1",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/journey/backfill/ack/v1",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/mot/${VEHICLE_ID}/charge/backfill/ack/v1"
       ]
     },
     {
@@ -139,12 +167,15 @@ cat > "$OUT_DIR/policy.json" <<EOF
       "Resource": [
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/commands/*",
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/configuration/*",
-        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/history/backfill/ack/v1"
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/history/backfill/ack/v1",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/journey/backfill/ack/v1",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/mot/${VEHICLE_ID}/charge/backfill/ack/v1"
       ]
     }
   ]
 }
 EOF
+fi
 
 aws iot create-policy \
   --region "$REGION" \

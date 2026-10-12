@@ -14,7 +14,9 @@ Current implemented slice:
 - shared optional-GPS detection and NMEA fix-state handling;
 - bounded in-memory drive capture with on-demand summaries for known CAN IDs;
 - WiFi station configuration and optional runtime per-device AWS IoT publication;
-- N16-only RAM journey-energy accumulator with 60-second and stop checkpoints;
+- N16-only journey-energy accumulator with 60-second durable checkpoints and a
+  separate acknowledged completed-journey replay journal under the existing
+  offline-cache setting;
 - protected device-specific setup/fallback AP and non-blocking reconnect;
 - authenticated local WebUI, backup/restore, factory reset and local OTA;
 - authenticated seven-step local device onboarding wizard;
@@ -33,6 +35,17 @@ Build without flashing:
 ```sh
 pio run -e nanoesp32c6-n16
 pio run -e xiao-esp32c6
+```
+
+The canonical `nanoesp32c6-n16` production environment includes the bounded
+local-display BLE GATT service. It
+publishes one versioned, CRC-protected 16-byte notification at no more than 5 Hz
+and exposes no write characteristic. BLE remains disabled on XIAO. The former
+`nanoesp32c6-n16-display-ble` environment remains as a compatibility alias for
+local tooling; both names now produce the same production feature set. Build with:
+
+```sh
+pio run -e nanoesp32c6-n16
 ```
 
 Both canonical environments always include AWS IoT and LittleFS. MOT Cloud is
@@ -80,11 +93,12 @@ flat-road traction/regeneration test. The completed 2026-08-06 test confirmed
 negative pack current during traction, positive pack current during regeneration
 and increased electrical regeneration under light braking.
 
-### Dedicated B.025 SOC-discovery image
+### Dedicated B.025 SOC/lock-discovery image
 
 The `nanoesp32c6-n16-soc-diagnostic` environment adds a passive, RAM-only scan of
-all 11-bit CAN1 identifiers. It is intended for the B.025 test adapter and reports
-itself as `C6-001-REV15-SOC-DIAG-B025`; it does not change decoder or AWS topic
+all 11-bit CAN1 identifiers plus a bounded change recorder for every 11-bit frame
+on CAN1 and CAN2. It is intended for the B.025 test adapter and reports itself as
+`C6-001-REV36-SOC-LOCK-DIAG-B025`; it does not change decoder or AWS topic
 semantics. At a stable displayed SOC, run `soc reset`, wait for all buses to be
 active, then run `soc mark`. After driving or charging changes the displayed SOC,
 run `soc dump`. The comparison lists byte and 16-bit little-/big-endian fields
@@ -95,6 +109,89 @@ and other coincidental matches. State is lost on restart.
 with the last `soc mark`, even when Display-CAN SOC has not changed. It is intended
 for controlled plugged and charging state transitions; repeat transitions to
 separate state bits from rolling counters.
+
+For lock-state discovery, keep the door position unchanged and run `lock start`
+before the remote-control transition. `lock stop` freezes the 1,024 most recent
+payload changes, `lock dump` prints them with channel and timestamp, and
+`lock diff` compares the latest payload per identifier with the start mark.
+Repeated lock or unlock commands without a state change help distinguish a
+momentary command from a persistent locked/unlocked bit. The recorder is passive,
+RAM-only and is cleared on restart or by `lock reset`. A single identifier is
+limited to 32 stored changes per capture so a rolling counter cannot displace
+the state transitions from all other identifiers.
+
+### Dedicated B.025 data-usage analysis image
+
+The `nanoesp32c6-n16-data-analysis-b025` environment uses the current REV36 N16
+feature set without the RAM-heavy SOC/lock recorder and identifies itself as
+`C6-001-REV36-DATA-ANALYSIS2-B025`. Runtime diagnostics expose separate AWS and
+secure-local-MQTT publish counts, application payload bytes, estimated MQTT
+PUBLISH packet bytes, connection successes or reconnects, and disconnects.
+This second temporary analysis image checkpoints the three local-MQTT volume
+counters as one NVS blob at most every 20 minutes and only after a successful
+publish changed them. A restart restores the last completed checkpoint, so a
+hard power loss can discard at most the newest 20-minute interval. Additional
+status fields expose restore state, successful checkpoints, write failures and
+checkpoint age. Production builds remain RAM-only. All variants deliberately
+exclude TLS, TCP/IP and mobile-network framing. Compare their deltas over the
+same interval with the router/provider counter; a large remainder indicates
+connection handshakes, other router traffic or accounting outside MQTT PUBLISH
+packets.
+
+### Optional N16 BM2 BLE diagnostic image
+
+The `nanoesp32c6-n16-bm2-diagnostic` environment is a separate BM2/BM6 diagnostic
+application based on the complete REV36 N16 firmware. It identifies itself as
+`C6-001-REV36-BM2-BM6-AUTO-DIAG`, uses the normal 16 MB partition table and does not erase
+or migrate NVS, WiFi, service credentials or local configuration. It is not a
+production or WebFlash target and is deliberately unavailable for the 4 MB XIAO.
+
+The image performs bounded BLE identification scans after the normal network startup.
+It first checks for the 16-byte encrypted manufacturer advertisement used by some
+BM2-type 12-V battery monitors. Active scan requests also retrieve device names
+and advertised services from otherwise incompatible candidates. Automatic scans
+start after 30 seconds, last 15 seconds and repeat at most once per minute with a
+20-percent scan window to keep initial WiFi/AWS qualification representative.
+
+After a qualified candidate is found, this special diagnostic image automatically
+opens one bounded GATT session. BM6 receives only the documented live activation
+query. BM2 first collects live FFF4 values and then requests the known read-only
+history transfer. The session ends after a successful capture or after 60 seconds
+and permits no more than three connection attempts per boot. The physically tested
+BM2 accepts only one BLE client at a time, so its smartphone application must be
+fully disconnected during diagnosis.
+
+The authenticated local Runtime Diagnostics expose the phase, attempt count,
+single-client warning, live values and BM2 history summary under
+`bm2.autoDiagnostic`; a remote pilot needs no terminal command. The USB console
+commands remain available for development:
+
+```text
+bm2 scan
+bm2 stop
+bm2 status
+bm2 connect
+bm6 connect
+bm2 disconnect
+bm2 history
+bm2 history dump
+```
+
+The exact AEG BM2 was identified as an FFF0 device whose advertisement does not
+contain the known live-value frame. FFF4 voltage notifications are physically
+confirmed. The explicit `bm2 history` command sends only the documented encrypted
+history count/data requests to FFF3; it does not change configuration. A bounded
+8-KiB buffer summarizes up to 2,048 two-minute samples, and `bm2 history dump` emits the
+reconstructed UTC series for analysis. No AWS publication or cloud-portal
+integration exists. BM2 telemetry remains outside numbered production
+firmware, and all other writes remain outside this diagnostic slice.
+
+For a scanned device named `BM6`, `bm6 connect` uses its separate AES key,
+subscribes to FFF4 and sends the documented encrypted `D1 55 07` activation
+query through FFF3. The diagnostic decoder exposes plausible voltage,
+temperature and SOC. BM6 History is not implemented because the available
+reference protocol documents only the live response. BM2 and BM6 state remain
+strictly separate.
 
 ## WiFi and AWS qualification
 
