@@ -60,8 +60,23 @@ static void decode602(const uint8_t *b)
     telemetry.display.estimatedRangeKm = roundf(RANGE_FULL_KM * telemetry.display.soc / 100.0f);
 }
 
+void decoderDisplayCanHandleIndicatorFrame(const MotCanFrame &frame)
+{
+    if (frame.extended || frame.dlc < 8 || frame.id != 0x603) return;
+    const uint8_t *b = frame.data;
+    // DBC start bits 17/18/19 are Intel-order bits 1/2/3 in data byte 2.
+    // Some dashboards may signal hazards only through the dedicated hazard
+    // bit, so make that state illuminate both direction indicators.
+    const bool hazardsActive = (b[2] & 0x08U) != 0;
+    telemetry.display.indicatorStateValid = true;
+    telemetry.display.leftIndicatorActive = hazardsActive || (b[2] & 0x04U) != 0;
+    telemetry.display.rightIndicatorActive = hazardsActive || (b[2] & 0x02U) != 0;
+    telemetry.display.indicatorLastUpdateMs = millis();
+}
+
 static void decode603(const uint8_t *b)
 {
+
     telemetry.charging.valid = true;
     telemetry.charging.lastUpdateMs = millis();
     telemetry.charging.powerDisplay = b[4];
@@ -82,7 +97,10 @@ void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
     switch (frame.id) {
         case 0x601: decode601(frame.data); break;
         case 0x602: decode602(frame.data); break;
-        case 0x603: decode603(frame.data); break;
+        case 0x603:
+            decoderDisplayCanHandleIndicatorFrame(frame);
+            decode603(frame.data);
+            break;
         // 0x604 data[4] bit 4 was previously treated as a plugged flag.
         // Controlled unplugged testing disproved that interpretation. Keep the
         // frame out of canonical telemetry; raw capture remains available in

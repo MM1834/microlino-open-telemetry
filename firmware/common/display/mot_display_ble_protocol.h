@@ -10,6 +10,7 @@ constexpr char kTelemetryUuid[] = "cba1d466-344c-4be3-ab3f-189f80dd7518";
 constexpr char kStatusUuid[] = "d8f3f4c2-7795-4c3d-9e71-33f4f6c0b112";
 constexpr char kCapabilitiesUuid[] = "66c17b7e-21e4-4bc2-9d4d-bf6ff52c4d01";
 constexpr char kExtendedTelemetryUuid[] = "e417d275-18c1-4bc5-8f8e-4c864f6061d1";
+constexpr char kDrivingStatusUuid[] = "6f6572db-4ee8-4e8b-91cb-356e86f97d3a";
 constexpr uint16_t kMagic = 0x4D54;  // "MT" on the wire, little endian.
 constexpr uint8_t kProtocolVersion = 1;
 constexpr uint8_t kCapabilitiesVersion = 1;
@@ -24,6 +25,14 @@ enum FeatureFlags : uint16_t {
     kStatusV1Feature = 1U << 1,
     kBondedEncryptionFeature = 1U << 2,
     kExtendedTelemetryV1Feature = 1U << 3,
+    kDrivingStatusV1Feature = 1U << 4,
+};
+
+enum DrivingFlags : uint8_t {
+    kDrivingSpeedValid = 1U << 0,
+    kIndicatorStateValid = 1U << 1,
+    kLeftIndicatorActive = 1U << 2,
+    kRightIndicatorActive = 1U << 3,
 };
 
 enum ExtendedFlags : uint16_t {
@@ -124,12 +133,23 @@ struct ExtendedTelemetryV1 {
     uint16_t chargeRemainingMinutes;
     uint16_t crc16;
 };
+
+struct DrivingStatusV1 {
+    uint16_t magic;
+    uint8_t version;
+    uint8_t flags;
+    uint16_t sequence;
+    uint16_t speedDeciKmh;
+    uint16_t sourceAgeMs;
+    uint16_t crc16;
+};
 #pragma pack(pop)
 
 static_assert(sizeof(TelemetryV1) == 16, "BLE display packet must remain 16 bytes");
 static_assert(sizeof(StatusV1) == 60, "BLE display status packet must remain 60 bytes");
 static_assert(sizeof(CapabilitiesV1) == 10, "BLE capability packet must remain 10 bytes");
 static_assert(sizeof(ExtendedTelemetryV1) == 32, "BLE extended packet must remain 32 bytes");
+static_assert(sizeof(DrivingStatusV1) == 12, "BLE driving packet must remain 12 bytes");
 
 inline uint16_t crc16Ccitt(const uint8_t *data, size_t length)
 {
@@ -195,6 +215,19 @@ inline bool valid(const ExtendedTelemetryV1 &packet)
     return packet.magic == kMagic && packet.version == kProtocolVersion &&
         packet.crc16 == crc16Ccitt(reinterpret_cast<const uint8_t *>(&packet),
                                   offsetof(ExtendedTelemetryV1, crc16));
+}
+
+inline void seal(DrivingStatusV1 &packet)
+{
+    packet.crc16 = crc16Ccitt(reinterpret_cast<const uint8_t *>(&packet),
+                             offsetof(DrivingStatusV1, crc16));
+}
+
+inline bool valid(const DrivingStatusV1 &packet)
+{
+    return packet.magic == kMagic && packet.version == kProtocolVersion &&
+        packet.crc16 == crc16Ccitt(reinterpret_cast<const uint8_t *>(&packet),
+                                  offsetof(DrivingStatusV1, crc16));
 }
 
 }  // namespace MotDisplayBle

@@ -29,6 +29,7 @@ BLECharacteristic *telemetryCharacteristic = nullptr;
 BLECharacteristic *statusCharacteristic = nullptr;
 BLECharacteristic *capabilitiesCharacteristic = nullptr;
 BLECharacteristic *extendedTelemetryCharacteristic = nullptr;
+BLECharacteristic *drivingStatusCharacteristic = nullptr;
 bool clientConnected = false;
 uint16_t sequence = 0;
 uint32_t lastPublishMs = 0;
@@ -37,6 +38,7 @@ uint32_t statusNotifications = 0;
 uint32_t lastStatusPublishMs = 0;
 uint16_t statusSequence = 0;
 uint16_t extendedSequence = 0;
+uint16_t drivingSequence = 0;
 
 class ServerCallbacks final : public BLEServerCallbacks {
     void onConnect(BLEServer *) override
@@ -163,6 +165,36 @@ MotDisplayBle::ExtendedTelemetryV1 makeExtendedPacket(uint32_t nowMs)
     return packet;
 }
 
+MotDisplayBle::DrivingStatusV1 makeDrivingPacket(uint32_t nowMs)
+{
+    MotDisplayBle::DrivingStatusV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    packet.sequence = ++drivingSequence;
+    packet.sourceAgeMs = UINT16_MAX;
+    const bool displayFresh = telemetry.display.valid &&
+        nowMs - telemetry.display.lastUpdateMs <= kDisplayFreshMs;
+    if (displayFresh && isfinite(telemetry.display.speedKmh) &&
+        telemetry.display.speedKmh >= 0.0F && telemetry.display.speedKmh <= 250.0F) {
+        packet.flags |= MotDisplayBle::kDrivingSpeedValid;
+        packet.speedDeciKmh = static_cast<uint16_t>(lroundf(telemetry.display.speedKmh * 10.0F));
+        packet.sourceAgeMs = boundedAge(telemetry.display.lastUpdateMs, nowMs);
+    }
+    const bool indicatorsFresh = telemetry.display.indicatorStateValid &&
+        nowMs - telemetry.display.indicatorLastUpdateMs <= kDisplayFreshMs;
+    if (indicatorsFresh) {
+        packet.flags |= MotDisplayBle::kIndicatorStateValid;
+        if (telemetry.display.leftIndicatorActive)
+            packet.flags |= MotDisplayBle::kLeftIndicatorActive;
+        if (telemetry.display.rightIndicatorActive)
+            packet.flags |= MotDisplayBle::kRightIndicatorActive;
+        packet.sourceAgeMs = min<uint16_t>(
+            packet.sourceAgeMs, boundedAge(telemetry.display.indicatorLastUpdateMs, nowMs));
+    }
+    MotDisplayBle::seal(packet);
+    return packet;
+}
+
 void copyBounded(char *destination, size_t capacity, const String &source)
 {
     if (!destination || !capacity) return;
@@ -221,10 +253,14 @@ void c6DisplayBleSetup()
     extendedTelemetryCharacteristic = service->createCharacteristic(
         MotDisplayBle::kExtendedTelemetryUuid,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    drivingStatusCharacteristic = service->createCharacteristic(
+        MotDisplayBle::kDrivingStatusUuid,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
     telemetryCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     statusCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     capabilitiesCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     extendedTelemetryCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+    drivingStatusCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     MotDisplayBle::TelemetryV1 initial = makePacket(millis());
     telemetryCharacteristic->setValue(reinterpret_cast<uint8_t *>(&initial), sizeof(initial));
     MotDisplayBle::StatusV1 initialStatus = makeStatusPacket();
@@ -237,13 +273,16 @@ void c6DisplayBleSetup()
     capabilities.screenFlags = MotDisplayBle::kPowerScreen | MotDisplayBle::kAdapterStatusScreen;
     capabilities.featureFlags = MotDisplayBle::kTelemetryV1Feature |
         MotDisplayBle::kStatusV1Feature | MotDisplayBle::kBondedEncryptionFeature |
-        MotDisplayBle::kExtendedTelemetryV1Feature;
+        MotDisplayBle::kExtendedTelemetryV1Feature | MotDisplayBle::kDrivingStatusV1Feature;
     MotDisplayBle::seal(capabilities);
     capabilitiesCharacteristic->setValue(reinterpret_cast<uint8_t *>(&capabilities),
                                          sizeof(capabilities));
     MotDisplayBle::ExtendedTelemetryV1 initialExtended = makeExtendedPacket(millis());
     extendedTelemetryCharacteristic->setValue(
         reinterpret_cast<uint8_t *>(&initialExtended), sizeof(initialExtended));
+    MotDisplayBle::DrivingStatusV1 initialDriving = makeDrivingPacket(millis());
+    drivingStatusCharacteristic->setValue(
+        reinterpret_cast<uint8_t *>(&initialDriving), sizeof(initialDriving));
     service->start();
 
     BLEAdvertising *advertising = BLEDevice::getAdvertising();
@@ -270,6 +309,10 @@ void c6DisplayBleLoop()
         extendedTelemetryCharacteristic->setValue(reinterpret_cast<uint8_t *>(&extended),
                                                   sizeof(extended));
         extendedTelemetryCharacteristic->notify();
+        MotDisplayBle::DrivingStatusV1 driving = makeDrivingPacket(nowMs);
+        drivingStatusCharacteristic->setValue(reinterpret_cast<uint8_t *>(&driving),
+                                               sizeof(driving));
+        drivingStatusCharacteristic->notify();
     }
     if (nowMs - lastStatusPublishMs >= 1000U) {
         lastStatusPublishMs = nowMs;

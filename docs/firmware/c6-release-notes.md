@@ -1,12 +1,30 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV39-AWS`
+> **Current repository release:** `C6-001-REV40-AWS`
 
 > **Separate analysis build:** `C6-001-REV36-BM2-BM6-DIAG` is an N16-only,
 > BLE battery-monitor qualification image for separate BM2 and BM6 protocols. It does not change the production REV36
 > release or its WebFlash artifacts.
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV40-AWS` — repository production candidate
+
+REV40 promotes the accepted local Display BLE contract into the canonical N16
+release identity. It adds the optional driving-status record with Display-CAN
+speed and locally decoded left/right/hazard state. Indicator state is used only
+by the encrypted local display service and is absent from AWS and local-MQTT
+payload construction. The former `nanoesp32c6-n16-display-ble` environment is a
+configuration compatibility alias for `nanoesp32c6-n16`, not a separate firmware stream.
+The XIAO build remains without Display BLE.
+
+The configuration-preserving N16 application is 1,925,648 bytes with SHA-256
+`45e71f144abca73623398199637f9aa610ae8942fbf71c544bb125c676919e4c`.
+The XIAO compatibility application is 1,493,696 bytes with SHA-256
+`a2d358a2e6582ee64e602058fdec6d0bd8834b727f06f804fc56df1a98040971`.
+Both builds, the compatibility alias, the Display 1.0.0 build and 68 focused
+contracts pass. Catalog activation and physical installation remain separately
+controlled release operations.
 
 ### `C6-001-REV39-AWS` — repository production candidate
 

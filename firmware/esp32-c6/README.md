@@ -41,8 +41,9 @@ The canonical `nanoesp32c6-n16` production environment includes the bounded
 local-display BLE GATT service. It
 publishes one versioned, CRC-protected 16-byte notification at no more than 5 Hz
 and exposes no write characteristic. BLE remains disabled on XIAO. The former
-`nanoesp32c6-n16-display-ble` environment remains as a compatibility alias for
-local tooling; both names now produce the same production feature set. Build with:
+`nanoesp32c6-n16-display-ble` environment remains as a configuration compatibility
+alias for local tooling; both names produce the same production feature set and
+firmware identity. Build the release artifact only with the canonical name:
 
 ```sh
 pio run -e nanoesp32c6-n16

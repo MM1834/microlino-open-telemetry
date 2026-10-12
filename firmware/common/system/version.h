@@ -5,7 +5,7 @@
 #define MOT_NAME "Microlino Open Telemetry"
 #define MOT_SHORT_NAME "MOT"
 #define MOT_SPRINT "C6-001"
-#define MOT_REVISION "REV39"
+#define MOT_REVISION "REV40"
 
 #ifdef MOT_BM2_DIAGNOSTIC
 #define MOT_BUILD_VARIANT "BM2-BM6-DIAG"
@@ -18,10 +18,10 @@
 #define MOT_VERSION "C6-001-REV38-SOC-LOCK-DIAG-B025"
 #elif defined(MOT_AWS_IOT)
 #define MOT_BUILD_VARIANT "AWS"
-#define MOT_VERSION "C6-001-REV39-AWS"
+#define MOT_VERSION "C6-001-REV40-AWS"
 #else
 #define MOT_BUILD_VARIANT "MQTT"
-#define MOT_VERSION "C6-001-REV39-MQTT"
+#define MOT_VERSION "C6-001-REV40-MQTT"
 #endif
 
 #ifndef MOT_BOARD

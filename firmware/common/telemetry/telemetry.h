@@ -8,7 +8,11 @@ struct MotDisplayTelemetry {
     float speedKmh = NAN;
     float odometerKm = NAN;
     int estimatedRangeKm = -1;
+    bool indicatorStateValid = false;
+    bool leftIndicatorActive = false;
+    bool rightIndicatorActive = false;
     uint32_t lastUpdateMs = 0;
+    uint32_t indicatorLastUpdateMs = 0;
 };
 
 struct MotChargingTelemetry {
