@@ -38,8 +38,9 @@ Display-CAN freshness window.
 - The USB-connected adapter/display pair was installed and loader-verified.
 - The display layout marker was restored after USB upload and read back with
   SHA-256 `007908ae4fbba301897798e8aa8a377a6907d429ab133ba144e7c404d8c81623`.
-- Display factory and application-update WebFlash catalogs are active on 1.1.0;
-  the normal N16 WebFlash catalog remains REV38.
+- Display factory and application-update WebFlash catalogs are active on 1.1.0.
+- The normal N16 WebFlash catalog is active on REV41 through replacement-free
+  Change Set `n16-webflash-rev41-20261013`; no grants were migrated.
 - The controlled pair was recovered after a temporary USB-port assignment mix-up:
   the original Waveshare image proved the display hardware, Display 1.1.0 was
   reinstalled, and the N16 adapter was fully restored to REV41 with its existing

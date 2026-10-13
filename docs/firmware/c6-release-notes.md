@@ -32,8 +32,10 @@ The USB-connected N16 adapter and 1.28-inch display were updated together and
 verified by the flash loader. The display layout marker was restored after the
 USB upload and read back with its expected SHA-256. Display WebFlash factory and
 marker-gated update catalogs are active on 1.1.0 through the replacement-free
-Change Set `display-webflash-1-1-0-20261013`; the normal N16 WebFlash catalog
-deliberately remains REV38. The controlled pair is installed and boot-verified;
+Change Set `display-webflash-1-1-0-20261013`. The normal N16 WebFlash catalog
+was promoted to REV41 through replacement-free Change Set
+`n16-webflash-rev41-20261013`; the stack reached `UPDATE_COMPLETE`, Lambda is
+active/successful and no grants were migrated. The controlled pair is installed and boot-verified;
 the final vehicle warning-signal spot check is part of the pre-shipment
 operational acceptance.
 

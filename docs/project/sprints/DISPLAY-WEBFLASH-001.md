@@ -54,7 +54,9 @@ N16 WebFlash catalog remains REV38. Existing grants were not migrated.
 Live close-out verification on 2026-10-13 confirmed `UPDATE_COMPLETE`, both
 1.1.0 catalog parameter sets, the immutable factory/update object sizes and
 AES256 encryption in the private versioned firmware bucket. The normal N16
-WebFlash catalog remains unchanged.
+WebFlash catalog was subsequently promoted independently to REV41 through
+Change Set `n16-webflash-rev41-20261013`; both display paths remain byte-for-byte
+unchanged on 1.1.0.
 
 ## Repository implementation 2026-10-10
 
