@@ -30,7 +30,7 @@ class MotDisplayContractTests(unittest.TestCase):
     def test_capabilities_are_additive_and_required_before_subscription(self):
         self.assertIn("sizeof(CapabilitiesV1) == 10", PROTOCOL)
         self.assertIn("sizeof(ExtendedTelemetryV1) == 32", PROTOCOL)
-        self.assertIn("sizeof(DrivingStatusV1) == 12", PROTOCOL)
+        self.assertIn("sizeof(DrivingStatusV1) == 14", PROTOCOL)
         self.assertIn("kExtendedTelemetryV1Feature", PROTOCOL)
         self.assertIn("kDrivingStatusV1Feature", PROTOCOL)
         self.assertIn("kCapabilitiesUuid", CLIENT)
@@ -66,8 +66,8 @@ class MotDisplayContractTests(unittest.TestCase):
         dual_can = (ROOT / "firmware/esp32-c6/src/c6_dual_can.cpp").read_text(
             encoding="utf-8"
         )
-        self.assertIn("decoderDisplayCanHandleIndicatorFrame(frame)", dual_can)
-        self.assertIn("Canonical\n        // charging and power", dual_can)
+        self.assertIn("decoderDisplayCanHandleLocalStatusFrame(frame)", dual_can)
+        self.assertIn("Canonical charging and power", dual_can)
         self.assertIn("kDrivingStatusUuid", CLIENT)
         self.assertIn("motBleClientLatestDriving", DISPLAY)
         self.assertIn('? String(static_cast<unsigned>(lroundf(driving.speedDeciKmh / 10.0F))) : "--"', DISPLAY)
@@ -80,7 +80,7 @@ class MotDisplayContractTests(unittest.TestCase):
         self.assertIn("DECODER_PROFILE_STANDARD_CAN_V2", ADAPTER_MAIN)
 
     def test_display_stream_alias_uses_the_production_identity(self):
-        self.assertIn('MOT_VERSION "C6-001-REV40-AWS"', VERSION)
+        self.assertIn('MOT_VERSION "C6-001-REV41-AWS"', VERSION)
         display_env = ADAPTER_INI.split("[env:nanoesp32c6-n16-display-ble]", 1)[1]
         display_env = display_env.split("[env:", 1)[0]
         self.assertIn("extends = env:nanoesp32c6-n16", display_env)
@@ -89,9 +89,36 @@ class MotDisplayContractTests(unittest.TestCase):
     def test_indicator_state_stays_out_of_cloud_and_local_mqtt(self):
         aws = (ROOT / "firmware/esp32-c6/src/c6_aws.cpp").read_text(encoding="utf-8")
         mqtt = (ROOT / "firmware/esp32-c6/src/c6_local_mqtt.cpp").read_text(encoding="utf-8")
-        for field in ("indicatorStateValid", "leftIndicatorActive", "rightIndicatorActive"):
+        for field in (
+            "indicatorStateValid",
+            "leftIndicatorActive",
+            "rightIndicatorActive",
+            "safetyStateValid",
+            "parkingBrakeActive",
+            "warning90Code",
+            "warningHblAhActive",
+            "drivetrainWarningYellow",
+        ):
             self.assertNotIn(field, aws)
             self.assertNotIn(field, mqtt)
+
+    def test_local_display_safety_states_are_decoded_and_rendered(self):
+        decoder = (ROOT / "firmware/common/decoders/decoder_display_can.cpp").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("parkingBrakeActive = (b[2] & 0x10U) != 0", decoder)
+        self.assertIn("warning90Code = b[3]", decoder)
+        self.assertIn("warningHblAhActive = (b[5] & 0x08U) != 0", decoder)
+        self.assertIn("drivetrainWarningYellow = (b[5] & 0x20U) != 0", decoder)
+        self.assertIn("kParkingBrakeActive", SERVER)
+        self.assertIn("warning90Code != 0U", SERVER)
+        self.assertIn("kWarning90Active", SERVER)
+        self.assertIn("kWarningHblAhActive", SERVER)
+        self.assertIn("kDrivetrainWarningYellow", SERVER)
+        self.assertIn('graphics->print("P")', DISPLAY)
+        self.assertIn('"! WARNUNG 90"', DISPLAY)
+        self.assertIn('"! HBL / AH"', DISPLAY)
+        self.assertIn('"! ANTRIEB GELB"', DISPLAY)
 
     def test_gesture_uses_the_qmi8658_hardware_tap_engine(self):
         self.assertIn("kConfigureTapCommand = 0x0C", GESTURE)
@@ -132,7 +159,7 @@ class MotDisplayContractTests(unittest.TestCase):
     def test_long_ble_footer_uses_smaller_text(self):
         self.assertIn("footer.length() > 16 ? 1 : 2", DISPLAY)
         self.assertIn("printCentered(footer, 184", DISPLAY)
-        self.assertIn('kFirmwareVersion[] = "MOT-DISPLAY-1.0.0"', DISPLAY)
+        self.assertIn('kFirmwareVersion[] = "MOT-DISPLAY-1.1.0"', DISPLAY)
 
     def test_aws_health_is_additive_and_publish_based(self):
         aws = (ROOT / "firmware/esp32-c6/src/c6_aws.cpp").read_text(encoding="utf-8")

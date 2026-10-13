@@ -1,12 +1,41 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV40-AWS`
+> **Current repository release:** `C6-001-REV41-AWS`
 
 > **Separate analysis build:** `C6-001-REV36-BM2-BM6-DIAG` is an N16-only,
 > BLE battery-monitor qualification image for separate BM2 and BM6 protocols. It does not change the production REV36
 > release or its WebFlash artifacts.
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV41-AWS` — repository candidate
+
+REV41 extends the encrypted local Display-CAN emergency-instrument record with
+four `0x603` states: parking brake at Intel start bit 20, warning byte 3,
+HBL/AH warning at bit 43 and yellow drivetrain warning at
+bit 45. Display firmware `MOT-DISPLAY-1.1.0` renders a red `(P)`-style symbol
+and replaces the lower informational lines with active yellow warning text.
+
+This is a deliberate controlled break of the 12-byte Display 1.0 driving
+record: the paired record is now 14 bytes. Both known adapters and both known
+1.28-inch displays must therefore be updated together. The four states remain
+local to the adapter/display BLE link and are absent from AWS and local-MQTT
+payloads. Seventy-nine focused contracts and both N16/display builds pass.
+The reviewed configuration-preserving N16 OTA application is 1,926,000 bytes with SHA-256
+`6ddd205feb731650191f9818712762838f445771718af70743d078491667c59d`.
+The Display 1.1.0 application is 856,224 bytes with SHA-256
+`1e392f648ab8897fb9a577ecac2fa6a0e9a6ae310719a14648607866791dacab`.
+The XIAO regression application is 1,493,808 bytes with SHA-256
+`99d583b82a4ebf5d3d7b553d77366fbe37be62866ba31ce454c0785935e311f5`;
+it remains without Display BLE.
+The USB-connected N16 adapter and 1.28-inch display were updated together and
+verified by the flash loader. The display layout marker was restored after the
+USB upload and read back with its expected SHA-256. Display WebFlash factory and
+marker-gated update catalogs are active on 1.1.0 through the replacement-free
+Change Set `display-webflash-1-1-0-20261013`; the normal N16 WebFlash catalog
+deliberately remains REV38. The controlled pair is installed and boot-verified;
+the final vehicle warning-signal spot check is part of the pre-shipment
+operational acceptance.
 
 ### `C6-001-REV40-AWS` — repository production candidate
 

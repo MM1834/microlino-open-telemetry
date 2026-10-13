@@ -1,6 +1,6 @@
 # DISPLAY-WEBFLASH-001 — Portal installation for MOT Display
 
-> **Status:** Display 1.0.0 factory and application-update catalogs active; physical WebFlasher acceptance open
+> **Status:** Complete; Display 1.1.0 factory and application-update catalogs active
 >
 > **Created:** 2026-10-10
 >
@@ -37,6 +37,24 @@ stack reached `UPDATE_COMPLETE`, Lambda is active/successful and recent error
 logs are empty. The N16 WebFlash release remains exactly REV38 and existing
 display grants were not migrated. Physical browser acceptance of both 1.0.0
 paths remains open.
+
+## Display 1.1.0 safety-status update — 2026-10-13
+
+Both display paths now serve `MOT-DISPLAY-1.1.0`. The marker-gated application
+artifact is 856,224 bytes with SHA-256
+`1e392f648ab8897fb9a577ecac2fa6a0e9a6ae310719a14648607866791dacab`.
+The marker-bearing factory artifact is 921,760 bytes with SHA-256
+`df7a581a2ad7cad86b254da64f3111ee28be52838464803c2354648f360b0705`.
+Both were uploaded AES256-encrypted to the private versioned firmware bucket and
+read back byte-identical. Replacement-free Change Set
+`display-webflash-1-1-0-20261013` reached `UPDATE_COMPLETE`; Lambda is active
+with successful update status and clean logs. XIAO remains REV36 and the normal
+N16 WebFlash catalog remains REV38. Existing grants were not migrated.
+
+Live close-out verification on 2026-10-13 confirmed `UPDATE_COMPLETE`, both
+1.1.0 catalog parameter sets, the immutable factory/update object sizes and
+AES256 encryption in the private versioned firmware bucket. The normal N16
+WebFlash catalog remains unchanged.
 
 ## Repository implementation 2026-10-10
 

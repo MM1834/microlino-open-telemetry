@@ -60,7 +60,7 @@ static void decode602(const uint8_t *b)
     telemetry.display.estimatedRangeKm = roundf(RANGE_FULL_KM * telemetry.display.soc / 100.0f);
 }
 
-void decoderDisplayCanHandleIndicatorFrame(const MotCanFrame &frame)
+void decoderDisplayCanHandleLocalStatusFrame(const MotCanFrame &frame)
 {
     if (frame.extended || frame.dlc < 8 || frame.id != 0x603) return;
     const uint8_t *b = frame.data;
@@ -72,6 +72,17 @@ void decoderDisplayCanHandleIndicatorFrame(const MotCanFrame &frame)
     telemetry.display.leftIndicatorActive = hazardsActive || (b[2] & 0x04U) != 0;
     telemetry.display.rightIndicatorActive = hazardsActive || (b[2] & 0x02U) != 0;
     telemetry.display.indicatorLastUpdateMs = millis();
+
+    // Additional local-only dashboard states from Intel-order DBC start bits:
+    // 20 = byte 2 bit 4, 24 = complete byte 3, 43 = byte 5 bit 3,
+    // 45 = byte 5 bit 5. These values are intentionally not canonical cloud
+    // telemetry; they exist only for the directly paired MOT Display.
+    telemetry.display.safetyStateValid = true;
+    telemetry.display.parkingBrakeActive = (b[2] & 0x10U) != 0;
+    telemetry.display.warning90Code = b[3];
+    telemetry.display.warningHblAhActive = (b[5] & 0x08U) != 0;
+    telemetry.display.drivetrainWarningYellow = (b[5] & 0x20U) != 0;
+    telemetry.display.safetyLastUpdateMs = millis();
 }
 
 static void decode603(const uint8_t *b)
@@ -98,7 +109,7 @@ void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
         case 0x601: decode601(frame.data); break;
         case 0x602: decode602(frame.data); break;
         case 0x603:
-            decoderDisplayCanHandleIndicatorFrame(frame);
+            decoderDisplayCanHandleLocalStatusFrame(frame);
             decode603(frame.data);
             break;
         // 0x604 data[4] bit 4 was previously treated as a plugged flag.

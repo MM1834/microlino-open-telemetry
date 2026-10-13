@@ -94,8 +94,8 @@ Release 1 uses that guarded application-only path. Package it with:
 
 ```sh
 python3 tools/package_display_webflash_update.py \
-  --version MOT-DISPLAY-1.0.0 \
-  --output-dir /tmp/mot-display-1.0.0
+  --version MOT-DISPLAY-1.1.0 \
+  --output-dir /tmp/mot-display-1.1.0
 ```
 
 The resulting target is `waveshare-esp32-c6-lcd-128-b-update`. It preserves the

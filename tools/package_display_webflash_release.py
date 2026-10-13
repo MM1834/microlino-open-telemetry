@@ -132,7 +132,7 @@ def main() -> int:
     parser.add_argument("--partitions", type=Path, default=DEFAULT_PARTITIONS)
     parser.add_argument("--application", type=Path, default=DEFAULT_APPLICATION)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--version-marker", default="MOT-DISPLAY-1.0.0")
+    parser.add_argument("--version-marker", default="MOT-DISPLAY-1.1.0")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 

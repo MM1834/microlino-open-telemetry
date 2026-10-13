@@ -28,11 +28,16 @@ enum FeatureFlags : uint16_t {
     kDrivingStatusV1Feature = 1U << 4,
 };
 
-enum DrivingFlags : uint8_t {
+enum DrivingFlags : uint16_t {
     kDrivingSpeedValid = 1U << 0,
     kIndicatorStateValid = 1U << 1,
     kLeftIndicatorActive = 1U << 2,
     kRightIndicatorActive = 1U << 3,
+    kSafetyStateValid = 1U << 4,
+    kParkingBrakeActive = 1U << 5,
+    kWarning90Active = 1U << 6,
+    kWarningHblAhActive = 1U << 7,
+    kDrivetrainWarningYellow = 1U << 8,
 };
 
 enum ExtendedFlags : uint16_t {
@@ -137,9 +142,10 @@ struct ExtendedTelemetryV1 {
 struct DrivingStatusV1 {
     uint16_t magic;
     uint8_t version;
-    uint8_t flags;
+    uint16_t flags;
     uint16_t sequence;
     uint16_t speedDeciKmh;
+    uint8_t warning90Code;
     uint16_t sourceAgeMs;
     uint16_t crc16;
 };
@@ -149,7 +155,7 @@ static_assert(sizeof(TelemetryV1) == 16, "BLE display packet must remain 16 byte
 static_assert(sizeof(StatusV1) == 60, "BLE display status packet must remain 60 bytes");
 static_assert(sizeof(CapabilitiesV1) == 10, "BLE capability packet must remain 10 bytes");
 static_assert(sizeof(ExtendedTelemetryV1) == 32, "BLE extended packet must remain 32 bytes");
-static_assert(sizeof(DrivingStatusV1) == 12, "BLE driving packet must remain 12 bytes");
+static_assert(sizeof(DrivingStatusV1) == 14, "BLE driving packet must be 14 bytes");
 
 inline uint16_t crc16Ccitt(const uint8_t *data, size_t length)
 {

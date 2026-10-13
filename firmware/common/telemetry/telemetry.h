@@ -11,8 +11,14 @@ struct MotDisplayTelemetry {
     bool indicatorStateValid = false;
     bool leftIndicatorActive = false;
     bool rightIndicatorActive = false;
+    bool safetyStateValid = false;
+    bool parkingBrakeActive = false;
+    uint8_t warning90Code = 0;
+    bool warningHblAhActive = false;
+    bool drivetrainWarningYellow = false;
     uint32_t lastUpdateMs = 0;
     uint32_t indicatorLastUpdateMs = 0;
+    uint32_t safetyLastUpdateMs = 0;
 };
 
 struct MotChargingTelemetry {

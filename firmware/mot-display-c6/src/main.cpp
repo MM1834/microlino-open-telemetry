@@ -13,7 +13,7 @@ constexpr int kLcdSck = 11;
 constexpr int kLcdMosi = 21;
 constexpr int kLcdReset = 20;
 constexpr int kLcdBacklight = 7;
-constexpr char kFirmwareVersion[] = "MOT-DISPLAY-1.0.0";
+constexpr char kFirmwareVersion[] = "MOT-DISPLAY-1.1.0";
 
 constexpr int kScreenSize = 240;
 constexpr int kCenter = kScreenSize / 2;
@@ -30,6 +30,8 @@ constexpr uint16_t kTrack = 0x18E3;
 constexpr uint16_t kConsumption = 0xFBE0;
 constexpr uint16_t kRegen = 0x07F3;
 constexpr uint16_t kCharging = 0x051F;
+constexpr uint16_t kWarning = 0xFFE0;
+constexpr uint16_t kAlarm = 0xF800;
 
 Arduino_DataBus *bus = new Arduino_HWSPI(kLcdDc, kLcdCs, kLcdSck, kLcdMosi);
 Arduino_GFX *panel = new Arduino_GC9A01(bus, kLcdReset, 0, true);
@@ -138,6 +140,37 @@ void drawIndicators(const MotDisplayBle::DrivingStatusV1 &driving) {
   }
 }
 
+void drawParkingBrake(const MotDisplayBle::DrivingStatusV1 &driving) {
+  if (!(driving.flags & MotDisplayBle::kSafetyStateValid) ||
+      !(driving.flags & MotDisplayBle::kParkingBrakeActive)) return;
+  graphics->drawCircle(49, 35, 13, kAlarm);
+  graphics->drawCircle(49, 35, 12, kAlarm);
+  graphics->setTextSize(2);
+  graphics->setTextColor(kAlarm, kBackground);
+  graphics->setCursor(43, 28);
+  graphics->print("P");
+}
+
+bool drawWarnings(const MotDisplayBle::DrivingStatusV1 &driving) {
+  if (!(driving.flags & MotDisplayBle::kSafetyStateValid)) return false;
+  const uint16_t warningFlags = MotDisplayBle::kWarning90Active |
+      MotDisplayBle::kWarningHblAhActive | MotDisplayBle::kDrivetrainWarningYellow;
+  if (!(driving.flags & warningFlags)) return false;
+  int16_t y = 158;
+  if (driving.flags & MotDisplayBle::kWarning90Active) {
+    printCentered("! WARNUNG 90", y, 1, kWarning);
+    y += 18;
+  }
+  if (driving.flags & MotDisplayBle::kWarningHblAhActive) {
+    printCentered("! HBL / AH", y, 1, kWarning);
+    y += 18;
+  }
+  if (driving.flags & MotDisplayBle::kDrivetrainWarningYellow) {
+    printCentered("! ANTRIEB GELB", y, 1, kWarning);
+  }
+  return true;
+}
+
 void render(const MotDisplaySample &sample) {
   MotDisplayBle::DrivingStatusV1 driving{};
   uint32_t drivingAgeMs = 0;
@@ -147,7 +180,10 @@ void render(const MotDisplaySample &sample) {
   const uint16_t accent = sample.powerValid ? stateColor(sample.state) : kMuted;
   graphics->fillScreen(kBackground);
   drawRing(fabsf(sample.powerKw), accent);
-  if (drivingFresh) drawIndicators(driving);
+  if (drivingFresh) {
+    drawIndicators(driving);
+    drawParkingBrake(driving);
+  }
 
   printCentered(sample.socValid ? "SOC " + String(sample.socPercent) + "%" : "SOC --", 25, 2,
                 kForeground);
@@ -166,15 +202,17 @@ void render(const MotDisplaySample &sample) {
   printCentered("km/h", 96, 2, speedValid ? kForeground : kMuted);
   printCentered(String(power) + " kW", 128, 2, accent);
 
-  const String range = sample.rangeValid && sample.rangeToTargetKm < UINT16_MAX
-      ? String(sample.rangeToTargetKm) + " km bis " + String(sample.targetSocPercent) + "%"
-      : "-- km bis --%";
-  printCentered(range, 158, 1, kForeground);
-  const String footer = sample.powerValid ? stateLabel(sample.state) : motBleClientStatus();
-  // Long BLE states such as "SUCHE GEKOPPELTES MOT" exceed the round
-  // 240-pixel viewport at size 2. Keep the normal driving labels prominent,
-  // but fit diagnostic connection text without clipping the circular edge.
-  printCentered(footer, 184, footer.length() > 16 ? 1 : 2, accent);
+  if (!(drivingFresh && drawWarnings(driving))) {
+    const String range = sample.rangeValid && sample.rangeToTargetKm < UINT16_MAX
+        ? String(sample.rangeToTargetKm) + " km bis " + String(sample.targetSocPercent) + "%"
+        : "-- km bis --%";
+    printCentered(range, 158, 1, kForeground);
+    const String footer = sample.powerValid ? stateLabel(sample.state) : motBleClientStatus();
+    // Long BLE states such as "SUCHE GEKOPPELTES MOT" exceed the round
+    // 240-pixel viewport at size 2. Keep the normal driving labels prominent,
+    // but fit diagnostic connection text without clipping the circular edge.
+    printCentered(footer, 184, footer.length() > 16 ? 1 : 2, accent);
+  }
   canvas->flush();
 }
 

@@ -191,6 +191,23 @@ MotDisplayBle::DrivingStatusV1 makeDrivingPacket(uint32_t nowMs)
         packet.sourceAgeMs = min<uint16_t>(
             packet.sourceAgeMs, boundedAge(telemetry.display.indicatorLastUpdateMs, nowMs));
     }
+    const bool safetyFresh = telemetry.display.safetyStateValid &&
+        nowMs - telemetry.display.safetyLastUpdateMs <= kDisplayFreshMs;
+    if (safetyFresh) {
+        packet.flags |= MotDisplayBle::kSafetyStateValid;
+        if (telemetry.display.parkingBrakeActive)
+            packet.flags |= MotDisplayBle::kParkingBrakeActive;
+        if (telemetry.display.warning90Code != 0U) {
+            packet.flags |= MotDisplayBle::kWarning90Active;
+            packet.warning90Code = telemetry.display.warning90Code;
+        }
+        if (telemetry.display.warningHblAhActive)
+            packet.flags |= MotDisplayBle::kWarningHblAhActive;
+        if (telemetry.display.drivetrainWarningYellow)
+            packet.flags |= MotDisplayBle::kDrivetrainWarningYellow;
+        packet.sourceAgeMs = min<uint16_t>(
+            packet.sourceAgeMs, boundedAge(telemetry.display.safetyLastUpdateMs, nowMs));
+    }
     MotDisplayBle::seal(packet);
     return packet;
 }

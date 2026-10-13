@@ -97,9 +97,10 @@ void receiveChannel(size_t index)
     if (standardCanConfigured() &&
         channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&
         frame.id == 0x603) {
-        // Preserve only the independent dashboard indicator pair. Canonical
-        // charging and power continue to come exclusively from Standard-CAN.
-        decoderDisplayCanHandleIndicatorFrame(frame);
+        // Preserve only local dashboard status for the paired MOT Display.
+        // Canonical charging and power continue to come from Standard-CAN;
+        // indicators and warnings are never forwarded to MQTT or AWS.
+        decoderDisplayCanHandleLocalStatusFrame(frame);
     }
     if (!(standardCanConfigured() &&
           channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&
