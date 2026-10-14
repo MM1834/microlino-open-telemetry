@@ -1,6 +1,6 @@
 # WEBFLASH-001 — Controlled Portal Web Flasher
 
-> **Status:** Active
+> **Status:** Complete; controlled dual-target WebFlasher operational
 >
 > **Started:** 2026-09-01
 >
@@ -8,6 +8,10 @@
 
 > **Safety hold lifted 2026-09-17:** Two physical runs accepted the explicit
 > reset pulse. The previously valid N16 users now have exact REV29 grants.
+
+> **Current catalog:** N16 `C6-001-REV44-AWS`; XIAO `C6-001-REV36-AWS`.
+> Existing older grants remain bound to their exact prior release and were not
+> migrated.
 
 ## Objective
 
@@ -329,6 +333,38 @@ still-active REV29 N16 grants were atomically updated to REV31 while retaining
 their prior expiry, with one audit event per grant. The independent revoked grant
 remains REV27/REVOKED. Anonymous firmware access still returns HTTP 401. Local
 OTA validation passed; a physical WebFlash REV31 installation remains open.
+
+### REV36 dual-target release
+
+On 2026-09-28 the controlled catalog advanced both C6 targets to
+`C6-001-REV36-AWS`. Fresh PlatformIO 6.2.0 builds and the focused firmware and
+WebFlash backend tests passed. The N16 artifact is 1,506,752 bytes with SHA-256
+`b067438d46a8e4502065f22be25733bb57fbb90911f1876a4e8fb65f04bab71a`;
+the XIAO artifact is 1,481,264 bytes with SHA-256
+`aa8718e33763972c16282dfd401e26e28e7d1525237c89a9d636e638c0234ca3`.
+Private S3 read-back reproduced both hashes and confirmed AES256 encryption plus
+versioning. Reviewed Change Set `webflash-rev36-20260928` modified only the
+existing Lambda, API integration and IAM role with `Replacement: False`; the
+stack reached `UPDATE_COMPLETE`, Lambda is active/successful, IAM reads only the
+two exact REV36 objects and anonymous access remains HTTP 401. No firmware
+grants existed at activation time. Physical installation remains open.
+
+### REV44 N16 release and sprint close-out
+
+On 2026-10-14 the N16 catalog advanced to `C6-001-REV44-AWS`; XIAO remains
+unchanged on REV36. The application-only artifact is 1,926,688 bytes with
+SHA-256
+`baf1e448e7c37469e35ac2a1b2eb04416fbb6954d9d7511bf0e0611b35dafc5a`.
+Private S3 verification confirms the expected size, AES256 encryption, SHA-256
+metadata and object version `2TAGYOYI2zNmuqSdYmUu1vl5pj33CTPk`.
+
+Reviewed Change Set `n16-webflash-rev44-20261014` modified only the existing
+onboarding Lambda, API integration and IAM role with `Replacement: False`. The
+stack reached `UPDATE_COMPLETE`; Lambda is active/successful, the release
+environment matches REV44 and current error logs are empty. Existing grants
+were not migrated. With immutable packaging, exact authorization, both hardware
+targets, physical reset recovery and the production catalog path established,
+WEBFLASH-001 is complete; later firmware promotions use this operating path.
 
 ### Deferred bootloader entry
 

@@ -36,6 +36,36 @@ for charging: charger power is shown as a positive magnitude, while driving
 regeneration retains its negative sign and traction consumption remains positive.
 This is a rendering rule only; it does not change protocol v1 or adapter data.
 
+## Boot-selected standalone Display-CAN
+
+Display 1.2.0 adds an optional local, receive-only Display-CAN source without
+removing or changing the existing BLE protocol. `GPIO2` is sampled once with an
+internal pull-up during boot. A CAN harness that pulls it to GND selects local
+TWAI for the complete runtime; otherwise the display starts the existing BLE
+client. The firmware never switches or combines sources after boot.
+
+Standalone TWAI receives at 500 kbit/s on `GPIO1`. The driver reserves `GPIO3`
+as its unused TX signal, but that pin must not be wired to the transceiver. The
+transceiver TXD is instead held recessive at 3.3 V through 10 kΩ, establishing a
+hardware receive-only boundary. Wiring and the non-isolated/isolated CAN choice
+are specified in
+[Standalone Display-CAN wiring](../../docs/hardware/mot-display-standalone-can.md).
+
+`GPIO12` and `GPIO13` remain reserved for the board's native USB D-/D+ signals.
+They must not be used by the standalone harness or TWAI configuration.
+
+The standalone main page uses the shared Display-CAN decoder for SOC, speed,
+range, local power compatibility value, indicators/hazards, parking brake and
+accepted warnings. Trip and odometer are decoded from their DBC bit fields.
+N/D/R, position/low-beam and Sport/Eco are rendered as validation candidates;
+they remain local and must not be promoted to cloud telemetry before controlled
+vehicle confirmation. Adapter-only battery and network values remain explicitly
+unavailable in standalone mode. Because the local `0x603` power value did not
+produce useful charging measurements in the physical pilot, the standalone
+charging page deliberately shows only SOC and a green charging bar. It does not
+show or integrate local power. This does not alter the BLE adapter path or its
+full numeric charging screen.
+
 A second adapter-status packet is sent at 1 Hz and contains only bounded WiFi
 profile names, configured/active/online state, RSSI, local IP and MOT Cloud/AWS
 connection state plus whether the local setup AP is active. It never carries WiFi passwords, certificates or other
@@ -67,6 +97,18 @@ emergency-instrument view is the default driving page on the 1.28-inch display.
 On future larger touch displays it is intended as an explicit fallback mode,
 not the normal operating page; normal mode should omit speed and indicators.
 
+REV43/Display 1.2.0-RC4 retain the established 14-byte driving-status layout
+introduced with the local warning fields. Seven reserved flag bits carry gear,
+the two raw light bits, the two raw Eco/Sport bits and one shared validity marker,
+so older adapters remain fail-closed and no record-length migration is required.
+Physical testing maps the first raw state to the vehicle switch label `LICHT 0`.
+The second state remains active for both higher switch positions and therefore
+cannot distinguish them; the display labels it `LICHT 2` only as raw evidence.
+Fernlicht does not affect either currently decoded bit. RC4 consequently shows
+`LICHT 0`, `LICHT 2` or `LICHT 0+2` without claiming position, low-beam or
+high-beam semantics. These candidate values remain local to the encrypted
+display link.
+
 On a display without an existing assignment, startup opens a two-minute pairing
 window. The first adapter that completes encrypted bonding and presents a valid
 capability record with telemetry-v1, status-v1 and bonded-encryption support is
@@ -76,8 +118,10 @@ the boards have no pairing input/output, BLE uses encrypted `Just Works`
 bonding without MITM authentication; first pairing should therefore be done in
 physical proximity to the intended adapter.
 
-The status page advertises the initial three-second turn. The destructive step
-is shown only after that hold and still requires the opposite confirmed hold.
+The status page advertises the initial three-second turn. A short tilt followed
+by return to neutral remains normal page navigation. The destructive step is
+shown only after a continuously held three-second tilt and still requires the
+opposite confirmed hold.
 
 Arduino_GFX 1.6.7 is pinned because 1.6.4, still named in early vendor material,
 does not compile with the Arduino-ESP32 3.3.6+ SPI API used by MOT's current
@@ -94,8 +138,8 @@ Release 1 uses that guarded application-only path. Package it with:
 
 ```sh
 python3 tools/package_display_webflash_update.py \
-  --version MOT-DISPLAY-1.1.0 \
-  --output-dir /tmp/mot-display-1.1.0
+  --version MOT-DISPLAY-1.2.0-RC6 \
+  --output-dir /tmp/mot-display-1.2.0-rc6-update
 ```
 
 The resulting target is `waveshare-esp32-c6-lcd-128-b-update`. It preserves the
@@ -142,14 +186,14 @@ pio run -d firmware/esp32-c6 -e nanoesp32c6-n16-display-ble
 
 ## Portal WebFlash package
 
-The repository candidate uses PlatformIO's merged `firmware.factory.bin` for the
+The active release uses PlatformIO's merged `firmware.factory.bin` for the
 first installation on an untouched supported display. Package it only through
 the contract checker; do not substitute an application-only image:
 
 ```sh
 python3 tools/package_display_webflash_release.py \
-  --version MOT-DISPLAY-PROTOTYPE-0.2 \
-  --output-dir build/display-webflash
+  --version MOT-DISPLAY-1.2.0-RC6 \
+  --output-dir build/webflash-display-1.2.0-rc6-factory
 ```
 
 The packager verifies that the merged image contains the exact separately built

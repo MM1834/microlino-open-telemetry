@@ -162,7 +162,7 @@ float normalizedAngle(float angle)
 }
 
 MotGestureEvent classifyTilt(uint32_t nowMs, int16_t x, int16_t y, int16_t z,
-                             int32_t jerk, uint32_t holdMs)
+                             int32_t jerk, bool serviceHoldMode)
 {
     if (!tiltFilterInitialized) {
         filteredX = x;
@@ -184,6 +184,13 @@ MotGestureEvent classifyTilt(uint32_t nowMs, int16_t x, int16_t y, int16_t z,
         gravitySquared <= static_cast<float>(kTiltMaximumGravityRaw) * kTiltMaximumGravityRaw &&
         jerk < kRawJerkThreshold;
     if (!plausible) {
+        // On the status page a short tilt is deliberately emitted only after
+        // returning to neutral, so it cannot race the three-second service
+        // hold. The physical return movement can briefly exceed the jerk
+        // threshold; retain an already established candidate until a stable
+        // neutral sample confirms navigation. Stale samples are still cleared
+        // by motGesturePoll before reaching this function.
+        if (serviceHoldMode && tiltCandidateDirection != 0) return MotGestureEvent::None;
         tiltCandidateDirection = 0;
         tiltCandidateStartedMs = 0;
         return MotGestureEvent::None;
@@ -209,14 +216,26 @@ MotGestureEvent classifyTilt(uint32_t nowMs, int16_t x, int16_t y, int16_t z,
         }
         return MotGestureEvent::None;
     }
-    if (fabsf(deltaDegrees) < kTiltTriggerDegrees) {
+    if (fabsf(deltaDegrees) <= kTiltReleaseDegrees) {
+        const int8_t releasedDirection = tiltCandidateDirection;
+        const uint32_t heldMs = tiltCandidateStartedMs
+            ? nowMs - tiltCandidateStartedMs : 0U;
         tiltCandidateDirection = 0;
         tiltCandidateStartedMs = 0;
         // Slowly follow small mounting-angle changes without chasing a deliberate turn.
         if (fabsf(deltaDegrees) < 8.0F)
             neutralAngleRadians = normalizedAngle(neutralAngleRadians + deltaRadians * 0.002F);
+        if (serviceHoldMode && releasedDirection != 0 && heldMs >= kTiltHoldMs) {
+            Serial.printf("IMU: short service-page tilt released after %lums -> %s\n",
+                          static_cast<unsigned long>(heldMs),
+                          releasedDirection > 0 ? "right" : "left");
+            return releasedDirection > 0
+                ? MotGestureEvent::TiltRight : MotGestureEvent::TiltLeft;
+        }
         return MotGestureEvent::None;
     }
+
+    if (fabsf(deltaDegrees) < kTiltTriggerDegrees) return MotGestureEvent::None;
 
     const int8_t direction = deltaDegrees > 0.0F ? 1 : -1;
     if (direction != tiltCandidateDirection) {
@@ -224,6 +243,7 @@ MotGestureEvent classifyTilt(uint32_t nowMs, int16_t x, int16_t y, int16_t z,
         tiltCandidateStartedMs = nowMs;
         return MotGestureEvent::None;
     }
+    const uint32_t holdMs = serviceHoldMode ? kServiceTiltHoldMs : kTiltHoldMs;
     if (nowMs - tiltCandidateStartedMs < holdMs)
         return MotGestureEvent::None;
 
@@ -232,6 +252,10 @@ MotGestureEvent classifyTilt(uint32_t nowMs, int16_t x, int16_t y, int16_t z,
     tiltNeedsRelease = true;
     Serial.printf("IMU: held tilt %.1f deg -> %s\n", deltaDegrees,
                   direction > 0 ? "right" : "left");
+    if (serviceHoldMode) {
+        return direction > 0
+            ? MotGestureEvent::ServiceTiltRight : MotGestureEvent::ServiceTiltLeft;
+    }
     return direction > 0 ? MotGestureEvent::TiltRight : MotGestureEvent::TiltLeft;
 }
 }  // namespace
@@ -309,7 +333,7 @@ MotGestureEvent motGesturePoll(bool serviceHoldMode)
         return MotGestureEvent::None;
     }
     const MotGestureEvent tilt = classifyTilt(
-        nowMs, x, y, z, jerk, serviceHoldMode ? kServiceTiltHoldMs : kTiltHoldMs);
+        nowMs, x, y, z, jerk, serviceHoldMode);
     if (tilt != MotGestureEvent::None) return tilt;
     return MotGestureEvent::None;
 }

@@ -1,12 +1,62 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV41-AWS`
+> **Current repository release:** `C6-001-REV44-AWS`
 
 > **Separate analysis build:** `C6-001-REV36-BM2-BM6-DIAG` is an N16-only,
 > BLE battery-monitor qualification image for separate BM2 and BM6 protocols. It does not change the production REV36
 > release or its WebFlash artifacts.
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV44-AWS` — active N16 WebFlash release
+
+REV44 republishes only the retained `system/ip_address` topic when the active
+WiFi address changes, with a bounded five-second retry after a failed publish.
+This fixes a portal state that could retain the Home-WLAN address after the
+adapter had already moved to a mobile hotspot. The complete retained birth
+sequence remains once per boot, preserving the REV39 display/network stability
+boundary. The BLE status packet already used the live address and is unchanged.
+
+The configuration-preserving N16 application is 1,926,688 bytes with SHA-256
+`baf1e448e7c37469e35ac2a1b2eb04416fbb6954d9d7511bf0e0611b35dafc5a`.
+It is active in the controlled WebFlash catalog through replacement-free Change
+Set `n16-webflash-rev44-20261014`. The stack reached `UPDATE_COMPLETE`; the
+onboarding Lambda is active with successful update status and current error logs
+are empty. XIAO remains on REV36 and existing grants were not migrated.
+
+### `C6-001-REV43-AWS` — repository candidate
+
+REV43 keeps the Display BLE `DrivingStatusV1` record byte-for-byte at 14 bytes
+and uses the seven formerly reserved flag bits for compact gear, the two raw
+light bits, the two raw Eco/Sport bits and one shared candidate-valid marker.
+These Display-CAN candidates remain local
+to the encrypted adapter/display link and are still excluded from AWS and local
+MQTT. Older displays ignore the upper bits.
+
+Matching display candidate `MOT-DISPLAY-1.2.0-RC4` renders those states in both
+BLE and standalone modes. It also separates short status-page navigation from
+the three-second pairing service gesture: a short tilt changes page after the
+display returns to neutral, while only a continuously held three-second tilt
+starts pairing confirmation. Twenty-eight focused contracts plus the N16 and
+display builds pass. BLE backward compatibility, gear and Sport presentation
+and status-page navigation passed physically on 2026-10-14. Follow-up testing
+confirmed the first raw state matches the vehicle label `LICHT 0`; the second
+state is unchanged across both higher switch positions, and Fernlicht changes
+neither decoded bit. RC4 therefore labels only the observed raw states while
+the missing higher-position and high-beam signals remain open. Detailed
+warning-code interpretation also remains open;
+no OTA or WebFlash catalog was changed.
+
+### `C6-001-REV42-AWS` — physically accepted BLE candidate
+
+REV42 first added gear, semantic light and Normal/Eco/Sport states to the six
+then-free upper driving flags without changing the 14-byte record. Physical BLE
+testing on 2026-10-14 confirmed backward compatibility with the older display,
+the new functions after paired update, N/D/R and Sport presentation, distinct
+warning codes and normal page navigation. The vehicle exposed two light bits in
+combinations that did not support the provisional `Stand`/`Licht` semantics;
+REV43 therefore supersedes that candidate with raw light-bit presentation and a
+shared validity marker. REV42 was not promoted to OTA or WebFlash.
 
 ### `C6-001-REV41-AWS` — repository candidate
 

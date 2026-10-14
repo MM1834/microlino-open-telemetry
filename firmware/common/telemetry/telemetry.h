@@ -7,7 +7,16 @@ struct MotDisplayTelemetry {
     float soc = NAN;
     float speedKmh = NAN;
     float odometerKm = NAN;
+    float tripKm = NAN;
     int estimatedRangeKm = -1;
+    bool gearStateValid = false;
+    uint8_t gearState = 0;
+    bool lightStateValid = false;
+    bool positionLightActive = false;
+    bool lowBeamActive = false;
+    bool driveModeStateValid = false;
+    bool sportModeActive = false;
+    bool ecoModeActive = false;
     bool indicatorStateValid = false;
     bool leftIndicatorActive = false;
     bool rightIndicatorActive = false;
@@ -19,6 +28,7 @@ struct MotDisplayTelemetry {
     uint32_t lastUpdateMs = 0;
     uint32_t indicatorLastUpdateMs = 0;
     uint32_t safetyLastUpdateMs = 0;
+    uint32_t candidateStateLastUpdateMs = 0;
 };
 
 struct MotChargingTelemetry {

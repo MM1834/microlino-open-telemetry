@@ -29,7 +29,10 @@ String preparedNetworkIp;
 uint32_t lastSuccessfulPublishMs = 0;
 uint32_t telemetrySequence = 0;
 uint32_t lastCadenceEventGeneration = 0;
+String lastPublishedIp;
+uint32_t lastIpPublishAttemptMs = 0;
 constexpr size_t TELEMETRY_ENVELOPE_MAX_BYTES = 4096;
+constexpr uint32_t IP_PUBLISH_RETRY_MS = 5000;
 constexpr uint32_t ALTITUDE_DISPLAY_MAX_AGE_MS = 3000;
 constexpr float ALTITUDE_MIN_MOVING_SPEED_KMH = 1.0f;
 #ifdef MOT_DISPLAY_BLE
@@ -248,6 +251,16 @@ void c6AwsLoop()
     client.loop(runtime(), c6NetworkTransportReady() && endpointPrepared);
     if (client.connected()) {
         if (!connectedObservedSinceMs) connectedObservedSinceMs = millis();
+        const String activeIp = c6NetworkIp();
+        if (!activeIp.isEmpty() && activeIp != lastPublishedIp &&
+            (!lastIpPublishAttemptMs ||
+             millis() - lastIpPublishAttemptMs >= IP_PUBLISH_RETRY_MS)) {
+            lastIpPublishAttemptMs = millis();
+            if (client.publish("system/ip_address", activeIp, true)) {
+                lastPublishedIp = activeIp;
+                Serial.println("AWS IoT: retained IP updated to " + activeIp);
+            }
+        }
     } else {
         connectedObservedSinceMs = 0;
         freshLivePublished = false;

@@ -1,6 +1,6 @@
 # DISPLAY-WEBFLASH-001 — Portal installation for MOT Display
 
-> **Status:** Complete; Display 1.1.0 factory and application-update catalogs active
+> **Status:** Complete; Display 1.2.0-RC6 factory and application-update catalogs active
 >
 > **Created:** 2026-10-10
 >
@@ -57,6 +57,25 @@ AES256 encryption in the private versioned firmware bucket. The normal N16
 WebFlash catalog was subsequently promoted independently to REV41 through
 Change Set `n16-webflash-rev41-20261013`; both display paths remain byte-for-byte
 unchanged on 1.1.0.
+
+## Display 1.2.0-RC6 activation and close-out — 2026-10-14
+
+Both controlled 1.28-inch display paths now serve the same reviewed
+`MOT-DISPLAY-1.2.0-RC6` build. The marker-gated application artifact is 870,976
+bytes with SHA-256
+`74050c1769a04c4c5cd770c44ff5ede295b090e7e84393394e4ed935afcb8497`;
+the marker-bearing factory artifact is 936,512 bytes with SHA-256
+`2411a911b0c8d68c6281d272ac21d8e7ddeac2506c814b16d713cca1373fc42f`.
+Private S3 verification confirms both sizes, AES256 encryption, SHA-256 metadata
+and version IDs `2.pQweCMhOQa56fpkykLXRmawDUA3NAB` (update) and
+`3q_qpcc8sUNkJTq5Tf6eKw9sSueJITFe` (factory).
+
+Replacement-free Change Set `display-webflash-1-2-0-rc6-20261014` activated
+both paths atomically and reached `UPDATE_COMPLETE`. Lambda is active with
+successful update status and current error logs are empty. The independently
+promoted N16 catalog remains REV44, XIAO remains REV36 and no grants were
+migrated. The established factory/update safety split is therefore complete;
+later display releases use this operating path.
 
 ## Repository implementation 2026-10-10
 

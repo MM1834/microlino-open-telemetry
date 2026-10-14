@@ -38,6 +38,43 @@ enum DrivingFlags : uint16_t {
     kWarning90Active = 1U << 6,
     kWarningHblAhActive = 1U << 7,
     kDrivetrainWarningYellow = 1U << 8,
+    // Compact additive states in the formerly unused upper flag bits. Zero is
+    // unknown so older adapters remain fail-closed on newer displays.
+    kGearStateBit0 = 1U << 9,
+    kGearStateBit1 = 1U << 10,
+    kLightStateBit0 = 1U << 11,
+    kLightStateBit1 = 1U << 12,
+    kDriveModeBit0 = 1U << 13,
+    kDriveModeBit1 = 1U << 14,
+    kCandidateStatesValid = 1U << 15,
+};
+
+constexpr uint8_t kGearStateShift = 9;
+constexpr uint16_t kGearStateMask = 0x3U << kGearStateShift;
+constexpr uint8_t kLightStateShift = 11;
+constexpr uint16_t kLightStateMask = 0x3U << kLightStateShift;
+constexpr uint8_t kDriveModeShift = 13;
+constexpr uint16_t kDriveModeMask = 0x3U << kDriveModeShift;
+
+enum CompactGearState : uint8_t {
+    kGearNeutral = 0,
+    kGearDrive = 1,
+    kGearReverse = 2,
+    kGearUnknown = 3,
+};
+
+enum CompactLightState : uint8_t {
+    kLightOff = 0,
+    kLightBit1 = 1,
+    kLightBit2 = 2,
+    kLightBits1And2 = 3,
+};
+
+enum CompactDriveMode : uint8_t {
+    kDriveModeNormal = 0,
+    kDriveModeEco = 1,
+    kDriveModeSport = 2,
+    kDriveModeConflict = 3,
 };
 
 enum ExtendedFlags : uint16_t {

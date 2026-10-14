@@ -130,6 +130,13 @@ class C6ServiceParityTests(unittest.TestCase):
         self.assertIn("totalConnectFailures", AWS_CLIENT)
         self.assertIn("if (minimalBirth_)", AWS_CLIENT)
 
+    def test_changed_wifi_ip_is_republished_without_repeating_birth(self) -> None:
+        self.assertIn("String lastPublishedIp", AWS)
+        self.assertIn("IP_PUBLISH_RETRY_MS", AWS)
+        self.assertIn('client.publish("system/ip_address", activeIp, true)', AWS)
+        self.assertIn("lastPublishedIp = activeIp", AWS)
+        self.assertIn("birthPublished_", AWS_CLIENT)
+
     def test_c6_persists_service_state_but_redacts_secrets(self) -> None:
         self.assertIn('preferences.putBool("abrpEn"', CONFIG)
         self.assertIn('preferences.putString("abrpKey"', CONFIG)

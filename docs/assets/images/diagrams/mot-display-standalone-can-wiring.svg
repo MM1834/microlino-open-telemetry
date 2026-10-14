@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">MOT Display Standalone Display-CAN wiring</title>
+  <desc id="desc">Waveshare ESP32-C6 display connected to a receive-only SN65HVD230 and the Microlino Display-CAN. GPIO2 is grounded by the harness for boot-time mode detection. USB-C supplies power. A non-isolated transceiver additionally requires vehicle signal ground.</desc>
+  <defs>
+    <style>
+      .bg{fill:#0b1220}.panel{fill:#121d30;stroke:#405572;stroke-width:3}.display{fill:#172a42;stroke:#55c2ff;stroke-width:4}.can{fill:#1c2936;stroke:#52d6a2;stroke-width:4}.vehicle{fill:#282132;stroke:#ffbd59;stroke-width:4}.head{font:700 34px system-ui,sans-serif;fill:#f4f8ff}.sub{font:500 23px system-ui,sans-serif;fill:#c5d2e3}.pin{font:700 22px ui-monospace,monospace;fill:#f4f8ff}.note{font:500 21px system-ui,sans-serif;fill:#d3dce8}.tiny{font:500 18px system-ui,sans-serif;fill:#aebdd0}.power{stroke:#ff5c7a;stroke-width:6;fill:none}.ground{stroke:#a7b4c6;stroke-width:6;fill:none}.signal{stroke:#52d6a2;stroke-width:6;fill:none}.detect{stroke:#bd8cff;stroke-width:6;fill:none}.canline{stroke:#ffbd59;stroke-width:7;fill:none}.warn{fill:#2d2115;stroke:#ffbd59;stroke-width:3}.bad{stroke:#ff6b6b;stroke-width:5;stroke-dasharray:13 10;fill:none}.arrow{marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#52d6a2"/></marker>
+  </defs>
+  <rect class="bg" width="1600" height="980"/>
+  <text class="head" x="800" y="58" text-anchor="middle">MOT Display · Standalone Display-CAN</text>
+  <text class="sub" x="800" y="94" text-anchor="middle">Boot-Auswahl per Hardware-Strap · CAN dauerhaft nur empfangend</text>
+
+  <rect class="display" x="70" y="145" width="500" height="595" rx="28"/>
+  <text class="head" x="320" y="195" text-anchor="middle">Waveshare ESP32-C6</text>
+  <text class="sub" x="320" y="230" text-anchor="middle">LCD-1.28-B · SH1.0-Erweiterung</text>
+  <rect class="panel" x="125" y="280" width="390" height="390" rx="20"/>
+  <text class="pin" x="160" y="335">3V3</text>
+  <text class="pin" x="160" y="415">GND</text>
+  <text class="pin" x="160" y="495">GPIO1</text>
+  <text class="tiny" x="160" y="524">TWAI RX</text>
+  <text class="pin" x="160" y="595">GPIO2</text>
+  <text class="tiny" x="160" y="624">MODE DETECT · INPUT_PULLUP</text>
+  <circle cx="475" cy="328" r="9" fill="#ff5c7a"/><circle cx="475" cy="408" r="9" fill="#a7b4c6"/><circle cx="475" cy="488" r="9" fill="#52d6a2"/><circle cx="475" cy="588" r="9" fill="#bd8cff"/>
+  <rect class="panel" x="160" y="690" width="320" height="72" rx="16"/>
+  <text class="pin" x="320" y="735" text-anchor="middle">USB-C · 5 V Versorgung</text>
+
+  <rect class="can" x="660" y="195" width="400" height="505" rx="28"/>
+  <text class="head" x="860" y="245" text-anchor="middle">SN65HVD230</text>
+  <text class="sub" x="860" y="280" text-anchor="middle">3,3 V · nicht isoliert</text>
+  <text class="pin" x="710" y="345">VCC</text><circle cx="690" cy="338" r="9" fill="#ff5c7a"/>
+  <text class="pin" x="710" y="425">GND</text><circle cx="690" cy="418" r="9" fill="#a7b4c6"/>
+  <text class="pin" x="710" y="505">RXD</text><circle cx="690" cy="498" r="9" fill="#52d6a2"/>
+  <text class="pin" x="710" y="585">TXD</text><circle cx="690" cy="578" r="9" fill="#ffbd59"/>
+  <text class="pin" x="940" y="385">CAN-H</text><circle cx="1030" cy="378" r="9" fill="#ffbd59"/>
+  <text class="pin" x="940" y="465">CAN-L</text><circle cx="1030" cy="458" r="9" fill="#ffbd59"/>
+  <path class="power" d="M475 328 H690"/><path class="ground" d="M475 408 H690"/><path class="signal arrow" d="M690 498 H475"/>
+  <path class="power" d="M690 338 H625 V578 H690"/>
+  <text class="tiny" x="635" y="555">10 kΩ</text>
+  <text class="tiny" x="860" y="625" text-anchor="middle">TXD nicht mit ESP32 verbinden</text>
+  <text class="tiny" x="860" y="654" text-anchor="middle">keine zusätzliche 120-Ω-Terminierung</text>
+
+  <path class="detect" d="M475 588 H610 V720 H690"/>
+  <path class="ground" d="M690 720 H745"/><path class="ground" d="M725 720 v22 m-18 0 h36 m-29 10 h22 m-15 10 h8"/>
+  <text class="note" x="760" y="730">CAN-Kabel steckt: GPIO2 → GND</text>
+  <text class="tiny" x="760" y="758">nur beim Booten lesen · kein Quellenwechsel im Betrieb</text>
+
+  <rect class="vehicle" x="1160" y="225" width="365" height="425" rx="28"/>
+  <text class="head" x="1342" y="278" text-anchor="middle">Microlino</text>
+  <text class="sub" x="1342" y="314" text-anchor="middle">Display-CAN / OBD-Kabel</text>
+  <text class="pin" x="1210" y="390">CAN-H</text><circle cx="1180" cy="378" r="9" fill="#ffbd59"/>
+  <text class="pin" x="1210" y="470">CAN-L</text><circle cx="1180" cy="458" r="9" fill="#ffbd59"/>
+  <text class="pin" x="1210" y="550">SIGNAL-GND</text><circle cx="1180" cy="538" r="9" fill="#ff6b6b"/>
+  <path class="canline" d="M1030 378 H1180"/><path class="canline" d="M1030 458 H1180"/>
+  <path class="bad" d="M690 418 H1110 V538 H1180"/>
+  <text class="tiny" x="1100" y="360" text-anchor="middle">verdrilltes Paar</text>
+  <text class="tiny" x="1100" y="520" text-anchor="end">bei nicht isoliertem Modul erforderlich</text>
+
+  <rect class="warn" x="85" y="815" width="1430" height="115" rx="20"/>
+  <text class="head" x="800" y="858" text-anchor="middle">Nur zwei Fahrzeugdrähte?</text>
+  <text class="note" x="800" y="898" text-anchor="middle">Dann SN65HVD230 durch ein qualifiziertes galvanisch isoliertes CAN-Modul inklusive isolierter Versorgung ersetzen.</text>
+  <text class="tiny" x="800" y="924" text-anchor="middle">Exakte OBD-Pins erst nach fahrzeug- und kabelspezifischer Prüfung eintragen.</text>
+</svg>

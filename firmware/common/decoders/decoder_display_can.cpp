@@ -50,13 +50,19 @@ static void decode602(const uint8_t *b)
     telemetry.display.soc = b[0] / 2.0f;
     telemetry.display.speedKmh = b[1] / 2.0f;
 
-    uint32_t odoRaw =
-        ((uint32_t)(b[7] & 0x0F) << 24) |
-        ((uint32_t)b[6] << 16) |
-        ((uint32_t)b[5] << 8) |
-        b[4];
-
-    telemetry.display.odometerKm = odoRaw / 1024.0f;
+    // Intel-order DBC fields: trip 28|14 at 0.1 km and odometer 42|18 at 1 km.
+    const uint16_t tripRaw = static_cast<uint16_t>(b[3] >> 4) |
+        (static_cast<uint16_t>(b[4]) << 4) |
+        (static_cast<uint16_t>(b[5] & 0x03U) << 12);
+    const uint32_t odoRaw = static_cast<uint32_t>(b[5] >> 2) |
+        (static_cast<uint32_t>(b[6]) << 6) |
+        (static_cast<uint32_t>(b[7] & 0x0FU) << 14);
+    telemetry.display.tripKm = tripRaw / 10.0f;
+    telemetry.display.odometerKm = static_cast<float>(odoRaw);
+    const uint8_t gear = (b[7] >> 6) & 0x03U;
+    telemetry.display.gearStateValid = gear <= 2U;
+    telemetry.display.gearState = gear;
+    telemetry.display.candidateStateLastUpdateMs = millis();
     telemetry.display.estimatedRangeKm = roundf(RANGE_FULL_KM * telemetry.display.soc / 100.0f);
 }
 
@@ -83,6 +89,16 @@ void decoderDisplayCanHandleLocalStatusFrame(const MotCanFrame &frame)
     telemetry.display.warningHblAhActive = (b[5] & 0x08U) != 0;
     telemetry.display.drivetrainWarningYellow = (b[5] & 0x20U) != 0;
     telemetry.display.safetyLastUpdateMs = millis();
+
+    // External DBC discovery fields. Keep their validity separate until the
+    // light and Sport/Eco mappings have passed controlled vehicle tests.
+    telemetry.display.lightStateValid = true;
+    telemetry.display.positionLightActive = (b[2] & 0x40U) != 0;
+    telemetry.display.lowBeamActive = (b[2] & 0x80U) != 0;
+    telemetry.display.driveModeStateValid = true;
+    telemetry.display.sportModeActive = (b[5] & 0x80U) != 0;
+    telemetry.display.ecoModeActive = (b[6] & 0x80U) != 0;
+    telemetry.display.candidateStateLastUpdateMs = millis();
 }
 
 static void decode603(const uint8_t *b)

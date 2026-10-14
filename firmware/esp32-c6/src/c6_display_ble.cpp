@@ -208,6 +208,33 @@ MotDisplayBle::DrivingStatusV1 makeDrivingPacket(uint32_t nowMs)
         packet.sourceAgeMs = min<uint16_t>(
             packet.sourceAgeMs, boundedAge(telemetry.display.safetyLastUpdateMs, nowMs));
     }
+    const bool candidatesFresh = telemetry.display.candidateStateLastUpdateMs != 0U &&
+        nowMs - telemetry.display.candidateStateLastUpdateMs <= kDisplayFreshMs;
+    if (candidatesFresh) {
+        packet.flags |= MotDisplayBle::kCandidateStatesValid;
+        if (telemetry.display.gearStateValid && telemetry.display.gearState <= 2U) {
+            const uint16_t gear = static_cast<uint16_t>(telemetry.display.gearState);
+            packet.flags |= gear << MotDisplayBle::kGearStateShift;
+        } else {
+            packet.flags |= static_cast<uint16_t>(MotDisplayBle::kGearUnknown)
+                << MotDisplayBle::kGearStateShift;
+        }
+        if (telemetry.display.lightStateValid) {
+            const uint16_t light =
+                (telemetry.display.positionLightActive ? 1U : 0U) |
+                (telemetry.display.lowBeamActive ? 2U : 0U);
+            packet.flags |= light << MotDisplayBle::kLightStateShift;
+        }
+        if (telemetry.display.driveModeStateValid) {
+            const uint16_t mode =
+                (telemetry.display.ecoModeActive ? 1U : 0U) |
+                (telemetry.display.sportModeActive ? 2U : 0U);
+            packet.flags |= mode << MotDisplayBle::kDriveModeShift;
+        }
+        packet.sourceAgeMs = min<uint16_t>(
+            packet.sourceAgeMs,
+            boundedAge(telemetry.display.candidateStateLastUpdateMs, nowMs));
+    }
     MotDisplayBle::seal(packet);
     return packet;
 }

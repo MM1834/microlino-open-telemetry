@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DISPLAY = (ROOT / "firmware/mot-display-c6/src/main.cpp").read_text(encoding="utf-8")
 PROTOCOL = (ROOT / "firmware/common/display/mot_display_ble_protocol.h").read_text(encoding="utf-8")
 CLIENT = (ROOT / "firmware/mot-display-c6/src/mot_ble_client.cpp").read_text(encoding="utf-8")
+DATA_SOURCE = (ROOT / "firmware/mot-display-c6/src/mot_data_source.cpp").read_text(encoding="utf-8")
 SERVER = (ROOT / "firmware/esp32-c6/src/c6_display_ble.cpp").read_text(encoding="utf-8")
 GESTURE = (ROOT / "firmware/mot-display-c6/src/mot_gesture.cpp").read_text(encoding="utf-8")
 ADAPTER_MAIN = (ROOT / "firmware/esp32-c6/src/main.cpp").read_text(encoding="utf-8")
@@ -69,7 +70,7 @@ class MotDisplayContractTests(unittest.TestCase):
         self.assertIn("decoderDisplayCanHandleLocalStatusFrame(frame)", dual_can)
         self.assertIn("Canonical charging and power", dual_can)
         self.assertIn("kDrivingStatusUuid", CLIENT)
-        self.assertIn("motBleClientLatestDriving", DISPLAY)
+        self.assertIn("motDataSourceLatestDriving", DISPLAY)
         self.assertIn('? String(static_cast<unsigned>(lroundf(driving.speedDeciKmh / 10.0F))) : "--"', DISPLAY)
         self.assertIn('printCentered("km/h"', DISPLAY)
         self.assertIn("kLeftIndicatorActive", DISPLAY)
@@ -80,7 +81,7 @@ class MotDisplayContractTests(unittest.TestCase):
         self.assertIn("DECODER_PROFILE_STANDARD_CAN_V2", ADAPTER_MAIN)
 
     def test_display_stream_alias_uses_the_production_identity(self):
-        self.assertIn('MOT_VERSION "C6-001-REV41-AWS"', VERSION)
+        self.assertIn('MOT_VERSION "C6-001-REV44-AWS"', VERSION)
         display_env = ADAPTER_INI.split("[env:nanoesp32c6-n16-display-ble]", 1)[1]
         display_env = display_env.split("[env:", 1)[0]
         self.assertIn("extends = env:nanoesp32c6-n16", display_env)
@@ -98,6 +99,11 @@ class MotDisplayContractTests(unittest.TestCase):
             "warning90Code",
             "warningHblAhActive",
             "drivetrainWarningYellow",
+            "gearState",
+            "positionLightActive",
+            "lowBeamActive",
+            "sportModeActive",
+            "ecoModeActive",
         ):
             self.assertNotIn(field, aws)
             self.assertNotIn(field, mqtt)
@@ -119,6 +125,27 @@ class MotDisplayContractTests(unittest.TestCase):
         self.assertIn('"! WARNUNG 90"', DISPLAY)
         self.assertIn('"! HBL / AH"', DISPLAY)
         self.assertIn('"! ANTRIEB GELB"', DISPLAY)
+
+    def test_compact_candidate_states_keep_the_driving_record_at_14_bytes(self):
+        self.assertIn("kGearStateMask", PROTOCOL)
+        self.assertIn("kLightStateMask", PROTOCOL)
+        self.assertIn("kDriveModeMask", PROTOCOL)
+        self.assertIn("sizeof(DrivingStatusV1) == 14", PROTOCOL)
+        self.assertIn("kCandidateStatesValid", SERVER)
+        self.assertIn("positionLightActive ? 1U : 0U", SERVER)
+        self.assertIn("lowBeamActive ? 2U : 0U", SERVER)
+        self.assertIn("kLightStateShift", SERVER)
+        self.assertIn("kDriveModeShift", SERVER)
+        self.assertIn("drawDrivingCandidates(driving)", DISPLAY)
+
+    def test_status_page_short_tilt_navigates_and_long_tilt_is_service_only(self):
+        self.assertIn("MotGestureEvent::ServiceTiltLeft", GESTURE)
+        self.assertIn("MotGestureEvent::ServiceTiltRight", GESTURE)
+        self.assertIn("short service-page tilt released", GESTURE)
+        self.assertIn("serviceHoldMode && tiltCandidateDirection != 0", GESTURE)
+        self.assertIn("const bool serviceGesture", DISPLAY)
+        self.assertIn("else if (gesture == MotGestureEvent::TiltRight)", DISPLAY)
+        self.assertIn("else if (gesture == MotGestureEvent::TiltLeft)", DISPLAY)
 
     def test_gesture_uses_the_qmi8658_hardware_tap_engine(self):
         self.assertIn("kConfigureTapCommand = 0x0C", GESTURE)
@@ -146,8 +173,9 @@ class MotDisplayContractTests(unittest.TestCase):
         loop = DISPLAY.split("void loop()", 1)[1]
         self.assertIn("pairingGestureContext && !pairingConfirmationPending", loop)
         self.assertIn("pairingGestureContext && pairingConfirmationPending", loop)
-        self.assertIn("gesture != pairingConfirmationDirection", loop)
-        self.assertIn("motBleClientForgetPairing();", loop)
+        self.assertIn("serviceDirection != pairingConfirmationDirection", loop)
+        self.assertIn("serviceGesture", loop)
+        self.assertIn("motDataSourceForgetPairing();", loop)
         self.assertIn("kPairingConfirmationWindowMs = 10000", DISPLAY)
         self.assertNotIn("TripleKnock", loop)
 
@@ -159,7 +187,64 @@ class MotDisplayContractTests(unittest.TestCase):
     def test_long_ble_footer_uses_smaller_text(self):
         self.assertIn("footer.length() > 16 ? 1 : 2", DISPLAY)
         self.assertIn("printCentered(footer, 184", DISPLAY)
-        self.assertIn('kFirmwareVersion[] = "MOT-DISPLAY-1.1.0"', DISPLAY)
+        self.assertIn('kFirmwareVersion[] = "MOT-DISPLAY-1.2.0-RC6"', DISPLAY)
+        self.assertIn('"LICHT 0"', DISPLAY)
+        self.assertIn('"LICHT 2"', DISPLAY)
+
+    def test_data_source_is_selected_once_by_the_can_harness(self):
+        self.assertIn("kModeDetectPin = GPIO_NUM_2", DATA_SOURCE)
+        self.assertIn("kCanRxPin = GPIO_NUM_1", DATA_SOURCE)
+        self.assertIn("kUnusedCanTxPin = GPIO_NUM_3", DATA_SOURCE)
+        self.assertNotIn("kModeDetectPin = GPIO_NUM_12", DATA_SOURCE)
+        self.assertNotIn("kCanRxPin = GPIO_NUM_13", DATA_SOURCE)
+        self.assertIn("TWAI_MODE_LISTEN_ONLY", DATA_SOURCE)
+        self.assertIn("standalone = digitalRead", DATA_SOURCE)
+        setup = DATA_SOURCE.split("void motDataSourceSetup()", 1)[1].split(
+            "void motDataSourceLoop()", 1
+        )[0]
+        self.assertIn("setupStandaloneCan();", setup)
+        self.assertIn("motBleClientSetup();", setup)
+        self.assertNotIn("twai_receive", setup)
+        loop = DATA_SOURCE.split("void motDataSourceLoop()", 1)[1].split(
+            "bool motDataSourceStandalone()", 1
+        )[0]
+        self.assertIn("if (standalone) {", loop)
+        self.assertIn("receiveStandaloneCan();", loop)
+        self.assertIn("updateLocalChargeState();", loop)
+        self.assertIn("else motBleClientLoop();", loop)
+        self.assertIn("!motDataSourceStandalone()", DISPLAY)
+
+    def test_standalone_can_uses_a_non_numeric_charge_screen_without_ble_changes(self):
+        self.assertIn("bool localChargeEvidence()", DATA_SOURCE)
+        self.assertIn("telemetry.display.gearState == MotDisplayBle::kGearNeutral", DATA_SOURCE)
+        self.assertIn("updateLocalChargeState();", DATA_SOURCE)
+        standalone_render = DISPLAY.split("void renderCharging", 1)[1].split(
+            "MotDisplayBle::ExtendedTelemetryV1 packet", 1
+        )[0]
+        self.assertIn("if (motDataSourceStandalone())", standalone_render)
+        self.assertIn('printCentered("LADEVORGANG"', standalone_render)
+        self.assertIn("graphics->fillRect", standalone_render)
+        self.assertNotIn("chargePowerDeciKw", standalone_render)
+        self.assertNotIn("chargeEnergyWh", standalone_render)
+        extended = DATA_SOURCE.split(
+            "bool motDataSourceLatestExtended", 1
+        )[1].split("const char *motDataSourceStatus", 1)[0]
+        self.assertIn("if (!standalone) return motBleClientLatestExtended", extended)
+        self.assertNotIn("packet.chargePowerDeciKw", extended)
+        self.assertNotIn("packet.chargeEnergyWh", extended)
+
+    def test_shared_display_decoder_contains_new_candidate_fields(self):
+        decoder = (ROOT / "firmware/common/decoders/decoder_display_can.cpp").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("tripRaw", decoder)
+        self.assertIn("telemetry.display.tripKm = tripRaw / 10.0f", decoder)
+        self.assertIn("const uint8_t gear = (b[7] >> 6) & 0x03U", decoder)
+        self.assertIn("positionLightActive = (b[2] & 0x40U) != 0", decoder)
+        self.assertIn("lowBeamActive = (b[2] & 0x80U) != 0", decoder)
+        self.assertIn("sportModeActive = (b[5] & 0x80U) != 0", decoder)
+        self.assertIn("ecoModeActive = (b[6] & 0x80U) != 0", decoder)
+        self.assertIn("drawDrivingCandidates", DISPLAY)
 
     def test_aws_health_is_additive_and_publish_based(self):
         aws = (ROOT / "firmware/esp32-c6/src/c6_aws.cpp").read_text(encoding="utf-8")

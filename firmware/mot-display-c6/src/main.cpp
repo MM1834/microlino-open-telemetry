@@ -2,8 +2,9 @@
 #include <Arduino_GFX_Library.h>
 #include <cmath>
 
-#include "mot_ble_client.h"
+#include "mot_data_source.h"
 #include "mot_gesture.h"
+#include "telemetry/telemetry.h"
 
 namespace {
 
@@ -13,7 +14,7 @@ constexpr int kLcdSck = 11;
 constexpr int kLcdMosi = 21;
 constexpr int kLcdReset = 20;
 constexpr int kLcdBacklight = 7;
-constexpr char kFirmwareVersion[] = "MOT-DISPLAY-1.1.0";
+constexpr char kFirmwareVersion[] = "MOT-DISPLAY-1.2.0-RC6";
 
 constexpr int kScreenSize = 240;
 constexpr int kCenter = kScreenSize / 2;
@@ -143,12 +144,42 @@ void drawIndicators(const MotDisplayBle::DrivingStatusV1 &driving) {
 void drawParkingBrake(const MotDisplayBle::DrivingStatusV1 &driving) {
   if (!(driving.flags & MotDisplayBle::kSafetyStateValid) ||
       !(driving.flags & MotDisplayBle::kParkingBrakeActive)) return;
-  graphics->drawCircle(49, 35, 13, kAlarm);
-  graphics->drawCircle(49, 35, 12, kAlarm);
+  graphics->drawCircle(57, 51, 13, kAlarm);
+  graphics->drawCircle(57, 51, 12, kAlarm);
   graphics->setTextSize(2);
   graphics->setTextColor(kAlarm, kBackground);
-  graphics->setCursor(43, 28);
+  graphics->setCursor(51, 44);
   graphics->print("P");
+}
+
+void drawDrivingCandidates(const MotDisplayBle::DrivingStatusV1 &driving) {
+  if (!(driving.flags & MotDisplayBle::kCandidateStatesValid)) return;
+  const uint8_t gearState = static_cast<uint8_t>(
+      (driving.flags & MotDisplayBle::kGearStateMask) >> MotDisplayBle::kGearStateShift);
+  if (gearState != MotDisplayBle::kGearUnknown) {
+    const char gear = gearState == MotDisplayBle::kGearDrive ? 'D' :
+        gearState == MotDisplayBle::kGearReverse ? 'R' : 'N';
+    graphics->setTextSize(3);
+    graphics->setTextColor(kForeground, kBackground);
+    graphics->setCursor(174, 44);
+    graphics->print(gear);
+  }
+  const uint8_t lightState = static_cast<uint8_t>(
+      (driving.flags & MotDisplayBle::kLightStateMask) >> MotDisplayBle::kLightStateShift);
+  if (lightState != MotDisplayBle::kLightOff) {
+    graphics->setTextSize(1);
+    graphics->setTextColor(kWarning, kBackground);
+    graphics->setCursor(24, 82);
+    graphics->print(lightState == MotDisplayBle::kLightBit1 ? "LICHT 0" :
+                    lightState == MotDisplayBle::kLightBit2 ? "LICHT 2" : "LICHT 0+2");
+  }
+  const uint8_t driveMode = static_cast<uint8_t>(
+      (driving.flags & MotDisplayBle::kDriveModeMask) >> MotDisplayBle::kDriveModeShift);
+  if (driveMode == MotDisplayBle::kDriveModeSport ||
+      driveMode == MotDisplayBle::kDriveModeEco) {
+    printCentered(driveMode == MotDisplayBle::kDriveModeSport ? "SPORT" : "ECO", 207, 1,
+                  driveMode == MotDisplayBle::kDriveModeSport ? kConsumption : kRegen);
+  }
 }
 
 bool drawWarnings(const MotDisplayBle::DrivingStatusV1 &driving) {
@@ -174,7 +205,7 @@ bool drawWarnings(const MotDisplayBle::DrivingStatusV1 &driving) {
 void render(const MotDisplaySample &sample) {
   MotDisplayBle::DrivingStatusV1 driving{};
   uint32_t drivingAgeMs = 0;
-  const bool drivingFresh = motBleClientLatestDriving(driving, drivingAgeMs);
+  const bool drivingFresh = motDataSourceLatestDriving(driving, drivingAgeMs);
   const bool speedValid = drivingFresh &&
       (driving.flags & MotDisplayBle::kDrivingSpeedValid);
   const uint16_t accent = sample.powerValid ? stateColor(sample.state) : kMuted;
@@ -184,6 +215,7 @@ void render(const MotDisplaySample &sample) {
     drawIndicators(driving);
     drawParkingBrake(driving);
   }
+  if (drivingFresh) drawDrivingCandidates(driving);
 
   printCentered(sample.socValid ? "SOC " + String(sample.socPercent) + "%" : "SOC --", 25, 2,
                 kForeground);
@@ -207,7 +239,7 @@ void render(const MotDisplaySample &sample) {
         ? String(sample.rangeToTargetKm) + " km bis " + String(sample.targetSocPercent) + "%"
         : "-- km bis --%";
     printCentered(range, 158, 1, kForeground);
-    const String footer = sample.powerValid ? stateLabel(sample.state) : motBleClientStatus();
+    const String footer = sample.powerValid ? stateLabel(sample.state) : motDataSourceStatus();
     // Long BLE states such as "SUCHE GEKOPPELTES MOT" exceed the round
     // 240-pixel viewport at size 2. Keep the normal driving labels prominent,
     // but fit diagnostic connection text without clipping the circular edge.
@@ -224,9 +256,28 @@ String boundedName(const char *value, const char *fallback) {
 }
 
 void renderAdapterStatus() {
+  if (motDataSourceStandalone()) {
+    graphics->fillScreen(kBackground);
+    graphics->drawCircle(kCenter, kCenter, 113, kRegen);
+    graphics->drawCircle(kCenter, kCenter, 112, kRegen);
+    printCentered("STANDALONE CAN", 27, 2, kForeground);
+    printCentered(motDataSourceStatus(), 62, 2,
+                  motDataSourceCanFrames() ? kRegen : kMuted);
+    printCentered("FRAMES", 96, 1, kMuted);
+    printCentered(String(motDataSourceCanFrames()), 113, 2, kForeground);
+    const bool freshDisplay = telemetry.display.valid &&
+        millis() - telemetry.display.lastUpdateMs <= 2500U;
+    printCentered(freshDisplay && isfinite(telemetry.display.odometerKm)
+                      ? "ODO " + String(telemetry.display.odometerKm, 0) + " km"
+                      : "ODO -- km", 150, 2, freshDisplay ? kForeground : kMuted);
+    printCentered("BLE DEAKTIVIERT", 180, 1, kMuted);
+    printCentered("NEUSTART = QUELLE PRUEFEN", 211, 1, kMuted);
+    canvas->flush();
+    return;
+  }
   MotDisplayBle::StatusV1 status{};
   uint32_t ageMs = 0;
-  const bool valid = motBleClientLatestStatus(status, ageMs);
+  const bool valid = motDataSourceLatestStatus(status, ageMs);
   graphics->fillScreen(kBackground);
   graphics->drawCircle(kCenter, kCenter, 113, valid ? kCharging : kTrack);
   graphics->drawCircle(kCenter, kCenter, 112, valid ? kCharging : kTrack);
@@ -234,7 +285,7 @@ void renderAdapterStatus() {
   if (!valid) {
     printCentered("WARTE AUF", 91, 2, kMuted);
     printCentered("STATUSDATEN", 116, 2, kMuted);
-    const String bleStatus = motBleClientStatus();
+    const String bleStatus = motDataSourceStatus();
     const uint8_t bleStatusSize = bleStatus.length() > 16 ? 1 : 2;
     printCentered(bleStatus, bleStatusSize == 1 ? 180 : 174, bleStatusSize, kMuted);
     printCentered(motGestureAvailable() ? "3s DREHEN = KOPPELN" : "IMU NICHT BEREIT",
@@ -283,7 +334,7 @@ void renderAdapterStatus() {
 
 bool latestExtended(MotDisplayBle::ExtendedTelemetryV1 &packet) {
   uint32_t ageMs = 0;
-  return motBleClientLatestExtended(packet, ageMs);
+  return motDataSourceLatestExtended(packet, ageMs);
 }
 
 void renderBattery() {
@@ -338,6 +389,20 @@ void renderJourney() {
 }
 
 void renderCharging(const MotDisplaySample &sample) {
+  if (motDataSourceStandalone()) {
+    graphics->fillScreen(kBackground);
+    graphics->drawCircle(kCenter, kCenter, 113, kCharging);
+    graphics->drawCircle(kCenter, kCenter, 112, kCharging);
+    printCentered("LADEN", 35, 2, kForeground);
+    graphics->drawRect(48, 72, 144, 22, kCharging);
+    graphics->fillRect(53, 77, 134, 12, kCharging);
+    printCentered("LADEVORGANG", 111, 2, kCharging);
+    printCentered(sample.socValid ? "SOC " + String(sample.socPercent) + "%" : "SOC --%",
+                  147, 3, sample.socValid ? kForeground : kMuted);
+    printCentered("DREHEN = SEITE", 211, 1, kMuted);
+    canvas->flush();
+    return;
+  }
   MotDisplayBle::ExtendedTelemetryV1 packet{};
   const bool valid = latestExtended(packet);
   const bool charging = valid && (packet.flags & MotDisplayBle::kChargeValid);
@@ -426,7 +491,7 @@ void renderPairingConfirmation() {
 MotDisplaySample liveSample() {
   MotDisplayBle::TelemetryV1 packet{};
   uint32_t receivedAgeMs = 0;
-  if (!motBleClientLatest(packet, receivedAgeMs)) {
+  if (!motDataSourceLatest(packet, receivedAgeMs)) {
     return MotDisplaySample{0.0F, 0, UINT16_MAX, 0, FlowState::Ready, false, false, false};
   }
 
@@ -455,7 +520,7 @@ void setup() {
   Serial.begin(115200);
   delay(400);
   Serial.println();
-  Serial.printf("MOT Display C6 BLE %s\n", kFirmwareVersion);
+  Serial.printf("MOT Display C6 %s\n", kFirmwareVersion);
   Serial.printf("Heap before display: %u bytes\n", ESP.getFreeHeap());
 
   pinMode(kLcdBacklight, OUTPUT);
@@ -471,13 +536,15 @@ void setup() {
   digitalWrite(kLcdBacklight, HIGH);
   Serial.printf("Display ready: %dx%d, free heap: %u bytes\n",
                 graphics->width(), graphics->height(), ESP.getFreeHeap());
-  motBleClientSetup();
+  motDataSourceSetup();
   motGestureSetup();
-  Serial.printf("BLE client ready, free heap: %u bytes\n", ESP.getFreeHeap());
+  Serial.printf("Data source ready: %s, free heap: %u bytes\n",
+                motDataSourceStandalone() ? "standalone-can" : "ble",
+                ESP.getFreeHeap());
 }
 
 void loop() {
-  motBleClientLoop();
+  motDataSourceLoop();
   const uint32_t nowMs = millis();
   const MotDisplaySample currentSample = liveSample();
   if (currentSample.powerValid) {
@@ -495,26 +562,33 @@ void loop() {
     pairingConfirmationDirection = MotGestureEvent::None;
   }
 
-  const bool pairingGestureContext = activePage == DisplayPage::AdapterStatus;
+  const bool pairingGestureContext = !motDataSourceStandalone() &&
+      activePage == DisplayPage::AdapterStatus;
   const MotGestureEvent gesture = motGesturePoll(pairingGestureContext);
-  if (pairingGestureContext && !pairingConfirmationPending &&
-      gesture != MotGestureEvent::None) {
+  const bool serviceGesture = gesture == MotGestureEvent::ServiceTiltLeft ||
+      gesture == MotGestureEvent::ServiceTiltRight;
+  const MotGestureEvent serviceDirection = gesture == MotGestureEvent::ServiceTiltRight
+      ? MotGestureEvent::TiltRight : MotGestureEvent::TiltLeft;
+  if (pairingGestureContext && !pairingConfirmationPending && serviceGesture) {
     pairingConfirmationPending = true;
-    pairingConfirmationDirection = gesture;
+    pairingConfirmationDirection = serviceDirection;
     pairingConfirmationUntilMs = nowMs + kPairingConfirmationWindowMs;
     lastPageSelectionMs = nowMs;
-  } else if (pairingGestureContext && pairingConfirmationPending &&
-             gesture != MotGestureEvent::None &&
-             gesture != pairingConfirmationDirection) {
+  } else if (pairingGestureContext && pairingConfirmationPending && serviceGesture &&
+             serviceDirection != pairingConfirmationDirection) {
     pairingConfirmationPending = false;
     pairingConfirmationDirection = MotGestureEvent::None;
-    motBleClientForgetPairing();
+    motDataSourceForgetPairing();
     pairingResetNoticeUntilMs = nowMs + kPairingResetNoticeMs;
     lastPageSelectionMs = nowMs;
-  } else if (!pairingGestureContext && gesture == MotGestureEvent::TiltRight) {
+  } else if (gesture == MotGestureEvent::TiltRight) {
+    pairingConfirmationPending = false;
+    pairingConfirmationDirection = MotGestureEvent::None;
     activePage = nextPage(activePage);
     lastPageSelectionMs = nowMs;
-  } else if (!pairingGestureContext && gesture == MotGestureEvent::TiltLeft) {
+  } else if (gesture == MotGestureEvent::TiltLeft) {
+    pairingConfirmationPending = false;
+    pairingConfirmationDirection = MotGestureEvent::None;
     // The order is cyclic; four forward steps are one backward step.
     for (uint8_t step = 0; step < 4; ++step) activePage = nextPage(activePage);
     lastPageSelectionMs = nowMs;
@@ -548,18 +622,19 @@ void loop() {
     lastLogMs = nowMs;
     MotDisplayBle::TelemetryV1 packet{};
     uint32_t packetAgeMs = 0;
-    const bool packetFresh = motBleClientLatest(packet, packetAgeMs);
+    const bool packetFresh = motDataSourceLatest(packet, packetAgeMs);
     MotDisplayBle::StatusV1 status{};
     uint32_t statusAgeMs = 0;
-    const bool statusFresh = motBleClientLatestStatus(status, statusAgeMs);
-    Serial.printf("prototype alive: uptime=%lus free_heap=%u ble=%s packet=%s seq=%u age_ms=%lu flags=0x%02x status=%s status_seq=%u imu=%s page=%s\n",
-                  nowMs / 1000U, ESP.getFreeHeap(), motBleClientStatus(),
+    const bool statusFresh = motDataSourceLatestStatus(status, statusAgeMs);
+    Serial.printf("display alive: uptime=%lus free_heap=%u source=%s packet=%s seq=%u age_ms=%lu flags=0x%02x status=%s status_seq=%u imu=%s page=%s can_frames=%lu\n",
+                  nowMs / 1000U, ESP.getFreeHeap(), motDataSourceStatus(),
                   packetFresh ? "fresh" : "stale",
                   static_cast<unsigned>(packet.sequence),
                   static_cast<unsigned long>(packetAgeMs),
                   static_cast<unsigned>(packet.flags), statusFresh ? "fresh" : "stale",
                   static_cast<unsigned>(status.sequence),
                   motGestureAvailable() ? "ready" : "unavailable",
-                  pageName(activePage));
+                  pageName(activePage),
+                  static_cast<unsigned long>(motDataSourceCanFrames()));
   }
 }
