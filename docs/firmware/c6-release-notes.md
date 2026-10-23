@@ -1,14 +1,28 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository candidate:** `C6-001-REV49-AWS`
+> **Current repository candidate:** `C6-001-REV50-AWS`
 >
-> **B.025 production candidate:** `C6-001-REV49-AWS-BATMON-B025`
+> **B.025 production candidate:** `C6-001-REV50-AWS-BATMON-B025`
 
 > **Separate analysis build:** `C6-001-REV36-BM2-BM6-DIAG` is an N16-only,
 > BLE battery-monitor qualification image for separate BM2 and BM6 protocols. It does not change the production REV36
 > release or its WebFlash artifacts.
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV50-AWS` — Display-CAN IPC routing correction
+
+REV50 corrects one receive-only dual-CAN routing condition from REV49. With a
+Standard-CAN profile active, Display-CAN `0x603` remains local-only so it cannot
+override the canonical Standard-CAN charging state. Display-CAN `0x604` now
+continues through the normal Display-CAN decoder and publishes its passively
+received IPC software-version tuple. VCU `0x700`/`0x606`, BDU `0x0AC`, CAN
+listen-only mode and every REV49 board-network feature are unchanged.
+
+The configuration-preserving N16 application is 1,994,848 bytes with SHA-256
+`d304100bd3e76c2fd6f828a32bfedaa0c922749eb2f9a4c0c87681b0f9b99c83`.
+The focused routing contract passes 6 tests and the N16 build uses 74,584 bytes
+RAM (22.8%) and 1,913,438 bytes flash (36.5%).
 
 ### `C6-001-REV49-AWS` — consolidated N16 production candidate
 

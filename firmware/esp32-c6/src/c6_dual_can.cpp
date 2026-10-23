@@ -95,7 +95,7 @@ void receiveChannel(size_t index)
     c6LockDiscoveryObserve(index, frame);
     c6SocDiscoveryObserve(index, frame);
     c6VcuDiagnosticObserve(index, frame);
-    const bool displayChargingFrame = frame.id == 0x603 || frame.id == 0x604;
+    const bool displayChargingFrame = frame.id == 0x603;
     if (standardCanConfigured() &&
         channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&
         frame.id == 0x603) {
