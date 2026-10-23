@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include <cctype>
 
 #include "c6_dual_can.h"
 #include "c6_offline_cache.h"
@@ -9,7 +10,28 @@
 
 namespace {
 constexpr char PREFERENCES_NAMESPACE[] = "mot";
+constexpr char LOCAL_PERIPHERAL_ADDRESS_KEYS[][11] = {
+    "dev0addr", "dev1addr", "dev2addr", "dev3addr", "dev4addr",
+};
+constexpr char LOCAL_PERIPHERAL_PROTOCOL_KEYS[][11] = {
+    "dev0proto", "dev1proto", "dev2proto", "dev3proto", "dev4proto",
+};
 Preferences preferences;
+
+bool validBleAddress(String address)
+{
+    address.trim();
+    address.toLowerCase();
+    if (address.length() != 17) return false;
+    for (size_t index = 0; index < address.length(); ++index) {
+        if (index % 3 == 2) {
+            if (address[index] != ':') return false;
+        } else if (!isxdigit(static_cast<unsigned char>(address[index]))) {
+            return false;
+        }
+    }
+    return true;
+}
 
 bool validAdminPassword(const String &password)
 {
@@ -92,7 +114,41 @@ void c6ConfigLoad()
         c6Config.localMqttPublishIntervalMs = 5000;
     if (c6Config.localMqttPublishIntervalMs > 3600000)
         c6Config.localMqttPublishIntervalMs = 3600000;
+    c6Config.displayLanguage = preferences.getUChar("dispLang", 0);
+    if (c6Config.displayLanguage > 3) c6Config.displayLanguage = 0;
+    c6Config.displayUnitSystem = preferences.getUChar("dispUnits", 0);
+    if (c6Config.displayUnitSystem > 1) c6Config.displayUnitSystem = 0;
+    c6Config.displayConfigRevision = preferences.getUShort("dispCfgRev", 0);
+    const bool boardBatteryBindingStored =
+        preferences.isKey(LOCAL_PERIPHERAL_ADDRESS_KEYS[0]);
+    for (size_t index = 0;
+         index < static_cast<size_t>(C6LocalPeripheralSlot::Count); ++index) {
+        c6Config.localPeripherals[index].address =
+            preferences.getString(LOCAL_PERIPHERAL_ADDRESS_KEYS[index], "");
+        c6Config.localPeripherals[index].protocol =
+            preferences.getString(LOCAL_PERIPHERAL_PROTOCOL_KEYS[index], "");
+    }
+#ifdef MOT_BATTERY_MONITOR_MIGRATION_ADDRESS
+    // One-time migration for the B.025 pilot image. Once stored in NVS the
+    // assignment is fully local and can be changed without another firmware.
+    if (!boardBatteryBindingStored && c6Config.localPeripherals[0].address.isEmpty()) {
+        c6Config.localPeripherals[0].address = MOT_BATTERY_MONITOR_MIGRATION_ADDRESS;
+        c6Config.localPeripherals[0].protocol = "bm2";
+    }
+#endif
     preferences.end();
+
+#ifdef MOT_BATTERY_MONITOR_MIGRATION_ADDRESS
+    if (!boardBatteryBindingStored &&
+        !c6Config.localPeripherals[0].address.isEmpty()) {
+        preferences.begin(PREFERENCES_NAMESPACE, false);
+        preferences.putString(LOCAL_PERIPHERAL_ADDRESS_KEYS[0],
+                              c6Config.localPeripherals[0].address);
+        preferences.putString(LOCAL_PERIPHERAL_PROTOCOL_KEYS[0],
+                              c6Config.localPeripherals[0].protocol);
+        preferences.end();
+    }
+#endif
 
     if (c6Config.setupPassword.length() < 12) {
         c6Config.setupPassword = LocalWebSecurity::generateRecoveryPassword();
@@ -188,7 +244,70 @@ void c6ConfigSave()
     preferences.putBool("otaEn", c6Config.otaEnabled);
     preferences.putUInt("pubMs", c6Config.publishIntervalMs);
     preferences.putUInt("mqttPubMs", c6Config.localMqttPublishIntervalMs);
+    preferences.putUChar("dispLang", c6Config.displayLanguage);
+    preferences.putUChar("dispUnits", c6Config.displayUnitSystem);
+    preferences.putUShort("dispCfgRev", c6Config.displayConfigRevision);
+    for (size_t index = 0;
+         index < static_cast<size_t>(C6LocalPeripheralSlot::Count); ++index) {
+        preferences.putString(LOCAL_PERIPHERAL_ADDRESS_KEYS[index],
+                              c6Config.localPeripherals[index].address);
+        preferences.putString(LOCAL_PERIPHERAL_PROTOCOL_KEYS[index],
+                              c6Config.localPeripherals[index].protocol);
+    }
     preferences.end();
+}
+
+const C6LocalPeripheralBinding &c6ConfigLocalPeripheral(C6LocalPeripheralSlot slot)
+{
+    return c6Config.localPeripherals[static_cast<size_t>(slot)];
+}
+
+bool c6ConfigSetLocalPeripheral(C6LocalPeripheralSlot slot,
+    const String &addressValue, const String &protocolValue)
+{
+    const size_t index = static_cast<size_t>(slot);
+    if (index >= static_cast<size_t>(C6LocalPeripheralSlot::Count)) return false;
+    String address = addressValue;
+    String protocol = protocolValue;
+    address.trim(); address.toLowerCase();
+    protocol.trim(); protocol.toLowerCase();
+    if (!validBleAddress(address) || protocol.isEmpty() || protocol.length() > 12)
+        return false;
+    c6Config.localPeripherals[index].address = address;
+    c6Config.localPeripherals[index].protocol = protocol;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putString(LOCAL_PERIPHERAL_ADDRESS_KEYS[index], address);
+    preferences.putString(LOCAL_PERIPHERAL_PROTOCOL_KEYS[index], protocol);
+    preferences.end();
+    return true;
+}
+
+void c6ConfigClearLocalPeripheral(C6LocalPeripheralSlot slot)
+{
+    const size_t index = static_cast<size_t>(slot);
+    if (index >= static_cast<size_t>(C6LocalPeripheralSlot::Count)) return;
+    c6Config.localPeripherals[index] = {};
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    // Keep an explicit empty value so a one-time migration default is not
+    // resurrected after the user deliberately unassigns the device.
+    preferences.putString(LOCAL_PERIPHERAL_ADDRESS_KEYS[index], "");
+    preferences.putString(LOCAL_PERIPHERAL_PROTOCOL_KEYS[index], "");
+    preferences.end();
+}
+
+bool c6ConfigSetDisplayPresentation(uint8_t language, uint8_t unitSystem,
+    uint16_t revision)
+{
+    if (language > 3 || unitSystem > 1) return false;
+    c6Config.displayLanguage = language;
+    c6Config.displayUnitSystem = unitSystem;
+    c6Config.displayConfigRevision = revision;
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putUChar("dispLang", language);
+    preferences.putUChar("dispUnits", unitSystem);
+    preferences.putUShort("dispCfgRev", revision);
+    preferences.end();
+    return true;
 }
 
 bool c6ConfigAdminConfigured()

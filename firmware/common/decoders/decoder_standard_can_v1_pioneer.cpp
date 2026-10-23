@@ -17,6 +17,15 @@ static constexpr MotStandardCanBms::DecoderRules PIONEER_RULES = {
 
 void decoderStandardCanV1PioneerHandleFrame(const MotCanFrame &frame)
 {
+    if (!frame.extended && frame.id == 0x700 && frame.dlc == 8) {
+        telemetry.vehicleSoftware.vcuValid = true;
+        telemetry.vehicleSoftware.vcuMajor = frame.data[1];
+        telemetry.vehicleSoftware.vcuMinor = frame.data[0];
+        telemetry.vehicleSoftware.vcuBuild = static_cast<uint16_t>(frame.data[4]) |
+            (static_cast<uint16_t>(frame.data[5]) << 8);
+        telemetry.vehicleSoftware.vcuLastUpdateMs = millis();
+        return;
+    }
     if (!frame.extended && frame.id == 0x48D && frame.dlc == 8) {
         telemetry.bms.pioneerSocValid = true;
         telemetry.bms.socInternal = frame.data[6];

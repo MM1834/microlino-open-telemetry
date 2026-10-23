@@ -1,6 +1,6 @@
 #include "c6_bm2_diag.h"
 
-#ifdef MOT_BM2_DIAGNOSTIC
+#if defined(MOT_BM2_DIAGNOSTIC) || defined(MOT_BOARD_NETWORK_BM2)
 
 #include <BLEAdvertisedDevice.h>
 #include <BLEClient.h>
@@ -12,6 +12,8 @@
 
 #include <cstring>
 
+#include "c6_config.h"
+
 namespace {
 constexpr uint32_t kInitialScanDelayMs = 30000;
 constexpr uint32_t kScanIntervalMs = 60000;
@@ -22,7 +24,10 @@ constexpr uint32_t kConnectTimeoutMs = 10000;
 constexpr uint32_t kAutoCaptureTimeoutMs = 60000;
 constexpr uint32_t kAutoHistoryDelayMs = 5000;
 constexpr uint32_t kAutoDisconnectDelayMs = 3000;
+constexpr uint32_t kAutoRefreshIntervalMs = 60000;
 constexpr uint8_t kAutoMaximumConnectionAttempts = 3;
+constexpr uint32_t kPairingWindowMs = 120000;
+constexpr size_t kMaximumPairingCandidates = 8;
 const BLEUUID kBm2ServiceUuid("0000fff0-0000-1000-8000-00805f9b34fb");
 const BLEUUID kBm2NotifyUuid("0000fff4-0000-1000-8000-00805f9b34fb");
 const BLEUUID kBm2WriteUuid("0000fff3-0000-1000-8000-00805f9b34fb");
@@ -91,6 +96,10 @@ uint32_t historyBelow120Samples = 0;
 bool historyReceiving = false;
 bool historySecondCommandPending = false;
 bool historyComplete = false;
+uint8_t consecutiveLowAlarmCycles = 0;
+uint8_t consecutiveHighAlarmCycles = 0;
+bool lowAlarmQualified = false;
+bool highAlarmQualified = false;
 char historyMessage[80] = "not requested";
 AutoDiagnosticPhase autoPhase = AutoDiagnosticPhase::WaitingForScan;
 MonitorProtocol autoProtocol = MonitorProtocol::None;
@@ -101,7 +110,53 @@ uint32_t autoNextAttemptMs = 0;
 uint32_t autoNotificationBaseline = 0;
 bool autoHistoryRequested = false;
 char autoMessage[112] = "waiting for BM2/BM6; close the smartphone app so the monitor is available";
+struct PairingCandidate {
+    char address[24];
+    char name[40];
+    char protocol[8];
+    int rssi;
+    uint8_t addressType;
+    uint32_t lastSeenMs;
+};
+PairingCandidate pairingCandidates[kMaximumPairingCandidates]{};
+size_t pairingCandidateCount = 0;
+volatile bool pairingWindowActive = false;
+uint32_t pairingWindowStartedMs = 0;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
+
+bool addressMatchesBinding(const String &address)
+{
+    const auto &binding = c6ConfigLocalPeripheral(C6LocalPeripheralSlot::BoardBattery);
+    return !binding.address.isEmpty() && address.equalsIgnoreCase(binding.address);
+}
+
+void rememberPairingCandidate(const String &address, const String &name,
+    const char *protocol, int rssi, uint8_t addressType)
+{
+    portENTER_CRITICAL(&stateMux);
+    size_t index = pairingCandidateCount;
+    for (size_t candidate = 0; candidate < pairingCandidateCount; ++candidate) {
+        if (strcasecmp(pairingCandidates[candidate].address, address.c_str()) == 0) {
+            index = candidate;
+            break;
+        }
+    }
+    if (index == pairingCandidateCount) {
+        if (pairingCandidateCount >= kMaximumPairingCandidates) {
+            portEXIT_CRITICAL(&stateMux);
+            return;
+        }
+        ++pairingCandidateCount;
+    }
+    PairingCandidate &entry = pairingCandidates[index];
+    strlcpy(entry.address, address.c_str(), sizeof(entry.address));
+    strlcpy(entry.name, name.c_str(), sizeof(entry.name));
+    strlcpy(entry.protocol, protocol, sizeof(entry.protocol));
+    entry.rssi = rssi;
+    entry.addressType = addressType;
+    entry.lastSeenMs = millis();
+    portEXIT_CRITICAL(&stateMux);
+}
 
 const char *autoPhaseName(AutoDiagnosticPhase phase)
 {
@@ -230,6 +285,21 @@ void summarizeHistory()
         historyLatestVoltage = voltage;
     }
     historyComplete = true;
+    const uint16_t liveCentiV = static_cast<uint16_t>(lroundf(lastVoltage * 100.0f));
+    if (liveCentiV < 1180U) {
+        consecutiveLowAlarmCycles = min<uint8_t>(consecutiveLowAlarmCycles + 1U, 3U);
+    } else if (liveCentiV >= 1200U) {
+        consecutiveLowAlarmCycles = 0;
+        lowAlarmQualified = false;
+    }
+    if (liveCentiV > 1440U) {
+        consecutiveHighAlarmCycles = min<uint8_t>(consecutiveHighAlarmCycles + 1U, 3U);
+    } else if (liveCentiV <= 1420U) {
+        consecutiveHighAlarmCycles = 0;
+        highAlarmQualified = false;
+    }
+    if (consecutiveLowAlarmCycles >= 3U) lowAlarmQualified = true;
+    if (consecutiveHighAlarmCycles >= 3U) highAlarmQualified = true;
     snprintf(historyMessage, sizeof(historyMessage), "complete: %lu samples (%lu min)",
              static_cast<unsigned long>(historySamples),
              static_cast<unsigned long>(historySamples * 2));
@@ -373,6 +443,8 @@ public:
         ++advertisements;
         portEXIT_CRITICAL(&stateMux);
         const String address = device.getAddress().toString();
+        const bool selectedMonitor = addressMatchesBinding(address);
+        if (!pairingWindowActive && !selectedMonitor) return;
         const String name = device.haveName() ? device.getName() : String("unknown");
         const String lowerName = lowerCopy(name);
         const String manufacturerData = device.haveManufacturerData()
@@ -382,8 +454,22 @@ public:
             lowerName.indexOf("ancel") >= 0 || lowerName.indexOf("bm2") >= 0 ||
             lowerName.indexOf("bm6") >= 0;
         const bool bm6Name = lowerName == "bm6" || lowerName.startsWith("bm6 ");
-        const bool bm2GattCandidate = !bm6Name && advertisesFff0;
+        const bool assignedAsBm6 = selectedMonitor &&
+            c6ConfigLocalPeripheral(C6LocalPeripheralSlot::BoardBattery).protocol == "bm6";
+        const bool effectiveBm6 = pairingWindowActive ? bm6Name : assignedAsBm6;
+        // Some BM2-family firmware exposes FFF0 only after connection and
+        // advertises merely as "Battery Monitor". Retain that named candidate;
+        // connectMonitor still rejects it unless FFF0/FFF4 are really present.
+        const bool bm2GattCandidate = !bm6Name && (advertisesFff0 || likelyName);
         const bool candidate = likelyName || advertisesFff0 || manufacturerData.length() == 16;
+
+        // The local chooser lists only devices that advertise the known service
+        // or a BM-family name. A coincidental 16-byte manufacturer field alone
+        // is sufficient for passive diagnosis, but never for user assignment.
+        if (pairingWindowActive && (likelyName || advertisesFff0)) {
+            rememberPairingCandidate(address, name, bm6Name ? "bm6" : "bm2",
+                                     device.getRSSI(), device.getAddressType());
+        }
 
         if (candidate) {
             const String manufacturerHex = hexBytes(manufacturerData);
@@ -401,12 +487,12 @@ public:
             lastCandidateManufacturerLength = manufacturerData.length();
             lastCandidateAdvertisesFff0 = advertisesFff0;
             lastCandidateAddressType = device.getAddressType();
-            if (bm6Name) {
+            if (effectiveBm6) {
                 strlcpy(bm6CandidateAddress, address.c_str(), sizeof(bm6CandidateAddress));
                 bm6CandidateAddressType = device.getAddressType();
             } else if (bm2GattCandidate && !bm2CandidateAddress[0]) {
-                // Retain the first non-BM6 FFF0 device for the bounded automatic
-                // run instead of letting unrelated later advertisements replace it.
+                // Retain the first named/FFF0 non-BM6 device for the bounded
+                // automatic run instead of letting later advertisements replace it.
                 strlcpy(bm2CandidateAddress, address.c_str(), sizeof(bm2CandidateAddress));
                 bm2CandidateAddressType = device.getAddressType();
             }
@@ -419,6 +505,9 @@ public:
                               manufacturerHex.c_str());
             }
         }
+
+        // Discovery must never make an unassigned nearby monitor authoritative.
+        if (!selectedMonitor) return;
 
         if (!device.haveManufacturerData()) return;
 
@@ -544,16 +633,14 @@ bool c6Bm2DiagConnect()
 {
     char address[sizeof(lastCandidateAddress)];
     uint8_t addressType;
-    bool advertisesFff0;
     portENTER_CRITICAL(&stateMux);
-    strlcpy(address, lastCandidateAddress, sizeof(address));
-    addressType = lastCandidateAddressType;
-    advertisesFff0 = lastCandidateAdvertisesFff0;
+    strlcpy(address, bm2CandidateAddress, sizeof(address));
+    addressType = bm2CandidateAddressType;
     ++connectionAttempts;
     portEXIT_CRITICAL(&stateMux);
-    if (!address[0] || !advertisesFff0) {
-        strlcpy(connectionMessage, "no scanned FFF0 candidate", sizeof(connectionMessage));
-        Serial.println("BM2 connect requires a scanned FFF0 candidate");
+    if (!address[0]) {
+        strlcpy(connectionMessage, "no scanned BM2 candidate", sizeof(connectionMessage));
+        Serial.println("BM2 connect requires a scanned Battery Monitor/FFF0 candidate");
         return false;
     }
     return connectMonitor(address, addressType, MonitorProtocol::Bm2);
@@ -639,6 +726,25 @@ void c6Bm2DiagStopScan()
 void c6Bm2DiagLoop()
 {
     const uint32_t now = millis();
+    if (pairingWindowActive) {
+        if (now - pairingWindowStartedMs >= kPairingWindowMs) {
+            pairingWindowActive = false;
+            c6Bm2DiagStopScan();
+            strlcpy(autoMessage, "local battery-monitor pairing window expired",
+                    sizeof(autoMessage));
+        }
+        return;
+    }
+    if (c6ConfigLocalPeripheral(C6LocalPeripheralSlot::BoardBattery).address.isEmpty())
+        return;
+    if (autoPhase == AutoDiagnosticPhase::Complete && autoCompletedMs &&
+        now - autoCompletedMs >= kAutoRefreshIntervalMs) {
+        autoPhase = AutoDiagnosticPhase::WaitingForScan;
+        autoProtocol = MonitorProtocol::None;
+        autoConnectionAttempts = 0;
+        autoNextAttemptMs = now;
+        strlcpy(autoMessage, "scheduled BM2/BM6 refresh due", sizeof(autoMessage));
+    }
     if (historySecondCommandPending && now - historyCountReceivedMs >= kHistorySecondCommandDelayMs) {
         historySecondCommandPending = false;
         const uint8_t request[] = {
@@ -669,7 +775,8 @@ void c6Bm2DiagLoop()
                 strlcpy(autoMessage, "BM2 live capture active; history query could not start", sizeof(autoMessage));
             }
         }
-        const bool bm2Done = autoProtocol == MonitorProtocol::Bm2 && historyComplete;
+        const bool bm2Done = autoProtocol == MonitorProtocol::Bm2 &&
+            autoHistoryRequested && historyComplete;
         const bool bm6Done = autoProtocol == MonitorProtocol::Bm6 && receivedNotification &&
             now - lastSeenMs >= kAutoDisconnectDelayMs;
         if (bm2Done || bm6Done) {
@@ -823,9 +930,16 @@ String c6Bm2DiagStatusJson()
     out += ",\"attempts\":" + String(autoConnectionAttempts);
     out += ",\"maximumAttempts\":" + String(kAutoMaximumConnectionAttempts);
     out += ",\"captureTimeoutSeconds\":" + String(kAutoCaptureTimeoutMs / 1000);
+    out += ",\"refreshIntervalSeconds\":" + String(kAutoRefreshIntervalMs / 1000);
     out += ",\"completedAgeMs\":" + String(autoCompletedMs ? millis() - autoCompletedMs : 0);
     out += ",\"exclusiveConnectionRequired\":true";
     out += ",\"message\":\"" + jsonEscape(autoMessage) + "\"}";
+    const auto &binding = c6ConfigLocalPeripheral(C6LocalPeripheralSlot::BoardBattery);
+    out += ",\"binding\":{";
+    out += "\"assigned\":" + String(binding.address.isEmpty() ? "false" : "true");
+    out += ",\"address\":\"" + jsonEscape(binding.address.c_str()) + "\"";
+    out += ",\"protocol\":\"" + jsonEscape(binding.protocol.c_str()) + "\"}";
+    out += ",\"pairing\":" + c6Bm2PairingJson();
     out += ",\"bm2CandidateAddress\":\"" + jsonEscape(bm2CandidateAddress) + "\"";
     out += ",\"bm6CandidateAddress\":\"" + jsonEscape(bm6CandidateAddress) + "\"";
     out += ",\"history\":{";
@@ -854,9 +968,168 @@ String c6Bm2DiagStatusJson()
     return out;
 }
 
+String c6Bm2PairingJson()
+{
+    PairingCandidate candidates[kMaximumPairingCandidates];
+    size_t count;
+    bool active;
+    uint32_t started;
+    portENTER_CRITICAL(&stateMux);
+    count = pairingCandidateCount;
+    memcpy(candidates, pairingCandidates, sizeof(candidates));
+    active = pairingWindowActive;
+    started = pairingWindowStartedMs;
+    portEXIT_CRITICAL(&stateMux);
+    String out = "{\"active\":" + String(active ? "true" : "false");
+    const uint32_t elapsed = active ? millis() - started : 0;
+    out += ",\"remainingSeconds\":" +
+        String(active && elapsed < kPairingWindowMs ? (kPairingWindowMs - elapsed) / 1000U : 0);
+    out += ",\"candidates\":[";
+    for (size_t index = 0; index < count; ++index) {
+        if (index) out += ',';
+        out += "{\"address\":\"" + jsonEscape(candidates[index].address) + "\"";
+        out += ",\"name\":\"" + jsonEscape(candidates[index].name) + "\"";
+        out += ",\"protocol\":\"" + jsonEscape(candidates[index].protocol) + "\"";
+        out += ",\"rssi\":" + String(candidates[index].rssi);
+        out += ",\"ageMs\":" + String(millis() - candidates[index].lastSeenMs) + "}";
+    }
+    out += "]}";
+    return out;
+}
+
+bool c6Bm2PairingStart()
+{
+    c6Bm2DiagDisconnect();
+    c6Bm2DiagStopScan();
+    portENTER_CRITICAL(&stateMux);
+    pairingCandidateCount = 0;
+    memset(pairingCandidates, 0, sizeof(pairingCandidates));
+    pairingWindowActive = true;
+    pairingWindowStartedMs = millis();
+    portEXIT_CRITICAL(&stateMux);
+    strlcpy(autoMessage, "local battery-monitor pairing scan active", sizeof(autoMessage));
+    const bool started = c6Bm2DiagStartScan();
+    if (!started) pairingWindowActive = false;
+    return started;
+}
+
+bool c6Bm2PairingBind(const String &addressValue, const String &protocolValue,
+    String &error)
+{
+    String address = addressValue;
+    String protocol = protocolValue;
+    address.trim(); address.toLowerCase();
+    protocol.trim(); protocol.toLowerCase();
+    PairingCandidate selected{};
+    bool found = false;
+    portENTER_CRITICAL(&stateMux);
+    if (pairingWindowActive) {
+        for (size_t index = 0; index < pairingCandidateCount; ++index) {
+            if (address.equalsIgnoreCase(pairingCandidates[index].address) &&
+                protocol.equalsIgnoreCase(pairingCandidates[index].protocol)) {
+                selected = pairingCandidates[index];
+                found = true;
+                break;
+            }
+        }
+    }
+    portEXIT_CRITICAL(&stateMux);
+    if (!found) {
+        error = "candidate was not observed in the active local pairing window";
+        return false;
+    }
+    if (protocol != "bm2" && protocol != "bm6") {
+        error = "unsupported battery-monitor protocol";
+        return false;
+    }
+    if (!c6ConfigSetLocalPeripheral(C6LocalPeripheralSlot::BoardBattery,
+                                    address, protocol)) {
+        error = "invalid BLE identity";
+        return false;
+    }
+    c6Bm2DiagStopScan();
+    portENTER_CRITICAL(&stateMux);
+    pairingWindowActive = false;
+    strlcpy(lastCandidateAddress, selected.address, sizeof(lastCandidateAddress));
+    strlcpy(lastCandidateName, selected.name, sizeof(lastCandidateName));
+    lastCandidateAddressType = selected.addressType;
+    strlcpy(bm2CandidateAddress, protocol == "bm2" ? selected.address : "",
+            sizeof(bm2CandidateAddress));
+    bm2CandidateAddressType = selected.addressType;
+    strlcpy(bm6CandidateAddress, protocol == "bm6" ? selected.address : "",
+            sizeof(bm6CandidateAddress));
+    bm6CandidateAddressType = selected.addressType;
+    autoPhase = AutoDiagnosticPhase::WaitingForScan;
+    autoProtocol = MonitorProtocol::None;
+    autoConnectionAttempts = 0;
+    autoNextAttemptMs = millis();
+    portEXIT_CRITICAL(&stateMux);
+    strlcpy(autoMessage, "battery monitor assigned locally; validation pending",
+            sizeof(autoMessage));
+    return true;
+}
+
+void c6Bm2PairingUnbind()
+{
+    c6Bm2DiagDisconnect();
+    c6Bm2DiagStopScan();
+    c6ConfigClearLocalPeripheral(C6LocalPeripheralSlot::BoardBattery);
+    portENTER_CRITICAL(&stateMux);
+    pairingWindowActive = false;
+    bm2CandidateAddress[0] = '\0';
+    bm6CandidateAddress[0] = '\0';
+    lastSeenMs = 0;
+    historyComplete = false;
+    historySamples = 0;
+    lowAlarmQualified = false;
+    highAlarmQualified = false;
+    autoPhase = AutoDiagnosticPhase::WaitingForScan;
+    autoConnectionAttempts = 0;
+    portEXIT_CRITICAL(&stateMux);
+    strlcpy(autoMessage, "battery monitor unassigned; start local pairing",
+            sizeof(autoMessage));
+}
+
 void c6Bm2DiagPrintStatus()
 {
     Serial.println("BM2: " + c6Bm2DiagStatusJson());
+}
+
+C6BoardNetworkDisplaySnapshot c6Bm2DiagDisplaySnapshot()
+{
+    C6BoardNetworkDisplaySnapshot snapshot{};
+    portENTER_CRITICAL(&stateMux);
+    const uint32_t seenMs = lastSeenMs;
+    const float voltage = lastVoltage;
+    const bool complete = historyComplete;
+    const uint32_t samples = historySamples;
+    const float minimum = historyMinimumVoltage;
+    const float maximum = historyMaximumVoltage;
+    snapshot.lowAlarmQualified = lowAlarmQualified;
+    snapshot.highAlarmQualified = highAlarmQualified;
+    if (seenMs && voltage >= 6.0f && voltage <= 18.0f) {
+        snapshot.voltageValid = true;
+        snapshot.voltageCentiV = static_cast<uint16_t>(lroundf(voltage * 100.0f));
+        snapshot.sourceAgeSeconds = static_cast<uint16_t>(min<uint32_t>(
+            (millis() - seenMs) / 1000U, UINT16_MAX));
+    }
+    if (complete && samples && minimum >= 6.0f && maximum <= 18.0f) {
+        snapshot.boundsValid = true;
+        snapshot.minimumCentiV = static_cast<uint16_t>(lroundf(minimum * 100.0f));
+        snapshot.maximumCentiV = static_cast<uint16_t>(lroundf(maximum * 100.0f));
+        snapshot.historyCadenceMinutes = 2;
+        snapshot.historyCount = static_cast<uint8_t>(min<uint32_t>(samples, 12U));
+        const uint32_t first = samples > snapshot.historyCount ? samples - snapshot.historyCount : 0U;
+        for (uint8_t index = 0; index < snapshot.historyCount; ++index) {
+            const uint8_t *sample = &historyData[(first + index) * 4U];
+            const float value = nibbleValue(sample, 0, 3) / 100.0f;
+            if (value >= 6.0f && value <= 18.0f)
+                snapshot.historyCentiV[index] = static_cast<uint16_t>(lroundf(value * 100.0f));
+        }
+        snapshot.historyValid = snapshot.historyCount > 1;
+    }
+    portEXIT_CRITICAL(&stateMux);
+    return snapshot;
 }
 
 #else
@@ -871,6 +1144,11 @@ void c6Bm2DiagDisconnect() {}
 bool c6Bm2DiagRequestHistory() { return false; }
 void c6Bm2DiagDumpHistory() {}
 String c6Bm2DiagStatusJson() { return "{\"enabled\":false}"; }
+String c6Bm2PairingJson() { return "{\"active\":false,\"remainingSeconds\":0,\"candidates\":[]}"; }
+bool c6Bm2PairingStart() { return false; }
+bool c6Bm2PairingBind(const String &, const String &, String &error) { error = "feature unavailable"; return false; }
+void c6Bm2PairingUnbind() {}
 void c6Bm2DiagPrintStatus() { Serial.println("BM2 diagnostic is not included in this firmware build"); }
+C6BoardNetworkDisplaySnapshot c6Bm2DiagDisplaySnapshot() { return {}; }
 
 #endif

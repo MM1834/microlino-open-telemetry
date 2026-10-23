@@ -6,6 +6,8 @@
 
 #include "c6_config.h"
 #include "c6_charge_journal.h"
+#include "c6_bm2_diag.h"
+#include "c6_tyre_pressure_test.h"
 #include "c6_gps.h"
 #include "c6_journey_energy.h"
 #include "c6_network.h"
@@ -35,6 +37,13 @@ constexpr size_t TELEMETRY_ENVELOPE_MAX_BYTES = 4096;
 constexpr uint32_t IP_PUBLISH_RETRY_MS = 5000;
 constexpr uint32_t ALTITUDE_DISPLAY_MAX_AGE_MS = 3000;
 constexpr float ALTITUDE_MIN_MOVING_SPEED_KMH = 1.0f;
+constexpr uint32_t BOARD_NETWORK_CLOUD_INTERVAL_MS = 5UL * 60UL * 1000UL;
+constexpr uint32_t VEHICLE_MODE_DISPLAY_FRESH_MS = 3000;
+constexpr uint32_t VEHICLE_MODE_BMS_FRESH_MS = 10000;
+enum class BoardNetworkMode : uint8_t { Unknown, Off, Driving, Charging };
+uint32_t lastBoardNetworkPublishMs = 0;
+BoardNetworkMode lastBoardNetworkMode = BoardNetworkMode::Unknown;
+bool boardNetworkPublished = false;
 #ifdef MOT_DISPLAY_BLE
 portMUX_TYPE statusSnapshotMux = portMUX_INITIALIZER_UNLOCKED;
 char statusSnapshot[1024] = "starting";
@@ -63,6 +72,40 @@ bool altitudePublishable()
     const bool moving = displayFresh && isfinite(telemetry.display.speedKmh) &&
         telemetry.display.speedKmh > ALTITUDE_MIN_MOVING_SPEED_KMH;
     return c6GpsAltitudePublishable(moving);
+}
+
+BoardNetworkMode boardNetworkMode()
+{
+    const uint32_t nowMs = millis();
+    const bool bmsFresh = telemetry.bms.statusLastUpdateMs != 0 &&
+        static_cast<uint32_t>(nowMs - telemetry.bms.statusLastUpdateMs) <=
+            VEHICLE_MODE_BMS_FRESH_MS;
+    const bool chargingFresh = telemetry.charging.valid &&
+        static_cast<uint32_t>(nowMs - telemetry.charging.lastUpdateMs) <=
+            VEHICLE_MODE_BMS_FRESH_MS;
+    if ((bmsFresh || chargingFresh) && telemetryIsCharging())
+        return BoardNetworkMode::Charging;
+    const bool displayFresh = telemetry.display.valid &&
+        static_cast<uint32_t>(nowMs - telemetry.display.lastUpdateMs) <=
+            VEHICLE_MODE_DISPLAY_FRESH_MS;
+    const bool moving = displayFresh && isfinite(telemetry.display.speedKmh) &&
+        telemetry.display.speedKmh > 1.0F;
+    const bool currentFresh = telemetry.bms.packCurrentValid &&
+        static_cast<uint32_t>(nowMs - telemetry.bms.packCurrentLastUpdateMs) <=
+            VEHICLE_MODE_BMS_FRESH_MS;
+    if (moving || (currentFresh && telemetry.bms.isDischarging))
+        return BoardNetworkMode::Driving;
+    return (displayFresh || bmsFresh || chargingFresh || currentFresh)
+        ? BoardNetworkMode::Off : BoardNetworkMode::Unknown;
+}
+
+bool boardNetworkCloudDue()
+{
+    const C6BoardNetworkDisplaySnapshot snapshot = c6Bm2DiagDisplaySnapshot();
+    if (!snapshot.voltageValid || snapshot.sourceAgeSeconds > 300U) return false;
+    return !boardNetworkPublished || boardNetworkMode() != lastBoardNetworkMode ||
+        static_cast<uint32_t>(millis() - lastBoardNetworkPublishMs) >=
+            BOARD_NETWORK_CLOUD_INTERVAL_MS;
 }
 
 void handleAwsMessage(char *topic, uint8_t *payload, unsigned int length)
@@ -99,6 +142,28 @@ bool publishTelemetry()
     document["sequence"] = ++telemetrySequence;
     document["sampledAt"] = static_cast<uint64_t>(time(nullptr)) * 1000ULL;
     JsonObject values = document["values"].to<JsonObject>();
+#ifdef MOT_TYRE_PRESSURE_SIMULATION
+    values["vehicle/tyre_pressure_front_left"] = C6TyrePressureTest::kPressureKpa[0] / 100.0F;
+    values["vehicle/tyre_pressure_front_right"] = C6TyrePressureTest::kPressureKpa[1] / 100.0F;
+    values["vehicle/tyre_pressure_rear_left"] = C6TyrePressureTest::kPressureKpa[2] / 100.0F;
+    values["vehicle/tyre_pressure_rear_right"] = C6TyrePressureTest::kPressureKpa[3] / 100.0F;
+    values["vehicle/tyre_pressure_alarm"] = C6TyrePressureTest::alarm();
+#endif
+    const C6BoardNetworkDisplaySnapshot boardNetwork = c6Bm2DiagDisplaySnapshot();
+    const BoardNetworkMode currentBoardNetworkMode = boardNetworkMode();
+    const bool boardNetworkDue = !boardNetworkPublished ||
+        currentBoardNetworkMode != lastBoardNetworkMode ||
+        static_cast<uint32_t>(millis() - lastBoardNetworkPublishMs) >=
+            BOARD_NETWORK_CLOUD_INTERVAL_MS;
+    const bool boardNetworkIncluded = boardNetworkDue && boardNetwork.voltageValid &&
+        boardNetwork.sourceAgeSeconds <= 300U;
+    if (boardNetworkIncluded) {
+        values["system/supply_voltage"] = boardNetwork.voltageCentiV / 100.0f;
+        values["system/supply_voltage_source"] = "bm2_ble";
+        values["system/supply_voltage_source_age_s"] = boardNetwork.sourceAgeSeconds;
+        values["system/supply_undervoltage"] = boardNetwork.lowAlarmQualified;
+        values["system/supply_overvoltage"] = boardNetwork.highAlarmQualified;
+    }
     const bool freshBmsCurrent = telemetry.bms.packCurrentValid &&
         millis() - telemetry.bms.packCurrentLastUpdateMs <= 10000;
     const bool freshBmsStatus = telemetry.bms.statusLastUpdateMs != 0 &&
@@ -149,6 +214,15 @@ bool publishTelemetry()
         values["bms/cell_max_mv"] = telemetry.bms.maxCellVoltageMv;
         values["bms/cell_delta_mv"] = telemetry.bms.cellVoltageDeltaMv;
     }
+    if (telemetry.vehicleSoftware.vcuValid)
+        values["vehicle/vcu_software_version"] = String(telemetry.vehicleSoftware.vcuMajor) + "." +
+            String(telemetry.vehicleSoftware.vcuMinor) + "." + String(telemetry.vehicleSoftware.vcuBuild);
+    if (telemetry.vehicleSoftware.ipcValid)
+        values["vehicle/ipc_software_version"] = String(telemetry.vehicleSoftware.ipcMajor) + "." +
+            String(telemetry.vehicleSoftware.ipcMinor) + "." + String(telemetry.vehicleSoftware.ipcPatch);
+    if (telemetry.vehicleSoftware.bduValid)
+        values["vehicle/bdu_software_version"] = String(telemetry.vehicleSoftware.bduMajor) + "." +
+            String(telemetry.vehicleSoftware.bduMinor) + "." + String(telemetry.vehicleSoftware.bduPatch);
     if (c6GpsValid()) {
         values["location/latitude"] = round(c6GpsLatitude() * 1000000.0) / 1000000.0;
         values["location/longitude"] = round(c6GpsLongitude() * 1000000.0) / 1000000.0;
@@ -167,6 +241,11 @@ bool publishTelemetry()
         successfulPublishSeen = true;
         lastSuccessfulPublishMs = millis();
         if (journeyIncluded) c6JourneyEnergyEnvelopePublished();
+        if (boardNetworkIncluded) {
+            boardNetworkPublished = true;
+            lastBoardNetworkPublishMs = millis();
+            lastBoardNetworkMode = currentBoardNetworkMode;
+        }
     }
     return published;
 }
@@ -215,6 +294,19 @@ void refreshStatusSnapshot()
     portEXIT_CRITICAL(&statusSnapshotMux);
 #endif
 }
+}
+
+void c6AwsVolumeCounters(
+    uint32_t &publishCount, uint64_t &payloadBytes, uint64_t &mqttPublishBytes,
+    uint32_t &connectAttempts, uint32_t &reconnects, uint32_t &disconnects)
+{
+    const MotAwsStatus &status = client.status();
+    publishCount = status.publishCount;
+    payloadBytes = status.payloadBytes;
+    mqttPublishBytes = status.mqttPublishBytes;
+    connectAttempts = status.connectAttempts;
+    reconnects = status.reconnectCount;
+    disconnects = status.disconnectCount;
 }
 
 void c6AwsSetup()
@@ -269,8 +361,10 @@ void c6AwsLoop()
     const uint32_t intervalMs =
         c6TelemetryCadenceIntervalMs(c6Config.publishIntervalMs);
     const bool eventPending = cadenceGeneration != lastCadenceEventGeneration;
+    const bool boardNetworkPending = boardNetworkCloudDue();
     if (client.connected() &&
-        (!freshLivePublished || eventPending || millis() - lastPublishMs >= intervalMs)) {
+        (!freshLivePublished || eventPending || boardNetworkPending ||
+         millis() - lastPublishMs >= intervalMs)) {
         lastPublishMs = millis();
         const bool published = publishTelemetry();
         freshLivePublished = published || freshLivePublished;

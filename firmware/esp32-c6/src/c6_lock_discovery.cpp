@@ -228,3 +228,54 @@ void c6LockDiscoveryDiff()
     Serial.println("LOCK diff is available only in the dedicated diagnostic build");
 #endif
 }
+
+void c6LockDiscoveryVersionSearch()
+{
+#ifdef MOT_LOCK_DISCOVERY
+    size_t matches = 0;
+    Serial.println("VERSION_SEARCH targets=IPC-1.3.0,BDU-1.1.0 source=passive-last-payloads");
+    for (size_t channel = 0; channel < CHANNEL_COUNT; ++channel) {
+        for (uint16_t id = 0; id < STANDARD_ID_COUNT; ++id) {
+            const FrameState &state = states[channel][id];
+            if (!state.frames || state.dlc < 3) continue;
+
+            bool ipc = false;
+            bool bdu = false;
+            const char *layout = nullptr;
+            if (state.dlc >= 6 && state.data[1] == 1 &&
+                state.data[4] == 0 && state.data[5] == 0 &&
+                (state.data[0] == 3 || state.data[0] == 1)) {
+                ipc = state.data[0] == 3;
+                bdu = state.data[0] == 1;
+                layout = "vcu-fields";
+            }
+            for (uint8_t offset = 0; offset + 2 < state.dlc && !layout; ++offset) {
+                if (state.data[offset] == 1 && state.data[offset + 2] == 0 &&
+                    (state.data[offset + 1] == 3 || state.data[offset + 1] == 1)) {
+                    ipc = state.data[offset + 1] == 3;
+                    bdu = state.data[offset + 1] == 1;
+                    layout = "contiguous-major-minor-build";
+                } else if (state.data[offset + 1] == 1 && state.data[offset + 2] == 0 &&
+                           (state.data[offset] == 3 || state.data[offset] == 1)) {
+                    ipc = state.data[offset] == 3;
+                    bdu = state.data[offset] == 1;
+                    layout = "contiguous-minor-major-build";
+                }
+            }
+            if (!layout) continue;
+
+            Serial.printf("VERSION_MATCH target=%s can=%u id=0x%03X frames=%lu age_ms=%lu layout=%s raw=",
+                          ipc ? "IPC-1.3.0" : (bdu ? "BDU-1.1.0" : "unknown"),
+                          static_cast<unsigned>(channel + 1), id,
+                          static_cast<unsigned long>(state.frames),
+                          static_cast<unsigned long>(millis() - state.lastFrameMs), layout);
+            printPayload(state.data, state.dlc);
+            Serial.println();
+            matches++;
+        }
+    }
+    Serial.printf("VERSION_SEARCH matches=%u\n", static_cast<unsigned>(matches));
+#else
+    Serial.println("Version search is available only in the dedicated diagnostic build");
+#endif
+}

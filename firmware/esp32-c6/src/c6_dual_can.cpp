@@ -7,6 +7,7 @@
 #include "c6_drive_capture.h"
 #include "c6_lock_discovery.h"
 #include "c6_soc_discovery.h"
+#include "c6_vcu_diagnostic.h"
 #include "decoders/decoder_engine.h"
 #include "decoders/decoder_display_can.h"
 
@@ -93,6 +94,7 @@ void receiveChannel(size_t index)
     c6DriveCaptureObserve(index, frame);
     c6LockDiscoveryObserve(index, frame);
     c6SocDiscoveryObserve(index, frame);
+    c6VcuDiagnosticObserve(index, frame);
     const bool displayChargingFrame = frame.id == 0x603 || frame.id == 0x604;
     if (standardCanConfigured() &&
         channel.status.profile == DECODER_PROFILE_DISPLAY_CAN &&

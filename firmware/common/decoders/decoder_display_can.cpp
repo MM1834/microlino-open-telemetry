@@ -115,11 +115,42 @@ static void decode603(const uint8_t *b)
     telemetry.charging.isCharging = b[4] >= CHARGING_POWER_THRESHOLD;
 }
 
+static void decode604(const uint8_t *b)
+{
+    telemetry.vehicleSoftware.ipcValid = true;
+    telemetry.vehicleSoftware.ipcMajor = b[5];
+    telemetry.vehicleSoftware.ipcMinor = b[6];
+    telemetry.vehicleSoftware.ipcPatch = b[7];
+    telemetry.vehicleSoftware.ipcLastUpdateMs = millis();
+}
+
+static void decode606(const uint8_t *b)
+{
+    telemetry.vehicleSoftware.vcuValid = true;
+    telemetry.vehicleSoftware.vcuMajor = b[1];
+    telemetry.vehicleSoftware.vcuMinor = b[0];
+    telemetry.vehicleSoftware.vcuBuild = static_cast<uint16_t>(b[4]) |
+        (static_cast<uint16_t>(b[5]) << 8);
+    telemetry.vehicleSoftware.vcuLastUpdateMs = millis();
+}
+
+static void decode0ac(const uint8_t *b)
+{
+    telemetry.vehicleSoftware.bduValid = true;
+    telemetry.vehicleSoftware.bduMajor = b[0];
+    telemetry.vehicleSoftware.bduMinor = b[1];
+    telemetry.vehicleSoftware.bduPatch = b[2];
+    telemetry.vehicleSoftware.bduLastUpdateMs = millis();
+}
+
 void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
 {
-    if (frame.extended || frame.dlc < 8) {
+    if (frame.extended) return;
+    if (frame.id == 0x0AC && frame.dlc >= 3) {
+        decode0ac(frame.data);
         return;
     }
+    if (frame.dlc < 8) return;
 
     switch (frame.id) {
         case 0x601: decode601(frame.data); break;
@@ -128,11 +159,10 @@ void decoderDisplayCanHandleFrame(const MotCanFrame &frame)
             decoderDisplayCanHandleLocalStatusFrame(frame);
             decode603(frame.data);
             break;
-        // 0x604 data[4] bit 4 was previously treated as a plugged flag.
-        // Controlled unplugged testing disproved that interpretation. Keep the
-        // frame out of canonical telemetry; raw capture remains available in
-        // the C6 drive diagnostic only.
-        case 0x604: break;
+        // 0x604 data[4] bit 4 is not a plugged flag. Bytes 5..7 are the
+        // passively confirmed IPC software-version tuple.
+        case 0x604: decode604(frame.data); break;
+        case 0x606: decode606(frame.data); break;
         default: break;
     }
 }

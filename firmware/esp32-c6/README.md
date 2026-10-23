@@ -10,6 +10,8 @@ Current implemented slice:
 - listen-only operation with independent counters and decoder profiles;
 - persistent channel-specific CAN profile selection in Preferences/NVS;
 - Display-CAN, Standard-CAN V1 - Pioneer / Gen1 Mid-Range and Standard-CAN V2 shared decoders;
+- passive Pioneer VCU, IPC and BDU software-version decoding with local UI,
+  AWS/local-MQTT and additive encrypted MOT Display publication;
 - board, flash, CAN and GPS pin diagnostics;
 - shared optional-GPS detection and NMEA fix-state handling;
 - bounded in-memory drive capture with on-demand summaries for known CAN IDs;
@@ -99,7 +101,7 @@ and increased electrical regeneration under light braking.
 The `nanoesp32c6-n16-soc-diagnostic` environment adds a passive, RAM-only scan of
 all 11-bit CAN1 identifiers plus a bounded change recorder for every 11-bit frame
 on CAN1 and CAN2. It is intended for the B.025 test adapter and reports itself as
-`C6-001-REV36-SOC-LOCK-DIAG-B025`; it does not change decoder or AWS topic
+`C6-001-REV48-VCU-TEMP-DIAG-B025`; it does not change decoder or AWS topic
 semantics. At a stable displayed SOC, run `soc reset`, wait for all buses to be
 active, then run `soc mark`. After driving or charging changes the displayed SOC,
 run `soc dump`. The comparison lists byte and 16-bit little-/big-endian fields
@@ -120,6 +122,22 @@ momentary command from a persistent locked/unlocked bit. The recorder is passive
 RAM-only and is cleared on restart or by `lock reset`. A single identifier is
 limited to 32 stored changes per capture so a rolling counter cannot displace
 the state transitions from all other identifiers.
+
+The same B.025 image also includes a narrow passive VCU diagnostic recorder.
+`vcu reset` starts a fresh RAM-only observation and `vcu dump` reports raw,
+minimum, maximum and candidate-decoded values for Standard-CAN `0x105`
+temperatures, Standard-CAN `0x700` VCU software version and Display-CAN `0x606`
+VCU software version. The candidate versions are compared byte-for-byte when
+both are present. No value is persisted or published, and both CAN controllers
+remain in listen-only mode with zero transmit queue.
+`version search` scans the latest already-received payloads in RAM for the
+IPC `1.3.0` and BDU `1.1.0` layouts and prints matching channel, identifier and
+raw bytes. It does not transmit a CAN frame.
+The diagnostic image disables the optional adapter-to-MOT-Display BLE server so
+the RAM-heavy SOC/lock recorder cannot compete with the BLE controller. CAN1,
+CAN2, USB serial diagnostics and the local WebUI remain available. AWS IoT is
+also excluded from this temporary image so TLS retries cannot consume the RAM
+reserved for the bounded capture; stored credentials are neither read nor changed.
 
 ### Dedicated B.025 data-usage analysis image
 

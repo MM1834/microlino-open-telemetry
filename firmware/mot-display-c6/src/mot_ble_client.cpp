@@ -10,11 +10,18 @@
 #include <Preferences.h>
 #include <cstring>
 
+#if defined(CONFIG_NIMBLE_ENABLED)
+#include "host/ble_store.h"
+#endif
+
 namespace {
 constexpr uint32_t kScanRetryMs = 5000;
 constexpr uint32_t kPacketStaleMs = 2500;
 constexpr uint32_t kScanDurationSeconds = 3;
-constexpr uint32_t kInitialPairingWindowMs = 120000;
+#ifndef MOT_DISPLAY_INITIAL_PAIRING_MS
+#define MOT_DISPLAY_INITIAL_PAIRING_MS 120000
+#endif
+constexpr uint32_t kInitialPairingWindowMs = MOT_DISPLAY_INITIAL_PAIRING_MS;
 constexpr char kPreferencesNamespace[] = "mot-display";
 constexpr char kPeerAddressKey[] = "peer";
 
@@ -24,10 +31,17 @@ BLERemoteCharacteristic *telemetryCharacteristic = nullptr;
 BLERemoteCharacteristic *statusCharacteristic = nullptr;
 BLERemoteCharacteristic *extendedTelemetryCharacteristic = nullptr;
 BLERemoteCharacteristic *drivingStatusCharacteristic = nullptr;
-bool connected = false;
-bool connectPending = false;
+BLERemoteCharacteristic *presentationConfigCharacteristic = nullptr;
+BLERemoteCharacteristic *chargeSummaryCharacteristic = nullptr;
+BLERemoteCharacteristic *journeyAltitudeCharacteristic = nullptr;
+BLERemoteCharacteristic *vehicleBoardNetworkCharacteristic = nullptr;
+BLERemoteCharacteristic *softwareVersionsCharacteristic = nullptr;
+volatile bool connected = false;
+volatile bool connectPending = false;
+volatile bool connectWorkerRunning = false;
 volatile bool scanRunning = false;
 bool pairingMode = false;
+bool securityRecoveryAttempted = false;
 uint32_t pairingDeadlineMs = 0;
 String boundPeerAddress;
 Preferences preferences;
@@ -40,8 +54,30 @@ MotDisplayBle::ExtendedTelemetryV1 latestExtended{};
 uint32_t latestExtendedMs = 0;
 MotDisplayBle::DrivingStatusV1 latestDriving{};
 uint32_t latestDrivingMs = 0;
+MotDisplayBle::PresentationConfigV1 latestPresentationConfig{};
+uint32_t latestPresentationConfigMs = 0;
+MotDisplayBle::ChargeSummaryV1 latestChargeSummary{};
+uint32_t latestChargeSummaryMs = 0;
+MotDisplayBle::JourneyAltitudeV1 latestJourneyAltitude{};
+uint32_t latestJourneyAltitudeMs = 0;
+MotDisplayBle::VehicleBoardNetworkV1 latestVehicleBoardNetwork{};
+uint32_t latestVehicleBoardNetworkMs = 0;
+MotDisplayBle::SoftwareVersionsV1 latestSoftwareVersions{};
+uint32_t latestSoftwareVersionsMs = 0;
 portMUX_TYPE packetMux = portMUX_INITIALIZER_UNLOCKED;
 const char *statusText = "SUCHE MOT";
+
+bool clearStoredBonds()
+{
+#if defined(CONFIG_NIMBLE_ENABLED)
+    const int result = ble_store_clear();
+    Serial.printf("BLE: local bond store clear rc=%d\n", result);
+    return result == 0;
+#else
+    Serial.println("BLE: local bond-store reset is unavailable on this BLE stack");
+    return false;
+#endif
+}
 
 bool addressAllowed(BLEAdvertisedDevice &device)
 {
@@ -111,6 +147,85 @@ void extendedNotificationCallback(BLERemoteCharacteristic *, uint8_t *data, size
     acceptExtended(data, length);
 }
 
+void acceptChargeSummary(const uint8_t *data, size_t length)
+{
+    if (!data || length != sizeof(MotDisplayBle::ChargeSummaryV1)) return;
+    MotDisplayBle::ChargeSummaryV1 packet{};
+    memcpy(&packet, data, sizeof(packet));
+    if (!MotDisplayBle::valid(packet)) {
+        Serial.println("BLE: invalid charge summary rejected");
+        return;
+    }
+    portENTER_CRITICAL(&packetMux);
+    latestChargeSummary = packet;
+    latestChargeSummaryMs = millis();
+    portEXIT_CRITICAL(&packetMux);
+}
+
+void chargeSummaryNotificationCallback(BLERemoteCharacteristic *, uint8_t *data,
+                                       size_t length, bool)
+{
+    acceptChargeSummary(data, length);
+}
+
+void acceptJourneyAltitude(const uint8_t *data, size_t length)
+{
+    if (!data || length != sizeof(MotDisplayBle::JourneyAltitudeV1)) return;
+    MotDisplayBle::JourneyAltitudeV1 packet{};
+    memcpy(&packet, data, sizeof(packet));
+    if (!MotDisplayBle::valid(packet)) {
+        Serial.println("BLE: invalid journey altitude rejected");
+        return;
+    }
+    portENTER_CRITICAL(&packetMux);
+    latestJourneyAltitude = packet;
+    latestJourneyAltitudeMs = millis();
+    portEXIT_CRITICAL(&packetMux);
+}
+
+void journeyAltitudeNotificationCallback(BLERemoteCharacteristic *, uint8_t *data,
+                                         size_t length, bool)
+{
+    acceptJourneyAltitude(data, length);
+}
+
+void acceptVehicleBoardNetwork(const uint8_t *data, size_t length)
+{
+    if (!data || length != sizeof(MotDisplayBle::VehicleBoardNetworkV1)) return;
+    MotDisplayBle::VehicleBoardNetworkV1 packet{};
+    memcpy(&packet, data, sizeof(packet));
+    if (!MotDisplayBle::valid(packet) ||
+        packet.historyCount > MotDisplayBle::kBoardVoltageHistorySamples) return;
+    portENTER_CRITICAL(&packetMux);
+    latestVehicleBoardNetwork = packet;
+    latestVehicleBoardNetworkMs = millis();
+    portEXIT_CRITICAL(&packetMux);
+}
+
+void vehicleBoardNetworkNotificationCallback(BLERemoteCharacteristic *, uint8_t *data,
+                                             size_t length, bool)
+{
+    acceptVehicleBoardNetwork(data, length);
+}
+
+void acceptSoftwareVersions(const uint8_t *data, size_t length)
+{
+    if (!data || length != sizeof(MotDisplayBle::SoftwareVersionsV1)) return;
+    MotDisplayBle::SoftwareVersionsV1 packet{};
+    memcpy(&packet, data, sizeof(packet));
+    if (!MotDisplayBle::valid(packet)) return;
+    portENTER_CRITICAL(&packetMux);
+    latestSoftwareVersions = packet;
+    latestSoftwareVersionsMs = millis();
+    portEXIT_CRITICAL(&packetMux);
+}
+
+void softwareVersionsNotificationCallback(BLERemoteCharacteristic *, uint8_t *data,
+                                          size_t length, bool)
+{
+    acceptSoftwareVersions(data, length);
+}
+
 void acceptDriving(const uint8_t *data, size_t length)
 {
     if (!data || length != sizeof(MotDisplayBle::DrivingStatusV1)) return;
@@ -128,6 +243,25 @@ void drivingNotificationCallback(BLERemoteCharacteristic *, uint8_t *data, size_
     acceptDriving(data, length);
 }
 
+void acceptPresentationConfig(const uint8_t *data, size_t length)
+{
+    if (!data || length != sizeof(MotDisplayBle::PresentationConfigV1)) return;
+    MotDisplayBle::PresentationConfigV1 packet{};
+    memcpy(&packet, data, sizeof(packet));
+    if (!MotDisplayBle::valid(packet)) return;
+    portENTER_CRITICAL(&packetMux);
+    latestPresentationConfig = packet;
+    latestPresentationConfigMs = millis();
+    portEXIT_CRITICAL(&packetMux);
+}
+
+void presentationConfigNotificationCallback(BLERemoteCharacteristic *, uint8_t *data,
+                                              size_t length, bool)
+{
+    acceptPresentationConfig(data, length);
+}
+
+
 class ClientCallbacks final : public BLEClientCallbacks {
     void onConnect(BLEClient *) override {}
 
@@ -138,6 +272,11 @@ class ClientCallbacks final : public BLEClientCallbacks {
         statusCharacteristic = nullptr;
         extendedTelemetryCharacteristic = nullptr;
         drivingStatusCharacteristic = nullptr;
+        presentationConfigCharacteristic = nullptr;
+        chargeSummaryCharacteristic = nullptr;
+        journeyAltitudeCharacteristic = nullptr;
+        vehicleBoardNetworkCharacteristic = nullptr;
+        softwareVersionsCharacteristic = nullptr;
         statusText = "VERBINDUNG WEG";
         Serial.println("BLE: MOT disconnected");
     }
@@ -146,6 +285,13 @@ class ClientCallbacks final : public BLEClientCallbacks {
 class ScanCallbacks final : public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) override
     {
+#ifdef MOT_DISPLAY_SCAN_DIAGNOSTICS
+        Serial.printf("BLE scan: %s RSSI %d service=%s\n",
+                      advertisedDevice.getAddress().toString().c_str(),
+                      advertisedDevice.getRSSI(),
+                      advertisedDevice.haveServiceUUID()
+                          ? advertisedDevice.getServiceUUID().toString().c_str() : "-");
+#endif
         if (!advertisedDevice.haveServiceUUID() ||
             !advertisedDevice.isAdvertisingService(BLEUUID(MotDisplayBle::kServiceUuid))) return;
         if (!addressAllowed(advertisedDevice)) return;
@@ -187,21 +333,28 @@ void startScan()
     }
 }
 
-bool connectToCandidate()
+bool connectToCandidate(BLEAdvertisedDevice *target)
 {
-    connectPending = false;
-    if (!candidate) return false;
+    if (!target) return false;
     if (!client) {
         client = BLEDevice::createClient();
         client->setClientCallbacks(new ClientCallbacks());
     }
-    if (!client->connect(candidate)) {
+    if (!client->connect(target)) {
         statusText = "MOT NICHT ERREICHBAR";
         return false;
     }
     if (!client->secureConnection()) {
         client->disconnect();
-        statusText = "KOPPLUNG FEHLER";
+        if (!securityRecoveryAttempted) {
+            securityRecoveryAttempted = true;
+            clearStoredBonds();
+            lastScanMs = millis() - kScanRetryMs;
+            statusText = "KOPPLUNG WIRD ERNEUERT";
+            Serial.println("BLE: security failed; cleared local bonds for one recovery attempt");
+        } else {
+            statusText = "KOPPLUNG FEHLER";
+        }
         return false;
     }
     client->setMTU(128);
@@ -260,6 +413,70 @@ bool connectToCandidate()
             drivingStatusCharacteristic->registerForNotify(drivingNotificationCallback);
         else drivingStatusCharacteristic = nullptr;
     }
+    if (capabilities.featureFlags & MotDisplayBle::kPresentationConfigV1Feature) {
+        presentationConfigCharacteristic = service->getCharacteristic(
+            BLEUUID(MotDisplayBle::kPresentationConfigUuid));
+        if (presentationConfigCharacteristic && presentationConfigCharacteristic->canRead()) {
+            const String value = presentationConfigCharacteristic->readValue();
+            acceptPresentationConfig(reinterpret_cast<const uint8_t *>(value.c_str()),
+                                     value.length());
+        }
+        if (presentationConfigCharacteristic && presentationConfigCharacteristic->canNotify())
+            presentationConfigCharacteristic->registerForNotify(
+                presentationConfigNotificationCallback);
+        if (!presentationConfigCharacteristic || !presentationConfigCharacteristic->canWrite())
+            presentationConfigCharacteristic = nullptr;
+    }
+    if (capabilities.featureFlags & MotDisplayBle::kChargeSummaryV1Feature) {
+        chargeSummaryCharacteristic = service->getCharacteristic(
+            BLEUUID(MotDisplayBle::kChargeSummaryUuid));
+        if (chargeSummaryCharacteristic && chargeSummaryCharacteristic->canRead()) {
+            const String value = chargeSummaryCharacteristic->readValue();
+            acceptChargeSummary(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
+        }
+        if (chargeSummaryCharacteristic && chargeSummaryCharacteristic->canNotify())
+            chargeSummaryCharacteristic->registerForNotify(chargeSummaryNotificationCallback);
+        else chargeSummaryCharacteristic = nullptr;
+    }
+    if (capabilities.featureFlags & MotDisplayBle::kJourneyAltitudeV1Feature) {
+        journeyAltitudeCharacteristic = service->getCharacteristic(
+            BLEUUID(MotDisplayBle::kJourneyAltitudeUuid));
+        if (journeyAltitudeCharacteristic && journeyAltitudeCharacteristic->canRead()) {
+            const String value = journeyAltitudeCharacteristic->readValue();
+            acceptJourneyAltitude(reinterpret_cast<const uint8_t *>(value.c_str()),
+                                  value.length());
+        }
+        if (journeyAltitudeCharacteristic && journeyAltitudeCharacteristic->canNotify())
+            journeyAltitudeCharacteristic->registerForNotify(
+                journeyAltitudeNotificationCallback);
+        else journeyAltitudeCharacteristic = nullptr;
+    }
+    if (capabilities.featureFlags & MotDisplayBle::kVehicleBoardNetworkV1Feature) {
+        vehicleBoardNetworkCharacteristic = service->getCharacteristic(
+            BLEUUID(MotDisplayBle::kVehicleBoardNetworkUuid));
+        if (vehicleBoardNetworkCharacteristic && vehicleBoardNetworkCharacteristic->canRead()) {
+            const String value = vehicleBoardNetworkCharacteristic->readValue();
+            acceptVehicleBoardNetwork(reinterpret_cast<const uint8_t *>(value.c_str()),
+                                      value.length());
+        }
+        if (vehicleBoardNetworkCharacteristic && vehicleBoardNetworkCharacteristic->canNotify())
+            vehicleBoardNetworkCharacteristic->registerForNotify(
+                vehicleBoardNetworkNotificationCallback);
+        else vehicleBoardNetworkCharacteristic = nullptr;
+    }
+    if (capabilities.featureFlags & MotDisplayBle::kSoftwareVersionsV1Feature) {
+        softwareVersionsCharacteristic = service->getCharacteristic(
+            BLEUUID(MotDisplayBle::kSoftwareVersionsUuid));
+        if (softwareVersionsCharacteristic && softwareVersionsCharacteristic->canRead()) {
+            const String value = softwareVersionsCharacteristic->readValue();
+            acceptSoftwareVersions(reinterpret_cast<const uint8_t *>(value.c_str()),
+                                   value.length());
+        }
+        if (softwareVersionsCharacteristic && softwareVersionsCharacteristic->canNotify())
+            softwareVersionsCharacteristic->registerForNotify(
+                softwareVersionsNotificationCallback);
+        else softwareVersionsCharacteristic = nullptr;
+    }
     if (telemetryCharacteristic->canRead()) {
         const String value = telemetryCharacteristic->readValue();
         acceptPacket(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
@@ -267,8 +484,9 @@ bool connectToCandidate()
     telemetryCharacteristic->registerForNotify(notificationCallback);
     statusCharacteristic->registerForNotify(statusNotificationCallback);
     connected = true;
+    securityRecoveryAttempted = false;
     if (!boundPeerAddress.length()) {
-        boundPeerAddress = candidate->getAddress().toString();
+        boundPeerAddress = target->getAddress().toString();
         preferences.putString(kPeerAddressKey, boundPeerAddress);
         pairingMode = false;
         Serial.printf("BLE: paired permanently with MOT %s\n", boundPeerAddress.c_str());
@@ -276,6 +494,17 @@ bool connectToCandidate()
     statusText = "MOT VERBUNDEN";
     Serial.println("BLE: MOT telemetry connected and subscribed");
     return true;
+}
+
+void connectWorker(void *)
+{
+    BLEAdvertisedDevice *target = candidate;
+    candidate = nullptr;
+    connectPending = false;
+    connectToCandidate(target);
+    delete target;
+    connectWorkerRunning = false;
+    vTaskDelete(nullptr);
 }
 }  // namespace
 
@@ -300,13 +529,22 @@ void motBleClientSetup()
 
 void motBleClientLoop()
 {
-    if (connectPending) {
-        connectToCandidate();
-        delete candidate;
-        candidate = nullptr;
+    if (connectPending && !connectWorkerRunning) {
+        connectWorkerRunning = true;
+        BaseType_t started = xTaskCreate(connectWorker, "mot-ble-connect", 16384,
+                                         nullptr, 1, nullptr);
+        if (started != pdPASS) {
+            connectWorkerRunning = false;
+            connectPending = false;
+            delete candidate;
+            candidate = nullptr;
+            statusText = "BLE WORKER FEHLER";
+            Serial.println("BLE: connection worker could not start");
+        }
         return;
     }
-    if (!connected && !scanRunning && millis() - lastScanMs >= kScanRetryMs) startScan();
+    if (!connected && !connectWorkerRunning && !scanRunning &&
+        millis() - lastScanMs >= kScanRetryMs) startScan();
 }
 
 bool motBleClientLatest(MotDisplayBle::TelemetryV1 &packet, uint32_t &receivedAgeMs)
@@ -357,6 +595,87 @@ bool motBleClientLatestDriving(MotDisplayBle::DrivingStatusV1 &packet, uint32_t 
     return receivedAgeMs <= 2500U && MotDisplayBle::valid(packet);
 }
 
+bool motBleClientLatestChargeSummary(MotDisplayBle::ChargeSummaryV1 &packet,
+                                     uint32_t &receivedAgeMs)
+{
+    uint32_t receivedMs = 0;
+    portENTER_CRITICAL(&packetMux);
+    packet = latestChargeSummary;
+    receivedMs = latestChargeSummaryMs;
+    portEXIT_CRITICAL(&packetMux);
+    if (!receivedMs) return false;
+    receivedAgeMs = millis() - receivedMs;
+    return receivedAgeMs <= 3500U && MotDisplayBle::valid(packet);
+}
+
+bool motBleClientLatestJourneyAltitude(MotDisplayBle::JourneyAltitudeV1 &packet,
+                                       uint32_t &receivedAgeMs)
+{
+    uint32_t receivedMs = 0;
+    portENTER_CRITICAL(&packetMux);
+    packet = latestJourneyAltitude;
+    receivedMs = latestJourneyAltitudeMs;
+    portEXIT_CRITICAL(&packetMux);
+    if (!receivedMs) return false;
+    receivedAgeMs = millis() - receivedMs;
+    return receivedAgeMs <= 3500U && MotDisplayBle::valid(packet);
+}
+
+bool motBleClientLatestPresentationConfig(MotDisplayBle::PresentationConfigV1 &packet,
+                                          uint32_t &receivedAgeMs)
+{
+    uint32_t receivedMs = 0;
+    portENTER_CRITICAL(&packetMux);
+    packet = latestPresentationConfig;
+    receivedMs = latestPresentationConfigMs;
+    portEXIT_CRITICAL(&packetMux);
+    if (!receivedMs) return false;
+    receivedAgeMs = millis() - receivedMs;
+    return MotDisplayBle::valid(packet);
+}
+
+bool motBleClientLatestVehicleBoardNetwork(MotDisplayBle::VehicleBoardNetworkV1 &packet,
+                                           uint32_t &receivedAgeMs)
+{
+    uint32_t receivedMs = 0;
+    portENTER_CRITICAL(&packetMux);
+    packet = latestVehicleBoardNetwork;
+    receivedMs = latestVehicleBoardNetworkMs;
+    portEXIT_CRITICAL(&packetMux);
+    if (!receivedMs) return false;
+    receivedAgeMs = millis() - receivedMs;
+    return receivedAgeMs <= 3500U && MotDisplayBle::valid(packet) &&
+        packet.historyCount <= MotDisplayBle::kBoardVoltageHistorySamples;
+}
+
+bool motBleClientLatestSoftwareVersions(MotDisplayBle::SoftwareVersionsV1 &packet,
+                                       uint32_t &receivedAgeMs)
+{
+    uint32_t receivedMs = 0;
+    portENTER_CRITICAL(&packetMux);
+    packet = latestSoftwareVersions;
+    receivedMs = latestSoftwareVersionsMs;
+    portEXIT_CRITICAL(&packetMux);
+    if (!receivedMs) return false;
+    receivedAgeMs = millis() - receivedMs;
+    return receivedAgeMs <= 3500U && MotDisplayBle::valid(packet);
+}
+
+bool motBleClientWritePresentationConfig(uint8_t language, uint8_t unitSystem)
+{
+    if (!connected || !presentationConfigCharacteristic || language > 3 || unitSystem > 1)
+        return false;
+    MotDisplayBle::PresentationConfigV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    packet.language = language;
+    packet.unitSystem = unitSystem;
+    MotDisplayBle::seal(packet);
+    presentationConfigCharacteristic->writeValue(
+        reinterpret_cast<uint8_t *>(&packet), sizeof(packet), true);
+    return true;
+}
+
 const char *motBleClientStatus()
 {
     return statusText;
@@ -370,6 +689,7 @@ bool motBleClientIsBound()
 void motBleClientForgetPairing()
 {
     if (client && client->isConnected()) client->disconnect();
+    clearStoredBonds();
     preferences.remove(kPeerAddressKey);
     boundPeerAddress = "";
     pairingMode = true;

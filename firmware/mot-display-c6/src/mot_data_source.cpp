@@ -223,6 +223,24 @@ bool motDataSourceLatestStatus(MotDisplayBle::StatusV1 &packet, uint32_t &ageMs)
     return false;
 }
 
+bool motDataSourceLatestVehicleBoardNetwork(MotDisplayBle::VehicleBoardNetworkV1 &packet,
+                                            uint32_t &ageMs)
+{
+    if (!standalone) return motBleClientLatestVehicleBoardNetwork(packet, ageMs);
+    packet = {};
+    ageMs = UINT32_MAX;
+    return false;
+}
+
+bool motDataSourceLatestSoftwareVersions(MotDisplayBle::SoftwareVersionsV1 &packet,
+                                        uint32_t &ageMs)
+{
+    if (!standalone) return motBleClientLatestSoftwareVersions(packet, ageMs);
+    packet = MotDisplayBle::SoftwareVersionsV1{};
+    ageMs = UINT32_MAX;
+    return false;
+}
+
 bool motDataSourceLatestExtended(MotDisplayBle::ExtendedTelemetryV1 &packet, uint32_t &ageMs)
 {
     if (!standalone) return motBleClientLatestExtended(packet, ageMs);

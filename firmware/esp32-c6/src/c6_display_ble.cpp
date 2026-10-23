@@ -13,9 +13,11 @@
 #include "display/mot_display_ble_protocol.h"
 #include "c6_aws.h"
 #include "c6_charge_journal.h"
+#include "c6_bm2_diag.h"
 #include "c6_config.h"
 #include "c6_journey_energy.h"
 #include "c6_network.h"
+#include "c6_tyre_pressure_test.h"
 #include "system/device_id.h"
 #include "telemetry/telemetry.h"
 
@@ -23,6 +25,7 @@ namespace {
 constexpr uint32_t kPublishIntervalMs = 200;
 constexpr uint32_t kPowerFreshMs = 2500;
 constexpr uint32_t kDisplayFreshMs = 5000;
+constexpr uint16_t kBoardVoltageFreshSeconds = 300;
 constexpr float kFlowThresholdW = 200.0F;
 
 BLECharacteristic *telemetryCharacteristic = nullptr;
@@ -30,6 +33,11 @@ BLECharacteristic *statusCharacteristic = nullptr;
 BLECharacteristic *capabilitiesCharacteristic = nullptr;
 BLECharacteristic *extendedTelemetryCharacteristic = nullptr;
 BLECharacteristic *drivingStatusCharacteristic = nullptr;
+BLECharacteristic *presentationConfigCharacteristic = nullptr;
+BLECharacteristic *chargeSummaryCharacteristic = nullptr;
+BLECharacteristic *journeyAltitudeCharacteristic = nullptr;
+BLECharacteristic *vehicleBoardNetworkCharacteristic = nullptr;
+BLECharacteristic *softwareVersionsCharacteristic = nullptr;
 bool clientConnected = false;
 uint16_t sequence = 0;
 uint32_t lastPublishMs = 0;
@@ -39,6 +47,163 @@ uint32_t lastStatusPublishMs = 0;
 uint16_t statusSequence = 0;
 uint16_t extendedSequence = 0;
 uint16_t drivingSequence = 0;
+uint16_t journeyAltitudeSequence = 0;
+uint16_t vehicleBoardNetworkSequence = 0;
+uint16_t softwareVersionsSequence = 0;
+MotDisplayBle::PresentationConfigV1 pendingPresentationConfig{};
+volatile bool presentationConfigPending = false;
+
+MotDisplayBle::PresentationConfigV1 makePresentationConfig()
+{
+    MotDisplayBle::PresentationConfigV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    packet.language = c6Config.displayLanguage;
+    packet.unitSystem = c6Config.displayUnitSystem;
+    packet.revision = c6Config.displayConfigRevision;
+    MotDisplayBle::seal(packet);
+    return packet;
+}
+
+MotDisplayBle::ChargeSummaryV1 makeChargeSummary()
+{
+    MotDisplayBle::ChargeSummaryV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    const C6ChargeDisplaySnapshot charge = c6ChargeDisplaySnapshot();
+    packet.sequence = charge.completedSequence;
+    if (charge.completedValid) packet.flags |= MotDisplayBle::kChargeSummaryValid;
+    if (charge.completedSocValid) {
+        packet.flags |= MotDisplayBle::kChargeSummarySocValid;
+        packet.startSocPercent = charge.completedStartSocPercent;
+        packet.endSocPercent = charge.completedEndSocPercent;
+    }
+    if (charge.completedEnergyValid) {
+        packet.flags |= MotDisplayBle::kChargeSummaryEnergyValid;
+        packet.energyChargedWh = charge.completedEnergyChargedWh;
+    }
+    if (charge.completedDurationValid) {
+        packet.flags |= MotDisplayBle::kChargeSummaryDurationValid;
+        packet.durationMinutes = charge.completedDurationMinutes;
+    }
+    MotDisplayBle::seal(packet);
+    return packet;
+}
+
+MotDisplayBle::JourneyAltitudeV1 makeJourneyAltitude()
+{
+    MotDisplayBle::JourneyAltitudeV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    packet.sequence = ++journeyAltitudeSequence;
+    packet.sourceAgeMs = UINT16_MAX;
+    const C6JourneyDisplaySnapshot journey = c6JourneyDisplaySnapshot();
+    if (journey.active && journey.altitudeValid) {
+        packet.flags |= MotDisplayBle::kJourneyAltitudeValid;
+        packet.altitudeMeters = journey.altitudeMeters;
+        packet.sourceAgeMs = static_cast<uint16_t>(min<uint32_t>(
+            journey.altitudeAgeMs, UINT16_MAX));
+        if (journey.elevationGainValid) {
+            packet.flags |= MotDisplayBle::kJourneyElevationGainValid;
+            packet.ascentMeters = journey.ascentMeters;
+            packet.descentMeters = journey.descentMeters;
+        }
+    }
+    MotDisplayBle::seal(packet);
+    return packet;
+}
+
+MotDisplayBle::VehicleBoardNetworkV1 makeVehicleBoardNetwork()
+{
+    MotDisplayBle::VehicleBoardNetworkV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    packet.sequence = ++vehicleBoardNetworkSequence;
+    packet.sourceAgeSeconds = UINT16_MAX;
+#ifdef MOT_TYRE_PRESSURE_SIMULATION
+    packet.flags |= MotDisplayBle::kTyreFrontLeftValid |
+        MotDisplayBle::kTyreFrontRightValid |
+        MotDisplayBle::kTyreRearLeftValid |
+        MotDisplayBle::kTyreRearRightValid;
+    memcpy(packet.tyrePressureKpa, C6TyrePressureTest::kPressureKpa,
+           sizeof(C6TyrePressureTest::kPressureKpa));
+#endif
+    const C6BoardNetworkDisplaySnapshot source = c6Bm2DiagDisplaySnapshot();
+    if (source.voltageValid && source.sourceAgeSeconds <= kBoardVoltageFreshSeconds) {
+        packet.flags |= MotDisplayBle::kBoardVoltageValid;
+        packet.voltageCentiV = source.voltageCentiV;
+        packet.sourceAgeSeconds = source.sourceAgeSeconds;
+        if (source.voltageCentiV < MotDisplayBle::kGelLowAlarmCentiV)
+            packet.flags |= MotDisplayBle::kBoardVoltageLowAlarm;
+        else if (source.voltageCentiV < MotDisplayBle::kGelLowWarningCentiV)
+            packet.flags |= MotDisplayBle::kBoardVoltageLowWarning;
+        else if (source.voltageCentiV > MotDisplayBle::kGelHighAlarmCentiV)
+            packet.flags |= MotDisplayBle::kBoardVoltageHighAlarm;
+        else if (source.voltageCentiV > MotDisplayBle::kGelHighWarningCentiV)
+            packet.flags |= MotDisplayBle::kBoardVoltageHighWarning;
+    }
+    if (source.boundsValid) {
+        packet.flags |= MotDisplayBle::kBoardVoltageBoundsValid;
+        packet.minimumCentiV = source.minimumCentiV;
+        packet.maximumCentiV = source.maximumCentiV;
+    }
+    if (source.historyValid) {
+        packet.flags |= MotDisplayBle::kBoardVoltageHistoryValid;
+        packet.historyCount = min<uint8_t>(source.historyCount,
+            MotDisplayBle::kBoardVoltageHistorySamples);
+        packet.historyCadenceMinutes = source.historyCadenceMinutes;
+        memcpy(packet.historyCentiV, source.historyCentiV,
+               packet.historyCount * sizeof(packet.historyCentiV[0]));
+    }
+    MotDisplayBle::seal(packet);
+    return packet;
+}
+
+MotDisplayBle::SoftwareVersionsV1 makeSoftwareVersions()
+{
+    MotDisplayBle::SoftwareVersionsV1 packet{};
+    packet.magic = MotDisplayBle::kMagic;
+    packet.version = MotDisplayBle::kProtocolVersion;
+    packet.sequence = ++softwareVersionsSequence;
+    if (telemetry.vehicleSoftware.vcuValid) {
+        packet.flags |= MotDisplayBle::kVcuSoftwareVersionValid;
+        packet.vcuMajor = telemetry.vehicleSoftware.vcuMajor;
+        packet.vcuMinor = telemetry.vehicleSoftware.vcuMinor;
+        packet.vcuBuild = telemetry.vehicleSoftware.vcuBuild;
+    }
+    if (telemetry.vehicleSoftware.ipcValid) {
+        packet.flags |= MotDisplayBle::kIpcSoftwareVersionValid |
+            MotDisplayBle::kIpcSoftwareVersionCandidate;
+        packet.ipcMajor = telemetry.vehicleSoftware.ipcMajor;
+        packet.ipcMinor = telemetry.vehicleSoftware.ipcMinor;
+        packet.ipcPatch = telemetry.vehicleSoftware.ipcPatch;
+    }
+    if (telemetry.vehicleSoftware.bduValid) {
+        packet.flags |= MotDisplayBle::kBduSoftwareVersionValid |
+            MotDisplayBle::kBduSoftwareVersionCandidate;
+        packet.bduMajor = telemetry.vehicleSoftware.bduMajor;
+        packet.bduMinor = telemetry.vehicleSoftware.bduMinor;
+        packet.bduPatch = telemetry.vehicleSoftware.bduPatch;
+    }
+    MotDisplayBle::seal(packet);
+    return packet;
+}
+
+class PresentationConfigCallbacks final : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *characteristic) override
+    {
+        const String value = characteristic->getValue();
+        if (value.length() != sizeof(MotDisplayBle::PresentationConfigV1)) return;
+        MotDisplayBle::PresentationConfigV1 packet{};
+        memcpy(&packet, value.c_str(), sizeof(packet));
+        if (!MotDisplayBle::valid(packet)) {
+            Serial.println("Display BLE: invalid presentation config rejected");
+            return;
+        }
+        pendingPresentationConfig = packet;
+        presentationConfigPending = true;
+    }
+};
 
 class ServerCallbacks final : public BLEServerCallbacks {
     void onConnect(BLEServer *) override
@@ -100,6 +265,15 @@ MotDisplayBle::TelemetryV1 makePacket(uint32_t nowMs)
                isfinite(telemetry.bms.socPercent) &&
                telemetry.bms.socPercent >= 0.0F && telemetry.bms.socPercent <= 100.0F) {
         packet.socPercent = static_cast<uint8_t>(lroundf(telemetry.bms.socPercent));
+        packet.flags |= MotDisplayBle::kSocValid;
+    } else if (telemetry.bms.pioneerSocValid &&
+               nowMs - telemetry.bms.pioneerSocLastUpdateMs <= kDisplayFreshMs &&
+               isfinite(telemetry.bms.socDisplay) &&
+               telemetry.bms.socDisplay >= 0.0F && telemetry.bms.socDisplay <= 100.0F) {
+        // Pioneer V1 carries the cockpit-correlated SOC in 0x48D byte 7.
+        // Its generic 0x18D SOC byte is fixed at 100 on observed vehicles and
+        // is deliberately rejected by the standard-CAN decoder.
+        packet.socPercent = static_cast<uint8_t>(lroundf(telemetry.bms.socDisplay));
         packet.flags |= MotDisplayBle::kSocValid;
     }
 
@@ -285,7 +459,12 @@ void c6DisplayBleSetup()
     security->setAuthenticationMode(true, false, true);
     BLEServer *server = BLEDevice::createServer();
     server->setCallbacks(new ServerCallbacks());
-    BLEService *service = server->createService(MotDisplayBle::kServiceUuid);
+    // Ten characteristics, including nine notify characteristics with CCCDs,
+    // exceed the Arduino BLE default service allocation of 15 handles. Keep
+    // explicit headroom so every display can discover and subscribe to the
+    // complete encrypted GATT service.
+    BLEService *service = server->createService(
+        BLEUUID(String(MotDisplayBle::kServiceUuid)), 40);
     telemetryCharacteristic = service->createCharacteristic(
         MotDisplayBle::kTelemetryUuid,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
@@ -300,11 +479,34 @@ void c6DisplayBleSetup()
     drivingStatusCharacteristic = service->createCharacteristic(
         MotDisplayBle::kDrivingStatusUuid,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    presentationConfigCharacteristic = service->createCharacteristic(
+        MotDisplayBle::kPresentationConfigUuid,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE |
+            BLECharacteristic::PROPERTY_NOTIFY);
+    chargeSummaryCharacteristic = service->createCharacteristic(
+        MotDisplayBle::kChargeSummaryUuid,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    journeyAltitudeCharacteristic = service->createCharacteristic(
+        MotDisplayBle::kJourneyAltitudeUuid,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    vehicleBoardNetworkCharacteristic = service->createCharacteristic(
+        MotDisplayBle::kVehicleBoardNetworkUuid,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    softwareVersionsCharacteristic = service->createCharacteristic(
+        MotDisplayBle::kSoftwareVersionsUuid,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
     telemetryCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     statusCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     capabilitiesCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     extendedTelemetryCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
     drivingStatusCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+    presentationConfigCharacteristic->setAccessPermissions(
+        ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+    chargeSummaryCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+    journeyAltitudeCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+    vehicleBoardNetworkCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+    softwareVersionsCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+    presentationConfigCharacteristic->setCallbacks(new PresentationConfigCallbacks());
     MotDisplayBle::TelemetryV1 initial = makePacket(millis());
     telemetryCharacteristic->setValue(reinterpret_cast<uint8_t *>(&initial), sizeof(initial));
     MotDisplayBle::StatusV1 initialStatus = makeStatusPacket();
@@ -314,10 +516,15 @@ void c6DisplayBleSetup()
     capabilities.version = MotDisplayBle::kCapabilitiesVersion;
     capabilities.protocolMin = MotDisplayBle::kProtocolVersion;
     capabilities.protocolMax = MotDisplayBle::kProtocolVersion;
-    capabilities.screenFlags = MotDisplayBle::kPowerScreen | MotDisplayBle::kAdapterStatusScreen;
+    capabilities.screenFlags = MotDisplayBle::kPowerScreen |
+        MotDisplayBle::kAdapterStatusScreen | MotDisplayBle::kSoftwareVersionsScreen;
     capabilities.featureFlags = MotDisplayBle::kTelemetryV1Feature |
         MotDisplayBle::kStatusV1Feature | MotDisplayBle::kBondedEncryptionFeature |
-        MotDisplayBle::kExtendedTelemetryV1Feature | MotDisplayBle::kDrivingStatusV1Feature;
+        MotDisplayBle::kExtendedTelemetryV1Feature | MotDisplayBle::kDrivingStatusV1Feature |
+        MotDisplayBle::kPresentationConfigV1Feature | MotDisplayBle::kChargeSummaryV1Feature |
+        MotDisplayBle::kJourneyAltitudeV1Feature |
+        MotDisplayBle::kVehicleBoardNetworkV1Feature |
+        MotDisplayBle::kSoftwareVersionsV1Feature;
     MotDisplayBle::seal(capabilities);
     capabilitiesCharacteristic->setValue(reinterpret_cast<uint8_t *>(&capabilities),
                                          sizeof(capabilities));
@@ -327,6 +534,23 @@ void c6DisplayBleSetup()
     MotDisplayBle::DrivingStatusV1 initialDriving = makeDrivingPacket(millis());
     drivingStatusCharacteristic->setValue(
         reinterpret_cast<uint8_t *>(&initialDriving), sizeof(initialDriving));
+    MotDisplayBle::PresentationConfigV1 initialPresentation = makePresentationConfig();
+    presentationConfigCharacteristic->setValue(
+        reinterpret_cast<uint8_t *>(&initialPresentation), sizeof(initialPresentation));
+    MotDisplayBle::ChargeSummaryV1 initialChargeSummary = makeChargeSummary();
+    chargeSummaryCharacteristic->setValue(
+        reinterpret_cast<uint8_t *>(&initialChargeSummary), sizeof(initialChargeSummary));
+    MotDisplayBle::JourneyAltitudeV1 initialJourneyAltitude = makeJourneyAltitude();
+    journeyAltitudeCharacteristic->setValue(
+        reinterpret_cast<uint8_t *>(&initialJourneyAltitude), sizeof(initialJourneyAltitude));
+    MotDisplayBle::VehicleBoardNetworkV1 initialVehicleBoardNetwork = makeVehicleBoardNetwork();
+    vehicleBoardNetworkCharacteristic->setValue(
+        reinterpret_cast<uint8_t *>(&initialVehicleBoardNetwork),
+        sizeof(initialVehicleBoardNetwork));
+    MotDisplayBle::SoftwareVersionsV1 initialSoftwareVersions = makeSoftwareVersions();
+    softwareVersionsCharacteristic->setValue(
+        reinterpret_cast<uint8_t *>(&initialSoftwareVersions),
+        sizeof(initialSoftwareVersions));
     service->start();
 
     BLEAdvertising *advertising = BLEDevice::getAdvertising();
@@ -341,6 +565,21 @@ void c6DisplayBleLoop()
 {
     if (!telemetryCharacteristic) return;
     const uint32_t nowMs = millis();
+    if (presentationConfigPending) {
+        presentationConfigPending = false;
+        const uint16_t nextRevision = c6Config.displayConfigRevision == UINT16_MAX
+            ? 1U : static_cast<uint16_t>(c6Config.displayConfigRevision + 1U);
+        if (c6ConfigSetDisplayPresentation(pendingPresentationConfig.language,
+                                           pendingPresentationConfig.unitSystem,
+                                           nextRevision)) {
+            MotDisplayBle::PresentationConfigV1 applied = makePresentationConfig();
+            presentationConfigCharacteristic->setValue(
+                reinterpret_cast<uint8_t *>(&applied), sizeof(applied));
+            if (clientConnected) presentationConfigCharacteristic->notify();
+            Serial.printf("Display BLE: presentation config language=%u units=%u revision=%u\n",
+                          applied.language, applied.unitSystem, applied.revision);
+        }
+    }
     if (nowMs - lastPublishMs < kPublishIntervalMs) return;
     lastPublishMs = nowMs;
 
@@ -362,8 +601,24 @@ void c6DisplayBleLoop()
         lastStatusPublishMs = nowMs;
         MotDisplayBle::StatusV1 status = makeStatusPacket();
         statusCharacteristic->setValue(reinterpret_cast<uint8_t *>(&status), sizeof(status));
+        MotDisplayBle::ChargeSummaryV1 chargeSummary = makeChargeSummary();
+        chargeSummaryCharacteristic->setValue(
+            reinterpret_cast<uint8_t *>(&chargeSummary), sizeof(chargeSummary));
+        MotDisplayBle::JourneyAltitudeV1 journeyAltitude = makeJourneyAltitude();
+        journeyAltitudeCharacteristic->setValue(
+            reinterpret_cast<uint8_t *>(&journeyAltitude), sizeof(journeyAltitude));
+        MotDisplayBle::VehicleBoardNetworkV1 vehicleBoardNetwork = makeVehicleBoardNetwork();
+        vehicleBoardNetworkCharacteristic->setValue(
+            reinterpret_cast<uint8_t *>(&vehicleBoardNetwork), sizeof(vehicleBoardNetwork));
         if (clientConnected) {
             statusCharacteristic->notify();
+            chargeSummaryCharacteristic->notify();
+            journeyAltitudeCharacteristic->notify();
+            vehicleBoardNetworkCharacteristic->notify();
+            MotDisplayBle::SoftwareVersionsV1 softwareVersions = makeSoftwareVersions();
+            softwareVersionsCharacteristic->setValue(
+                reinterpret_cast<uint8_t *>(&softwareVersions), sizeof(softwareVersions));
+            softwareVersionsCharacteristic->notify();
             ++statusNotifications;
         }
     }

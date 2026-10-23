@@ -95,11 +95,30 @@ struct MotSystemTelemetry {
     uint32_t uptimeSec = 0;
 };
 
+struct MotVehicleSoftwareTelemetry {
+    bool vcuValid = false;
+    bool ipcValid = false;
+    bool bduValid = false;
+    uint8_t vcuMajor = 0;
+    uint8_t vcuMinor = 0;
+    uint16_t vcuBuild = 0;
+    uint8_t ipcMajor = 0;
+    uint8_t ipcMinor = 0;
+    uint8_t ipcPatch = 0;
+    uint8_t bduMajor = 0;
+    uint8_t bduMinor = 0;
+    uint8_t bduPatch = 0;
+    uint32_t vcuLastUpdateMs = 0;
+    uint32_t ipcLastUpdateMs = 0;
+    uint32_t bduLastUpdateMs = 0;
+};
+
 struct MotTelemetry {
     MotDisplayTelemetry display;
     MotChargingTelemetry charging;
     MotAccessTelemetry access;
     MotBmsTelemetry bms;
+    MotVehicleSoftwareTelemetry vehicleSoftware;
     MotSystemTelemetry system;
 };
 

@@ -9,6 +9,7 @@
 #include "c6_abrp.h"
 #include "c6_bm2_diag.h"
 #include "c6_config.h"
+#include "c6_data_volume.h"
 #include "c6_charge_journal.h"
 #include "c6_dual_can.h"
 #include "c6_gps.h"
@@ -173,6 +174,19 @@ String diagnosticsJson()
     out += ",\"runtime\":{\"resetReason\":\"" + String(resetReasonText()) + "\",\"freeHeap\":" + String(ESP.getFreeHeap()) + ",\"minFreeHeap\":" + String(ESP.getMinFreeHeap()) + ",\"largestFreeBlock\":" + String(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)) + "}";
     out += ",\"network\":{\"online\":" + String(c6NetworkOnline() ? "true" : "false") + ",\"transportReady\":" + String(c6NetworkTransportReady() ? "true" : "false") + ",\"linkWeak\":" + String(c6NetworkLinkWeak() ? "true" : "false") + ",\"weakForMs\":" + String(c6NetworkWeakForMs()) + ",\"transitions\":" + String(c6NetworkTransitionCount()) + ",\"lastTransitionAgeMs\":" + String(c6NetworkLastTransitionAgeMs()) + ",\"disconnects\":" + String(c6NetworkDisconnectCount()) + ",\"lastDisconnectReason\":" + String(c6NetworkLastDisconnectReason()) + ",\"lastDisconnectName\":\"" + jsonEscape(c6NetworkLastDisconnectReasonName()) + "\",\"lastDisconnectAgeMs\":" + String(c6NetworkLastDisconnectAgeMs()) + ",\"lastDisconnectManagerInitiated\":" + String(c6NetworkLastDisconnectWasManagerInitiated() ? "true" : "false") + ",\"homeConfigured\":" + String(c6NetworkHomeConfigured() ? "true" : "false") + ",\"mobileConfigured\":" + String(c6NetworkMobileConfigured() ? "true" : "false") + ",\"state\":\"" + c6NetworkStateName() + "\",\"profile\":\"" + c6NetworkProfileName() + "\",\"reason\":\"" + jsonEscape(c6NetworkReason()) + "\",\"ip\":\"" + c6NetworkIp() + "\",\"bssid\":\"" + c6NetworkBssid() + "\",\"channel\":" + String(c6NetworkChannel()) + ",\"rssi\":" + String(c6NetworkRssi()) + ",\"apActive\":" + String(c6NetworkApActive() ? "true" : "false") + ",\"apSsid\":\"" + c6NetworkApSsid() + "\"}";
     out += ",\"can1\":" + channelJson(0) + ",\"can2\":" + channelJson(1);
+    out += ",\"vehicleSoftware\":{";
+    out += "\"vcu\":" + String(telemetry.vehicleSoftware.vcuValid ?
+        "\"" + String(telemetry.vehicleSoftware.vcuMajor) + "." +
+        String(telemetry.vehicleSoftware.vcuMinor) + "." +
+        String(telemetry.vehicleSoftware.vcuBuild) + "\"" : "null");
+    out += ",\"ipc\":" + String(telemetry.vehicleSoftware.ipcValid ?
+        "\"" + String(telemetry.vehicleSoftware.ipcMajor) + "." +
+        String(telemetry.vehicleSoftware.ipcMinor) + "." +
+        String(telemetry.vehicleSoftware.ipcPatch) + "\"" : "null");
+    out += ",\"bdu\":" + String(telemetry.vehicleSoftware.bduValid ?
+        "\"" + String(telemetry.vehicleSoftware.bduMajor) + "." +
+        String(telemetry.vehicleSoftware.bduMinor) + "." +
+        String(telemetry.vehicleSoftware.bduPatch) + "\"" : "null") + "}";
     const bool gpsMoving = telemetry.display.valid &&
         millis() - telemetry.display.lastUpdateMs <= 5000 &&
         telemetry.display.speedKmh > 1.0f;
@@ -181,7 +195,8 @@ String diagnosticsJson()
     out += ",\"localMqtt\":" + c6LocalMqttStatusJson();
     out += ",\"offlineCache\":" + c6OfflineCacheStatusJson();
     out += ",\"abrp\":" + c6AbrpStatusJson();
-#ifdef MOT_BM2_DIAGNOSTIC
+    out += ",\"dataVolume\":" + c6DataVolumeStatusJson();
+#if defined(MOT_BM2_DIAGNOSTIC) || defined(MOT_BOARD_NETWORK_BM2)
     out += ",\"bm2\":" + c6Bm2DiagStatusJson();
 #endif
     out += "}";
@@ -193,14 +208,15 @@ void statusPage()
     if (!requireAdmin()) return;
     String out = header("MOT C6 Status");
     out += "<h1>Microlino Open Telemetry</h1><p>" MOT_VERSION " · " MOT_BOARD " · " + motDeviceId() + "</p>";
+    out += "<div class='card'><h2>Vehicle software versions</h2><p>VCU: <b id='sw-vcu'>--</b><br>IPC: <b id='sw-ipc'>--</b><br>BDU: <b id='sw-bdu'>--</b></p><p class='muted'>Passively received CAN broadcasts; no diagnostic request.</p></div>";
     out += "<div class='card'><h2>Runtime diagnostics</h2><pre id='diag'>Loading…</pre><button onclick='load()'>Refresh</button></div>";
-#ifdef MOT_BM2_DIAGNOSTIC
+#if defined(MOT_BM2_DIAGNOSTIC) || defined(MOT_BOARD_NETWORK_BM2)
     out += "<div class='card'><h2>Battery monitor diagnostics</h2><p>Close the BM2/BM6 smartphone app during this test; the monitor accepts only one BLE connection.</p><pre id='battery-monitor'>Waiting for automatic scan…</pre></div>";
 #endif
     out += "<div class='card'><h2>ABRP</h2><pre id='abrp'>Loading…</pre><button onclick='testAbrp()'>Send test telemetry</button></div>";
-    out += "<p><a href='/config'>Configuration</a> · <a href='/wizard'>Onboarding wizard</a> · <a href='/update'>Local OTA</a> · <a href='/api/status'>JSON diagnostics</a></p>";
+    out += "<p><a href='/config'>Configuration</a> · <a href='/peripherals'>Local devices</a> · <a href='/wizard'>Onboarding wizard</a> · <a href='/update'>Local OTA</a> · <a href='/api/status'>JSON diagnostics</a></p>";
     out += "<script>async function loadAbrp(){let r=await fetch('/api/abrp/status'),d=await r.json();document.getElementById('abrp').textContent=JSON.stringify(d,null,2)}async function testAbrp(){let r=await fetch('/api/abrp/test',{method:'POST'}),d=await r.json();document.getElementById('abrp').textContent=JSON.stringify(d,null,2)}loadAbrp()</script>";
-    out += "<script>async function load(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('diag').textContent=JSON.stringify(d,null,2);let b=document.getElementById('battery-monitor');if(b)b.textContent=JSON.stringify(d.bm2||{enabled:false},null,2)}load()</script></body></html>";
+    out += "<script>async function load(){let r=await fetch('/api/status'),d=await r.json();document.getElementById('diag').textContent=JSON.stringify(d,null,2);let s=d.vehicleSoftware||{};document.getElementById('sw-vcu').textContent=s.vcu||'--';document.getElementById('sw-ipc').textContent=s.ipc||'--';document.getElementById('sw-bdu').textContent=s.bdu||'--';let b=document.getElementById('battery-monitor');if(b)b.textContent=JSON.stringify(d.bm2||{enabled:false},null,2)}load()</script></body></html>";
     server.send(200, "text/html", out);
 }
 
@@ -220,8 +236,63 @@ void configPage()
     out += "<div class='card'><h2>Offline cache</h2><label><input style='width:auto' type='checkbox' name='offlineCacheEnabled'" + String(c6Config.offlineCacheEnabled ? " checked" : "") + "> Cache History samples, completed journeys and charges during Internet loss</label><p class='muted'>Default: enabled. SOC/Speed History, compact journey summaries and charge summaries use separate bounded journals under this one setting. Sampling and replay pause while MOT Cloud is disabled; queued records are retained. Trustworthy UTC is required. No GPS/location or WiFi identity is stored. Explicitly disabling the cache or factory reset deletes all journals; physical flash access may still expose unencrypted remnants.</p><pre>" + htmlEscape(c6OfflineCacheStatusJson()) + "</pre><pre>" + htmlEscape(c6JourneyEnergyStatusJson()) + "</pre><pre>" + htmlEscape(c6ChargeJournalStatusJson()) + "</pre></div>";
     out += "<div class='card'><h2>Runtime</h2><label>AWS active envelope interval (ms)</label><input type='number' min='1000' max='3600000' name='pubMs' value='" + String(c6Config.publishIntervalMs) + "'><p class='muted'>Default: 5000 ms while moving. Charging and parked states automatically use slower intervals; relevant state changes publish immediately.</p><label><input style='width:auto' type='checkbox' name='otaEnabled'" + String(c6Config.otaEnabled ? " checked" : "") + "> Enable local OTA</label><label>New admin password</label><input type='password' name='adminPassword' minlength='12' maxlength='63' placeholder='Leave blank to keep current'></div><button class='primary'>Save &amp; reboot</button></form>";
     out += "<div class='card'><h2>Backup / restore</h2><p><a href='/api/config/export'>Download backup (without secrets)</a></p><form method='POST' action='/config/import'><textarea name='configJson' rows='8' placeholder='Paste configuration JSON'></textarea><button>Restore &amp; reboot</button></form></div>";
+    out += "<div class='card'><h2>Local BLE devices</h2><p>Assign the 12-V battery monitor locally. The same device-slot model reserves front-left, front-right, rear-left and rear-right for later tyre-pressure sensors.</p><p><a href='/peripherals'>Manage local devices</a></p></div>";
     out += "<div class='card'><h2>Factory reset</h2><form method='POST' action='/factory-reset' onsubmit=\"return confirm('Erase all local configuration?')\"><button>Erase configuration &amp; reboot</button></form></div><p><a href='/status'>Status</a></p></body></html>";
     server.send(200, "text/html", out);
+}
+
+void peripheralsPage()
+{
+    if (!requireAdmin()) return;
+    String out = header("MOT Local Devices");
+    out += "<h1>Local devices</h1><div class='card'><h2>12-V battery monitor</h2>";
+    out += "<p>The pairing window is local, lasts two minutes and does not use MOT Cloud. Close every battery-monitor app first because BM2/BM6 permits only one active BLE connection.</p>";
+    out += "<p id='binding'>Loading…</p><button class='primary' id='scan' onclick='startScan()'>Search nearby monitors</button> ";
+    out += "<button class='secondary-small' onclick='unbindMonitor()'>Unassign monitor</button><div id='candidates'></div><pre id='result'></pre></div>";
+    out += "<div class='card'><h2>Tyre-pressure sensor slots</h2><p>Front left, front right, rear left and rear right are reserved in the local assignment registry. Pairing remains disabled until a real TPMS protocol and stable sensor identity have been qualified.</p></div>";
+    out += "<p><a href='/status'>Status</a> · <a href='/config'>Configuration</a></p>";
+    out += R"JS(<script>
+const result=document.getElementById('result'), candidates=document.getElementById('candidates');
+async function request(path,body){const options=body?{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)}:{};const response=await fetch(path,options);const text=await response.text();let data;try{data=JSON.parse(text)}catch(_){data={error:text}}if(!response.ok)throw new Error(data.error||text||response.statusText);return data}
+function render(data){const binding=data.binding||{};document.getElementById('binding').textContent=binding.assigned?`Assigned: ${binding.address} (${String(binding.protocol).toUpperCase()})`:'No battery monitor assigned';const pairing=data.pairing||{};candidates.replaceChildren();const title=document.createElement('p');title.textContent=pairing.active?`Pairing active: ${pairing.remainingSeconds}s remaining`:'Pairing inactive';candidates.append(title);for(const item of pairing.candidates||[]){const row=document.createElement('div');row.className='card';const label=document.createElement('span');label.textContent=`${item.name||'Battery monitor'} · ${item.address} · ${String(item.protocol).toUpperCase()} · ${item.rssi} dBm `;const button=document.createElement('button');button.textContent='Assign';button.onclick=()=>bindMonitor(item.address,item.protocol);row.append(label,button);candidates.append(row)}result.textContent=JSON.stringify({connection:data.connectionMessage,automatic:data.autoDiagnostic,history:data.history},null,2)}
+async function refresh(){try{render(await request('/api/peripherals/battery-monitor'))}catch(error){result.textContent=error.message}}
+async function startScan(){try{render(await request('/api/peripherals/battery-monitor/scan',{}));setTimeout(refresh,16000)}catch(error){result.textContent=error.message}}
+async function bindMonitor(address,protocol){if(!confirm(`Assign ${address} as the vehicle battery monitor?`))return;try{render(await request('/api/peripherals/battery-monitor/bind',{address,protocol}));setTimeout(refresh,2000)}catch(error){result.textContent=error.message}}
+async function unbindMonitor(){if(!confirm('Unassign the current battery monitor? Existing local history will be cleared.'))return;try{render(await request('/api/peripherals/battery-monitor/unbind',{}))}catch(error){result.textContent=error.message}}
+refresh();setInterval(refresh,5000);
+</script></body></html>)JS";
+    server.send(200, "text/html", out);
+}
+
+void batteryMonitorStatus()
+{
+    if (!requireAdmin()) return;
+    server.send(200, "application/json", c6Bm2DiagStatusJson());
+}
+
+void batteryMonitorScan()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    const bool started = c6Bm2PairingStart();
+    server.send(started ? 202 : 409, "application/json", c6Bm2DiagStatusJson());
+}
+
+void batteryMonitorBind()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    String error;
+    if (!c6Bm2PairingBind(server.arg("address"), server.arg("protocol"), error)) {
+        server.send(409, "application/json", "{\"error\":\"" + jsonEscape(error) + "\"}");
+        return;
+    }
+    server.send(200, "application/json", c6Bm2DiagStatusJson());
+}
+
+void batteryMonitorUnbind()
+{
+    if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+    c6Bm2PairingUnbind();
+    server.send(200, "application/json", c6Bm2DiagStatusJson());
 }
 
 void saveConfig()
@@ -547,6 +618,7 @@ void c6WebSetup()
     server.on("/setup", HTTP_GET, setupPage);
     server.on("/setup", HTTP_POST, setupSave);
     server.on("/status", HTTP_GET, statusPage);
+    server.on("/peripherals", HTTP_GET, peripheralsPage);
     server.on("/api/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", diagnosticsJson()); });
     server.on("/wizard", HTTP_GET, wizardPage);
     server.on("/wizard/hardware", HTTP_POST, wizardHardwareSave);
@@ -560,11 +632,23 @@ void c6WebSetup()
     server.on("/api/onboarding/restart", HTTP_POST, onboardingRestart);
     server.on("/api/gps/toggle", HTTP_POST, gpsToggle);
     server.on("/api/abrp/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6AbrpStatusJson()); });
+    server.on("/api/data-volume", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6DataVolumeStatusJson()); });
+    server.on("/api/data-volume/reset", HTTP_POST, [] {
+        if (!requireAdmin() || !LocalWebSecurity::requireSameOrigin(server)) return;
+        const bool reset = c6DataVolumeReset();
+        server.send(reset ? 200 : 409, "application/json", c6DataVolumeStatusJson());
+    });
     server.on("/api/abrp/test", HTTP_POST, abrpTest);
     server.on("/api/abrp/clear", HTTP_POST, abrpClear);
     server.on("/api/local-mqtt/status", HTTP_GET, [] { if (requireAdmin()) server.send(200, "application/json", c6LocalMqttStatusJson()); });
     server.on("/api/local-mqtt/clear", HTTP_POST, localMqttClear);
     server.on("/api/local-mqtt/location", HTTP_POST, localMqttLocation);
+#if defined(MOT_BM2_DIAGNOSTIC) || defined(MOT_BOARD_NETWORK_BM2)
+    server.on("/api/peripherals/battery-monitor", HTTP_GET, batteryMonitorStatus);
+    server.on("/api/peripherals/battery-monitor/scan", HTTP_POST, batteryMonitorScan);
+    server.on("/api/peripherals/battery-monitor/bind", HTTP_POST, batteryMonitorBind);
+    server.on("/api/peripherals/battery-monitor/unbind", HTTP_POST, batteryMonitorUnbind);
+#endif
     server.on("/config", HTTP_GET, configPage);
     server.on("/save", HTTP_POST, saveConfig);
     server.on("/api/config/export", HTTP_GET, exportConfig);

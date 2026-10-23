@@ -62,6 +62,16 @@ String telemetryToJson(const MotTelemetry &state)
         doc["bms"]["cell_delta_mv"] = state.bms.cellVoltageDeltaMv;
     }
 
+    if (state.vehicleSoftware.vcuValid)
+        doc["vehicle_software"]["vcu"] = String(state.vehicleSoftware.vcuMajor) + "." +
+            String(state.vehicleSoftware.vcuMinor) + "." + String(state.vehicleSoftware.vcuBuild);
+    if (state.vehicleSoftware.ipcValid)
+        doc["vehicle_software"]["ipc"] = String(state.vehicleSoftware.ipcMajor) + "." +
+            String(state.vehicleSoftware.ipcMinor) + "." + String(state.vehicleSoftware.ipcPatch);
+    if (state.vehicleSoftware.bduValid)
+        doc["vehicle_software"]["bdu"] = String(state.vehicleSoftware.bduMajor) + "." +
+            String(state.vehicleSoftware.bduMinor) + "." + String(state.vehicleSoftware.bduPatch);
+
     doc["system"]["firmware_version"] = state.system.firmwareVersion;
     doc["system"]["device_id"] = state.system.deviceId;
     doc["system"]["network_mode"] = state.system.networkMode;

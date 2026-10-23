@@ -2,6 +2,20 @@
 
 #include "decoders/decoder_profile.h"
 
+enum class C6LocalPeripheralSlot : uint8_t {
+    BoardBattery = 0,
+    TyreFrontLeft = 1,
+    TyreFrontRight = 2,
+    TyreRearLeft = 3,
+    TyreRearRight = 4,
+    Count = 5,
+};
+
+struct C6LocalPeripheralBinding {
+    String address;
+    String protocol;
+};
+
 struct C6Configuration {
     DecoderProfile can1Profile = DECODER_PROFILE_STANDARD_CAN_V1_PIONEER;
     DecoderProfile can2Profile = DECODER_PROFILE_DISPLAY_CAN;
@@ -32,6 +46,11 @@ struct C6Configuration {
     bool otaEnabled = false;
     uint32_t publishIntervalMs = 5000;
     uint32_t localMqttPublishIntervalMs = 60000;
+    uint8_t displayLanguage = 0;
+    uint8_t displayUnitSystem = 0;
+    uint16_t displayConfigRevision = 0;
+    C6LocalPeripheralBinding localPeripherals[
+        static_cast<size_t>(C6LocalPeripheralSlot::Count)];
 };
 
 extern C6Configuration c6Config;
@@ -62,3 +81,9 @@ String c6ConfigRecoverAdminPassword();
 String c6ConfigExportJson(bool includeSecrets = false);
 bool c6ConfigImportJson(const String &json, String &error);
 void c6ConfigFactoryReset();
+bool c6ConfigSetDisplayPresentation(uint8_t language, uint8_t unitSystem,
+    uint16_t revision);
+const C6LocalPeripheralBinding &c6ConfigLocalPeripheral(C6LocalPeripheralSlot slot);
+bool c6ConfigSetLocalPeripheral(C6LocalPeripheralSlot slot, const String &address,
+    const String &protocol);
+void c6ConfigClearLocalPeripheral(C6LocalPeripheralSlot slot);

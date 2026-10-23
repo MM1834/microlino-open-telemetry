@@ -12,7 +12,9 @@
 #include "c6_can_scan.h"
 #include "c6_drive_capture.h"
 #include "c6_soc_discovery.h"
+#include "c6_vcu_diagnostic.h"
 #include "c6_config.h"
+#include "c6_data_volume.h"
 #include "c6_dual_can.h"
 #include "c6_display_ble.h"
 #include "c6_gps.h"
@@ -207,6 +209,18 @@ void handleSerialCommand(String command)
         c6SocDiscoveryDiff();
         return;
     }
+    if (normalized == "vcu reset") {
+        c6VcuDiagnosticReset();
+        return;
+    }
+    if (normalized == "vcu dump") {
+        c6VcuDiagnosticDump();
+        return;
+    }
+    if (normalized == "version search") {
+        c6LockDiscoveryVersionSearch();
+        return;
+    }
     if (normalized == "soc 48d") {
         c6SocDiscovery48dDump();
         return;
@@ -309,6 +323,16 @@ void handleSerialCommand(String command)
         Serial.println("Local MQTT: " + c6LocalMqttStatusJson());
         return;
     }
+    if (normalized == "volume status") {
+        Serial.println("Data volume: " + c6DataVolumeStatusJson());
+        return;
+    }
+    if (normalized == "volume reset") {
+        Serial.println(c6DataVolumeReset()
+            ? "Data volume: counters reset and checkpointed"
+            : "Data volume: analysis build not enabled or reset failed");
+        return;
+    }
     if (normalized == "mqtt enable" || normalized == "mqtt disable") {
         const bool enabled = normalized == "mqtt enable";
         c6ConfigSetLocalMqttEnabled(enabled);
@@ -349,7 +373,7 @@ void handleSerialCommand(String command)
     }
 
     if (!normalized.startsWith("profile ")) {
-        Serial.println("Commands: support status | profiles | profile <1|2> <display|v1|v2|disabled> | bm2 scan | bm2 stop | bm2 status | bm2 connect | bm6 connect | bm2 disconnect | bm2 history | bm2 history dump | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc diff | soc 48d | lock reset | lock start | lock stop | lock dump | lock diff | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
+        Serial.println("Commands: support status | profiles | profile <1|2> <display|v1|v2|disabled> | bm2 scan | bm2 stop | bm2 status | bm2 connect | bm6 connect | bm2 disconnect | bm2 history | bm2 history dump | scan reset | scan dump | drive reset | drive dump | drive trace | soc reset | soc mark | soc dump | soc diff | soc 48d | vcu reset | vcu dump | version search | lock reset | lock start | lock stop | lock dump | lock diff | wifi status | wifi set <ssid>|<password> | wifi clear | wifi2 set <ssid>|<password> | wifi2 clear | setup status | admin recover | aws status | aws enable | aws disable | mqtt status | mqtt enable | mqtt disable | volume status | volume reset | cache status | cache enable | cache disable | cache purge | energy status | abrp status | abrp send | abrp enable | abrp disable | abrp clear");
         return;
     }
 
@@ -412,6 +436,7 @@ void setup()
     c6AwsSetup();
     c6LocalMqttSetup();
     c6AbrpSetup();
+    c6DataVolumeSetup();
     c6DisplayBleSetup();
 #ifdef MOT_DISPLAY_BLE
     c6CloudWorkerSetup();
@@ -456,6 +481,7 @@ void loop()
     c6DisplayBleLoop();
     serviceStartedMs = millis();
     c6AbrpLoop();
+    c6DataVolumeLoop();
     serviceElapsedMs = millis() - serviceStartedMs;
     if (serviceElapsedMs >= 250U)
         Serial.printf("Loop stall: service=abrp durationMs=%lu\n",
@@ -500,6 +526,28 @@ void loop()
                           static_cast<unsigned>(telemetry.bms.statusByte),
                           telemetry.bms.plugged ? "yes" : "no",
                           static_cast<unsigned long>(packAgeMs));
+        }
+        if (telemetry.bms.pioneerSocValid) {
+            Serial.printf("Pioneer SOC: internal=%.1f display=%.1f age=%lu ms\n",
+                          telemetry.bms.socInternal,
+                          telemetry.bms.socDisplay,
+                          static_cast<unsigned long>(millis() - telemetry.bms.pioneerSocLastUpdateMs));
+        }
+        if (telemetry.vehicleSoftware.vcuValid || telemetry.vehicleSoftware.ipcValid ||
+            telemetry.vehicleSoftware.bduValid) {
+            Serial.printf("Vehicle software: VCU=%u.%u.%u valid=%s IPC=%u.%u.%u valid=%s BDU=%u.%u.%u valid=%s\n",
+                          telemetry.vehicleSoftware.vcuMajor,
+                          telemetry.vehicleSoftware.vcuMinor,
+                          telemetry.vehicleSoftware.vcuBuild,
+                          telemetry.vehicleSoftware.vcuValid ? "yes" : "no",
+                          telemetry.vehicleSoftware.ipcMajor,
+                          telemetry.vehicleSoftware.ipcMinor,
+                          telemetry.vehicleSoftware.ipcPatch,
+                          telemetry.vehicleSoftware.ipcValid ? "yes" : "no",
+                          telemetry.vehicleSoftware.bduMajor,
+                          telemetry.vehicleSoftware.bduMinor,
+                          telemetry.vehicleSoftware.bduPatch,
+                          telemetry.vehicleSoftware.bduValid ? "yes" : "no");
         }
         const uint32_t currentAgeMs = millis() - telemetry.bms.packCurrentLastUpdateMs;
         if (telemetry.bms.packCurrentValid && currentAgeMs <= 10000) {

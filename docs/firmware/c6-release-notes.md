@@ -1,12 +1,79 @@
 # ESP32-C6 Firmware Release Notes
 
-> **Current repository release:** `C6-001-REV44-AWS`
+> **Current repository candidate:** `C6-001-REV49-AWS`
+>
+> **B.025 production candidate:** `C6-001-REV49-AWS-BATMON-B025`
 
 > **Separate analysis build:** `C6-001-REV36-BM2-BM6-DIAG` is an N16-only,
 > BLE battery-monitor qualification image for separate BM2 and BM6 protocols. It does not change the production REV36
 > release or its WebFlash artifacts.
 >
 > **Current field-accepted release:** `C6-001-REV29-AWS`
+
+### `C6-001-REV49-AWS` — consolidated N16 production candidate
+
+REV49 consolidates the physically accepted REV47/REV48 board-network work into
+the regular 16 MB C6 target. Its authenticated local WebUI can discover, assign,
+persist and remove one BM2/BM6 12-V monitor. No monitor is preselected, BLE
+capture remains idle until the owner assigns a device, and simulated tyre
+pressures are excluded. The four tyre positions remain reserved but inactive
+until real sensors are qualified. B.025 retains a separate one-time migration
+image for its already accepted AEG monitor; after migration the assignment is
+ordinary NVS state.
+
+The same release adds receive-only decoding for the confirmed VCU and BDU
+software versions and the IPC candidate established by the B.025 capture. The additive
+`vehicle/*_software_version` strings are available in the authenticated local
+UI, AWS and local-MQTT state envelopes, the responsive portal home page and the
+encrypted MOT Display record. Standard-CAN `0x105` temperatures and active
+diagnostic requests remain excluded.
+
+The consolidated standard N16 build uses 74,584 bytes RAM (22.8%) and
+1,913,448 bytes of its 5,242,880-byte application partition (36.5%). Its
+configuration-preserving application is 1,994,848 bytes with SHA-256
+`30578863e299dae9636586422beb6f76024c666dde7089c7be4190730ccb79a1`;
+the factory image is 2,060,384 bytes with SHA-256
+`93182eb245719cdf3dabc1b2f77a0f884ea3f9d8a32ef74a1c344d7bd4eeec35`.
+The separate B.025 migration application is 1,995,104 bytes with SHA-256
+`e89aec29f3887b1e617bbf6bbdf0d88e2563c06152cc4df4621f164b1292ebe0`.
+Standard N16, B.025 migration, XIAO regression and all three MOT Display targets
+compile successfully. The ECU software-version contract passes. The production
+N16 binary contains `C6-001-REV49-AWS` and no simulated tyre-pressure fixture.
+No image was flashed or deployed as part of this consolidation.
+
+### `C6-001-REV47-AWS-BM2-B025` — B.025 production candidate
+
+REV47 packages the physically accepted AEG BM2 board-network integration for
+B.025. The target is bound to monitor `9C:1D:58:12:74:6E`, publishes a fresh
+12-V value after adapter start, on driving/off/charging transitions and at least
+every five minutes, and labels the cloud source `bm2_ble`. Its bounded local
+two-minute monitor history remains available to the encrypted MOT Display
+record; AWS stores the bounded live series rather than bulk raw history.
+
+The production target deliberately omits all simulated tyre pressures. The
+additive BLE/cloud fields remain compatible but invalid/absent until real TPMS
+sensors are qualified. Fixed tyre values remain restricted to the explicit
+`nanoesp32c6-n16-data-analysis-b025` test target.
+
+The configuration-preserving application is 1,978,432 bytes with SHA-256
+`e2e808cbad82a85cb492249ae1c3bc42c7b5b061688ec72112789e8ff2ad05aa`.
+The separately packaged factory image is 2,043,968 bytes with SHA-256
+`9fd68d4cd3acd73653551f1f3ce8a75e241144b49b3d9270fa2ce6b7f36bbfee`.
+Build, embedded identity, fixed monitor address and simulated-TPMS absence checks
+pass. The image was not flashed during packaging.
+
+### `C6-001-REV46-AWS` — active N16 WebFlash release
+
+REV46 is the current standard N16 build and carries the accepted additive MOT
+Display configuration, completed-charge summary and journey-altitude records.
+Existing BLE records remain compatible; display-only vehicle states remain
+excluded from AWS and local MQTT.
+
+The configuration-preserving N16 application is 1,933,232 bytes with SHA-256
+`716429bc60d9a6321693bc12a03ad65d238cd9478e7106f436e76c14a6c14a1d`.
+It is active through replacement-free Change Set
+`n16-webflash-rev46-20261020`; the stack reached `UPDATE_COMPLETE`, Lambda is
+active/successful and existing grants were not migrated.
 
 ### `C6-001-REV44-AWS` — active N16 WebFlash release
 

@@ -5,6 +5,7 @@
 #include "mot_data_source.h"
 #include "mot_gesture.h"
 #include "telemetry/telemetry.h"
+#include "dualeye_fun_assets.h"
 
 namespace {
 
@@ -14,7 +15,7 @@ constexpr int kLcdSck = 11;
 constexpr int kLcdMosi = 21;
 constexpr int kLcdReset = 20;
 constexpr int kLcdBacklight = 7;
-constexpr char kFirmwareVersion[] = "MOT-DISPLAY-1.2.0-RC6";
+constexpr char kFirmwareVersion[] = "MOT-DISPLAY-1.2.0-RC9";
 
 constexpr int kScreenSize = 240;
 constexpr int kCenter = kScreenSize / 2;
@@ -57,7 +58,7 @@ struct MotDisplaySample {
   bool rangeValid;
 };
 
-enum class DisplayPage : uint8_t { Power, Battery, Journey, Charging, AdapterStatus };
+enum class DisplayPage : uint8_t { Power, Battery, Journey, Charging, SoftwareVersions, AdapterStatus, MotImage };
 DisplayPage activePage = DisplayPage::Power;
 bool chargingHome = false;
 uint32_t lastPageSelectionMs = 0;
@@ -429,6 +430,40 @@ void renderCharging(const MotDisplaySample &sample) {
   canvas->flush();
 }
 
+void renderMotImage() {
+  graphics->draw16bitRGBBitmap(0, 0,
+      const_cast<uint16_t *>(kDualEyeMotVector), kScreenSize, kScreenSize);
+  canvas->flush();
+}
+
+String semanticVersion(uint8_t major, uint8_t minor, uint16_t patch) {
+  return String(major) + "." + String(minor) + "." + String(patch);
+}
+
+void renderSoftwareVersions() {
+  MotDisplayBle::SoftwareVersionsV1 packet{};
+  uint32_t ageMs = 0;
+  const bool valid = motDataSourceLatestSoftwareVersions(packet, ageMs);
+  graphics->fillScreen(kBackground);
+  graphics->drawCircle(kCenter, kCenter, 113, valid ? kRegen : kTrack);
+  graphics->drawCircle(kCenter, kCenter, 112, valid ? kRegen : kTrack);
+  printCentered("SOFTWARE-VERSIONEN", 28, 1, kForeground);
+  const bool vcu = valid && (packet.flags & MotDisplayBle::kVcuSoftwareVersionValid);
+  const bool ipc = valid && (packet.flags & MotDisplayBle::kIpcSoftwareVersionValid);
+  const bool bdu = valid && (packet.flags & MotDisplayBle::kBduSoftwareVersionValid);
+  printCentered("VCU", 59, 1, vcu ? kForeground : kMuted);
+  printCentered(vcu ? semanticVersion(packet.vcuMajor, packet.vcuMinor, packet.vcuBuild) : "--",
+                76, 2, vcu ? kRegen : kMuted);
+  printCentered("IPC", 111, 1, ipc ? kForeground : kMuted);
+  printCentered(ipc ? semanticVersion(packet.ipcMajor, packet.ipcMinor, packet.ipcPatch) : "--",
+                128, 2, ipc ? kForeground : kMuted);
+  printCentered("BDU", 163, 1, bdu ? kForeground : kMuted);
+  printCentered(bdu ? semanticVersion(packet.bduMajor, packet.bduMinor, packet.bduPatch) : "--",
+                180, 2, bdu ? kForeground : kMuted);
+  printCentered("PASSIV EMPFANGEN", 211, 1, kMuted);
+  canvas->flush();
+}
+
 DisplayPage homePage() {
   return chargingHome ? DisplayPage::Charging : DisplayPage::Power;
 }
@@ -438,8 +473,10 @@ DisplayPage nextPage(DisplayPage page) {
     switch (page) {
       case DisplayPage::Charging: return DisplayPage::Battery;
       case DisplayPage::Battery: return DisplayPage::Journey;
-      case DisplayPage::Journey: return DisplayPage::AdapterStatus;
-      case DisplayPage::AdapterStatus: return DisplayPage::Power;
+      case DisplayPage::Journey: return DisplayPage::SoftwareVersions;
+      case DisplayPage::SoftwareVersions: return DisplayPage::AdapterStatus;
+      case DisplayPage::AdapterStatus: return DisplayPage::MotImage;
+      case DisplayPage::MotImage: return DisplayPage::Power;
       case DisplayPage::Power: return DisplayPage::Charging;
     }
   } else {
@@ -447,8 +484,10 @@ DisplayPage nextPage(DisplayPage page) {
       case DisplayPage::Power: return DisplayPage::Journey;
       case DisplayPage::Journey: return DisplayPage::Battery;
       case DisplayPage::Battery: return DisplayPage::Charging;
-      case DisplayPage::Charging: return DisplayPage::AdapterStatus;
-      case DisplayPage::AdapterStatus: return DisplayPage::Power;
+      case DisplayPage::Charging: return DisplayPage::SoftwareVersions;
+      case DisplayPage::SoftwareVersions: return DisplayPage::AdapterStatus;
+      case DisplayPage::AdapterStatus: return DisplayPage::MotImage;
+      case DisplayPage::MotImage: return DisplayPage::Power;
     }
   }
   return homePage();
@@ -460,7 +499,9 @@ const char *pageName(DisplayPage page) {
     case DisplayPage::Battery: return "battery";
     case DisplayPage::Journey: return "journey";
     case DisplayPage::Charging: return "charging";
+    case DisplayPage::SoftwareVersions: return "software-versions";
     case DisplayPage::AdapterStatus: return "status";
+    case DisplayPage::MotImage: return "mot-image";
   }
   return "unknown";
 }
@@ -589,8 +630,8 @@ void loop() {
   } else if (gesture == MotGestureEvent::TiltLeft) {
     pairingConfirmationPending = false;
     pairingConfirmationDirection = MotGestureEvent::None;
-    // The order is cyclic; four forward steps are one backward step.
-    for (uint8_t step = 0; step < 4; ++step) activePage = nextPage(activePage);
+    // The order is cyclic; six forward steps are one backward step.
+    for (uint8_t step = 0; step < 6; ++step) activePage = nextPage(activePage);
     lastPageSelectionMs = nowMs;
   }
 
@@ -615,7 +656,9 @@ void loop() {
   else if (activePage == DisplayPage::Battery) renderBattery();
   else if (activePage == DisplayPage::Journey) renderJourney();
   else if (activePage == DisplayPage::Charging) renderCharging(currentSample);
-  else renderAdapterStatus();
+  else if (activePage == DisplayPage::SoftwareVersions) renderSoftwareVersions();
+  else if (activePage == DisplayPage::AdapterStatus) renderAdapterStatus();
+  else renderMotImage();
 
   static uint32_t lastLogMs = 0;
   if (nowMs - lastLogMs >= 5000U) {

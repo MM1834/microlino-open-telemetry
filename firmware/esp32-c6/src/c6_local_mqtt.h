@@ -12,6 +12,9 @@ bool c6LocalMqttExclusiveTlsCooldownActive();
 bool c6LocalMqttConnected();
 String c6LocalMqttStatusJson();
 bool c6LocalMqttCredentialsReady();
+void c6LocalMqttVolumeCounters(
+    uint32_t &publishCount, uint64_t &payloadBytes, uint64_t &mqttPublishBytes,
+    uint32_t &connectAttemptsValue, uint32_t &connectSuccesses, uint32_t &disconnects);
 bool c6LocalMqttStoreCredentials(
     const String &rootCa,
     const String &password,

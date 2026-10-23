@@ -13,6 +13,12 @@ struct C6JourneyDisplaySnapshot {
     uint32_t durationSeconds = 0;
     float netKwhPer100Km = 0.0f;
     uint16_t regenPeakW = 0;
+    bool altitudeValid = false;
+    bool elevationGainValid = false;
+    int16_t altitudeMeters = 0;
+    uint16_t ascentMeters = 0;
+    uint16_t descentMeters = 0;
+    uint32_t altitudeAgeMs = 0;
 };
 
 void c6JourneyEnergySetup();

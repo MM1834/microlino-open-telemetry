@@ -29,6 +29,11 @@ struct AbrpStatus {
     uint32_t heapAfter = 0;
     uint32_t largestFreeBlock = 0;
     uint32_t lowMemorySkips = 0;
+    uint32_t attemptCount = 0;
+    uint32_t successCount = 0;
+    uint32_t failureCount = 0;
+    uint64_t requestBytes = 0;
+    uint64_t responseBytes = 0;
     String lastPayload;
 };
 

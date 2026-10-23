@@ -13,6 +13,7 @@
 #include <time.h>
 
 #include "c6_config.h"
+#include "c6_gps.h"
 #include "system/version.h"
 
 namespace {
@@ -31,6 +32,9 @@ constexpr uint32_t JOURNEY_MAGIC = 0x4D4F544A;
 constexpr uint8_t JOURNEY_VERSION = 1;
 constexpr size_t JOURNEY_MAX_RECORDS = 32;
 constexpr uint32_t BACKFILL_RETRY_MS = 30000;
+constexpr uint32_t ALTITUDE_SAMPLE_MS = 30000;
+constexpr float ALTITUDE_DEADBAND_M = 5.0f;
+constexpr float ALTITUDE_MAX_RATE_MPS = 5.0f;
 
 struct JourneyRecord {
     uint32_t magic;
@@ -82,6 +86,15 @@ struct JourneyEnergyState {
     float endSoc = NAN;
     uint32_t powerCoverageMs = 0;
     uint16_t odometerAnomalyCount = 0;
+    bool altitudeValid = false;
+    bool altitudeAnchorValid = false;
+    uint8_t altitudeSampleCount = 0;
+    float altitudeMeters = NAN;
+    float altitudeAnchorMeters = NAN;
+    float altitudeAscentMeters = 0.0f;
+    float altitudeDescentMeters = 0.0f;
+    uint32_t altitudeAcceptedMs = 0;
+    uint32_t altitudeSampleMs = 0;
     bool cloudConnected = false;
     bool hadConnectivityGap = false;
     uint32_t lastCheckpointMs = 0;
@@ -261,6 +274,15 @@ void startJourney(uint32_t nowMs)
     state.regenPeakW = 0;
     state.powerCoverageMs = 0;
     state.odometerAnomalyCount = 0;
+    state.altitudeValid = false;
+    state.altitudeAnchorValid = false;
+    state.altitudeSampleCount = 0;
+    state.altitudeMeters = NAN;
+    state.altitudeAnchorMeters = NAN;
+    state.altitudeAscentMeters = 0.0f;
+    state.altitudeDescentMeters = 0.0f;
+    state.altitudeAcceptedMs = 0;
+    state.altitudeSampleMs = 0;
     state.hadConnectivityGap = !state.cloudConnected;
     state.lastCheckpointMs = 0;
     currentUtcMs(state.startedAtMs);
@@ -368,6 +390,37 @@ void c6JourneyEnergyLoop()
     if (state.active && movingNow) {
         int64_t movingAtMs = 0;
         if (currentUtcMs(movingAtMs)) state.lastMovingAtMs = movingAtMs;
+    }
+
+    if (state.active && !state.sealed && movingNow &&
+        c6GpsAltitudePublishable(true)) {
+        const float altitude = static_cast<float>(c6GpsAltitudeMeters());
+        if (isfinite(altitude)) {
+            state.altitudeValid = true;
+            state.altitudeMeters = altitude;
+            state.altitudeAcceptedMs = nowMs;
+            if (!state.altitudeAnchorValid) {
+                state.altitudeAnchorValid = true;
+                state.altitudeAnchorMeters = altitude;
+                state.altitudeSampleMs = nowMs;
+                state.altitudeSampleCount = 1;
+            } else if (static_cast<uint32_t>(nowMs - state.altitudeSampleMs) >=
+                       ALTITUDE_SAMPLE_MS) {
+                const float elapsedSeconds =
+                    static_cast<float>(nowMs - state.altitudeSampleMs) / 1000.0f;
+                const float delta = altitude - state.altitudeAnchorMeters;
+                if (fabsf(delta) <= max(50.0f, elapsedSeconds * ALTITUDE_MAX_RATE_MPS)) {
+                    if (state.altitudeSampleCount < UINT8_MAX)
+                        state.altitudeSampleCount++;
+                    if (fabsf(delta) >= ALTITUDE_DEADBAND_M) {
+                        state.altitudeAnchorMeters = altitude;
+                        if (delta > 0.0f) state.altitudeAscentMeters += delta;
+                        else state.altitudeDescentMeters -= delta;
+                    }
+                }
+                state.altitudeSampleMs = nowMs;
+            }
+        }
     }
 
     if (state.active && !state.sealed) {
@@ -607,6 +660,17 @@ C6JourneyDisplaySnapshot c6JourneyDisplaySnapshot()
             out.durationSeconds = static_cast<uint32_t>((nowMs - state.startedAtMs) / 1000);
     }
     out.regenPeakW = state.regenPeakW;
+    out.altitudeValid = state.altitudeValid && isfinite(state.altitudeMeters);
+    out.elevationGainValid = out.altitudeValid && state.altitudeSampleCount >= 2;
+    if (out.altitudeValid) {
+        out.altitudeMeters = static_cast<int16_t>(constrain(
+            lroundf(state.altitudeMeters), -32768L, 32767L));
+        out.altitudeAgeMs = millis() - state.altitudeAcceptedMs;
+    }
+    out.ascentMeters = static_cast<uint16_t>(constrain(
+        lroundf(state.altitudeAscentMeters), 0L, 65535L));
+    out.descentMeters = static_cast<uint16_t>(constrain(
+        lroundf(state.altitudeDescentMeters), 0L, 65535L));
     return out;
 }
 

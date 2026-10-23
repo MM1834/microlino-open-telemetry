@@ -5,6 +5,146 @@ Supported release-1 local instrument display for the Waveshare
 vehicle adapter firmware and is installed or updated through its dedicated
 controlled WebFlasher targets.
 
+## 1.85-inch touch prototype
+
+The independent PlatformIO environment
+`waveshare-esp32-s3-touch-lcd-185c-v2` targets the Waveshare
+ESP32-S3-Touch-LCD-1.85C V2 (360 x 360, 16 MB flash, 8 MB PSRAM).
+It reuses the versioned MOT BLE contract and combines the normal power view
+with speed, indicators, gear, parking brake, light/mode candidates and local
+warning states. Prototype PRE7 adds a display-local manual speed warning and
+the 1.28-inch display's journey, traction-battery and charging views; it
+does not change the adapter, BLE records or canonical telemetry.
+
+- Tap the driving screen or press the side key to open manual speed control.
+  Choose `30`, `50`, `60`, `80`, `OFF` or toggle sound muting; every choice
+  returns directly to the driving screen. Values follow the selected km/h or
+  mph presentation unit.
+- Further page changes open MOT status and presentation settings. Tap the
+  language, units or source
+  row to cycle it; tap the lower return area to return to the driving view.
+- Language supports German, English, French and Italian. Metric presentation
+  uses km and km/h; UK presentation uses mi and mph. Power and energy remain kW
+  and kWh in both systems.
+- Presentation settings are stored locally in display NVS. Source `MOT SYNC`
+  additionally writes them over the encrypted bonded BLE link to the adapter,
+  which persists and republishes the additive `display-config-v1` record. Source
+  `LOCAL` ignores adapter changes. This path works without WiFi or AWS and leaves
+  a stable adapter-owned seam for later portal synchronization.
+- Hold the status screen for three seconds to clear the fixed MOT pairing.
+- The target is intentionally separate from the released 1.28-inch C6 build.
+
+The normal page order is driving, speed control, current journey, traction
+battery, charging, MOT status and settings. While charging, the display changes
+home automatically to the charging page and follows the 1.28-inch priority
+order: charging, battery, journey, status, settings, driving and speed control.
+Non-home pages return to the state-dependent home after 15 seconds; MOT status
+retains its 30-second service window. The power label is rendered from the
+wire-format integer tenths rather than LVGL floating-point formatting.
+
+PRE8 gives the charging home a large green power value, a larger SOC value and
+a 270-degree SOC progress arc whose active colour moves from red through amber
+and yellow to green at 80 percent. MOT status shows both configured WiFi
+profiles, then IP and setup AP, followed by a visually separated AWS state.
+Presentation settings are read-only on entry; a 1.2-second touch or GPIO0 hold
+toggles the red/green locked state before rows can change. Parking brake and
+gear are moved inward on the driving page for the circular viewport. PRE9
+replaces the temporary text chevrons with larger built-in LVGL left/right arrow
+symbols and lowers them slightly toward the 1.28-inch instrument position.
+PRE10 splits MOT status into independent WiFi 1, WiFi 2, IP/AP and AWS labels.
+The active WiFi profile and a connected AWS state use the existing green
+success colour; inactive and disconnected states remain neutral.
+
+PRE11 adds the optional encrypted `charge-summary-v1` characteristic. With a
+REV45 adapter, the charging page changes to `LETZTE LADUNG` while idle and shows
+the last locally persisted charged energy, SOC start/end and duration. Existing
+telemetry records and older 1.28-inch displays remain wire-compatible.
+
+PRE12 adds the optional encrypted `journey-altitude-v1` characteristic from a
+REV46 adapter. The 1.85-inch current-journey footer shows accepted live GNSS
+altitude and, after two bounded samples, cumulative `+ ascent / - descent`.
+Missing or stale altitude is hidden. Values follow metric/UK presentation while
+the BLE record remains canonical metres.
+
+PRE13 adds the shared MOT vector image as the final 1.85-inch page after
+settings. The matching 1.28-inch `1.2.0-RC7` candidate places it after MOT
+status; clockwise and counter-clockwise non-touch navigation include the new
+sixth page.
+
+PRE14 and the matching 1.28-inch `1.2.0-RC8` candidate use the complete BLE
+re-pair reset: the stored peer address and the local NimBLE bond are both
+cleared before scanning resumes. The 1.85-inch status page now keeps the
+localized re-pair gesture visible and confirms a successful reset briefly.
+The 1.28-inch non-touch status page retains its existing two-stage rotation
+gesture, instruction and confirmation screen.
+
+The 1.28-inch `1.2.0-RC9` candidate adds an optional encrypted
+`software-versions-v1` record and a dedicated `SOFTWARE-VERSIONEN` page for VCU,
+IPC and BDU. Missing values render as `--`; no CAN request is involved. The
+target builds at 953,890 bytes flash (72.8% of its application partition) and
+21,396 bytes RAM (6.5%), leaving sufficient reserve for the screen.
+
+DualEye `0.1-PRE9` and the 1.85-inch `0.4.1-PRE15` add the same page to their
+touch cycles. Their builds use respectively 15.3%/9.4% and 21.5%/31.0% of the
+reported flash/RAM budgets, so the page is retained on all three display targets.
+
+## DualEye 1.28-inch touch prototype
+
+The `waveshare-esp32-s3-dualeye-touch-lcd-128` environment targets the
+Waveshare ESP32-S3-DualEye-Touch-LCD-1.28. PRE2 reads and acknowledges both
+CST816 controllers after their GPIO5/GPIO7 interrupts, so a tap on either eye
+advances the right-hand page cycle. The board's GPIO0 BOOT key provides the same
+debounced page action and also exits the timed two-image MOT screen.
+
+PRE3 makes that two-image MOT presentation the regular final entry of the
+right-hand page cycle instead of exposing it only through `WEITER` on the manual
+speed-control page. It remains bounded to 11 seconds and either touch surface or
+the GPIO0 key can dismiss it immediately.
+
+PRE4 moves the synchronous BLE connect, secure-connection and GATT discovery
+sequence out of the Arduino UI loop into a dedicated FreeRTOS worker. A slow or
+failed secure handshake therefore no longer suspends rendering, both touch
+controllers or the GPIO0 page key while reconnection continues in the
+background.
+
+PRE5 adds the previously missing local re-pairing action. Only on the `MOT
+STATUS` page, holding GPIO0 for three seconds clears the fixed adapter assignment
+and opens the existing ten-minute pairing window. A short press still advances
+the page; releasing after the accepted service hold does not also advance it.
+
+PRE6 replaces repeated CST816 interrupt handling with one bounded touch-contact
+state. A short contact changes exactly one page on release, while a continuous
+three-second touch on `MOT STATUS` performs the same re-pairing action as the
+GPIO0 hold. Holding either touch surface on another page can no longer race
+through the complete page cycle.
+
+PRE7 adds the compact `3S TOUCH/TASTE: KOPPELN` service hint directly to the
+`MOT STATUS` page so the otherwise hidden re-pairing action remains discoverable.
+
+PRE8 makes that explicit re-pairing action complete: it clears both the fixed MOT
+address in display preferences and the ESP32 BLE bond store. Normal reconnects
+retain their bond; only the confirmed three-second status action removes keys.
+This prevents a stale key from repeatedly producing `secureConnection rc=13`
+when the display is deliberately moved from one adapter to another.
+
+After the selected limit plus a canonical tolerance of 2 km/h at 30 or 3 km/h
+at higher limits has been exceeded continuously for 1.5 seconds, a ring around
+the speed flashes orange and later red. The onboard ES8311/I2S speaker also
+emits a short repeated warning beep unless muted. Audio initialization is
+fail-soft: an unavailable codec or speaker leaves the visual warning active.
+
+Build and flash:
+
+```sh
+pio run -e waveshare-esp32-s3-touch-lcd-185c-v2
+pio run -e waveshare-esp32-s3-touch-lcd-185c-v2 -t upload --upload-port /dev/cu.usbmodem...
+```
+
+The first inspected V2 sample (MAC `b8:1f:3f:d1:9f:c0`) was backed up before
+flashing as `outputs/mot-display-s3-185c/factory-b81f3fd19fc0-20261015.bin`.
+Its SHA-256 is
+`cb8d122235e0bc64deac8a5faad03120d0d0ac6ff599780fc78e3e1f964440be`.
+
 The BLE display renders live values from the optional N16 display service:
 
 - signed traction, regeneration and charging power;

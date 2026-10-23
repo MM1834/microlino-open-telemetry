@@ -16,8 +16,12 @@
 namespace {
 constexpr char PATH[] = "/offline-cache/charges.bin";
 constexpr char NEXT_PATH[] = "/offline-cache/charges.next";
+constexpr char LAST_DISPLAY_PATH[] = "/display-last-charge.bin";
+constexpr char LAST_DISPLAY_NEXT_PATH[] = "/display-last-charge.next";
 constexpr uint32_t MAGIC = 0x4D4F5443;
 constexpr uint8_t VERSION = 1;
+constexpr uint32_t LAST_DISPLAY_MAGIC = 0x4D4F5444;
+constexpr uint8_t LAST_DISPLAY_VERSION = 1;
 constexpr size_t MAX_RECORDS = 16;
 constexpr uint32_t FRESH_MS = 3000;
 constexpr uint32_t STOP_MS = 60000;
@@ -38,6 +42,25 @@ struct ChargeRecord {
     float endSoc;
     uint32_t energyChargedWh;
     uint32_t powerCoverageMs;
+    uint32_t checksum;
+};
+
+enum LastDisplayFlags : uint8_t {
+    LAST_VALID = 1U << 0,
+    LAST_SOC_VALID = 1U << 1,
+    LAST_ENERGY_VALID = 1U << 2,
+    LAST_DURATION_VALID = 1U << 3,
+};
+
+struct LastDisplayChargeRecord {
+    uint32_t magic;
+    uint8_t version;
+    uint8_t flags;
+    uint16_t sequence;
+    uint8_t startSocPercent;
+    uint8_t endSocPercent;
+    uint16_t durationMinutes;
+    uint32_t energyChargedWh;
     uint32_t checksum;
 };
 
@@ -63,12 +86,24 @@ struct State {
     float endSoc = NAN;
     String batchId;
     String result = "none";
+    LastDisplayChargeRecord lastDisplayCharge{};
 } state;
 
 uint32_t checksum(const ChargeRecord &record) {
     const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&record);
     uint32_t crc = 0xFFFFFFFFU;
     for (size_t i = 0; i < offsetof(ChargeRecord, checksum); ++i) {
+        crc ^= bytes[i];
+        for (uint8_t bit = 0; bit < 8; ++bit)
+            crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1U)));
+    }
+    return ~crc;
+}
+
+uint32_t lastDisplayChecksum(const LastDisplayChargeRecord &record) {
+    const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&record);
+    uint32_t crc = 0xFFFFFFFFU;
+    for (size_t i = 0; i < offsetof(LastDisplayChargeRecord, checksum); ++i) {
         crc ^= bytes[i];
         for (uint8_t bit = 0; bit < 8; ++bit)
             crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1U)));
@@ -90,6 +125,56 @@ bool valid(const ChargeRecord &r) {
         fabsf(r.endOdometerKm - r.startOdometerKm) <= 0.2f &&
         isfinite(r.startSoc) && isfinite(r.endSoc) && r.endSoc >= r.startSoc &&
         r.checksum == checksum(r);
+}
+
+bool validLastDisplayCharge(const LastDisplayChargeRecord &r) {
+    return r.magic == LAST_DISPLAY_MAGIC && r.version == LAST_DISPLAY_VERSION &&
+        (r.flags & LAST_VALID) &&
+        (!(r.flags & LAST_SOC_VALID) ||
+         (r.startSocPercent <= 100 && r.endSocPercent <= 100)) &&
+        r.checksum == lastDisplayChecksum(r);
+}
+
+void saveLastDisplayCharge() {
+    int64_t ended = 0;
+    if (!utc(ended)) return;
+    LastDisplayChargeRecord record{};
+    record.magic = LAST_DISPLAY_MAGIC;
+    record.version = LAST_DISPLAY_VERSION;
+    record.flags = LAST_VALID;
+    record.sequence = state.lastDisplayCharge.sequence == UINT16_MAX
+        ? 1U : static_cast<uint16_t>(state.lastDisplayCharge.sequence + 1U);
+    if (isfinite(state.startSoc) && isfinite(state.endSoc) &&
+        state.startSoc >= 0.0F && state.startSoc <= 100.0F &&
+        state.endSoc >= 0.0F && state.endSoc <= 100.0F) {
+        record.flags |= LAST_SOC_VALID;
+        record.startSocPercent = static_cast<uint8_t>(lroundf(state.startSoc));
+        record.endSocPercent = static_cast<uint8_t>(lroundf(state.endSoc));
+    }
+    if (state.coveredMs > 0) {
+        record.flags |= LAST_ENERGY_VALID;
+        record.energyChargedWh = static_cast<uint32_t>(max(
+            0.0, state.chargedWattMs / 3600000.0));
+    }
+    if (state.startedAt > 0 && ended >= state.startedAt) {
+        record.flags |= LAST_DURATION_VALID;
+        const uint64_t minutes = static_cast<uint64_t>(ended - state.startedAt) / 60000ULL;
+        record.durationMinutes = static_cast<uint16_t>(min<uint64_t>(minutes, UINT16_MAX));
+    }
+    record.checksum = lastDisplayChecksum(record);
+    File file = LittleFS.open(LAST_DISPLAY_NEXT_PATH, "w");
+    if (!file) return;
+    const bool written = file.write(reinterpret_cast<const uint8_t *>(&record),
+                                    sizeof(record)) == sizeof(record);
+    file.flush();
+    file.close();
+    if (!written) {
+        LittleFS.remove(LAST_DISPLAY_NEXT_PATH);
+        return;
+    }
+    LittleFS.remove(LAST_DISPLAY_PATH);
+    if (LittleFS.rename(LAST_DISPLAY_NEXT_PATH, LAST_DISPLAY_PATH))
+        state.lastDisplayCharge = record;
 }
 
 void startCharge() {
@@ -147,6 +232,12 @@ bool removeFirst() {
 void c6ChargeJournalSetup() {
     state = State(); state.nonce = esp_random(); state.mounted = LittleFS.begin(false);
     if (!state.mounted) return;
+    File last = LittleFS.open(LAST_DISPLAY_PATH, "r");
+    LastDisplayChargeRecord lastRecord{};
+    if (last && last.read(reinterpret_cast<uint8_t *>(&lastRecord), sizeof(lastRecord)) ==
+                    sizeof(lastRecord) && validLastDisplayCharge(lastRecord))
+        state.lastDisplayCharge = lastRecord;
+    if (last) last.close();
     File f = LittleFS.open(PATH, "r"); ChargeRecord r{};
     while (f && f.read(reinterpret_cast<uint8_t *>(&r), sizeof(r)) == sizeof(r)) {
         if (!valid(r)) break; state.pending++;
@@ -181,7 +272,7 @@ void c6ChargeJournalLoop() {
         state.lastIntegration = now;
     } else state.lastIntegration = 0;
     if (state.stopSince && now - state.stopSince >= STOP_MS) {
-        appendCharge(); state.active = false; state.stopSince = 0;
+        saveLastDisplayCharge(); appendCharge(); state.active = false; state.stopSince = 0;
     }
 }
 
@@ -242,6 +333,16 @@ C6ChargeDisplaySnapshot c6ChargeDisplaySnapshot() {
     out.active = state.active;
     out.energyValid = state.active && state.coveredMs > 0;
     out.energyChargedWh = static_cast<uint32_t>(max(0.0, state.chargedWattMs / 3600000.0));
+    const LastDisplayChargeRecord &last = state.lastDisplayCharge;
+    out.completedValid = validLastDisplayCharge(last);
+    out.completedSocValid = out.completedValid && (last.flags & LAST_SOC_VALID);
+    out.completedEnergyValid = out.completedValid && (last.flags & LAST_ENERGY_VALID);
+    out.completedDurationValid = out.completedValid && (last.flags & LAST_DURATION_VALID);
+    out.completedStartSocPercent = last.startSocPercent;
+    out.completedEndSocPercent = last.endSocPercent;
+    out.completedDurationMinutes = last.durationMinutes;
+    out.completedEnergyChargedWh = last.energyChargedWh;
+    out.completedSequence = last.sequence;
     return out;
 }
 

@@ -103,13 +103,16 @@ String telemetryJson(time_t now, AbrpLocationProvider locationProvider)
     return json;
 }
 
-void finishAttempt(bool success, int httpCode, const String &message)
+void finishAttempt(bool success, int httpCode, const String &message, size_t responseBytes = 0)
 {
     lockStatus();
     currentStatus.inFlight = false;
     currentStatus.lastSuccess = success;
     currentStatus.lastHttpCode = httpCode;
     currentStatus.lastMessage = message;
+    if (success) currentStatus.successCount++;
+    else currentStatus.failureCount++;
+    currentStatus.responseBytes += responseBytes;
     if (success) currentStatus.lastSendMs = millis();
     unlockStatus();
 }
@@ -133,7 +136,7 @@ void performSend(const AbrpTaskInput &input)
     if (code > 0) {
         const String body = http.getString();
         const bool success = code >= 200 && code < 300;
-        finishAttempt(success, code, body.length() ? body : "HTTP " + String(code));
+        finishAttempt(success, code, body.length() ? body : "HTTP " + String(code), body.length());
         Serial.printf("ABRP: HTTP %d %s\n", code, success ? "OK" : "FAIL");
     } else {
         const String message = http.errorToString(code);
@@ -195,6 +198,11 @@ String abrpStatusJson(const AbrpSettings &settings)
     json += "\"heapAfter\":" + String(state.heapAfter) + ',';
     json += "\"largestFreeBlock\":" + String(state.largestFreeBlock) + ',';
     json += "\"lowMemorySkips\":" + String(state.lowMemorySkips) + ',';
+    json += "\"attemptCount\":" + String(state.attemptCount) + ',';
+    json += "\"successCount\":" + String(state.successCount) + ',';
+    json += "\"failureCount\":" + String(state.failureCount) + ',';
+    json += "\"requestBytes\":" + String(static_cast<unsigned long long>(state.requestBytes)) + ',';
+    json += "\"responseBytes\":" + String(static_cast<unsigned long long>(state.responseBytes)) + ',';
     json += "\"lastPayload\":\"" + jsonEscape(state.lastPayload) + "\"}";
     return json;
 }
@@ -274,11 +282,18 @@ bool queueAbrpTelemetry(const AbrpSettings &settings, AbrpLocationProvider locat
     input->userToken = settings.userToken;
     input->payload = telemetryJson(now, locationProvider);
 
+    String measuredUrl = ABRP_URL;
+    measuredUrl += "?api_key=" + urlEncode(input->apiKey);
+    measuredUrl += "&token=" + urlEncode(input->userToken);
+    measuredUrl += "&tlm=" + urlEncode(input->payload);
+
     lockStatus();
     currentStatus.inFlight = true;
     currentStatus.lastAttemptMs = nowMs;
     currentStatus.lastPayload = input->payload;
     currentStatus.lastMessage = "Queued";
+    currentStatus.attemptCount++;
+    currentStatus.requestBytes += measuredUrl.length();
     currentStatus.heapBefore = freeHeap;
     currentStatus.largestFreeBlock = largestBlock;
     unlockStatus();

@@ -15,6 +15,8 @@
 
 #include "c6_config.h"
 #include "c6_aws.h"
+#include "c6_bm2_diag.h"
+#include "c6_tyre_pressure_test.h"
 #include "c6_gps.h"
 #include "c6_network.h"
 #include "c6_telemetry_cadence.h"
@@ -395,6 +397,21 @@ bool publishTelemetry()
     document["sequence"] = ++telemetrySequence;
     document["sampledAt"] = static_cast<uint64_t>(time(nullptr)) * 1000ULL;
     JsonObject values = document["values"].to<JsonObject>();
+#ifdef MOT_TYRE_PRESSURE_SIMULATION
+    values["vehicle/tyre_pressure_front_left"] = C6TyrePressureTest::kPressureKpa[0] / 100.0F;
+    values["vehicle/tyre_pressure_front_right"] = C6TyrePressureTest::kPressureKpa[1] / 100.0F;
+    values["vehicle/tyre_pressure_rear_left"] = C6TyrePressureTest::kPressureKpa[2] / 100.0F;
+    values["vehicle/tyre_pressure_rear_right"] = C6TyrePressureTest::kPressureKpa[3] / 100.0F;
+    values["vehicle/tyre_pressure_alarm"] = C6TyrePressureTest::alarm();
+#endif
+    const C6BoardNetworkDisplaySnapshot boardNetwork = c6Bm2DiagDisplaySnapshot();
+    if (boardNetwork.voltageValid && boardNetwork.sourceAgeSeconds <= 300U) {
+        values["system/supply_voltage"] = boardNetwork.voltageCentiV / 100.0f;
+        values["system/supply_undervoltage"] = boardNetwork.lowAlarmQualified;
+        values["system/supply_overvoltage"] = boardNetwork.highAlarmQualified;
+        values["system/supply_voltage_source"] = "bm2_ble";
+        values["system/supply_voltage_source_age_s"] = boardNetwork.sourceAgeSeconds;
+    }
     if (telemetry.display.valid) {
         values["display/soc"] = roundf(telemetry.display.soc * 10.0f) / 10.0f;
         values["display/speed_kmh"] = roundf(telemetry.display.speedKmh * 10.0f) / 10.0f;
@@ -445,6 +462,15 @@ bool publishTelemetry()
         values["bms/cell_max_mv"] = telemetry.bms.maxCellVoltageMv;
         values["bms/cell_delta_mv"] = telemetry.bms.cellVoltageDeltaMv;
     }
+    if (telemetry.vehicleSoftware.vcuValid)
+        values["vehicle/vcu_software_version"] = String(telemetry.vehicleSoftware.vcuMajor) + "." +
+            String(telemetry.vehicleSoftware.vcuMinor) + "." + String(telemetry.vehicleSoftware.vcuBuild);
+    if (telemetry.vehicleSoftware.ipcValid)
+        values["vehicle/ipc_software_version"] = String(telemetry.vehicleSoftware.ipcMajor) + "." +
+            String(telemetry.vehicleSoftware.ipcMinor) + "." + String(telemetry.vehicleSoftware.ipcPatch);
+    if (telemetry.vehicleSoftware.bduValid)
+        values["vehicle/bdu_software_version"] = String(telemetry.vehicleSoftware.bduMajor) + "." +
+            String(telemetry.vehicleSoftware.bduMinor) + "." + String(telemetry.vehicleSoftware.bduPatch);
     if (c6Config.localMqttLocationEnabled && c6GpsValid()) {
         values["location/latitude"] = round(c6GpsLatitude() * 1000000.0) / 1000000.0;
         values["location/longitude"] = round(c6GpsLongitude() * 1000000.0) / 1000000.0;
@@ -558,6 +584,18 @@ void refreshStatusSnapshot()
     portEXIT_CRITICAL(&statusSnapshotMux);
 #endif
 }
+}
+
+void c6LocalMqttVolumeCounters(
+    uint32_t &publishCountValue, uint64_t &payloadBytesValue, uint64_t &mqttPublishBytesValue,
+    uint32_t &connectAttemptsValue, uint32_t &connectSuccesses, uint32_t &disconnects)
+{
+    publishCountValue = publishCount;
+    payloadBytesValue = payloadBytes;
+    mqttPublishBytesValue = mqttPublishBytes;
+    connectAttemptsValue = connectAttempts;
+    connectSuccesses = connectSuccessCount;
+    disconnects = disconnectCount;
 }
 
 void c6LocalMqttSetup()
