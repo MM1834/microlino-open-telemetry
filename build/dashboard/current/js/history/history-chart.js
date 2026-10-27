@@ -132,6 +132,34 @@ async function render(hours=currentRangeHours){
 
   renderBinaryHistory(samples,hours);
 
+  const supplyPoints=samples.filter(sample=>
+    sample.supplyVoltage!==null&&sample.supplyVoltage!==undefined&&
+    Number.isFinite(Number(sample.supplyVoltage))
+  );
+  renderSeries({
+    canvasId:"supply-history-chart",
+    emptyId:"supply-history-empty",
+    samples:supplyPoints,
+    field:"supplyVoltage",
+    label:"12-V-Bordnetz",
+    unit:"V",
+    min:null,
+    max:null,
+    color:"#22c55e",
+    decimals:2,
+    axisDecimals:1,
+    rangeHours:hours
+  });
+  const supplyStatus=document.getElementById("supply-history-status");
+  if(supplyStatus){
+    const source=[...supplyPoints].reverse().find(point=>point.supplySource)?.supplySource;
+    const text=source==="bm2_ble"
+      ?"Quelle: BM2-Batteriemonitor"
+      :source==="bm2_ble_history"?"Quelle: rekonstruierte BM2-History (2-Minuten-Raster)"
+      :source==="adapter_adc"?"Quelle: Adaptermessung":"";
+    supplyStatus.textContent=window.MOT_I18N?.translate?.(text)||text;
+  }
+
   const meta=document.getElementById("soc-history-meta");
   if(meta){
     const charging=samples.filter(s=>s.charging===true).length;
@@ -429,7 +457,7 @@ function draw(canvas,points,o){
     ctx.moveTo(L,y);
     ctx.lineTo(w-R,y);
     ctx.stroke();
-    ctx.fillText((maxY-(i*(maxY-chartMinY)/4)).toFixed(0),6,y+4);
+    ctx.fillText((maxY-(i*(maxY-chartMinY)/4)).toFixed(o.axisDecimals??0),6,y+4);
   }
 
   const minTs=allPoints[0].ts;

@@ -19,6 +19,9 @@ close inactive chart gaps.
 For the AWS backend it renders authorized SOC, Speed, signed-power, charging and
 plugged history for 24 hours, 7 days and 30 days. Speed and power gaps are closed
 at zero in the chart rather than linearly interpolated across missing reception.
+The optional 12-V BatMon history uses one decimal place on its voltage axis so
+that normal battery-voltage changes remain visible. This presentation was
+accepted on both smartphone and desktop on 2026-10-27.
 Legacy MQTT retains browser-local history as a fallback.
 AWS History is loaded on entry, range selection and actual vehicle changes rather
 than on the five-second live-state poll. Concurrent same-range requests are

@@ -56,6 +56,11 @@ class HistoryBinaryChartContractTests(unittest.TestCase):
         gap_call = HISTORY.index("const powerSamples=closeInactiveGaps")
         self.assertLess(status_call, gap_call)
 
+    def test_supply_voltage_axis_keeps_decimal_precision(self) -> None:
+        supply = HISTORY.split('canvasId:"supply-history-chart"', 1)[1].split('});', 1)[0]
+        self.assertIn("axisDecimals:1", supply)
+        self.assertIn("toFixed(o.axisDecimals??0)", HISTORY)
+
 
 if __name__ == "__main__":
     unittest.main()

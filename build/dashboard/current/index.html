@@ -268,6 +268,14 @@
         <canvas id="charging-history-chart" aria-label="Ladezustand und Ladekabel als Ein-Aus-Stufenlinien"></canvas>
       </div>
     </div>
+    <div class="history-mini" data-layout-id="history-supply">
+      <h3>12-V-Bordnetz Verlauf</h3>
+      <div id="supply-history-status" class="history-series-status" aria-live="polite"></div>
+      <div class="history-chart-wrap">
+        <div id="supply-history-empty" class="history-empty">Noch keine 12-V-History vorhanden.</div>
+        <canvas id="supply-history-chart" aria-label="Verlauf der 12-V-Bordnetzspannung"></canvas>
+      </div>
+    </div>
   </div>
   <div id="soc-history-meta" class="history-meta"></div>
 </section>
@@ -391,8 +399,8 @@
   <script src="js/providers/aws-backend-provider.js?v=20260917-usbdiag1"></script>
   <script src="js/app.js?v=20260922-dual-range2"></script>
   <script src="js/history/history-db.js"></script>
-  <script src="js/history/history-recorder.js"></script>
-  <script src="js/history/history-chart.js?v=20260904-history-split1"></script>
+  <script src="js/history/history-recorder.js?v=20260924-mot-lite-soc1"></script>
+  <script src="js/history/history-chart.js?v=20261027-supply-axis1"></script>
   <script src="js/history/history-export.js"></script>
   <script src="js/history/history-debug.js"></script>
 </body>
